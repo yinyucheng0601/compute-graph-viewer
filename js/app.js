@@ -83,6 +83,18 @@
     reader.readAsText(file);
   }
 
+  // Wire sample chips
+  document.querySelectorAll('.sample-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const url = chip.dataset.sample;
+      const label = chip.dataset.label;
+      fetch(url)
+        .then(r => r.json())
+        .then(data => loadGraphData(data, label))
+        .catch(() => alert('Failed to load sample.\nTry serving the app via a local server (e.g. npx serve .)'));
+    });
+  });
+
   // Wire recent chip
   recentChip.addEventListener('click', () => {
     try {
