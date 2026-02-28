@@ -29,6 +29,9 @@
   const recentRow     = document.getElementById('recentRow');
   const recentChip    = document.getElementById('recentChip');
   const recentName    = document.getElementById('recentName');
+  const graphPicker   = document.getElementById('graphPicker');
+  const graphMenu     = document.getElementById('graphMenu');
+  const graphMenuLocal = document.getElementById('graphMenuLocal');
 
   // ── State ──────────────────────────────────────────────────────
   let graph  = null;
@@ -83,7 +86,7 @@
     reader.readAsText(file);
   }
 
-  // Wire sample chips
+  // Wire sample chips (empty-state cards)
   document.querySelectorAll('.sample-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const url = chip.dataset.sample;
@@ -93,6 +96,36 @@
         .then(data => loadGraphData(data, label))
         .catch(() => alert('Failed to load sample.\nTry serving the app via a local server (e.g. npx serve .)'));
     });
+  });
+
+  // ── Graph picker dropdown ───────────────────────────────────────
+  loadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    graphMenu.classList.toggle('open');
+  });
+
+  // Menu sample items
+  graphMenu.querySelectorAll('.graph-menu-item[data-sample]').forEach(item => {
+    item.addEventListener('click', () => {
+      graphMenu.classList.remove('open');
+      const url = item.dataset.sample;
+      const label = item.dataset.label;
+      fetch(url)
+        .then(r => r.json())
+        .then(data => loadGraphData(data, label))
+        .catch(() => alert('Failed to load sample.\nTry serving the app via a local server (e.g. npx serve .)'));
+    });
+  });
+
+  // Menu local file item
+  graphMenuLocal.addEventListener('click', () => {
+    graphMenu.classList.remove('open');
+    fileInput.click();
+  });
+
+  // Close menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!graphPicker.contains(e.target)) graphMenu.classList.remove('open');
   });
 
   // Wire recent chip
@@ -109,19 +142,12 @@
     setRecentChip(name);
   })();
 
-  // Auto-load: try localStorage cache first, then default file
-  (() => {
-    try {
-      const cached = localStorage.getItem(LS_JSON);
-      if (cached) { loadGraphData(JSON.parse(cached), localStorage.getItem(LS_NAME)); return; }
-    } catch (_) {}
-    fetch('deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json')
-      .then(r => r.json())
-      .then(data => loadGraphData(data, 'After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json'))
-      .catch(() => {});
-  })();
+  // Auto-load first sample on startup
+  fetch('deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json')
+    .then(r => r.json())
+    .then(data => loadGraphData(data, 'LOOP_RESHAPE · PATH0'))
+    .catch(() => {});
 
-  loadBtn.addEventListener('click', () => fileInput.click());
   emptyLoadBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     if (e.target.files[0]) loadJSON(e.target.files[0]);
@@ -293,7 +319,7 @@
     const ox = (mw - (canvasW || 0) * gs) / 2;
     const oy = (mh - (canvasH || 0) * gs) / 2;
 
-    const TYPE_COLORS = { incast:'#87C80F', outcast:'#F59E0B', op:'#3577F6', tensor:'#A855F7' };
+    const TYPE_COLORS = { incast:'#87C80F', outcast:'#C9107D', op:'#3577F6', tensor:'#A855F7' };
     for (const node of graph.nodes) {
       const pos = positions.get(node.id);
       if (!pos) continue;
