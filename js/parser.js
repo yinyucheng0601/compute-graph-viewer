@@ -20,7 +20,73 @@ function shapeStr(shape) {
   return '[' + shape.join(', ') + ']';
 }
 
+// ── Sample format parser ───────────────────────────────────────────────────
+// Handles the annotated JSON format with semantic_label / op_type fields
+
+function parseSampleGraph(data) {
+  const nodes = [];
+  const edges = [];
+  let incastIdx = 0, outcastIdx = 0;
+
+  const TYPE_MAP = { Operation: 'op', Tensor: 'tensor', Incast: 'incast', Outcast: 'outcast' };
+
+  for (let i = 0; i < data.nodes.length; i++) {
+    const n = data.nodes[i];
+    const type = TYPE_MAP[n.type] || 'tensor';
+    const dtype = n.dtype ? n.dtype.replace(/^DT_/, '') : '?';
+
+    const nodeData = {
+      magic: i,
+      semanticLabel: n.semantic_label || '',
+      shape: n.shape || [],
+      rawShape: n.shape || [],
+      dtype,
+      format: 0,
+      offset: n.offset || [],
+    };
+
+    if (type === 'op') {
+      nodeData.opcode = n.op_type || n.name;
+      nodeData.latency = n.latency ?? null;
+      nodeData.subgraphId = null;
+      nodeData.kind = null;
+      nodeData.ioperands = [];
+      nodeData.ooperands = [];
+      nodeData.outShape = null;
+      nodeData.opAttr = {};
+    } else {
+      nodeData.symbol = n.name;
+      nodeData.memId = -1;
+      nodeData.kind = null;
+      nodeData.lifeRange = null;
+      if (type === 'incast')  { nodeData.slotIdx = incastIdx++;  nodeData.rawConnections = []; }
+      if (type === 'outcast') { nodeData.slotIdx = outcastIdx++; nodeData.rawConnections = []; }
+    }
+
+    nodes.push({ id: n.id, type, label: n.name, subLabel: n.name, data: nodeData });
+  }
+
+  for (const e of (data.edges || [])) {
+    edges.push({ source: e.source, target: e.target });
+  }
+
+  return {
+    nodes, edges,
+    meta: {
+      name: data.graph_name || 'graph',
+      hash: '', funcId: 0, file: '',
+      totalNodes: nodes.length, totalEdges: edges.length,
+      incastCount: incastIdx, outcastCount: outcastIdx,
+      opCount: nodes.filter(n => n.type === 'op').length,
+      tensorCount: nodes.filter(n => n.type === 'tensor').length,
+    },
+  };
+}
+
+// ── Main entry point — auto-detects format ─────────────────────────────────
+
 function parseGraph(data) {
+  if (Array.isArray(data.nodes) && !data.functions) return parseSampleGraph(data);
   const func = data.functions[0];
 
   const tensorList   = func.tensors    || [];
@@ -122,6 +188,9 @@ function parseGraph(data) {
         subgraphId: op.subgraphid,
         outShape: firstOut?.shape ?? null,
         opAttr: op.op_attr || {},
+        semanticLabel: op.semantic_label?.label ?? null,
+        semanticFile:  op.semantic_label?.filename ?? null,
+        semanticLine:  op.semantic_label?.lineno ?? null,
       }
     });
 
