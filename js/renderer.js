@@ -51,7 +51,7 @@ function buildIncastCard(node) {
       </div>
     </div>
     <svg class="node-wave" viewBox="0 0 252 30" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M250.871 15.5C214.882 3 188.371 3 188.371 3C161.86 3 125.871 15.5 125.871 15.5C125.871 15.5 89.6591 26.5 63.3711 26.5C37.0831 26.5 0.871094 15.5 0.871094 15.5" fill="none" stroke="rgba(135,200,15,0.8)" stroke-width="3"/>
+      <path d="M250.871 15.5C214.882 3 188.371 3 188.371 3C161.86 3 125.871 15.5 125.871 15.5C125.871 15.5 89.6591 26.5 63.3711 26.5C37.0831 26.5 0.871094 15.5 0.871094 15.5" fill="none" style="stroke: var(--node-accent, rgba(135,200,15,0.8))" stroke-width="3"/>
     </svg>`;
 }
 
@@ -86,7 +86,7 @@ function buildOutcastCard(node) {
       </div>
     </div>
     <svg class="node-wave" viewBox="0 0 252 30" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M250.871 15.5C214.882 3 188.371 3 188.371 3C161.86 3 125.871 15.5 125.871 15.5C125.871 15.5 89.6591 26.5 63.3711 26.5C37.0831 26.5 0.871094 15.5 0.871094 15.5" fill="none" stroke="rgba(201,16,125,0.8)" stroke-width="3"/>
+      <path d="M250.871 15.5C214.882 3 188.371 3 188.371 3C161.86 3 125.871 15.5 125.871 15.5C125.871 15.5 89.6591 26.5 63.3711 26.5C37.0831 26.5 0.871094 15.5 0.871094 15.5" fill="none" style="stroke: var(--node-accent, rgba(201,16,125,0.8))" stroke-width="3"/>
     </svg>`;
 }
 
@@ -159,7 +159,7 @@ function buildTensorCard(node) {
 
 // ── Main render function ──────────────────────────────────────────────────
 
-function renderGraph(graph, layout, nodesLayer, edgesSvg, onNodeClick) {
+function renderGraph(graph, layout, nodesLayer, edgesSvg, onNodeClick, colorMap, colorMode) {
   const { nodes, edges } = graph;
   const { positions, canvasW, canvasH } = layout;
 
@@ -224,6 +224,23 @@ function renderGraph(graph, layout, nodesLayer, edgesSvg, onNodeClick) {
     el.style.height = pos.h + 'px';
     el.dataset.nodeId = node.id;
 
+    const color = colorMap?.get(node.id) ?? null;
+    if (color) el.style.setProperty('--node-accent', color);
+
+    // Set hover badge hint for non-Type color modes
+    let colorHint = '';
+    if (colorMode && colorMode !== 'none' && node.type === 'op') {
+      if (colorMode === 'semantic') {
+        colorHint = node.data.semanticLabel ||
+          (OPCODE_CATEGORY[(node.data.opcode || '').toUpperCase()] || node.data.opcode || '');
+      } else if (colorMode === 'latency' && node.data.latency != null) {
+        colorHint = node.data.latency.toLocaleString() + ' cy';
+      } else if (colorMode === 'subgraph' && node.data.subgraphId != null) {
+        colorHint = 'SG·' + node.data.subgraphId;
+      }
+    }
+    el.dataset.colorHint = colorHint;
+
     switch (node.type) {
       case 'incast':  el.innerHTML = buildIncastCard(node);  break;
       case 'outcast': el.innerHTML = buildOutcastCard(node); break;
@@ -274,6 +291,7 @@ function buildDetailContent(node, graph) {
 
   if (node.type === 'op') {
     html += detailSection('Operation', [
+      ...(d.semanticLabel ? [['semantic', d.semanticLabel]] : []),
       ['opcode',    d.opcode],
       ['magic',     `#${d.magic}`],
       ['kind',      d.kind],
@@ -286,6 +304,7 @@ function buildDetailContent(node, graph) {
     }
   } else {
     html += detailSection('Tensor', [
+      ...(d.semanticLabel ? [['semantic', d.semanticLabel]] : []),
       ['symbol', d.symbol],
       ['magic',  `#${d.magic}`],
       ['shape',  shapeStr(d.shape)],

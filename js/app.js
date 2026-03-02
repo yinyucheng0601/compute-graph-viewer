@@ -26,6 +26,7 @@
   const minimapEl     = document.getElementById('minimap');
   const minimapCanvas = document.getElementById('minimapCanvas');
   const minimapVp     = document.getElementById('minimapViewport');
+  const colorPanel    = document.getElementById('colorPanel');
   const recentRow     = document.getElementById('recentRow');
   const recentChip    = document.getElementById('recentChip');
   const recentName    = document.getElementById('recentName');
@@ -39,9 +40,181 @@
   let tx = 0, ty = 0, scale = 1;
   let panning = false, panStart = { x: 0, y: 0 };
   let selectedNodeId = null;
+  let colorMode = 'none';  // 'none' | 'semantic' | 'subgraph' | 'latency'
+  let colorMap  = null;    // Map<nodeId, hexColor> | null
 
   const SCALE_MIN = 0.06;
   const SCALE_MAX = 4;
+
+  // ── Color mapping ──────────────────────────────────────────────
+
+  const BOUNDARY_COLORS = { incast: '#87c80f', outcast: '#c9107d' };
+
+  function buildNodeColorMap(mode) {
+    if (!graph || mode === 'none') return null;
+
+    let nodeIdMap = new Map();
+
+    if (mode === 'semantic') {
+      const keys = graph.nodes.map(n => getSemanticKey(n));
+      const keyColorMap = buildColorMap(keys);
+      graph.nodes.forEach(n => {
+        const color = n.type === 'tensor' ? '#606060' : keyColorMap.get(getSemanticKey(n));
+        nodeIdMap.set(n.id, color);
+      });
+    } else if (mode === 'subgraph') {
+      const nodeMap = new Map(graph.nodes.map(n => [n.id, n]));
+      const tensorToSg = new Map();
+      graph.edges.forEach(e => {
+        const srcNode = nodeMap.get(e.source);
+        if (srcNode?.type === 'op' && srcNode.data.subgraphId != null) {
+          tensorToSg.set(e.target, srcNode.data.subgraphId);
+        }
+      });
+      const keys = new Set();
+      graph.nodes.forEach(n => {
+        if (n.type === 'op') keys.add('sg_' + n.data.subgraphId);
+        else if (n.type === 'incast' || n.type === 'outcast') keys.add('boundary');
+        else { const sgId = tensorToSg.get(n.id); keys.add(sgId != null ? 'sg_' + sgId : 'sg_input'); }
+      });
+      const keyColorMap = buildColorMap([...keys]);
+      graph.nodes.forEach(n => {
+        let key;
+        if (n.type === 'op') key = 'sg_' + n.data.subgraphId;
+        else if (n.type === 'incast' || n.type === 'outcast') key = 'boundary';
+        else { const sgId = tensorToSg.get(n.id); key = sgId != null ? 'sg_' + sgId : 'sg_input'; }
+        nodeIdMap.set(n.id, keyColorMap.get(key));
+      });
+    } else if (mode === 'latency') {
+      graph.nodes.forEach(n => {
+        let color = null;
+        if (n.type === 'op') color = latencyToColor(n.data.latency);
+        else if (n.type === 'tensor') color = '#606060';
+        nodeIdMap.set(n.id, color);
+      });
+    }
+
+    // Always pin boundary node colors regardless of mode
+    graph.nodes.forEach(n => {
+      if (BOUNDARY_COLORS[n.type]) nodeIdMap.set(n.id, BOUNDARY_COLORS[n.type]);
+    });
+
+    return nodeIdMap;
+  }
+
+  const LEGEND_LABELS = {
+    'cat:MEMORY':       'Memory / Reshape',
+    'cat:MATMUL':       'Matrix Multiply',
+    'cat:ELEMENTWISE':  'Elementwise',
+    'cat:REDUCE':       'Reduction',
+    'cat:SPECIAL_MATH': 'Special Math',
+    'cat:CAST':         'Precision Cast',
+    'cat:COMMS':        'Data Movement',
+    'boundary:incast':  'Graph Input',
+    'boundary:outcast': 'Graph Output',
+    'boundary':         'Boundary',
+  };
+
+  function legendLabel(key) {
+    if (LEGEND_LABELS[key]) return LEGEND_LABELS[key];
+    if (key.startsWith('sem:'))  return key.slice(4).replace(/-/g, ' ');
+    if (key.startsWith('cat:'))  return key.slice(4);
+    if (key.startsWith('op:'))   return key.slice(3);
+    if (key.startsWith('sg_'))   return 'SG · ' + key.slice(3);
+    return key;
+  }
+
+  function setColorMode(mode) {
+    colorMode = mode;
+    document.querySelectorAll('.cp-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    if (!graph) return;
+    colorMap = buildNodeColorMap(mode);
+    renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick, colorMap, colorMode);
+    updateLegend();
+    drawMinimap();
+  }
+
+  function updateLegend() {
+    const legendEl = document.getElementById('legend');
+    if (!legendEl) return;
+
+    if (colorMode === 'none') {
+      legendEl.innerHTML = `
+        <span class="legend-item"><span class="legend-dot" style="background:var(--incast-accent)"></span>Incast</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--op-accent)"></span>Op</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--tensor-accent)"></span>Tensor</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--outcast-accent)"></span>Outcast</span>`;
+      return;
+    }
+
+    if (colorMode === 'latency') {
+      const latencies = graph
+        ? graph.nodes.filter(n => n.type === 'op' && n.data.latency != null && n.data.latency > 0).map(n => n.data.latency)
+        : [];
+      const minCy = latencies.length ? Math.min(...latencies) : 0;
+      const maxCy = latencies.length ? Math.max(...latencies) : 0;
+      const fmtCy = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'K cy' : v + ' cy';
+      legendEl.innerHTML = `
+        <span class="legend-item" style="flex-direction:column;align-items:stretch;gap:4px">
+          <span class="legend-gradient"></span>
+          <span style="display:flex;justify-content:space-between;font-size:10px;opacity:0.50">
+            <span>${fmtCy(minCy)}</span><span>${fmtCy(maxCy)}</span>
+          </span>
+        </span>`;
+      return;
+    }
+
+    if (!colorMap) { legendEl.innerHTML = ''; return; }
+
+    // Collect key → { color, count }
+    const keyData = new Map();
+    graph.nodes.forEach(n => {
+      let key;
+      if (colorMode === 'semantic') {
+        key = getSemanticKey(n);
+        if (key === 'tensor' || key === 'boundary:incast' || key === 'boundary:outcast') return;
+      } else {
+        // subgraph: only show op/boundary in legend
+        if (n.type === 'op') key = 'sg_' + n.data.subgraphId;
+        else if (n.type === 'incast' || n.type === 'outcast') key = 'boundary';
+        else return;
+      }
+      if (!key) return;
+      const color = colorMap.get(n.id);
+      if (!keyData.has(key)) keyData.set(key, { color: color || null, count: 0 });
+      keyData.get(key).count++;
+    });
+
+    const entries = [...keyData.entries()]
+      .filter(([, v]) => v.color)
+      .map(([key, v]) => ({ key, color: v.color, count: v.count }));
+
+    const MAX = 12;
+    const shown = entries.slice(0, MAX);
+    const extra = entries.length - shown.length;
+
+    legendEl.innerHTML = shown.map(({ key, color, count }) =>
+      `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span><span class="legend-item-label">${legendLabel(key)}</span><span class="legend-item-count">(${count})</span></span>`
+    ).join('') + (extra > 0 ? `<span class="legend-item" style="opacity:0.45">+${extra}</span>` : '');
+  }
+
+  function updateModeAvailability() {
+    if (!graph) return;
+    const hasPartition = graph.nodes.some(n => n.type === 'op' && n.data.subgraphId != null && n.data.subgraphId >= 0);
+    const hasCost = graph.nodes.some(n => n.type === 'op' && n.data.latency != null);
+    setModeEnabled('subgraph', hasPartition);
+    setModeEnabled('latency', hasCost);
+  }
+
+  function setModeEnabled(mode, enabled) {
+    document.querySelectorAll(`.cp-btn[data-mode="${mode}"]`).forEach(btn => {
+      btn.disabled = !enabled;
+      btn.classList.toggle('disabled', !enabled);
+    });
+    if (!enabled && colorMode === mode) setColorMode('none');
+  }
 
   // ── File loading ───────────────────────────────────────────────
 
@@ -51,7 +224,9 @@
   function loadGraphData(data, fileName) {
     graph  = parseGraph(data);
     layout = computeLayout(graph);
-    renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick);
+    colorMap = buildNodeColorMap(colorMode);
+    updateModeAvailability();
+    renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick, colorMap, colorMode);
     graphTitle.textContent = graph.meta.name;
     graphStats.innerHTML = `
       <span class="stat-chip">${graph.meta.incastCount} incast</span>
@@ -60,6 +235,8 @@
       <span class="stat-chip">${graph.meta.outcastCount} outcast</span>`;
     emptyState.classList.add('hidden');
     minimapEl.classList.add('visible');
+    colorPanel.classList.add('visible');
+    updateLegend();
     fitView();
 
     // Cache to localStorage
@@ -142,11 +319,19 @@
     setRecentChip(name);
   })();
 
-  // Auto-load first sample on startup
-  fetch('deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json')
-    .then(r => r.json())
-    .then(data => loadGraphData(data, 'LOOP_RESHAPE · PATH0'))
-    .catch(() => {});
+  // Auto-load from ?file= URL param, otherwise fall back to default sample
+  const urlFile = new URLSearchParams(location.search).get('file');
+  if (urlFile) {
+    fetch(urlFile)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => loadGraphData(data, urlFile.split('/').pop()))
+      .catch(err => { emptyState.classList.remove('hidden'); console.error('Failed to load', urlFile, err); });
+  } else {
+    fetch('deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json')
+      .then(r => r.json())
+      .then(data => loadGraphData(data, 'LOOP_RESHAPE · PATH0'))
+      .catch(() => {});
+  }
 
   emptyLoadBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
@@ -323,7 +508,9 @@
     for (const node of graph.nodes) {
       const pos = positions.get(node.id);
       if (!pos) continue;
-      ctx.fillStyle = (TYPE_COLORS[node.type] || '#555') + 'AA';
+      const mapped = colorMap?.get(node.id);
+      const baseColor = (mapped != null ? mapped : null) ?? (TYPE_COLORS[node.type] || '#555');
+      ctx.fillStyle = baseColor + 'AA';
       ctx.fillRect(
         Math.round(pos.x * gs + ox), Math.round(pos.y * gs + oy),
         Math.max(2, Math.round(pos.w * gs)), Math.max(1, Math.round(pos.h * gs))
@@ -340,5 +527,10 @@
     minimapVp.style.width  = Math.round(vW * gs) + 'px';
     minimapVp.style.height = Math.round(vH * gs) + 'px';
   }
+
+  // ── Color toggle buttons ───────────────────────────────────────
+  document.querySelectorAll('.cp-btn').forEach(btn => {
+    btn.addEventListener('click', () => setColorMode(btn.dataset.mode));
+  });
 
 })();
