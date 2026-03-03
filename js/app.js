@@ -10,6 +10,7 @@
   const edgesSvg      = document.getElementById('edgesSvg');
   const emptyState    = document.getElementById('emptyState');
   const fileInput     = document.getElementById('fileInput');
+  const dirInput      = document.getElementById('dirInput');
   const loadBtn       = document.getElementById('loadBtn');
   const emptyLoadBtn  = document.getElementById('emptyLoadBtn');
   const fitBtn        = document.getElementById('fitBtn');
@@ -33,6 +34,7 @@
   const graphPicker   = document.getElementById('graphPicker');
   const graphMenu     = document.getElementById('graphMenu');
   const graphMenuLocal = document.getElementById('graphMenuLocal');
+  const graphMenuDir  = document.getElementById('graphMenuDir');
 
   // ── State ──────────────────────────────────────────────────────
   let graph  = null;
@@ -42,6 +44,7 @@
   let selectedNodeId = null;
   let colorMode = 'none';  // 'none' | 'semantic' | 'subgraph' | 'latency'
   let colorMap  = null;    // Map<nodeId, hexColor> | null
+  const localFileRefs = new Map(); // ref -> File
 
   const SCALE_MIN = 0.06;
   const SCALE_MAX = 4;
@@ -218,6 +221,48 @@
 
   // ── File loading ───────────────────────────────────────────────
 
+  function normalizePath(v) {
+    return String(v || '').replace(/\\/g, '/');
+  }
+
+  function toLocalRef(relativePath) {
+    return 'local::' + normalizePath(relativePath);
+  }
+
+  function clearLocalRefs() {
+    localFileRefs.clear();
+  }
+
+  function readAndLoadLocalFile(file, displayName) {
+    return file.text()
+      .then(text => {
+        const data = JSON.parse(text);
+        loadGraphData(data, displayName || file.name);
+      });
+  }
+
+  function loadRefFile(fileRef) {
+    const localFile = localFileRefs.get(fileRef);
+    if (localFile) {
+      readAndLoadLocalFile(localFile, localFile.name)
+        .catch(err => {
+          console.error('Nav: failed to load local ref', fileRef, err);
+          alert('Failed to parse local graph file:\n' + (err?.message || err));
+        });
+      return;
+    }
+
+    fetch(fileRef)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d => loadGraphData(d, fileRef.split('/').pop()))
+      .catch(err => console.error('Nav: failed to load', fileRef, err));
+  }
+
+  window.loadFile = (fileRef) => {
+    if (!fileRef) return;
+    loadRefFile(fileRef);
+  };
+
   const LS_JSON = 'pto_last_json';
   const LS_NAME = 'pto_last_name';
 
@@ -255,12 +300,68 @@
   }
 
   function loadJSON(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try { loadGraphData(JSON.parse(e.target.result), file.name); }
-      catch (err) { console.error(err); alert('Failed to parse JSON:\n' + err.message); }
-    };
-    reader.readAsText(file);
+    readAndLoadLocalFile(file, file.name)
+      .catch(err => {
+        console.error(err);
+        alert('Failed to parse JSON:\n' + (err?.message || err));
+      });
+  }
+
+  function applyLocalPassFolder(entries, sourceLabel) {
+    if (!window.buildNavIndexFromFileEntries) {
+      alert('Local folder indexing is unavailable (missing nav_index_builder.js).');
+      return;
+    }
+    if (!entries.length) {
+      alert('No JSON files found in selected folder.');
+      return;
+    }
+
+    clearLocalRefs();
+    const builderEntries = [];
+    for (const entry of entries) {
+      const rel = normalizePath(entry.relativePath);
+      if (!rel.toLowerCase().endsWith('.json')) continue;
+      const ref = toLocalRef(rel);
+      localFileRefs.set(ref, entry.file);
+      builderEntries.push({ relativePath: rel, ref });
+    }
+
+    const navIndex = window.buildNavIndexFromFileEntries(builderEntries, { basePath: sourceLabel || 'local' });
+    if (!navIndex?.passes?.length) {
+      alert('Selected folder does not look like output_deepseek Pass snapshots.');
+      return;
+    }
+    if (window.setNavIndex) window.setNavIndex(navIndex, { sourceLabel: sourceLabel || 'local' });
+  }
+
+  async function collectHandleEntries(handle, prefix = '') {
+    const out = [];
+    for await (const [name, child] of handle.entries()) {
+      const rel = prefix ? `${prefix}/${name}` : name;
+      if (child.kind === 'directory') {
+        const sub = await collectHandleEntries(child, rel);
+        out.push(...sub);
+      } else if (name.toLowerCase().endsWith('.json')) {
+        const file = await child.getFile();
+        out.push({ relativePath: rel, file });
+      }
+    }
+    return out;
+  }
+
+  async function openLocalPassFolder() {
+    if (window.showDirectoryPicker) {
+      try {
+        const dirHandle = await window.showDirectoryPicker({ id: 'pto-pass-folder' });
+        const entries = await collectHandleEntries(dirHandle);
+        applyLocalPassFolder(entries, dirHandle.name);
+      } catch (err) {
+        if (err?.name !== 'AbortError') console.error('Folder picker failed:', err);
+      }
+      return;
+    }
+    dirInput.click();
   }
 
   // Wire sample chips (empty-state cards)
@@ -300,6 +401,12 @@
     fileInput.click();
   });
 
+  // Menu local folder item
+  graphMenuDir.addEventListener('click', () => {
+    graphMenu.classList.remove('open');
+    openLocalPassFolder();
+  });
+
   // Close menu on outside click
   document.addEventListener('click', (e) => {
     if (!graphPicker.contains(e.target)) graphMenu.classList.remove('open');
@@ -319,23 +426,31 @@
     setRecentChip(name);
   })();
 
-  // Auto-load from ?file= URL param, otherwise fall back to default sample
+  // Auto-load from ?file= URL param
   const urlFile = new URLSearchParams(location.search).get('file');
   if (urlFile) {
     fetch(urlFile)
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => loadGraphData(data, urlFile.split('/').pop()))
       .catch(err => { emptyState.classList.remove('hidden'); console.error('Failed to load', urlFile, err); });
-  } else {
-    fetch('deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json')
-      .then(r => r.json())
-      .then(data => loadGraphData(data, 'LOOP_RESHAPE · PATH0'))
-      .catch(() => {});
   }
 
-  emptyLoadBtn.addEventListener('click', () => fileInput.click());
+  emptyLoadBtn.addEventListener('click', () => openLocalPassFolder());
+  document.getElementById('emptyLoadFileBtn')?.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     if (e.target.files[0]) loadJSON(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  dirInput.addEventListener('change', (e) => {
+    const files = [...(e.target.files || [])].filter(f => f.name.toLowerCase().endsWith('.json'));
+    const entries = files.map(file => ({
+      relativePath: normalizePath(file.webkitRelativePath || file.name),
+      file,
+    }));
+    const folderName = files[0]?.webkitRelativePath?.split('/')?.[0] || 'local-folder';
+    applyLocalPassFolder(entries, folderName);
+    e.target.value = '';
   });
 
   viewport.addEventListener('dragover', (e) => { e.preventDefault(); viewport.classList.add('drag-over'); });

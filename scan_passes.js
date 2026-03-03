@@ -11,10 +11,10 @@ const OUTPUT_DIR = path.join(__dirname, BASE);
 const OUT_FILE   = path.join(__dirname, 'nav_index.json');
 
 const STAGES = [
-  { label: 'Tensor',        range: [0,   4],  color: '#87C80F' },
-  { label: 'Tile',          range: [5,  26],  color: '#3577F6' },
-  { label: 'Split',         range: [27, 27],  color: '#A855F7' },
-  { label: 'Block/Execute', range: [28, 36],  color: '#C9107D' },
+  { label: 'Tensor',        range: [0,   4],  color: '#6B92FF' },
+  { label: 'Tile',          range: [5,  26],  color: '#6ADB02' },
+  { label: 'Split',         range: [27, 27],  color: '#FA6401' },
+  { label: 'Block/Execute', range: [28, 36],  color: '#D8B900' },
 ];
 
 function getStage(idx) {
