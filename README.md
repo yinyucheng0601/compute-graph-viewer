@@ -11,6 +11,7 @@ A browser-based visualizer for Ascend NPU computation graphs.
 - Zoom / pan / fit view + minimap
 - Click any node to inspect its properties in the detail panel
 - Drag & drop a `.json` file, or open via file picker
+- Open an `output_deepseek` pass folder directly (`Open Pass Folder...`) to build timeline navigation in-browser
 - Remembers the last opened file (localStorage)
 
 ## Usage
