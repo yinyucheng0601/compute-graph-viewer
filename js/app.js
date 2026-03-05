@@ -45,6 +45,8 @@
   let colorMode = 'none';  // 'none' | 'semantic' | 'subgraph' | 'latency'
   let colorMap  = null;    // Map<nodeId, hexColor> | null
   const localFileRefs = new Map(); // ref -> File
+  const BRIDGE_DB = 'pto-launch-bridge';
+  const BRIDGE_STORE = 'pending-dir-handles';
 
   const SCALE_MIN = 0.06;
   const SCALE_MAX = 4;
@@ -59,10 +61,10 @@
     let nodeIdMap = new Map();
 
     if (mode === 'semantic') {
-      const keys = graph.nodes.map(n => getSemanticKey(n));
-      const keyColorMap = buildColorMap(keys);
+      const pipelineMap = buildPipelineSemanticColorMap(graph.nodes);
       graph.nodes.forEach(n => {
-        const color = n.type === 'tensor' ? '#606060' : keyColorMap.get(getSemanticKey(n));
+        const color = n.type === 'tensor' ? '#606060'
+                    : (pipelineMap.get(n.id) ?? '#666666');
         nodeIdMap.set(n.id, color);
       });
     } else if (mode === 'subgraph') {
@@ -333,6 +335,15 @@
       return;
     }
     if (window.setNavIndex) window.setNavIndex(navIndex, { sourceLabel: sourceLabel || 'local' });
+
+    // 显示 cf-panel（首次加载文件夹后）
+    const cfPanel = document.getElementById('cfPanel');
+    if (cfPanel && !cfPanel.classList.contains('cf-visible')) {
+      cfPanel.classList.add('cf-visible');
+      const reopenBtn = document.getElementById('cfReopenBtn');
+      if (reopenBtn) reopenBtn.style.display = 'none';
+      setTimeout(() => { if (window.drawMappingLines) window.drawMappingLines(null); }, 260);
+    }
   }
 
   async function collectHandleEntries(handle, prefix = '') {
@@ -348,6 +359,52 @@
       }
     }
     return out;
+  }
+
+  function openBridgeDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(BRIDGE_DB, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(BRIDGE_STORE)) db.createObjectStore(BRIDGE_STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function consumePendingDirHandle(token) {
+    if (!token) return false;
+
+    const db = await openBridgeDb();
+    let dirHandle = null;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(BRIDGE_STORE, 'readwrite');
+      const store = tx.objectStore(BRIDGE_STORE);
+      const getReq = store.get(token);
+      getReq.onsuccess = () => {
+        dirHandle = getReq.result || null;
+        if (dirHandle) store.delete(token);
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+
+    if (!dirHandle || dirHandle.kind !== 'directory') return false;
+
+    if (typeof dirHandle.queryPermission === 'function') {
+      let perm = await dirHandle.queryPermission({ mode: 'read' });
+      if (perm === 'prompt' && typeof dirHandle.requestPermission === 'function') {
+        perm = await dirHandle.requestPermission({ mode: 'read' });
+      }
+      if (perm !== 'granted') return false;
+    }
+
+    const entries = await collectHandleEntries(dirHandle);
+    applyLocalPassFolder(entries, dirHandle.name || 'local');
+    return true;
   }
 
   async function openLocalPassFolder() {
@@ -426,13 +483,35 @@
     setRecentChip(name);
   })();
 
-  // Auto-load from ?file= URL param
-  const urlFile = new URLSearchParams(location.search).get('file');
+  // Auto-load from URL params
+  const urlParams = new URLSearchParams(location.search);
+  const urlFile = urlParams.get('file');
+  const urlAction = urlParams.get('action');
+  const urlToken = urlParams.get('token');
+
   if (urlFile) {
     fetch(urlFile)
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => loadGraphData(data, urlFile.split('/').pop()))
       .catch(err => { emptyState.classList.remove('hidden'); console.error('Failed to load', urlFile, err); });
+  } else if (urlAction === 'consume-folder') {
+    // Folder handle selected on launch page; consume and auto-load here.
+    setTimeout(() => {
+      consumePendingDirHandle(urlToken)
+        .then(ok => { if (!ok) return openLocalPassFolder(); return null; })
+        .catch(err => {
+          console.error('Consume pending folder failed:', err);
+          return openLocalPassFolder();
+        });
+    }, 0);
+  } else if (urlAction === 'open-folder') {
+    // Reuse existing folder-loading flow from index.html
+    setTimeout(() => {
+      openLocalPassFolder().catch(err => console.error('Auto open folder failed:', err));
+    }, 0);
+  } else if (urlAction === 'open-file') {
+    // Reuse existing local file picker flow from index.html
+    setTimeout(() => fileInput.click(), 0);
   }
 
   emptyLoadBtn.addEventListener('click', () => openLocalPassFolder());
