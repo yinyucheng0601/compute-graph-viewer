@@ -353,6 +353,7 @@
   }
 
   window.setNavIndex = setNavIndex;
+  window.navSelectPath = selectPath;
 
   // ── Initial load ─────────────────────────────────────────────────────────
   fetch('nav_index.json')
@@ -531,6 +532,7 @@
     rebuildLoopMenu();
     rebuildUnrollMenu();
     rebuildSnapMenu();
+    if (window.cfHighlightPath) window.cfHighlightPath(activePath);
     loadCurrent();
   }
 
@@ -538,6 +540,25 @@
     activeUnroll = factor;
     activePath = derivePath();
     activeSnap = 'main';
+    rebuildUnrollMenu();
+    rebuildSnapMenu();
+    if (window.cfHighlightPath) window.cfHighlightPath(activePath);
+    loadCurrent();
+  }
+
+  function selectPath(pathId) {
+    const UNROLL_FROM_PATH = { PATH0_6:32, PATH0_8:16, PATH0_10:8, PATH0_12:4, PATH0_14:2, PATH0_16:1 };
+    if (pathId === 'PATH0_4') {
+      activeLoop = 'RESHAPE';
+    } else {
+      const unroll = UNROLL_FROM_PATH[pathId];
+      if (!unroll) return;
+      activeLoop = 'MAIN';
+      activeUnroll = unroll;
+    }
+    activePath = pathId;
+    activeSnap = 'main';
+    rebuildLoopMenu();
     rebuildUnrollMenu();
     rebuildSnapMenu();
     loadCurrent();

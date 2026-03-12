@@ -9,24 +9,79 @@
  * Output: Map<nodeId, {x, y, w, h}>
  */
 
-const NODE_W    = 250;   // fixed width for all nodes
-const H_STEP    = 330;   // horizontal step: column width + gap
-const V_STEP    = 220;   // vertical step: node height + gap
-const PAD       = 60;    // canvas padding
+const NODE_W = 150;   // default node width
+const H_GAP = 180;    // default horizontal gap between layers
+const H_STEP = NODE_W + H_GAP;   // horizontal step: column width + gap
+const V_GAP = 20;     // dynamic gap between nodes when using per-node heights
+const V_GAP_COMPACT = 30;
+const PAD = 60;    // canvas padding
 
 const NODE_HEIGHTS = {
-  incast:  200,
-  outcast: 200,
-  op:      148,
-  tensor:  200,
+  incast: 208,
+  outcast: 208,
+  op: 156,
+  tensor: 208,
+  group: 200,
 };
 
-function getNodeHeight(type) {
+const NODE_HEIGHTS_COMPACT = {
+  // Must match real compact card outer height (content + margins + node padding),
+  // otherwise layout underestimates vertical space and cards overlap/clipped.
+  incast: 98,
+  outcast: 98,
+  op: 64,
+  tensor: 98,
+  group: 98,
+};
+
+function estimateGroupRows(node) {
+  const d = node?.data || {};
+  let rows = 0;
+  const hasShape = Array.isArray(d.shape) ? d.shape.length > 0 : !!d.shape;
+  if (hasShape) rows += 1;
+  if (d.memFlow || d.memFrom || d.memTo) rows += 1;
+  if (Array.isArray(d.rows)) rows += d.rows.length;
+  return rows;
+}
+
+function estimateGroupVisibleStackCount(node) {
+  const d = node?.data || {};
+  const members = Array.isArray(d.members) ? d.members : [];
+  if (members.length === 0) {
+    const fallbackCount = Number(d.count) || 0;
+    return Math.min(7, Math.max(2, fallbackCount || 2));
+  }
+  return members.length <= 7 ? members.length : 7;
+}
+
+function estimateGroupHeight(node) {
+  // Mirrors renderer/card CSS roughly: header + rows + compressed stack bars.
+  const rows = estimateGroupRows(node);
+  const stackCount = estimateGroupVisibleStackCount(node);
+  const headH = 56; // include extra top inset in .group-content
+  const rowPad = rows > 0 ? 8 : 0;
+  const rowH = 19;
+  const stackMargin = 6; // match group-stack margin: 2(top)+4(bottom)
+  const stackItemH = 12;
+  const stackGap = 4;
+  const stackH = stackMargin + (stackCount * stackItemH) + (Math.max(0, stackCount - 1) * stackGap);
+  const estimated = headH + rowPad + (rows * rowH) + stackH;
+  return Math.max(148, Math.min(320, Math.round(estimated)));
+}
+
+function getNodeHeight(nodeOrType, compact) {
+  const type = typeof nodeOrType === 'string' ? nodeOrType : nodeOrType?.type;
+  if (compact) return NODE_HEIGHTS_COMPACT[type] ?? 44;
+  if (type === 'group') return estimateGroupHeight(nodeOrType);
   return NODE_HEIGHTS[type] ?? 124;
 }
 
-function computeLayout(graph) {
+function computeLayout(graph, options = {}) {
   const { nodes, edges } = graph;
+  const compact = !!options.compact;
+  const nodeWidth = compact ? NODE_W : (options.nodeWidth || NODE_W);
+  const hStep = compact ? 200 : (options.hStep || (nodeWidth + H_GAP));
+  const vGap = compact ? V_GAP_COMPACT : V_GAP;
   if (nodes.length === 0) return { positions: new Map(), layerNodes: [], maxLayer: 0 };
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
@@ -71,6 +126,21 @@ function computeLayout(graph) {
     if (!layer.has(n.id)) layer.set(n.id, 0);
   }
 
+  // ── Push down sources (tensors/incasts) closer to consumers ──
+  const layerReversed = Array.from(layer.keys()).sort((a, b) => layer.get(b) - layer.get(a));
+  for (const id of layerReversed) {
+    if (inDeg.get(id) === 0) {
+      const outNodes = succ.get(id);
+      if (outNodes.length > 0) {
+        // Find minimum layer among successors
+        const minOutLayer = Math.min(...outNodes.map(outId => layer.get(outId)));
+        if (minOutLayer > 1) {
+          layer.set(id, minOutLayer - 1);
+        }
+      }
+    }
+  }
+
   const maxLayer = Math.max(...layer.values());
 
   // ── Group nodes by layer ─────────────────────────────────────
@@ -110,13 +180,63 @@ function computeLayout(graph) {
     layerNodes[l].forEach((id, i) => posInLayer.set(id, i));
   }
 
-  // ── Connection-aware Y-coordinate assignment ─────────────────
-  // Each node's ideal Y = average Y of its already-placed predecessors.
-  // This makes a single unbranched flow a perfectly horizontal line.
-  // Nodes are placed in crossing-minimized order; minimum gap = V_STEP.
+  // ── Coordinate assignment ─────────────────────────────────────
+  // TB mode: layers go down (Y axis), nodes spread right (X axis).
+  // LR mode: layers go right (X axis), nodes spread down (Y axis).
 
-  const layerX = layerNodes.map((_, l) => PAD + l * H_STEP);
-  const nodeY  = new Map();
+  if (options.direction === 'TB') {
+    const layerY = layerNodes.map((_, l) => PAD + l * hStep);
+    const nodeX = new Map();
+
+    for (let l = 0; l <= maxLayer; l++) {
+      const ids = layerNodes[l];
+      if (ids.length === 0) continue;
+      let cursor = PAD;
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const placedPreds = (pred.get(id) || []).filter(p => nodeX.has(p));
+        const ideal = placedPreds.length > 0
+          ? placedPreds.reduce((s, p) => s + nodeX.get(p), 0) / placedPreds.length
+          : null;
+        const x = ideal !== null ? Math.max(cursor, ideal) : cursor;
+        nodeX.set(id, x);
+        cursor = x + hStep;
+      }
+    }
+
+    for (let l = maxLayer - 1; l >= 0; l--) {
+      const ids = layerNodes[l];
+      let ceiling = Infinity;
+      for (let i = ids.length - 1; i >= 0; i--) {
+        const id = ids[i];
+        const placedSuccs = (succ.get(id) || []).filter(s => nodeX.has(s));
+        if (placedSuccs.length > 0) {
+          const ideal = placedSuccs.reduce((s, p) => s + nodeX.get(p), 0) / placedSuccs.length;
+          const maxX = ceiling === Infinity ? ideal : Math.min(ideal, ceiling - hStep);
+          if (maxX <= nodeX.get(id)) {
+            nodeX.set(id, Math.max(nodeX.get(id), maxX < PAD ? PAD : maxX));
+          }
+        }
+        ceiling = nodeX.get(id);
+      }
+    }
+
+    const positions = new Map();
+    for (let l = 0; l <= maxLayer; l++) {
+      for (const id of layerNodes[l]) {
+        const node = nodeMap.get(id);
+        const h = getNodeHeight(node, compact);
+        positions.set(id, { x: nodeX.get(id) ?? PAD, y: layerY[l], w: nodeWidth, h });
+      }
+    }
+    const maxRight = Math.max(...[...positions.values()].map(p => p.x + p.w));
+    const maxBottom = Math.max(...[...positions.values()].map(p => p.y + p.h));
+    return { positions, layerNodes, maxLayer, canvasW: maxRight + PAD, canvasH: maxBottom + PAD };
+  }
+
+  // ── LR: layers go right, nodes spread down ───────────────────
+  const layerX = layerNodes.map((_, l) => PAD + l * hStep);
+  const nodeY = new Map();
 
   for (let l = 0; l <= maxLayer; l++) {
     const ids = layerNodes[l];
@@ -125,29 +245,29 @@ function computeLayout(graph) {
     let cursor = PAD;
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
-
-      // Ideal Y = avg of placed predecessors
       const placedPreds = (pred.get(id) || []).filter(p => nodeY.has(p));
       const ideal = placedPreds.length > 0
         ? placedPreds.reduce((s, p) => s + nodeY.get(p), 0) / placedPreds.length
         : null;
-
+      const node = nodeMap.get(id);
+      const nodeH = getNodeHeight(node, compact);
       const y = ideal !== null ? Math.max(cursor, ideal) : cursor;
       nodeY.set(id, y);
-      cursor = y + V_STEP;
+      cursor = y + nodeH + vGap;
     }
   }
 
-  // Also do a backward pass to pull nodes toward successors
   for (let l = maxLayer - 1; l >= 0; l--) {
     const ids = layerNodes[l];
     let ceiling = Infinity;
     for (let i = ids.length - 1; i >= 0; i--) {
       const id = ids[i];
+      const node = nodeMap.get(id);
+      const nodeH = getNodeHeight(node, compact);
       const placedSuccs = (succ.get(id) || []).filter(s => nodeY.has(s));
       if (placedSuccs.length > 0) {
         const ideal = placedSuccs.reduce((s, p) => s + nodeY.get(p), 0) / placedSuccs.length;
-        const maxY = ceiling === Infinity ? ideal : Math.min(ideal, ceiling - V_STEP);
+        const maxY = ceiling === Infinity ? ideal : Math.min(ideal, ceiling - (nodeH + vGap));
         if (maxY > nodeY.get(id)) {
           // Only pull up (toward ideal) if it doesn't cause overlap
         } else {
@@ -162,19 +282,13 @@ function computeLayout(graph) {
   for (let l = 0; l <= maxLayer; l++) {
     for (const id of layerNodes[l]) {
       const node = nodeMap.get(id);
-      const h = getNodeHeight(node?.type);
-      positions.set(id, {
-        x: layerX[l],
-        y: nodeY.get(id) ?? PAD,
-        w: NODE_W,
-        h,
-      });
+      const h = getNodeHeight(node, compact);
+      positions.set(id, { x: layerX[l], y: nodeY.get(id) ?? PAD, w: nodeWidth, h });
     }
   }
 
-  // Canvas dimensions from actual node positions
   const maxNodeBottom = Math.max(...[...positions.values()].map(p => p.y + p.h));
-  const canvasW = PAD * 2 + (maxLayer + 1) * H_STEP;
+  const canvasW = PAD * 2 + (maxLayer + 1) * hStep;
   const canvasH = maxNodeBottom + PAD;
 
   return { positions, layerNodes, maxLayer, canvasW, canvasH };

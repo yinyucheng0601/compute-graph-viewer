@@ -1,0 +1,2852 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Source Graph — lightning_indexer_prolog_quant.py</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .vt-header {
+      height: var(--toolbar-height);
+      background: var(--toolbar-bg);
+      border-bottom: 1px solid var(--toolbar-border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .vt-home {
+      margin-right: 2px;
+    }
+
+    .vt-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.01em;
+    }
+
+    .vt-subtitle {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: var(--text-mono);
+    }
+
+    .vt-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--toolbar-border);
+    }
+
+    .vt-stats {
+      font-size: 11px;
+      color: var(--text-label);
+      font-family: var(--text-mono);
+    }
+
+    /* ── View toggle ─────────────────────────────────────────── */
+    .vt-view-toggle {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--toolbar-border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .vt-view-btn {
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 5px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-family: var(--text-mono);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .vt-view-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary);
+    }
+
+    .vt-view-btn.active {
+      background: rgba(124, 58, 237, 0.25);
+      color: #c4b5fd;
+      border: 1px solid rgba(124, 58, 237, 0.4);
+    }
+
+    .vt-view-arrow {
+      font-size: 13px;
+      color: var(--text-label);
+      padding: 0 2px;
+      user-select: none;
+    }
+
+    /* ── Layout icon switch ──────────────────────────────────── */
+    .vt-layout-switch {
+      display: flex;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      overflow: hidden;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .vt-layout-icon {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .vt-layout-icon:last-child {
+      border-right: none;
+    }
+
+    .vt-layout-icon:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-primary);
+    }
+
+    .vt-layout-icon.active {
+      background: rgba(124, 58, 237, 0.3);
+      color: #c4b5fd;
+    }
+
+    .vt-layout-label {
+      font-size: 11px;
+      font-family: var(--text-mono);
+      color: var(--text-secondary);
+      margin-left: 8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      align-self: center;
+    }
+
+    /* ── Compiler view sub-header ────────────────────────────── */
+    .vt-compiler-bar {
+      height: 30px;
+      background: rgba(124, 58, 237, 0.08);
+      border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+      display: none;
+      align-items: center;
+      padding: 0 16px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .vt-compiler-bar.visible {
+      display: flex;
+    }
+
+    .vt-compiler-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #a78bfa;
+      font-family: var(--text-mono);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .vt-compiler-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: var(--text-mono);
+    }
+
+    .vt-compiler-diff {
+      margin-left: auto;
+      font-size: 11px;
+      font-family: var(--text-mono);
+      color: var(--text-label);
+      display: flex;
+      gap: 8px;
+    }
+
+    .vt-diff-added {
+      color: #4ade80;
+    }
+
+    .vt-diff-removed {
+      color: #f87171;
+    }
+
+    .vt-diff-same {
+      color: var(--text-label);
+    }
+
+    /* ── File load button (for Pass_00 JSON) ─────────────────── */
+    .vt-load-btn {
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(124, 58, 237, 0.4);
+      background: rgba(124, 58, 237, 0.12);
+      color: #c4b5fd;
+      font-size: 10px;
+      font-family: var(--text-mono);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .vt-load-btn:hover {
+      background: rgba(124, 58, 237, 0.25);
+      border-color: rgba(124, 58, 237, 0.6);
+    }
+
+    /* ── Graph canvas transition (fading-out state) ─────────────── */
+    .vt-graph-root.fading-out {
+      opacity: 0 !important;
+      pointer-events: none;
+    }
+
+    /* ── Diff node highlight classes ─────────────────────────── */
+    .node-added .node-card,
+    .node-card.node-added {
+      outline: 2px solid #4ade80 !important;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px rgba(74, 222, 128, 0.25) !important;
+    }
+
+    .node-removed .node-card,
+    .node-card.node-removed {
+      outline: 2px solid #f87171 !important;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.2) !important;
+      opacity: 0.55;
+    }
+
+
+
+    /* ── Info bar at bottom ──────────────────────────────────── */
+    .vt-info-bar {
+      height: 32px;
+      background: rgba(14, 14, 18, 0.96);
+      border-top: 1px solid var(--toolbar-border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .vt-info-icon {
+      width: 14px;
+      height: 14px;
+      color: var(--text-label);
+      flex-shrink: 0;
+    }
+
+    .vt-info-text {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: var(--text-mono);
+      transition: opacity 0.3s;
+    }
+
+    .vt-pipeline-legend {
+      position: absolute;
+      top: 56px;
+      right: 16px;
+      z-index: 20;
+      background: rgba(20, 20, 20, 0.92);
+      border: 1px solid var(--toolbar-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+    }
+
+    .vt-legend-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-label);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .vt-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .vt-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .vt-viewport {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: var(--canvas-bg);
+      cursor: grab;
+    }
+
+    .vt-viewport.panning {
+      cursor: grabbing;
+    }
+
+    /* 竖向布局样式 */
+    .vt-canvas-area.vertical-layout {
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .vt-canvas-area.vertical-layout .vt-viewport {
+      height: 50%;
+      width: 100%;
+    }
+
+    .vt-canvas-area.vertical-layout .vt-tb-panel {
+      border-top: 1px solid var(--toolbar-border);
+      border-left: none;
+    }
+
+    .vt-graph-root {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+    }
+
+    .vt-graph-root .edges-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .vt-graph-root .nodes-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .vt-antv-host {
+      position: absolute;
+      inset: 0;
+      display: none;
+      background: transparent;
+    }
+
+    .vt-antv-host .x6-graph {
+      background: transparent;
+    }
+
+    .vt-antv-edge-tooltip {
+      position: absolute;
+      z-index: 18;
+      max-width: 280px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(12, 16, 24, 0.96);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 11px;
+      line-height: 1.35;
+      font-family: var(--text-mono);
+      white-space: pre-wrap;
+      pointer-events: none;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(8px);
+    }
+
+    .vt-zoom-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid var(--toolbar-border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      backdrop-filter: blur(8px);
+    }
+
+    .vt-zoom-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .vt-zoom-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    .vt-zoom-label {
+      font-size: 11px;
+      font-family: var(--text-mono);
+      color: var(--text-secondary);
+      min-width: 38px;
+      text-align: center;
+    }
+
+    .vt-zoom-sep {
+      width: 1px;
+      height: 16px;
+      background: var(--toolbar-border);
+    }
+
+    .vt-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+      gap: 10px;
+    }
+
+    /* ── Compact node style (source view) ───────────────────── */
+    .node-card[data-compact] {
+      background: transparent;
+      box-shadow: none;
+      border-radius: 0;
+      border: none;
+    }
+
+    .node-card[data-compact]:hover {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .node-card[data-compact] {
+      overflow: visible;
+    }
+
+    .node-card[data-compact] .op-pill {
+      margin: 4px 0;
+      padding: 5px 8px;
+    }
+
+    .node-card[data-compact] .op-pill-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .node-card[data-compact] .op-pill-name {
+      font-size: 13px;
+    }
+
+    .node-card[data-compact] .op-pill-latency {
+      font-size: 11px;
+    }
+
+    .node-card[data-compact] .tensor-rect {
+      height: auto;
+      margin: 4px 0;
+      padding: 6px 10px;
+      border-radius: 10px;
+    }
+
+    .node-card[data-compact] .tensor-rect-name {
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .node-card[data-compact] .tensor-rect-shape {
+      font-size: 11px;
+    }
+
+    .vt-edge-label-group {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .vt-edge-label-item {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10px;
+      line-height: 1.15;
+      font-family: var(--text-mono);
+      color: rgba(255, 255, 255, 0.72);
+      letter-spacing: 0;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    }
+  </style>
+</head>
+
+<body style="display:flex;flex-direction:column;height:100vh;overflow:hidden;">
+
+  <div class="vt-header">
+    <a class="home-link vt-home" href="launch.html" title="Back To Home" aria-label="Back To Home">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path
+          d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z"
+          stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      </svg>
+    </a>
+    <span class="vt-title" id="vtTitle"
+      style="color: #ffffff; font-weight: 500; letter-spacing: normal; flex-shrink:0;">lightning_indexer_prolog_quant.py</span>
+    <div class="vt-sep"></div>
+    <span class="vt-stats" id="vtStats">loading…</span>
+    <div style="flex:1"></div>
+
+    <!-- Layout icon switch pill -->
+    <div class="vt-layout-switch" id="vtLayoutSwitch">
+      <button class="vt-layout-icon active" id="vtBtnHorizontal" title="Horizontal layout">
+        <!-- LR arrows icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="4" width="6" height="8" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+          <rect x="9" y="4" width="6" height="8" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+          <line x1="7" y1="8" x2="9" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        </svg>
+      </button>
+      <button class="vt-layout-icon" id="vtBtnVertical" title="Vertical layout">
+        <!-- TB arrows icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="4" y="1" width="8" height="6" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+          <rect x="4" y="9" width="8" height="6" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+          <line x1="8" y1="7" x2="8" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        </svg>
+      </button>
+      <button class="vt-layout-icon" id="vtBtnDual" title="Dual layout (LR + TB)">
+        <!-- Split screen icon -->
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="2" width="6" height="12" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+          <rect x="9" y="2" width="6" height="12" rx="1.2" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      </button>
+    </div>
+    <span class="vt-layout-label" id="vtLayoutLabel">Horizontal</span>
+  </div>
+
+
+  <!-- Compiler view sub-header -->
+  <div class="vt-compiler-bar" id="vtCompilerBar">
+    <span class="vt-compiler-label" id="vtCompilerLabel">Pass JSON</span>
+    <div class="vt-sep" style="height:14px;"></div>
+    <span class="vt-compiler-desc" id="vtCompilerDesc">Load a compiled graph JSON for side-by-side comparison.</span>
+    <div class="vt-compiler-diff" id="vtDiffStats" style="display:none;">
+      <span class="vt-diff-added" id="vtDiffAdded"></span>
+      <span class="vt-diff-removed" id="vtDiffRemoved"></span>
+      <span class="vt-diff-same" id="vtDiffSame"></span>
+    </div>
+    <label class="vt-load-btn" id="vtLoadLabel" title="选择 Before_000_LoopUnroll_PROGRAM_ENTRY.json">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
+        style="display:inline-block;vertical-align:middle;margin-right:4px;">
+        <path d="M5 1v6M2 5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+          stroke-linejoin="round" />
+        <path d="M1 9h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      </svg>
+      <span id="vtLoadLabelText">Load Pass JSON</span>
+      <input type="file" id="vtFileInput" accept=".json" style="display:none;">
+    </label>
+  </div>
+
+  <div class="vt-canvas-area" id="vtCanvasArea">
+
+    <div class="vt-viewport" id="vtViewport">
+      <div class="vt-graph-root" id="vtGraphRoot">
+        <svg class="edges-svg" id="vtEdgesSvg" xmlns="http://www.w3.org/2000/svg">
+          <defs></defs>
+        </svg>
+        <div class="nodes-layer" id="vtNodesLayer"></div>
+      </div>
+      <div class="vt-antv-host" id="vtAntvHost"></div>
+
+      <div class="vt-loading" id="vtLoading">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
+          <path d="M8 2a6 6 0 0 1 6 6" stroke="var(--op-accent)" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        Loading graph…
+      </div>
+
+      <!-- Pipeline legend -->
+      <div class="vt-pipeline-legend" id="vtLegend" style="display:none;"></div>
+
+      <!-- Zoom controls -->
+      <div class="vt-zoom-controls">
+        <button class="vt-zoom-btn" id="vtZoomOut" title="Zoom Out">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <span class="vt-zoom-label" id="vtZoomLabel">100%</span>
+        <button class="vt-zoom-btn" id="vtZoomIn" title="Zoom In">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 3v8M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <div class="vt-zoom-sep"></div>
+        <button class="vt-zoom-btn" id="vtFit" title="Fit View">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 5V2h3M10 2h3v3M13 9v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.3"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div class="vt-panel-label" id="vtLabelLR" style="display:none;">→ LR</div>
+    </div>
+
+    <!-- TB panel (dual mode only) -->
+    <div class="vt-viewport vt-tb-panel" id="vtViewport2">
+      <div class="vt-graph-root" id="vtGraphRoot2">
+        <svg class="edges-svg" id="vtEdgesSvg2" xmlns="http://www.w3.org/2000/svg">
+          <defs></defs>
+        </svg>
+        <div class="nodes-layer" id="vtNodesLayer2"></div>
+      </div>
+      <div class="vt-antv-host" id="vtAntvHost2"></div>
+      <div class="vt-zoom-controls">
+        <button class="vt-zoom-btn" id="vtZoomOut2">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <span class="vt-zoom-label" id="vtZoomLabel2">100%</span>
+        <button class="vt-zoom-btn" id="vtZoomIn2">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 3v8M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+        <div class="vt-zoom-sep"></div>
+        <button class="vt-zoom-btn" id="vtFit2">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 5V2h3M10 2h3v3M13 9v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.3"
+              stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <div class="vt-panel-label">↓ TB</div>
+    </div>
+
+  </div><!-- /vt-canvas-area -->
+
+  <!-- Info bar -->
+  <div class="vt-info-bar">
+    <svg class="vt-info-icon" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2" />
+      <path d="M7 6.5v3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      <circle cx="7" cy="4.5" r="0.7" fill="currentColor" />
+    </svg>
+    <span class="vt-info-text" id="vtInfoText">开发者视角：3 条计算路径，1 个量化共享原语（Prolog-Quant）</span>
+  </div>
+
+  <!-- Source Code Viewer Panel -->
+  <div id="vtSourcePanel"
+    style="display:none; position:absolute; right:20px; bottom:60px; width:600px; height:400px; background:#1e1e1e; border:1px solid #333; border-radius:8px; z-index:9999; display:none; flex-direction:column; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+    <div
+      style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#252526; border-bottom:1px solid #333; border-radius:8px 8px 0 0;">
+      <span id="vtSourceTitle"
+        style="font-size:13px; font-weight:600; color:#ddd; font-family:monospace;">lightning_indexer_prolog_quant.py</span>
+      <button id="vtCloseSourceBtn" style="background:none; border:none; color:#888; cursor:pointer;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M3 3l8 8m0-8l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+    <div
+      style="flex:1; overflow:auto; padding:12px; font-family:Menlo, Monaco, Consolas, monospace; font-size:12px; color:#c5c8c6; line-height:1.5;">
+      <pre id="vtSourceCode" style="margin:0;"></pre>
+    </div>
+  </div>
+
+  <script src="js/colormap.js"></script>
+  <script src="js/parser.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/layout-tb.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="mvp/x6.min.js"></script>
+  <script src="js/antv-flow.js"></script>
+  <script>
+    (function () {
+      const viewport = document.getElementById('vtViewport');
+      const graphRoot = document.getElementById('vtGraphRoot');
+      const nodesLayer = document.getElementById('vtNodesLayer');
+      const edgesSvg = document.getElementById('vtEdgesSvg');
+      const antvHost = document.getElementById('vtAntvHost');
+      const loading = document.getElementById('vtLoading');
+      const legend = document.getElementById('vtLegend');
+      const statsEl = document.getElementById('vtStats');
+      const zoomLabel = document.getElementById('vtZoomLabel');
+      const vtTitle = document.getElementById('vtTitle');
+      const btnSource = document.getElementById('vtBtnSource');
+      const btnCompiler = document.getElementById('vtBtnCompiler');
+      const btnDual = document.getElementById('vtBtnDual');
+      const btnHorizontal = document.getElementById('vtBtnHorizontal');
+      const btnVertical = document.getElementById('vtBtnVertical');
+      const layoutLabel = document.getElementById('vtLayoutLabel');
+      const canvasArea = document.getElementById('vtCanvasArea');
+      const compilerBar = document.getElementById('vtCompilerBar');
+      const diffStats = document.getElementById('vtDiffStats');
+      const diffAdded = document.getElementById('vtDiffAdded');
+      const diffRemoved = document.getElementById('vtDiffRemoved');
+      const diffSame = document.getElementById('vtDiffSame');
+      const fileInput = document.getElementById('vtFileInput');
+      const loadLabelText = document.getElementById('vtLoadLabelText');
+      const infoText = document.getElementById('vtInfoText');
+      const labelLR = document.getElementById('vtLabelLR');
+      const compilerLabel = document.getElementById('vtCompilerLabel');
+      const compilerDesc = document.getElementById('vtCompilerDesc');
+      // TB panel refs
+      const viewport2 = document.getElementById('vtViewport2');
+      const graphRoot2 = document.getElementById('vtGraphRoot2');
+      const nodesLayer2 = document.getElementById('vtNodesLayer2');
+      const edgesSvg2 = document.getElementById('vtEdgesSvg2');
+      const antvHost2 = document.getElementById('vtAntvHost2');
+      const zoomLabel2 = document.getElementById('vtZoomLabel2');
+      const sourceTitleEl = document.getElementById('vtSourceTitle');
+
+      const DEFAULT_INFO = {
+        source: '开发者视角：3 条计算路径，1 个量化共享原语（Prolog-Quant）',
+        compiler: '编译器视角：已加载的 JSON 会与当前源码图做结构对比。',
+      };
+      const DEFAULT_LEGEND_ITEMS = [
+        { label: 'Query', color: '#3a6fd8' },
+        { label: 'Key', color: '#7b4bbf' },
+        { label: 'Weight', color: '#2e8a59' },
+        { label: 'Incast / Tensor', color: '#606060' },
+        { label: 'Outcast', color: getComputedStyle(document.documentElement).getPropertyValue('--outcast-accent').trim() || '#c9107d' },
+      ];
+      const DEFAULT_SOURCE_NAME = 'lightning_indexer_prolog_quant.py';
+      const SOURCE_PRESETS = {
+        [DEFAULT_SOURCE_NAME]: {
+          sourceUrl: DEFAULT_SOURCE_NAME,
+          graphUrl: 'data/source-graph.json',
+        },
+        'modeling_deepseek.py': {
+          sourceUrl: 'deepseek-v3/modeling_deepseek.py',
+          graphUrl: 'deepseek-v3/deepseek_v3_source_graph.json',
+        },
+      };
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlAction = urlParams.get('action');
+
+      const COMPACT_OPTS = { compact: true };
+      const pipelineRenderTokens = new Map();
+      const antvPrimary = AntvFlowGraph ? new AntvFlowGraph(antvHost, { zoomLabelEl: zoomLabel }) : null;
+      const antvSecondary = AntvFlowGraph ? new AntvFlowGraph(antvHost2, { zoomLabelEl: zoomLabel2 }) : null;
+
+      let sourceGraph = null;
+      let sourceLayout = null;
+      let sourceVerticalLayout = null;
+      let compiledGraph = null;
+      let compiledLayout = null;
+      let compiledVerticalLayout = null;
+      let currentView = 'source'; // 'source' | 'compiler'
+
+      let tx = 0, ty = 0, scale = 1;
+      let panning = false, panStart = { x: 0, y: 0 };
+      const SCALE_MIN = 0.06, SCALE_MAX = 4;
+      let dualMode = false;
+      let tbLayout = null;
+      let currentLayout = 'horizontal'; // 'horizontal' | 'vertical'
+      // TB viewport state
+      let tx2 = 0, ty2 = 0, scale2 = 1;
+      let panning2 = false, panStart2 = { x: 0, y: 0 };
+      let activePanTarget = null; // 1 or 2
+
+      // Source code viewer state
+      let sourceCodeText = '';
+      let sourceCodeLines = [];
+      const sourcePanel = document.getElementById('vtSourcePanel');
+      const sourceCodeEl = document.getElementById('vtSourceCode');
+      let currentSourceName = DEFAULT_SOURCE_NAME;
+      let currentSourcePreset = { ...SOURCE_PRESETS[DEFAULT_SOURCE_NAME] };
+      let currentSourceInfo = DEFAULT_INFO.source;
+      let currentLegendItems = DEFAULT_LEGEND_ITEMS;
+      let currentSourceDefaultLayout = 'horizontal';
+
+      function safeParseJSON(raw) {
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch (err) {
+          console.warn('Failed to parse stored source context:', err);
+          return null;
+        }
+      }
+
+      function setSourceTitles(name) {
+        currentSourceName = name || DEFAULT_SOURCE_NAME;
+        vtTitle.textContent = currentSourceName;
+        sourceTitleEl.textContent = currentSourceName;
+        document.title = `Source Graph — ${currentSourceName}`;
+      }
+
+      function renderLegendItems(items) {
+        const list = Array.isArray(items) && items.length ? items : DEFAULT_LEGEND_ITEMS;
+        legend.innerHTML = `<div class="vt-legend-title">Pipeline</div>${list.map(item => `
+          <div class="vt-legend-item">
+            <span class="vt-legend-dot" style="background:${item.color}"></span>${item.label}
+          </div>`).join('')}`;
+      }
+
+      function applySourceGraphMeta(graph) {
+        const meta = graph?.meta || {};
+        currentSourceInfo = meta.infoSource || DEFAULT_INFO.source;
+        currentLegendItems = Array.isArray(meta.legendItems) && meta.legendItems.length
+          ? meta.legendItems
+          : DEFAULT_LEGEND_ITEMS;
+        currentSourceDefaultLayout = meta.defaultLayout || 'horizontal';
+        renderLegendItems(currentLegendItems);
+      }
+
+      function resolveSourceContext() {
+        const storedMeta = safeParseJSON(sessionStorage.getItem('vtSelectedFile'));
+        const storedText = sessionStorage.getItem('vtSelectedFileText');
+        if (urlAction === 'open-py-file' && storedMeta?.name) {
+          currentSourcePreset = { ...(SOURCE_PRESETS[storedMeta.name] || SOURCE_PRESETS[DEFAULT_SOURCE_NAME]) };
+          setSourceTitles(storedMeta.name);
+          if (storedText) {
+            sourceCodeText = storedText;
+            sourceCodeLines = storedText.split('\n');
+          }
+          return;
+        }
+        currentSourcePreset = { ...SOURCE_PRESETS[DEFAULT_SOURCE_NAME] };
+        setSourceTitles(DEFAULT_SOURCE_NAME);
+      }
+
+      function invalidatePipelineRender(nodesLayerRef) {
+        if (!nodesLayerRef) return 0;
+        const key = nodesLayerRef.id || '__pipeline__';
+        const nextToken = (pipelineRenderTokens.get(key) || 0) + 1;
+        pipelineRenderTokens.set(key, nextToken);
+        return nextToken;
+      }
+
+      function beginPipelineRender(nodesLayerRef) {
+        return invalidatePipelineRender(nodesLayerRef);
+      }
+
+      function isPipelineRenderCurrent(nodesLayerRef, token) {
+        const key = nodesLayerRef?.id || '__pipeline__';
+        return pipelineRenderTokens.get(key) === token;
+      }
+
+      resolveSourceContext();
+      renderLegendItems(DEFAULT_LEGEND_ITEMS);
+
+      // Fetch source code unless we already received local file text from the launcher.
+      if (!sourceCodeLines.length) {
+        fetch(currentSourcePreset.sourceUrl)
+          .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+          })
+          .then(text => {
+            sourceCodeText = text;
+            sourceCodeLines = text.split('\n');
+          })
+          .catch(err => console.error('Could not load python source:', err));
+      }
+
+      document.getElementById('vtCloseSourceBtn').addEventListener('click', () => {
+        sourcePanel.style.display = 'none';
+      });
+
+      function isAntvHostVisible(host) {
+        return !!host && host.style.display !== 'none' && !host.hidden;
+      }
+
+      function setAntvViewportVisible(which, visible) {
+        const host = which === 'secondary' ? antvHost2 : antvHost;
+        const root = which === 'secondary' ? graphRoot2 : graphRoot;
+        if (!host || !root) return;
+        if (visible) {
+          root.style.display = 'none';
+          host.hidden = false;
+          host.style.display = 'block';
+        } else {
+          host.hidden = true;
+          host.style.display = 'none';
+          root.style.display = '';
+        }
+      }
+
+      function antvControllerForPanel(nodesLayer) {
+        return nodesLayer === nodesLayer2 ? antvSecondary : antvPrimary;
+      }
+
+      // ── Transform ────────────────────────────────────────────────
+      function applyTransform() {
+        graphRoot.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+        zoomLabel.textContent = Math.round(scale * 100) + '%';
+      }
+
+      function fitView(layoutObj) {
+        const target = layoutObj || (
+          currentLayout === 'vertical' && !dualMode
+            ? (currentView === 'compiler' ? compiledVerticalLayout : sourceVerticalLayout)
+            : (currentView === 'compiler' ? compiledLayout : sourceLayout)
+        );
+        if (!target) return;
+        if (target.isAntv && antvPrimary) {
+          antvPrimary.fit();
+          return;
+        }
+        const vw = viewport.clientWidth;
+        const vh = viewport.clientHeight;
+        const { canvasW, canvasH } = target;
+        const pad = 40;
+        const s = Math.min((vw - pad * 2) / canvasW, (vh - pad * 2) / canvasH, 1);
+        scale = s;
+        tx = (vw - canvasW * s) / 2;
+        ty = (vh - canvasH * s) / 2;
+        applyTransform();
+      }
+
+      function applyTransform2() {
+        graphRoot2.style.transform = `translate(${tx2}px, ${ty2}px) scale(${scale2})`;
+        zoomLabel2.textContent = Math.round(scale2 * 100) + '%';
+      }
+
+      function fitView2() {
+        if (!tbLayout) return;
+        if (tbLayout.isAntv && antvSecondary) {
+          antvSecondary.fit();
+          return;
+        }
+        const vw = viewport2.clientWidth;
+        const vh = viewport2.clientHeight;
+        const { canvasW, canvasH } = tbLayout;
+        const pad = 40;
+        const s = Math.min((vw - pad * 2) / canvasW, (vh - pad * 2) / canvasH, 1);
+        scale2 = s;
+        tx2 = (vw - canvasW * s) / 2;
+        ty2 = (vh - canvasH * s) / 2;
+        applyTransform2();
+      }
+
+      function zoom(delta, cx, cy) {
+        const prevScale = scale;
+        scale = Math.min(SCALE_MAX, Math.max(SCALE_MIN, scale * (1 + delta)));
+        const factor = scale / prevScale;
+        tx = cx - factor * (cx - tx);
+        ty = cy - factor * (cy - ty);
+        applyTransform();
+      }
+
+      // ── Wheel zoom ───────────────────────────────────────────────
+      viewport.addEventListener('wheel', (e) => {
+        if (isAntvHostVisible(antvHost)) return;
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const delta = e.deltaY < 0 ? 0.12 : -0.12;
+        zoom(delta, cx, cy);
+      }, { passive: false });
+
+      // ── Pan ──────────────────────────────────────────────────────
+      viewport.addEventListener('mousedown', (e) => {
+        if (isAntvHostVisible(antvHost)) return;
+        if (e.target.closest('.node-card') || e.target.closest('.vt-zoom-controls') || e.target.closest('.vt-pipeline-legend')) return;
+        panning = true;
+        panStart = { x: e.clientX - tx, y: e.clientY - ty };
+        viewport.classList.add('panning');
+      });
+
+      viewport2.addEventListener('mousedown', (e) => {
+        if (isAntvHostVisible(antvHost2)) return;
+        if (e.target.closest('.node-card') || e.target.closest('.vt-zoom-controls')) return;
+        panning2 = true;
+        panStart2 = { x: e.clientX - tx2, y: e.clientY - ty2 };
+        viewport2.classList.add('panning');
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (panning) {
+          tx = e.clientX - panStart.x;
+          ty = e.clientY - panStart.y;
+          applyTransform();
+        }
+        if (panning2) {
+          tx2 = e.clientX - panStart2.x;
+          ty2 = e.clientY - panStart2.y;
+          applyTransform2();
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        panning = false;
+        panning2 = false;
+        viewport.classList.remove('panning');
+        viewport2.classList.remove('panning');
+      });
+
+      // ── Zoom buttons ─────────────────────────────────────────────
+      document.getElementById('vtZoomIn').addEventListener('click', () => {
+        if (isAntvHostVisible(antvHost) && antvPrimary) return antvPrimary.zoomBy(0.2);
+        zoom(0.2, viewport.clientWidth / 2, viewport.clientHeight / 2);
+      });
+      document.getElementById('vtZoomOut').addEventListener('click', () => {
+        if (isAntvHostVisible(antvHost) && antvPrimary) return antvPrimary.zoomBy(-0.2);
+        zoom(-0.2, viewport.clientWidth / 2, viewport.clientHeight / 2);
+      });
+      document.getElementById('vtFit').addEventListener('click', () => fitView());
+
+      document.getElementById('vtZoomIn2').addEventListener('click', () => {
+        if (isAntvHostVisible(antvHost2) && antvSecondary) return antvSecondary.zoomBy(0.2);
+        zoom2(0.2, viewport2.clientWidth / 2, viewport2.clientHeight / 2);
+      });
+      document.getElementById('vtZoomOut2').addEventListener('click', () => {
+        if (isAntvHostVisible(antvHost2) && antvSecondary) return antvSecondary.zoomBy(-0.2);
+        zoom2(-0.2, viewport2.clientWidth / 2, viewport2.clientHeight / 2);
+      });
+      document.getElementById('vtFit2').addEventListener('click', () => fitView2());
+
+      viewport2.addEventListener('wheel', (e) => {
+        if (isAntvHostVisible(antvHost2)) return;
+        e.preventDefault();
+        const rect = viewport2.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const delta = e.deltaY < 0 ? 0.12 : -0.12;
+        zoom2(delta, cx, cy);
+      }, { passive: false });
+
+      function zoom2(delta, cx, cy) {
+        const prevScale = scale2;
+        scale2 = Math.min(SCALE_MAX, Math.max(SCALE_MIN, scale2 * (1 + delta)));
+        const factor = scale2 / prevScale;
+        tx2 = cx - factor * (cx - tx2);
+        ty2 = cy - factor * (cy - ty2);
+        applyTransform2();
+      }
+
+      function basename(path) {
+        if (!path) return '';
+        return String(path).split(/[\\/]/).pop();
+      }
+
+      function syntaxColor(raw) {
+        let s = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        s = s.replace(/(#[^\n]*)$/, '<span style="color:#8b949e;font-style:italic;">$1</span>');
+        s = s.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, '<span style="color:#a5d6ff;">$1</span>');
+        s = s.replace(/\b(def|class|import|from|return|if|else|elif|for|while|in|True|False|None|and|or|not|as|with|yield|break|continue|pass|lambda|try|except|finally|raise)\b/g, '<span style="color:#ff7ab2;">$1</span>');
+        s = s.replace(/(@\w+)/g, '<span style="color:#d2a8ff;">$1</span>');
+        s = s.replace(/\b(\d+\.?\d*)\b/g, '<span style="color:#79c0ff;">$1</span>');
+        return s;
+      }
+
+      function getNodeSourceLineMatches(node) {
+        if (!node?.data) return [];
+        const activeFile = basename(currentSourceName);
+        const refs = Array.isArray(node.data.sourceRefFiles) ? node.data.sourceRefFiles.map(basename) : [];
+        const refLines = Array.isArray(node.data.sourceRefLines) ? node.data.sourceRefLines : [];
+        if ((!refs.length || refs.includes(activeFile)) && refLines.length) {
+          return [...new Set(refLines.filter(line => Number.isInteger(line) && line > 0))].sort((a, b) => a - b);
+        }
+        const semanticFile = basename(node.data.semanticFile);
+        if ((!semanticFile || semanticFile === activeFile) && Number.isInteger(node.data.semanticLine) && node.data.semanticLine > 0) {
+          return [node.data.semanticLine];
+        }
+        return [];
+      }
+
+      function buildSourceSearchString(node) {
+        if (!node) return '';
+        if (node.type === 'op') {
+          const semKey = getSemanticKey(node);
+          const parsed = parsePipelineLabel(semKey);
+          if (parsed) return `set_semantic_label("${parsed.pipeline}-${parsed.stage}")`;
+          if (node.data?.submodule) return node.data.submodule;
+          if (node.data?.opcode) return `pypto.${node.data.opcode.toLowerCase()}(`;
+          return node.label || '';
+        }
+        return node.data?.symbol || node.label || '';
+      }
+
+      function renderSourcePanelForMatches(matchIndexes) {
+        if (!sourceCodeLines.length || !matchIndexes.length) return false;
+        const highlightSet = new Set(matchIndexes.filter(i => i >= 0 && i < sourceCodeLines.length));
+        if (!highlightSet.size) return false;
+
+        let html = '';
+        for (let i = 0; i < sourceCodeLines.length; i++) {
+          const lineNum = String(i + 1).padStart(4, '\u00a0');
+          const isMatch = highlightSet.has(i);
+          const bg = isMatch ? 'rgba(121,192,255,0.15)' : 'transparent';
+          const borderLeft = isMatch ? '3px solid #79c0ff' : '3px solid transparent';
+          html += `<div id="vtSrcline-${i}" style="background:${bg};border-left:${borderLeft};display:flex;padding:1px 6px;line-height:1.5;"><span style="color:#555;width:36px;flex-shrink:0;user-select:none;text-align:right;margin-right:12px;">${lineNum}</span><span style="white-space:pre;">${syntaxColor(sourceCodeLines[i])}</span></div>`;
+        }
+        sourceCodeEl.innerHTML = html;
+        sourcePanel.style.display = 'flex';
+
+        const firstMatch = Math.min(...highlightSet);
+        setTimeout(() => {
+          const targetLineEl = document.getElementById(`vtSrcline-${firstMatch}`);
+          if (targetLineEl) {
+            sourceCodeEl.parentElement.scrollTop = Math.max(0, targetLineEl.offsetTop - 120);
+          }
+        }, 50);
+        return true;
+      }
+
+      function clearGraphSelection() {
+        document.querySelectorAll('.node-card.selected').forEach(n => n.classList.remove('selected'));
+        if (antvPrimary) antvPrimary.highlightNode(null);
+        if (antvSecondary) antvSecondary.highlightNode(null);
+        document.querySelectorAll('.edge-highlight').forEach(p => {
+          p.classList.remove('edge-highlight');
+          p.style.stroke = '';
+        });
+        document.querySelectorAll('.edge-grad').forEach(g => g.remove());
+      }
+
+      // ── Node click ───────────────────────────────────────────────
+      function handleNodeClick(node, el) {
+        clearGraphSelection();
+        if (antvPrimary) antvPrimary.highlightNode(node.id);
+        if (antvSecondary) antvSecondary.highlightNode(node.id);
+
+        // Select in both viewports if present
+        const idSelector = `[data-node-id="${node.id}"]`;
+        document.querySelectorAll(idSelector).forEach(n => n.classList.add('selected'));
+
+        [edgesSvg, edgesSvg2].forEach((svg, idx) => {
+          if (!svg || svg.parentElement.parentElement.style.display === 'none') return;
+          const defs = svg.querySelector('defs');
+          if (!defs) return;
+          const nLayer = idx === 0 ? nodesLayer : nodesLayer2;
+
+          svg.querySelectorAll(`path[data-source="${node.id}"], path[data-target="${node.id}"]`).forEach(p => {
+            p.classList.add('edge-highlight');
+            const sid = p.dataset.source;
+            const tid = p.dataset.target;
+            const srcEl = nLayer.querySelector(`[data-node-id="${sid}"]`);
+            const tgtEl = nLayer.querySelector(`[data-node-id="${tid}"]`);
+
+            const c1 = srcEl?.style.getPropertyValue('--node-accent') || 'rgba(255,255,255,0.4)';
+            const c2 = tgtEl?.style.getPropertyValue('--node-accent') || 'rgba(255,255,255,0.4)';
+            const gid = 'eg' + Math.random().toString(36).slice(2, 7) + idx;
+            const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+            grad.setAttribute('id', gid);
+            grad.setAttribute('class', 'edge-grad');
+            grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+
+            // Get path start/end points for userSpaceOnUse gradient
+            const d = p.getAttribute('d');
+            const m = d.match(/M\s*([\d.]+)\s*([\d.]+).*L\s*([\d.]+)\s*([\d.]+)\s*$/);
+            if (m) {
+              grad.setAttribute('x1', m[1]); grad.setAttribute('y1', m[2]);
+              grad.setAttribute('x2', m[3]); grad.setAttribute('y2', m[4]);
+            } else {
+              grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+              grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '0%');
+            }
+
+            const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', c1);
+            const s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+            s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', c2);
+            grad.append(s1, s2);
+            defs.appendChild(grad);
+            p.style.stroke = `url(#${gid})`;
+          });
+        });
+
+        // ── Highlight Source Code (runs once, outside svg loop) ──
+        if (sourceCodeLines.length > 0) {
+          const sourceLines = getNodeSourceLineMatches(node);
+          if (sourceLines.length) {
+            renderSourcePanelForMatches(sourceLines.map(line => line - 1));
+            return;
+          }
+
+          const searchStr = buildSourceSearchString(node);
+          if (searchStr) {
+            const foundLineIdx = sourceCodeLines.findIndex(line => line.includes(searchStr));
+            if (foundLineIdx !== -1) {
+              renderSourcePanelForMatches([foundLineIdx]);
+            }
+          }
+        }
+      }
+
+      // ── Semantic color map ────────────────────────────────────────
+      function buildSemanticColorMap(nodes, edges) {
+        const pipelineMap = buildPipelineSemanticColorMap(nodes);
+        const map = new Map();
+        const BOUNDARY_COLORS = { incast: '#606060', outcast: '#606060' };
+        nodes.forEach(n => {
+          if (BOUNDARY_COLORS[n.type]) {
+            map.set(n.id, BOUNDARY_COLORS[n.type]);
+          } else if (n.type === 'tensor') {
+            map.set(n.id, '#606060');
+          } else if (n.type === 'op') {
+            const c = pipelineMap.get(n.id);
+            if (c && c !== '#666666') {
+              map.set(n.id, c);
+            } else {
+              const cat = OPCODE_CATEGORY[(n.data?.opcode || '').toUpperCase()];
+              const CAT_FALLBACK = { MEMORY: '#3c7eab', CAST: '#6a6aaa' };
+              map.set(n.id, CAT_FALLBACK[cat] ?? '#666666');
+            }
+          }
+        });
+        if (edges) fixPrologColors(map, nodes, edges);
+        return map;
+      }
+
+      // ── Compiler color map (flat teal/violet palette) ─────────────
+      function buildCompilerColorMap(nodes) {
+        const map = new Map();
+        nodes.forEach(n => {
+          if (n.type === 'incast' || n.type === 'outcast') map.set(n.id, '#606060');
+          else if (n.type === 'tensor') map.set(n.id, '#3d5a72');
+          else if (n.type === 'op') map.set(n.id, '#5b3fa6');
+        });
+        return map;
+      }
+
+      // ── Graph Diff ────────────────────────────────────────────────
+      // Match source ops by semantic_label; match tensors by symbol.
+      // Returns: Map<nodeId, 'added'|'removed'|'preserved'>
+      function computeGraphDiff(srcGraph, cmpGraph) {
+        const diff = new Map();
+
+        // Collect source op semantic labels and tensor symbols
+        const srcOpLabels = new Set();
+        const srcTensorSym = new Set();
+        for (const n of srcGraph.nodes) {
+          if (n.type === 'op') {
+            const lbl = n.data.semanticLabel || n.data.opcode || n.label;
+            if (lbl) srcOpLabels.add(lbl);
+          } else if (n.type === 'tensor' || n.type === 'incast' || n.type === 'outcast') {
+            const sym = n.data.symbol || n.label;
+            if (sym) srcTensorSym.add(sym);
+          }
+        }
+
+        // Collect compiled op labels and tensor symbols
+        const cmpOpLabels = new Set();
+        const cmpTensorSym = new Set();
+        for (const n of cmpGraph.nodes) {
+          if (n.type === 'op') {
+            const lbl = n.data.semanticLabel || n.data.opcode || n.label;
+            if (lbl) cmpOpLabels.add(lbl);
+          } else {
+            const sym = n.data.symbol || n.label;
+            if (sym) cmpTensorSym.add(sym);
+          }
+        }
+
+        // Tag source nodes
+        for (const n of srcGraph.nodes) {
+          if (n.type === 'op') {
+            const lbl = n.data.semanticLabel || n.data.opcode || n.label;
+            diff.set(n.id, cmpOpLabels.has(lbl) ? 'preserved' : 'removed');
+          } else {
+            const sym = n.data.symbol || n.label;
+            diff.set(n.id, cmpTensorSym.has(sym) ? 'preserved' : 'removed');
+          }
+        }
+
+        // Tag compiled nodes
+        for (const n of cmpGraph.nodes) {
+          if (n.type === 'op') {
+            const lbl = n.data.semanticLabel || n.data.opcode || n.label;
+            diff.set(n.id, srcOpLabels.has(lbl) ? 'preserved' : 'added');
+          } else {
+            const sym = n.data.symbol || n.label;
+            diff.set(n.id, srcTensorSym.has(sym) ? 'preserved' : 'added');
+          }
+        }
+
+        return diff;
+      }
+
+      function applyDiffClasses(diff) {
+        nodesLayer.querySelectorAll('[data-node-id]').forEach(el => {
+          const id = el.dataset.nodeId;
+          el.classList.remove('node-added', 'node-removed', 'node-preserved');
+          if (diff && diff.has(id)) {
+            el.classList.add('node-' + diff.get(id));
+          }
+        });
+      }
+
+      function renderWithTransition(graph, layout, colorMap, diffMap, onReady) {
+        invalidatePipelineRender(nodesLayer);
+        // Fade out
+        graphRoot.classList.add('fading-out');
+
+        setTimeout(() => {
+          // Clear
+          nodesLayer.innerHTML = '';
+          edgesSvg.innerHTML = `<defs>
+        <marker id="arrow-default" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="rgba(255,255,255,0.15)"/>
+        </marker>
+        <marker id="arrow-incast" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="var(--incast-accent)"/>
+        </marker>
+        <marker id="arrow-op" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="var(--op-accent)"/>
+        </marker>
+        <marker id="arrow-outcast" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L6,3 z" fill="var(--outcast-accent)"/>
+        </marker>
+      </defs>`;
+
+          renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick, colorMap, 'semantic', COMPACT_OPTS);
+
+          // Apply diff classes after render
+          if (diffMap) {
+            applyDiffClasses(diffMap);
+          }
+
+          // Fade in
+          graphRoot.classList.remove('fading-out');
+          // Force reflow then animate in
+          graphRoot.style.opacity = '0';
+          graphRoot.style.transform = `translate(${tx}px, ${ty}px) scale(${scale * 0.97})`;
+          requestAnimationFrame(() => {
+            graphRoot.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            graphRoot.style.opacity = '1';
+            graphRoot.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+            setTimeout(() => {
+              graphRoot.style.transition = '';
+              if (onReady) onReady();
+            }, 320);
+          });
+        }, 210);
+      }
+
+      // ── Switch to Source View ─────────────────────────────────────
+      function switchToSource() {
+        if (currentView === 'source') return;
+        currentView = 'source';
+        btnSource.classList.add('active');
+        btnCompiler.classList.remove('active');
+        compilerBar.classList.remove('visible');
+        vtTitle.textContent = currentSourceName;
+        infoText.textContent = currentSourceInfo;
+
+        const colorMap = buildSemanticColorMap(sourceGraph.nodes, sourceGraph.edges);
+        const finalize = () => {
+          const m = sourceGraph.meta;
+          statsEl.textContent = `${m.totalNodes} nodes · ${m.totalEdges} edges · ${m.incastCount} in · ${m.outcastCount} out`;
+          legend.style.display = 'flex';
+          renderLegendItems(currentLegendItems);
+        };
+
+        if (dualMode) {
+          renderWithTransition(sourceGraph, sourceLayout, colorMap, null, () => {
+            fitView(sourceLayout);
+            finalize();
+            renderPipelineColumnView(sourceGraph, nodesLayer2, edgesSvg2, colorMap).then(layout => {
+              if (!layout) return;
+              tbLayout = layout;
+              setTimeout(() => fitView2(), 50);
+            });
+          });
+          return;
+        }
+
+        if (currentLayout === 'vertical') {
+          renderPipelineColumnView(sourceGraph, nodesLayer, edgesSvg, colorMap).then(layout => {
+            if (!layout) return;
+            sourceVerticalLayout = layout;
+            fitView(layout);
+            finalize();
+          });
+          return;
+        }
+
+        renderWithTransition(sourceGraph, sourceLayout, colorMap, null, () => {
+          fitView(sourceLayout);
+          finalize();
+        });
+      }
+
+      // ── Switch to Compiler View ───────────────────────────────────
+      function switchToCompiler() {
+        if (currentView === 'compiler') return;
+        if (!compiledGraph) {
+          // Show compiler bar first so user sees the Load button, then prompt
+          btnCompiler.classList.add('active');
+          btnSource.classList.remove('active');
+          compilerBar.classList.add('visible');
+          fileInput.click();
+          // Revert button state if user cancels — handled by fileInput change
+          fileInput.addEventListener('cancel', () => {
+            btnCompiler.classList.remove('active');
+            btnSource.classList.add('active');
+            compilerBar.classList.remove('visible');
+          }, { once: true });
+          return;
+        }
+        currentView = 'compiler';
+        btnSource.classList.remove('active');
+        btnCompiler.classList.add('active');
+        compilerBar.classList.add('visible');
+        vtTitle.textContent = 'Compiler Graph';
+        infoText.textContent = DEFAULT_INFO.compiler;
+        legend.style.display = 'none';
+
+        const colorMap = buildCompilerColorMap(compiledGraph.nodes);
+        const diffMap = computeGraphDiff(sourceGraph, compiledGraph);
+
+        // Count diff
+        let added = 0, removed = 0, preserved = 0;
+        for (const v of diffMap.values()) {
+          if (v === 'added') added++;
+          else if (v === 'removed') removed++;
+          else preserved++;
+        }
+        diffAdded.textContent = `+${added} added`;
+        diffRemoved.textContent = `-${removed} removed`;
+        diffSame.textContent = `${preserved} preserved`;
+        diffStats.style.display = 'flex';
+
+        const srcN = sourceGraph.meta.totalNodes;
+        const cmpN = compiledGraph.meta.totalNodes;
+        statsEl.textContent = `Source: ${srcN} → Compiled: ${cmpN} nodes`;
+
+        if (dualMode) {
+          renderWithTransition(compiledGraph, compiledLayout, colorMap, diffMap, () => {
+            fitView(compiledLayout);
+            renderPipelineColumnView(compiledGraph, nodesLayer2, edgesSvg2, colorMap).then(layout => {
+              if (!layout) return;
+              tbLayout = layout;
+              setTimeout(() => fitView2(), 50);
+            });
+          });
+          return;
+        }
+
+        if (currentLayout === 'vertical') {
+          renderPipelineColumnView(compiledGraph, nodesLayer, edgesSvg, colorMap).then(layout => {
+            if (!layout) return;
+            compiledVerticalLayout = layout;
+            fitView(layout);
+          });
+          return;
+        }
+
+        renderWithTransition(compiledGraph, compiledLayout, colorMap, diffMap, () => {
+          fitView(compiledLayout);
+        });
+      }
+
+      // ── File loader ───────────────────────────────────────────────
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const loadLabel = document.getElementById('vtLoadLabel');
+        loadLabel.style.opacity = '0.5';
+        loadLabel.style.pointerEvents = 'none';
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            compiledGraph = parseGraph(data);
+            compiledLayout = pipelineAwareLayout(compiledGraph, computeLayout(compiledGraph, COMPACT_OPTS), COMPACT_OPTS);
+
+            loadLabelText.textContent = file.name.replace(/_/g, '_\u200b');
+            loadLabel.style.opacity = '';
+            loadLabel.style.pointerEvents = '';
+            compilerLabel.textContent = 'Pass JSON';
+            compilerDesc.textContent = file.name;
+
+            // Auto-switch to compiler view
+            currentView = 'source'; // reset so switchToCompiler proceeds
+            switchToCompiler();
+          } catch (err) {
+            loadLabel.style.opacity = '';
+            loadLabel.style.pointerEvents = '';
+            alert('Failed to parse JSON: ' + err.message);
+            console.error(err);
+          }
+        };
+        reader.readAsText(file);
+        // reset so same file can be reloaded
+        fileInput.value = '';
+      });
+
+      // ── Layout toggle handlers ─────────────────────────────────────
+      function setLayoutIconActive(activeBtn, label) {
+        [btnHorizontal, btnVertical, btnDual].forEach(b => b.classList.remove('active'));
+        activeBtn.classList.add('active');
+        if (layoutLabel) layoutLabel.textContent = label;
+      }
+
+      function switchToHorizontalLayout() {
+        if (currentLayout === 'horizontal' && !dualMode) return;
+        dualMode = false;
+        currentLayout = 'horizontal';
+        invalidatePipelineRender(nodesLayer);
+        invalidatePipelineRender(nodesLayer2);
+        setAntvViewportVisible('primary', false);
+        setAntvViewportVisible('secondary', false);
+        canvasArea.style.flexDirection = 'column';
+        viewport.style.borderRight = 'none';
+        viewport.style.flex = '';
+        viewport2.style.display = 'none';
+        setLayoutIconActive(btnHorizontal, 'Horizontal');
+
+        const graph = currentView === 'compiler' ? compiledGraph : sourceGraph;
+        if (graph) {
+          const layout = computeLayout(graph, COMPACT_OPTS);
+          const colorMap = currentView === 'compiler' ? buildCompilerColorMap(graph.nodes) : buildSemanticColorMap(graph.nodes, graph.edges);
+          renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick, colorMap, 'semantic', COMPACT_OPTS);
+          if (currentView === 'compiler') {
+            compiledLayout = layout;
+            applyDiffClasses(computeGraphDiff(sourceGraph, compiledGraph));
+          } else {
+            sourceLayout = layout;
+          }
+          fitView(layout);
+        }
+      }
+
+      function tensorShapeStr(shape) {
+        if (!shape || !Array.isArray(shape) || shape.length === 0) return '';
+        return '[' + shape.join('×') + ']';
+      }
+
+      function tensorLabelForNode(node) {
+        return {
+          tensorId: node.id,
+          name: node.data?.symbol || node.label || node.id,
+          shape: tensorShapeStr(node.data?.shape),
+        };
+      }
+
+      function buildPipelineOpOnlyGraph(baseGraph) {
+        if (!baseGraph) return null;
+        const { nodes, edges } = baseGraph;
+        const nodeById = new Map(nodes.map(n => [n.id, n]));
+        const succ = new Map(nodes.map(n => [n.id, []]));
+        const pred = new Map(nodes.map(n => [n.id, []]));
+        for (const e of edges) {
+          succ.get(e.source)?.push(e.target);
+          pred.get(e.target)?.push(e.source);
+        }
+
+        const opNodes = nodes.filter(n => n.type === 'op');
+        const stubNodes = new Map();
+        const edgeMap = new Map();
+
+        function ensureStubNode(id, kind, pipelineHint) {
+          if (!stubNodes.has(id)) {
+            stubNodes.set(id, {
+              id,
+              type: 'stub',
+              label: kind,
+              data: { stubKind: kind, pipelineHint: pipelineHint || null }
+            });
+          } else if (pipelineHint && !stubNodes.get(id).data.pipelineHint) {
+            stubNodes.get(id).data.pipelineHint = pipelineHint;
+          }
+          return stubNodes.get(id);
+        }
+
+        function ensureEdge(source, target) {
+          const key = `${source}@@${target}`;
+          if (!edgeMap.has(key)) edgeMap.set(key, { source, target, tensorLabels: [] });
+          return edgeMap.get(key);
+        }
+
+        function pushEdgeLabel(source, target, label) {
+          const edge = ensureEdge(source, target);
+          if (!label) return edge;
+          const exists = edge.tensorLabels.some(item =>
+            item.tensorId === label.tensorId ||
+            (item.name === label.name && item.shape === label.shape)
+          );
+          if (!exists) edge.tensorLabels.push(label);
+          return edge;
+        }
+
+        for (const e of edges) {
+          const srcNode = nodeById.get(e.source);
+          const tgtNode = nodeById.get(e.target);
+          if (srcNode?.type === 'op' && tgtNode?.type === 'op') {
+            ensureEdge(e.source, e.target);
+          }
+        }
+
+        for (const node of nodes) {
+          if (node.type === 'op') continue;
+
+          const upstreamOps = (pred.get(node.id) || []).filter(id => nodeById.get(id)?.type === 'op');
+          const downstreamOps = (succ.get(node.id) || []).filter(id => nodeById.get(id)?.type === 'op');
+          const label = tensorLabelForNode(node);
+
+          if (upstreamOps.length > 0 && downstreamOps.length > 0) {
+            upstreamOps.forEach(sourceId => {
+              downstreamOps.forEach(targetId => {
+                pushEdgeLabel(sourceId, targetId, label);
+              });
+            });
+            continue;
+          }
+
+          if (downstreamOps.length > 0) {
+            downstreamOps.forEach(targetId => {
+              const targetNode = nodeById.get(targetId);
+              const parsed = targetNode ? parsePipelineLabel(getSemanticKey(targetNode)) : null;
+              const pipelineHint = parsed?.pipeline && parsed.pipeline !== 'Prolog' ? parsed.pipeline : null;
+              const stubId = `stub_in__${targetId}`;
+              ensureStubNode(stubId, 'input', pipelineHint);
+              pushEdgeLabel(stubId, targetId, label);
+            });
+            continue;
+          }
+
+          if (upstreamOps.length > 0) {
+            upstreamOps.forEach(sourceId => {
+              const sourceNode = nodeById.get(sourceId);
+              const parsed = sourceNode ? parsePipelineLabel(getSemanticKey(sourceNode)) : null;
+              const pipelineHint = parsed?.pipeline && parsed.pipeline !== 'Prolog' ? parsed.pipeline : null;
+              const stubId = `stub_out__${sourceId}`;
+              ensureStubNode(stubId, 'output', pipelineHint);
+              pushEdgeLabel(sourceId, stubId, label);
+            });
+          }
+        }
+
+        const newNodes = [...opNodes, ...stubNodes.values()];
+        const newEdges = [...edgeMap.values()];
+        return {
+          nodes: newNodes,
+          edges: newEdges,
+          meta: { ...baseGraph.meta, totalNodes: newNodes.length, totalEdges: newEdges.length }
+        };
+      }
+
+      function summarizePipelineLabels(labels, maxVisible = 2) {
+        const items = Array.isArray(labels) ? labels.filter(Boolean) : [];
+        if (items.length <= maxVisible) return items;
+        const visibleCount = Math.max(1, maxVisible - 1);
+        const visible = items.slice(0, visibleCount);
+        const hidden = items.slice(visibleCount);
+        visible.push({
+          name: `+${hidden.length} tensors`,
+          shape: '',
+          hiddenItems: hidden,
+        });
+        return visible;
+      }
+
+      function pipelineEdgeLabelText(label) {
+        if (!label) return '';
+        const name = String(label.name || '');
+        const shortName = name.length > 30 ? (name.slice(0, 27) + '...') : name;
+        if (Array.isArray(label.hiddenItems) && label.hiddenItems.length) {
+          return shortName;
+        }
+        const shortShape = label.shape && label.shape.length <= 16 ? ` ${label.shape}` : '';
+        return shortName + shortShape;
+      }
+
+      function pipelineEdgeCompactLabelText(label, options = {}) {
+        if (!label) return '';
+        const name = String(label.name || '');
+        const shape = String(label.shape || '');
+        const shortName = name.length > 20 ? (name.slice(0, 17) + '...') : name;
+        const preferShape = !!options.preferShape;
+
+        if (preferShape && shape && shape.length <= 18) {
+          return shape;
+        }
+        if (shape && shortName && shortName.length <= 14 && shape.length <= 14) {
+          return `${shortName} ${shape}`;
+        }
+        if (shortName) return shortName;
+        if (shape) return shape;
+        return '';
+      }
+
+      function pipelineEdgeDetailText(label) {
+        if (!label) return '';
+        const name = String(label.name || '');
+        return name + (label.shape ? ` ${label.shape}` : '');
+      }
+
+      function clampNumber(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function buildPipelineEdgeDisclosure(labels, options = {}) {
+        const items = Array.isArray(labels) ? labels.filter(Boolean) : [];
+        const detailItems = items
+          .slice(0, 8)
+          .map(pipelineEdgeDetailText)
+          .filter(Boolean);
+        if (items.length > 8) {
+          detailItems.push(`+${items.length - 8} more`);
+        }
+
+        const edgeSpanY = Number(options.edgeSpanY) || 0;
+        const endpointDegree = Math.max(
+          Number(options.sourceDegree) || 0,
+          Number(options.targetDegree) || 0
+        );
+        const veryDense = endpointDegree >= 5 || edgeSpanY < 56 || items.length > 4;
+        const dense = endpointDegree >= 4 || edgeSpanY < 72 || items.length > 2;
+
+        let inlineText = '';
+        let alwaysShowLabel = false;
+        let showLabelOnSelect = false;
+
+        // Rule table:
+        // 1. sparse single edge -> always show short tensor label
+        // 2. medium single edge -> always show compact shape/name
+        // 3. sparse 2-tensor edge -> always show "2 tensors"
+        // 4. dense multi edge -> only hover/select summary + tooltip
+        // 5. very dense edge -> no persistent inline label
+        if (items.length === 1) {
+          if (!dense) {
+            inlineText = pipelineEdgeLabelText(items[0]);
+            alwaysShowLabel = !!inlineText;
+          } else if (!veryDense) {
+            inlineText = pipelineEdgeCompactLabelText(items[0], { preferShape: true });
+            alwaysShowLabel = !!inlineText;
+          }
+          showLabelOnSelect = !!inlineText || !!detailItems.length;
+        } else if (items.length === 2 && !dense && edgeSpanY >= 96) {
+          inlineText = '2 tensors';
+          alwaysShowLabel = true;
+          showLabelOnSelect = true;
+        } else if (!veryDense && edgeSpanY >= 84) {
+          inlineText = `${items.length} tensors`;
+          showLabelOnSelect = true;
+        } else {
+          showLabelOnSelect = items.length > 0;
+        }
+
+        return {
+          inlineText,
+          detailText: detailItems.join('\n'),
+          alwaysShowLabel,
+          showLabelOnSelect,
+        };
+      }
+
+      function buildPipelineAntvScene(originalGraph, colorMap) {
+        const graph = buildPipelineOpOnlyGraph(originalGraph);
+        if (!graph) return null;
+
+        const { nodes, edges } = graph;
+        const nodeById = new Map(nodes.map(n => [n.id, n]));
+        const opNodes = nodes.filter(n => n.type === 'op');
+        const stubNodes = nodes.filter(n => n.type === 'stub');
+        const { nodePipeline, pipelineOrder } = assignPipelineHints(graph);
+        const sizeMap = measurePipelineNodeBoxes(nodes);
+
+        const succ = new Map(nodes.map(n => [n.id, []]));
+        const pred = new Map(nodes.map(n => [n.id, []]));
+        for (const edge of edges) {
+          succ.get(edge.source)?.push(edge.target);
+          pred.get(edge.target)?.push(edge.source);
+        }
+        const degreeMap = new Map(nodes.map(n => [
+          n.id,
+          (succ.get(n.id) || []).length + (pred.get(n.id) || []).length,
+        ]));
+
+        const inDegree = new Map(opNodes.map(n => [n.id, 0]));
+        for (const edge of edges) {
+          if (inDegree.has(edge.source) && inDegree.has(edge.target)) {
+            inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
+          }
+        }
+
+        const topoOrder = [];
+        const queue = opNodes
+          .filter(n => (inDegree.get(n.id) || 0) === 0)
+          .map(n => n.id);
+        const visited = new Set(queue);
+
+        while (queue.length) {
+          const id = queue.shift();
+          topoOrder.push(id);
+          (succ.get(id) || []).forEach(nextId => {
+            if (!inDegree.has(nextId)) return;
+            const nextDeg = (inDegree.get(nextId) || 1) - 1;
+            inDegree.set(nextId, nextDeg);
+            if (nextDeg <= 0 && !visited.has(nextId)) {
+              visited.add(nextId);
+              queue.push(nextId);
+            }
+          });
+        }
+
+        opNodes.forEach(node => {
+          if (!visited.has(node.id)) topoOrder.push(node.id);
+        });
+
+        const discovered = [...new Set(opNodes.map(node => nodePipeline.get(node.id)).filter(Boolean))];
+        const fallbackPipeline = discovered[0] || 'Main';
+        const activePipelines = pipelineOrder.filter(name => discovered.includes(name));
+        discovered.forEach(name => {
+          if (!activePipelines.includes(name)) activePipelines.push(name);
+        });
+        if (!activePipelines.length) activePipelines.push(fallbackPipeline);
+
+        const COL_W = 300;
+        const COL_GAP = 128;
+        const NODE_W = 236;
+        const NODE_V_GAP = 40;
+        const HEADER_H = 72;
+        const PAD_LEFT = 56;
+        const PAD_RIGHT = 64;
+        const PAD_BOTTOM = 88;
+        const STUB_W = 4;
+        const STUB_H = 12;
+        const STUB_OFFSET = 48;
+        const GROUP_TOP = 24;
+
+        const colX = new Map();
+        activePipelines.forEach((name, index) => {
+          colX.set(name, PAD_LEFT + index * (COL_W + COL_GAP));
+        });
+
+        const posMap = new Map();
+        const colCursor = new Map(activePipelines.map(name => [name, HEADER_H + 28]));
+
+        topoOrder.forEach((id) => {
+          const node = nodeById.get(id);
+          if (!node) return;
+          const pipeline = nodePipeline.get(id) || fallbackPipeline;
+          const size = sizeMap.get(id) || { width: NODE_W, height: 48 };
+          const nodeW = size.width || NODE_W;
+          const x = (colX.get(pipeline) || PAD_LEFT) + (COL_W - nodeW) / 2;
+          const y = colCursor.get(pipeline) || HEADER_H;
+          posMap.set(id, {
+            x,
+            y,
+            w: nodeW,
+            h: size.height,
+            pipeline,
+          });
+          colCursor.set(pipeline, y + size.height + NODE_V_GAP);
+        });
+
+        stubNodes.forEach((node) => {
+          const pipeline = nodePipeline.get(node.id) || fallbackPipeline;
+          const centerX = (colX.get(pipeline) || PAD_LEFT) + COL_W / 2;
+          const upstreamOpId = (pred.get(node.id) || []).find(id => nodeById.get(id)?.type === 'op');
+          const downstreamOpId = (succ.get(node.id) || []).find(id => nodeById.get(id)?.type === 'op');
+          const sourcePos = upstreamOpId ? posMap.get(upstreamOpId) : null;
+          const targetPos = downstreamOpId ? posMap.get(downstreamOpId) : null;
+
+          let y = HEADER_H - STUB_OFFSET;
+          if (node.data?.stubKind === 'input' && targetPos) {
+            y = Math.max(18, targetPos.y - STUB_OFFSET);
+          } else if (node.data?.stubKind === 'output' && sourcePos) {
+            y = sourcePos.y + sourcePos.h + STUB_OFFSET - STUB_H;
+          }
+
+          posMap.set(node.id, {
+            x: centerX - STUB_W / 2,
+            y,
+            w: STUB_W,
+            h: STUB_H,
+            pipeline,
+          });
+        });
+
+        const groups = [];
+        const groupBottomByPipeline = new Map();
+        activePipelines.forEach((pipeline) => {
+          const opInPipeline = opNodes
+            .map(node => ({ node, pos: posMap.get(node.id) }))
+            .filter(entry => entry.pos?.pipeline === pipeline);
+          if (!opInPipeline.length) return;
+          const minY = Math.min(...opInPipeline.map(entry => entry.pos.y));
+          const maxY = Math.max(...opInPipeline.map(entry => entry.pos.y + entry.pos.h));
+          const repNode = opInPipeline[0]?.node;
+          const color = repNode ? (colorMap?.get(repNode.id) || '#8aa3ff') : '#8aa3ff';
+          const groupY = Math.max(GROUP_TOP, minY - 56);
+          const groupH = maxY - groupY + 34;
+          groupBottomByPipeline.set(pipeline, groupY + groupH);
+          groups.push({
+            id: `pipeline_group_${pipeline.toLowerCase()}`,
+            title: pipeline,
+            x: colX.get(pipeline) || PAD_LEFT,
+            y: groupY,
+            w: COL_W,
+            h: groupH,
+            color,
+          });
+        });
+
+        const canvasW = PAD_LEFT + activePipelines.length * COL_W + Math.max(activePipelines.length - 1, 0) * COL_GAP + PAD_RIGHT;
+        const canvasH = Math.max(
+          ...Array.from(posMap.values()).map(pos => pos.y + pos.h + PAD_BOTTOM),
+          ...Array.from(groupBottomByPipeline.values()).map(val => val + PAD_BOTTOM),
+          HEADER_H + PAD_BOTTOM
+        );
+
+        const sceneNodes = nodes.map((node) => {
+          const pos = posMap.get(node.id);
+          if (!pos) return null;
+          const groupId = pos.pipeline ? `pipeline_group_${String(pos.pipeline).toLowerCase()}` : null;
+          const label = node.type === 'op'
+            ? (semanticDisplayLabelFromData(node.data) || node.label || node.id)
+            : node.label;
+          return {
+            id: node.id,
+            kind: node.type === 'op' ? 'op' : 'stub',
+            label,
+            x: pos.x,
+            y: pos.y,
+            w: pos.w,
+            h: pos.h,
+            groupId,
+            color: node.type === 'op' ? (colorMap?.get(node.id) || '#7aa2ff') : 'rgba(255,255,255,0)',
+            nodeData: node.type === 'op' ? node : null,
+          };
+        }).filter(Boolean);
+
+        const outgoingOrder = new Map();
+        const incomingOrder = new Map();
+        const edgesBySource = new Map();
+        const edgesByTarget = new Map();
+
+        edges.forEach((edge) => {
+          if (!edgesBySource.has(edge.source)) edgesBySource.set(edge.source, []);
+          if (!edgesByTarget.has(edge.target)) edgesByTarget.set(edge.target, []);
+          edgesBySource.get(edge.source).push(edge);
+          edgesByTarget.get(edge.target).push(edge);
+        });
+
+        edgesBySource.forEach((list, sourceId) => {
+          const sorted = [...list].sort((a, b) => {
+            const ap = posMap.get(a.target);
+            const bp = posMap.get(b.target);
+            return (ap?.x || 0) - (bp?.x || 0) || (ap?.y || 0) - (bp?.y || 0);
+          });
+          const mid = (sorted.length - 1) / 2;
+          sorted.forEach((edge, index) => {
+            outgoingOrder.set(`${edge.source}@@${edge.target}`, index - mid);
+          });
+        });
+
+        edgesByTarget.forEach((list, targetId) => {
+          const sorted = [...list].sort((a, b) => {
+            const ap = posMap.get(a.source);
+            const bp = posMap.get(b.source);
+            return (ap?.x || 0) - (bp?.x || 0) || (ap?.y || 0) - (bp?.y || 0);
+          });
+          const mid = (sorted.length - 1) / 2;
+          sorted.forEach((edge, index) => {
+            incomingOrder.set(`${edge.source}@@${edge.target}`, index - mid);
+          });
+        });
+
+        const sceneEdges = edges.map((edge, index) => {
+          const sp = posMap.get(edge.source);
+          const tp = posMap.get(edge.target);
+          if (!sp || !tp) return null;
+
+          const x1 = sp.x + sp.w / 2;
+          const y1 = sp.y + sp.h;
+          const x2 = tp.x + tp.w / 2;
+          const y2 = tp.y;
+          const vertices = [];
+
+          if (Math.abs(x1 - x2) >= 4) {
+            const elbowY = Math.min(y1 + 40, y1 + Math.max(26, (y2 - y1) * 0.46));
+            vertices.push({ x: x1, y: elbowY }, { x: x2, y: elbowY });
+          }
+
+          const disclosure = buildPipelineEdgeDisclosure(edge.tensorLabels || [], {
+            edgeSpanY: Math.abs(y2 - y1),
+            sourceDegree: degreeMap.get(edge.source) || 0,
+            targetDegree: degreeMap.get(edge.target) || 0,
+          });
+          const edgeKey = `${edge.source}@@${edge.target}`;
+          const outgoingLane = outgoingOrder.get(edgeKey) || 0;
+          const incomingLane = incomingOrder.get(edgeKey) || 0;
+          const labelDistance = clampNumber(
+            0.54 + (outgoingLane * 0.1) + (incomingLane * 0.06),
+            0.24,
+            0.8
+          );
+          const srcPipeline = sp.pipeline || tp.pipeline || fallbackPipeline;
+          const groupId = srcPipeline ? `pipeline_group_${String(srcPipeline).toLowerCase()}` : null;
+          return {
+            id: `pipeline_edge_${index}`,
+            source: edge.source,
+            target: edge.target,
+            vertices,
+            labelText: disclosure.inlineText,
+            labelDistance,
+            detailText: disclosure.detailText,
+            alwaysShowLabel: disclosure.alwaysShowLabel,
+            showLabelOnSelect: disclosure.showLabelOnSelect,
+            color: colorMap?.get(edge.source) || colorMap?.get(edge.target) || 'rgba(255,255,255,0.22)',
+            groupId,
+          };
+        }).filter(Boolean);
+
+        return {
+          canvasW,
+          canvasH,
+          groups,
+          nodes: sceneNodes,
+          edges: sceneEdges,
+        };
+      }
+
+      function renderPipelineColumnViewAntv(originalGraph, nodesLayer, edgesSvg, colorMap) {
+        const controller = antvControllerForPanel(nodesLayer);
+        if (!controller) return Promise.resolve(null);
+        setAntvViewportVisible(nodesLayer === nodesLayer2 ? 'secondary' : 'primary', true);
+
+        const token = beginPipelineRender(nodesLayer);
+        const scene = buildPipelineAntvScene(originalGraph, colorMap);
+        if (!isPipelineRenderCurrent(nodesLayer, token)) return Promise.resolve(null);
+        if (!scene) return Promise.resolve(null);
+
+        const layout = controller.render(scene, {
+          onNodeClick: (node) => handleNodeClick(node, null),
+          onBlankClick: () => clearGraphSelection(),
+        });
+        return Promise.resolve(layout);
+      }
+
+      function switchToVerticalLayout() {
+        if (currentLayout === 'vertical' && !dualMode) return;
+        dualMode = false;
+        currentLayout = 'vertical';
+        invalidatePipelineRender(nodesLayer2);
+        setAntvViewportVisible('primary', true);
+        setAntvViewportVisible('secondary', false);
+        canvasArea.style.flexDirection = 'column';
+        viewport.style.borderRight = 'none';
+        viewport.style.flex = '';
+        viewport2.style.display = 'none';
+        setLayoutIconActive(btnVertical, 'Vertical');
+
+        const graph = currentView === 'compiler' ? compiledGraph : sourceGraph;
+        if (graph) {
+          const targetView = currentView;
+          const colorMap = currentView === 'compiler' ? buildCompilerColorMap(graph.nodes) : buildSemanticColorMap(graph.nodes, graph.edges);
+          renderPipelineColumnView(graph, nodesLayer, edgesSvg, colorMap).then(layout => {
+            if (!layout) return;
+            if (targetView === 'compiler') compiledVerticalLayout = layout; else sourceVerticalLayout = layout;
+            if (currentLayout === 'vertical' && !dualMode && currentView === targetView) {
+              fitView(layout);
+            }
+          });
+        }
+      }
+      // ── Tab button handlers ───────────────────────────────────────
+      btnHorizontal.addEventListener('click', switchToHorizontalLayout);
+      btnVertical.addEventListener('click', switchToVerticalLayout);
+
+      btnDual.addEventListener('click', () => {
+        if (dualMode) {
+          // toggle off
+          switchToHorizontalLayout();
+          return;
+        }
+        const wasVertical = currentLayout === 'vertical';
+        dualMode = true;
+        currentLayout = 'horizontal'; // base layout stays horizontal
+        setLayoutIconActive(btnDual, 'Dual');
+        setAntvViewportVisible('primary', false);
+        setAntvViewportVisible('secondary', true);
+        canvasArea.style.flexDirection = 'row';
+        viewport.style.borderRight = '1px solid var(--border-color)';
+        viewport.style.flex = '1';
+        viewport2.style.display = 'flex';
+
+        // Ensure graph is loaded
+        const graph = currentView === 'compiler' ? compiledGraph : sourceGraph;
+        if (!graph) return;
+
+        const colorMap = currentView === 'compiler'
+          ? buildCompilerColorMap(graph.nodes)
+          : buildSemanticColorMap(graph.nodes, graph.edges);
+
+        if (wasVertical) {
+          const layout = currentView === 'compiler'
+            ? (compiledLayout || computeLayout(graph, COMPACT_OPTS))
+            : (sourceLayout || computeLayout(graph, COMPACT_OPTS));
+          renderGraph(graph, layout, nodesLayer, edgesSvg, handleNodeClick, colorMap, 'semantic', COMPACT_OPTS);
+          if (currentView === 'compiler') {
+            compiledLayout = layout;
+            applyDiffClasses(computeGraphDiff(sourceGraph, compiledGraph));
+          } else {
+            sourceLayout = layout;
+          }
+        }
+
+        renderPipelineColumnView(graph, nodesLayer2, edgesSvg2, colorMap).then(layout => {
+          if (!layout) return;
+          tbLayout = layout;
+          setTimeout(() => fitView2(), 50);
+        });
+
+        fitView(currentView === 'compiler' ? compiledLayout : sourceLayout);
+      });
+
+      // ── Initial load: Source Graph ────────────────────────────────
+      fetch(currentSourcePreset.graphUrl)
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(data => {
+          sourceGraph = parseGraph(data);
+          applySourceGraphMeta(sourceGraph);
+          sourceLayout = pipelineAwareLayout(sourceGraph, computeLayout(sourceGraph, COMPACT_OPTS), COMPACT_OPTS);
+
+          const colorMap = buildSemanticColorMap(sourceGraph.nodes, sourceGraph.edges);
+          renderGraph(sourceGraph, sourceLayout, nodesLayer, edgesSvg, handleNodeClick, colorMap, 'semantic', COMPACT_OPTS);
+
+          loading.style.display = 'none';
+          legend.style.display = 'flex';
+          infoText.textContent = currentSourceInfo;
+          renderLegendItems(currentLegendItems);
+
+          const m = sourceGraph.meta;
+          statsEl.textContent = `${m.totalNodes} nodes · ${m.totalEdges} edges · ${m.incastCount} in · ${m.outcastCount} out`;
+
+          if (currentSourceDefaultLayout === 'vertical') {
+            switchToVerticalLayout();
+          } else {
+            fitView(sourceLayout);
+          }
+        })
+        .catch(err => {
+          loading.innerHTML = `<span style="color:#e05a5a">Failed to load graph: ${err.message}</span>`;
+          console.error(err);
+        });
+
+      function edgeLabelText(label) {
+        if (!label) return '';
+        return label.name + (label.shape ? ` ${label.shape}` : '');
+      }
+
+      function estimateEdgeLabelBox(text) {
+        return {
+          width: Math.max(54, Math.min(240, Math.ceil(text.length * 6.4 + 10))),
+          height: 12,
+        };
+      }
+
+      function buildPipelineTopology(graph) {
+        const { nodes, edges } = graph;
+        const nodeById = new Map(nodes.map(n => [n.id, n]));
+        const succ = new Map(nodes.map(n => [n.id, []]));
+        const pred = new Map(nodes.map(n => [n.id, []]));
+        for (const e of edges) {
+          succ.get(e.source)?.push(e.target);
+          pred.get(e.target)?.push(e.source);
+        }
+        return { nodeById, succ, pred };
+      }
+
+      function assignPipelineHints(graph) {
+        const { nodes } = graph;
+        const { nodeById, succ, pred } = buildPipelineTopology(graph);
+        const opNodes = nodes.filter(n => n.type === 'op');
+        const stubNodes = nodes.filter(n => n.type === 'stub');
+        const PIPELINE_ORDER = ['Key', 'Query', 'Weight'];
+        const nodePipeline = new Map();
+
+        const findPipeline = (nodeId) => {
+          const node = nodeById.get(nodeId);
+          if (!node) return null;
+          if (node.type === 'stub') return node.data?.pipelineHint || null;
+          if (node.type !== 'op') return null;
+          const parsed = parsePipelineLabel(getSemanticKey(node));
+          return parsed && parsed.pipeline !== 'Prolog' ? parsed.pipeline : null;
+        };
+
+        for (const node of opNodes) {
+          const pipeline = findPipeline(node.id);
+          if (pipeline) nodePipeline.set(node.id, pipeline);
+        }
+
+        for (const node of opNodes) {
+          if (nodePipeline.has(node.id)) continue;
+          let found = null;
+          const visited = new Set([node.id]);
+          const queue = [...(succ.get(node.id) || [])];
+          while (queue.length && !found) {
+            const id = queue.shift();
+            if (visited.has(id)) continue;
+            visited.add(id);
+            const pipeline = findPipeline(id) || nodePipeline.get(id);
+            if (pipeline) {
+              found = pipeline;
+              break;
+            }
+            queue.push(...(succ.get(id) || []));
+          }
+          if (!found) {
+            const backQueue = [...(pred.get(node.id) || [])];
+            while (backQueue.length && !found) {
+              const id = backQueue.shift();
+              if (visited.has(id)) continue;
+              visited.add(id);
+              const pipeline = findPipeline(id) || nodePipeline.get(id);
+              if (pipeline) {
+                found = pipeline;
+                break;
+              }
+              backQueue.push(...(pred.get(id) || []));
+            }
+          }
+          if (found) nodePipeline.set(node.id, found);
+        }
+
+        const discovered = [...new Set(opNodes.map(node => nodePipeline.get(node.id)).filter(Boolean))];
+        const fallbackPipeline = discovered[0] || 'Main';
+        for (const node of opNodes) {
+          if (!nodePipeline.has(node.id)) nodePipeline.set(node.id, fallbackPipeline);
+        }
+        for (const node of stubNodes) {
+          if (nodePipeline.has(node.id)) continue;
+          const neighbors = [...(pred.get(node.id) || []), ...(succ.get(node.id) || [])];
+          const pipeline = neighbors.map(id => nodePipeline.get(id)).find(Boolean) || fallbackPipeline;
+          nodePipeline.set(node.id, pipeline);
+        }
+
+        const ordered = PIPELINE_ORDER.filter(name => discovered.includes(name));
+        discovered.forEach(name => {
+          if (!ordered.includes(name)) ordered.push(name);
+        });
+        if (!ordered.length) ordered.push(fallbackPipeline);
+        return { nodePipeline, pipelineOrder: ordered };
+      }
+
+      function measurePipelineNodeBoxes(nodes) {
+        const NODE_W = 236;
+        const STUB_W = 2;
+        const STUB_H = 14;
+        const sizeMap = new Map();
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;pointer-events:none;';
+        probe.style.width = NODE_W + 'px';
+        document.body.appendChild(probe);
+
+        for (const node of nodes) {
+          if (node.type !== 'op') {
+            sizeMap.set(node.id, { width: STUB_W, height: STUB_H });
+            continue;
+          }
+          const dummy = document.createElement('div');
+          dummy.className = `node-card node-card-${node.type}`;
+          dummy.dataset.compact = '';
+          dummy.style.width = NODE_W + 'px';
+          dummy.innerHTML = buildCompactOpCard(node);
+          probe.appendChild(dummy);
+          const rect = dummy.getBoundingClientRect();
+          sizeMap.set(node.id, {
+            width: NODE_W,
+            height: Math.max(Math.ceil(rect.height || 46), 34),
+          });
+          probe.innerHTML = '';
+        }
+
+        document.body.removeChild(probe);
+        return sizeMap;
+      }
+
+      function buildElkEdgePath(sections, pad = 0) {
+        if (!Array.isArray(sections) || sections.length === 0) return '';
+        return sections.map(section => {
+          const points = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
+          return points.reduce((acc, point, index) => {
+            const x = Math.round(point.x + pad);
+            const y = Math.round(point.y + pad);
+            return acc + (index === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+          }, '');
+        }).join(' ');
+      }
+
+      function fallbackLabelCenters(edge, pad = 0) {
+        if (!Array.isArray(edge?.sections) || edge.sections.length === 0) return [];
+        const centers = [];
+        edge.sections.forEach(section => {
+          const points = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
+          for (let i = 0; i < points.length - 1; i++) {
+            const a = points[i];
+            const b = points[i + 1];
+            centers.push({
+              x: (a.x + b.x) / 2 + pad,
+              y: (a.y + b.y) / 2 + pad,
+            });
+          }
+        });
+        return centers;
+      }
+
+      async function computeElkPipelineLayout(graph) {
+        return null;
+      }
+
+      async function renderPipelineColumnViewElk(originalGraph, nodesLayer, edgesSvg, colorMap) {
+        return renderPipelineColumnViewAntv(originalGraph, nodesLayer, edgesSvg, colorMap);
+      }
+
+
+      // ── Pipeline Column View ──────────────────────────────────────────────
+      // Public entry: render the vertical pipeline scene with AntV X6.
+      function renderPipelineColumnView(originalGraph, nodesLayer, edgesSvg, colorMap, options = {}) {
+        return renderPipelineColumnViewAntv(originalGraph, nodesLayer, edgesSvg, colorMap, options);
+        const graph = buildPipelineOpOnlyGraph(originalGraph);
+        const { nodes, edges } = graph;
+        const nodeById = new Map(nodes.map(n => [n.id, n]));
+        const opNodes = nodes.filter(n => n.type === 'op');
+        const stubNodes = nodes.filter(n => n.type === 'stub');
+
+        // ── 1. Build topology maps for the (potentially transformed) graph ──
+        const succ = new Map(nodes.map(n => [n.id, []]));
+        const pred = new Map(nodes.map(n => [n.id, []]));
+        for (const e of edges) {
+          succ.get(e.source)?.push(e.target);
+          pred.get(e.target)?.push(e.source);
+        }
+
+        // ── 2. Assign nodes to pipelines ──
+        const PIPELINE_ORDER = ['Key', 'Query', 'Weight'];
+        const nodePipeline = new Map();
+
+        const findPipeline = (nodeId) => {
+          const n = nodeById.get(nodeId);
+          if (!n) return null;
+          if (n.type === 'stub') return n.data?.pipelineHint || null;
+          if (n.type === 'op') {
+            const parsed = parsePipelineLabel(getSemanticKey(n));
+            if (parsed && parsed.pipeline !== 'Prolog') return parsed.pipeline;
+          }
+          return null;
+        };
+
+        for (const n of opNodes) {
+          const p = findPipeline(n.id);
+          if (p) nodePipeline.set(n.id, p);
+        }
+
+        // Assign nodes without explicit pipeline to nearest semantic lane.
+        for (const n of opNodes) {
+          if (nodePipeline.has(n.id)) continue;
+
+          let found = null;
+          const visited = new Set([n.id]);
+          const queue = [...(succ.get(n.id) || [])];
+          while (queue.length && !found) {
+            const id = queue.shift();
+            if (visited.has(id)) continue;
+            visited.add(id);
+            const p = findPipeline(id) || nodePipeline.get(id);
+            if (p) { found = p; break; }
+            queue.push(...(succ.get(id) || []));
+          }
+          if (!found) {
+            const q2 = [...(pred.get(n.id) || [])];
+            while (q2.length && !found) {
+              const id = q2.shift();
+              if (visited.has(id)) continue;
+              visited.add(id);
+              const p = findPipeline(id) || nodePipeline.get(id);
+              if (p) { found = p; break; }
+              q2.push(...(pred.get(id) || []));
+            }
+          }
+          if (found) nodePipeline.set(n.id, found);
+        }
+
+        const discoveredPipelines = [...new Set(opNodes.map(n => nodePipeline.get(n.id)).filter(Boolean))];
+        const fallbackPipeline = discoveredPipelines[0] || 'Main';
+        for (const n of opNodes) {
+          if (!nodePipeline.has(n.id)) nodePipeline.set(n.id, fallbackPipeline);
+        }
+        for (const n of stubNodes) {
+          if (nodePipeline.has(n.id)) continue;
+          const neighbors = [...(pred.get(n.id) || []), ...(succ.get(n.id) || [])];
+          const found = neighbors.map(id => nodePipeline.get(id)).find(Boolean) || fallbackPipeline;
+          nodePipeline.set(n.id, found);
+        }
+
+        const nodeCol = nodePipeline;
+
+        // ── 4. Topological sort (ops only) ──
+        const inDegree = new Map(opNodes.map(n => [n.id, 0]));
+        for (const e of edges) {
+          if (inDegree.has(e.source) && inDegree.has(e.target)) {
+            inDegree.set(e.target, (inDegree.get(e.target) || 0) + 1);
+          }
+        }
+        const topoOrder = [];
+        const topoQueue = opNodes
+          .filter(n => (inDegree.get(n.id) ?? 0) === 0)
+          .map(n => n.id);
+        const topoVisited = new Set(topoQueue);
+        while (topoQueue.length) {
+          const id = topoQueue.shift();
+          topoOrder.push(id);
+          for (const s of (succ.get(id) || [])) {
+            if (!inDegree.has(s)) continue;
+            const deg = (inDegree.get(s) || 1) - 1;
+            inDegree.set(s, deg);
+            if (deg <= 0 && !topoVisited.has(s)) { topoVisited.add(s); topoQueue.push(s); }
+          }
+        }
+        for (const n of opNodes) {
+          if (!topoVisited.has(n.id)) topoOrder.push(n.id);
+        }
+
+        // ── 5. Layout constants ──
+        const activePipelines = PIPELINE_ORDER.filter(p => discoveredPipelines.includes(p));
+        discoveredPipelines.forEach(p => {
+          if (!activePipelines.includes(p)) activePipelines.push(p);
+        });
+        if (!activePipelines.length) activePipelines.push(fallbackPipeline);
+        const COL_W = 232;
+        const COL_GAP = 72;
+        const NODE_W = 196;
+        const NODE_V_GAP = 20;
+        const HEADER_H = 46;
+        const PAD_LEFT = 44;
+        const PAD_RIGHT = 44;
+        const PAD_BOTTOM = 56;
+        const STUB_W = 2;
+        const STUB_H = 14;
+        const STUB_OFFSET = 34;
+
+        const colX = new Map(); // pipeline → left edge X of column
+        activePipelines.forEach((p, i) => {
+          colX.set(p, PAD_LEFT + i * (COL_W + COL_GAP));
+        });
+
+        // ── 6. Position op nodes per column in topo order ──
+        const posMap = new Map();
+        const colCursor = new Map(activePipelines.map(p => [p, HEADER_H + 18]));
+
+        // We'll render nodes off-screen first to measure heights, then position them
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;visibility:hidden;pointer-events:none;';
+        probe.style.width = NODE_W + 'px';
+        document.body.appendChild(probe);
+
+        const measuredH = new Map();
+
+        for (const id of topoOrder) {
+          const n = nodeById.get(id);
+          if (!n) continue;
+          const col = nodeCol.get(id);
+          if (!col || !colX.has(col)) continue;
+
+          // Measure height
+          if (!measuredH.has(id)) {
+            const dummy = document.createElement('div');
+            dummy.className = `node-card node-card-${n.type}`;
+            dummy.dataset.compact = '';
+            dummy.style.width = NODE_W + 'px';
+            dummy.innerHTML = buildCompactOpCard(n);
+            probe.appendChild(dummy);
+            const h = dummy.getBoundingClientRect().height || 44;
+            measuredH.set(id, Math.max(h, 30));
+            probe.innerHTML = '';
+          }
+
+          const h = measuredH.get(id) || 44;
+          const x = colX.get(col) + (COL_W - NODE_W) / 2;
+          const y = colCursor.get(col) || HEADER_H;
+          posMap.set(id, { x, y, w: NODE_W, h });
+          colCursor.set(col, y + h + NODE_V_GAP);
+        }
+        document.body.removeChild(probe);
+
+        // ── 7. Position hidden boundary stubs near the connected op ──
+        for (const n of stubNodes) {
+          const pipeline = nodeCol.get(n.id) || fallbackPipeline;
+          const centerX = (colX.get(pipeline) || PAD_LEFT) + COL_W / 2;
+          const upstreamOpId = (pred.get(n.id) || []).find(id => nodeById.get(id)?.type === 'op');
+          const downstreamOpId = (succ.get(n.id) || []).find(id => nodeById.get(id)?.type === 'op');
+          const sourcePos = upstreamOpId ? posMap.get(upstreamOpId) : null;
+          const targetPos = downstreamOpId ? posMap.get(downstreamOpId) : null;
+
+          let y = HEADER_H - STUB_OFFSET;
+          if (n.data?.stubKind === 'input' && targetPos) {
+            y = Math.max(18, targetPos.y - STUB_OFFSET);
+          } else if (n.data?.stubKind === 'output' && sourcePos) {
+            y = sourcePos.y + sourcePos.h + STUB_OFFSET - STUB_H;
+          }
+
+          posMap.set(n.id, { x: centerX - STUB_W / 2, y, w: STUB_W, h: STUB_H });
+        }
+
+        // ── 8. Canvas size ──
+        const positionedNodes = [...posMap.values()];
+        const maxBottom = positionedNodes.length
+          ? Math.max(...positionedNodes.map(pos => pos.y + pos.h))
+          : HEADER_H + PAD_BOTTOM;
+        const canvasW = PAD_LEFT + activePipelines.length * COL_W + Math.max(activePipelines.length - 1, 0) * COL_GAP + PAD_RIGHT;
+        const canvasH = maxBottom + PAD_BOTTOM;
+
+        // ── 9. Clear + setup SVG ──
+        nodesLayer.innerHTML = '';
+        nodesLayer.style.position = 'relative';
+
+        const svgNs = 'http://www.w3.org/2000/svg';
+        edgesSvg.setAttribute('width', canvasW);
+        edgesSvg.setAttribute('height', canvasH);
+        while (edgesSvg.children.length > 1) edgesSvg.removeChild(edgesSvg.lastChild);
+
+        const edgeGroup = document.createElementNS(svgNs, 'g');
+        edgeGroup.setAttribute('class', 'edges-group');
+
+        // Spine lines per pipeline
+        for (const p of activePipelines) {
+          const cx = colX.get(p) + COL_W / 2;
+          const maxY = colCursor.get(p) || HEADER_H;
+          const line = document.createElementNS(svgNs, 'line');
+          line.setAttribute('x1', cx); line.setAttribute('y1', HEADER_H - 6);
+          line.setAttribute('x2', cx); line.setAttribute('y2', maxY);
+          line.setAttribute('stroke', 'rgba(255,255,255,0.08)');
+          line.setAttribute('stroke-width', '1');
+          line.setAttribute('stroke-dasharray', '4 4');
+          edgeGroup.appendChild(line);
+        }
+
+        // Edges as elbow connectors
+        for (const e of edges) {
+          const sp = posMap.get(e.source);
+          const tp = posMap.get(e.target);
+          if (!sp || !tp) continue;
+
+          const x1 = sp.x + sp.w / 2;
+          const y1 = sp.y + sp.h;
+          const x2 = tp.x + tp.w / 2;
+          const y2 = tp.y;
+
+          const srcNode = nodeById.get(e.source);
+          let d;
+          let midX;
+          let midY;
+          if (Math.abs(x1 - x2) < 4) {
+            d = `M ${x1} ${y1} L ${x2} ${y2}`;
+            midX = x1;
+            midY = (y1 + y2) / 2;
+          } else {
+            const elbowY = Math.min(y1 + 20, (y1 + y2) / 2);
+            d = `M ${x1} ${y1} L ${x1} ${elbowY} L ${x2} ${elbowY} L ${x2} ${y2}`;
+            midX = (x1 + x2) / 2;
+            midY = elbowY;
+          }
+
+          const path = document.createElementNS(svgNs, 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('data-source', e.source);
+          path.setAttribute('data-target', e.target);
+          path.setAttribute('class', srcNode?.type === 'op' ? 'edge edge-op' : 'edge edge-default');
+          edgeGroup.appendChild(path);
+
+          if (e.tensorLabels?.length) {
+            const labelGroup = document.createElement('div');
+            labelGroup.className = 'vt-edge-label-group';
+            labelGroup.style.left = `${midX}px`;
+            labelGroup.style.top = `${midY}px`;
+            e.tensorLabels.forEach(label => {
+              const item = document.createElement('div');
+              item.className = 'vt-edge-label-item';
+              item.textContent = label.name + (label.shape ? ` ${label.shape}` : '');
+              labelGroup.appendChild(item);
+            });
+            nodesLayer.appendChild(labelGroup);
+          }
+        }
+        edgesSvg.appendChild(edgeGroup);
+
+        // ── 10. Pipeline header labels ──
+        for (const p of activePipelines) {
+          const cx = colX.get(p) + COL_W / 2;
+          const repOp = nodes.find(n => nodePipeline.get(n.id) === p);
+          const labelColor = repOp ? (colorMap?.get(repOp.id) || '#aaa') : '#aaa';
+
+          const labelEl = document.createElement('div');
+          labelEl.style.cssText = `position:absolute;left:${colX.get(p)}px;top:8px;width:${COL_W}px;`
+            + `text-align:center;font-size:12px;font-weight:600;font-family:var(--text-mono);`
+            + `color:${labelColor};letter-spacing:.06em;pointer-events:none;text-transform:uppercase;`;
+          labelEl.textContent = p;
+          nodesLayer.appendChild(labelEl);
+        }
+
+        // ── 11. Render all node pills ──
+        for (const [id, pos] of posMap) {
+          const n = nodeById.get(id);
+          if (!n || n.type !== 'op') continue;
+
+          const el = document.createElement('div');
+          el.style.cssText = `position:absolute;left:${pos.x}px;top:${pos.y}px;width:${pos.w}px;`;
+          el.dataset.nodeId = id;
+          el.dataset.compact = '';
+          el.className = `node-card node-card-${n.type}`;
+
+          const color = colorMap?.get(id) ?? null;
+          if (color) el.style.setProperty('--node-accent', color);
+
+          el.innerHTML = buildCompactOpCard(n);
+
+          el.addEventListener('click', ev => {
+            ev.stopPropagation();
+            handleNodeClick(n, el);
+          });
+
+          nodesLayer.appendChild(el);
+        }
+
+        return { canvasW, canvasH };
+      }
+      function pipelineAwareLayout(graph, layoutResult, options = {}) {
+        const { positions, layerNodes } = layoutResult;
+        const { nodes, edges } = graph;
+        const compact = !!options.compact;
+        const laneH = compact ? 220 : 440;
+
+        const pred = new Map(nodes.map(n => [n.id, []]));
+        const succ = new Map(nodes.map(n => [n.id, []]));
+        for (const e of edges) {
+          pred.get(e.target)?.push(e.source);
+          succ.get(e.source)?.push(e.target);
+        }
+
+        const PIPELINE_ORDER = ['Key', 'Query', 'Weight'];
+        const nodePipeline = new Map();
+
+        for (const n of nodes) {
+          if (n.type !== 'op') continue;
+          const parsed = parsePipelineLabel(getSemanticKey(n));
+          if (parsed && parsed.pipeline !== 'Prolog') nodePipeline.set(n.id, parsed.pipeline);
+        }
+
+        for (const n of nodes) {
+          if (n.type !== 'op' || nodePipeline.has(n.id)) continue;
+          const parsed = parsePipelineLabel(getSemanticKey(n));
+          if (parsed?.pipeline === 'Prolog') {
+            const visited = new Set([n.id]);
+            const queue = [...(succ.get(n.id) || [])];
+            let found = null;
+            while (queue.length && !found) {
+              const id = queue.shift();
+              if (visited.has(id)) continue;
+              visited.add(id);
+              if (nodePipeline.has(id)) { found = nodePipeline.get(id); break; }
+              queue.push(...(succ.get(id) || []));
+            }
+            if (found) nodePipeline.set(n.id, found);
+          }
+        }
+
+        const activePipelines = PIPELINE_ORDER.filter(p => [...nodePipeline.values()].includes(p));
+        const pipelineLaneY = new Map(activePipelines.map((p, i) => [p, PAD + i * laneH]));
+
+        const newY = new Map();
+        for (const n of nodes) {
+          if (n.type !== 'op') continue;
+          const lane = nodePipeline.get(n.id);
+          if (lane) {
+            newY.set(n.id, pipelineLaneY.get(lane));
+          }
+        }
+
+        function collectOpYs(nodeId) {
+          const node = nodes.find(n => n.id === nodeId);
+          if (!node) return [];
+
+          // 对于RESHAPE等MEMORY操作，需要找到它的目标pipeline
+          if (node.type === 'op' && getSemanticKey(node) === 'cat:MEMORY') {
+            const visited = new Set([nodeId]);
+            const queue = [...(succ.get(nodeId) || [])];
+            let targetLane = null;
+
+            while (queue.length > 0 && !targetLane) {
+              const id = queue.shift();
+              if (visited.has(id)) continue;
+              visited.add(id);
+
+              if (nodePipeline.has(id)) {
+                targetLane = nodePipeline.get(id);
+                break;
+              }
+              queue.push(...(succ.get(id) || []));
+            }
+
+            if (targetLane && pipelineLaneY.has(targetLane)) {
+              return [pipelineLaneY.get(targetLane)];
+            }
+          }
+
+          // 默认策略：优先下游操作，然后上游操作
+          // Priority 1: direct successor ops (bias downstream)
+          const succYs = (succ.get(nodeId) || []).filter(id => newY.has(id)).map(id => newY.get(id));
+          if (succYs.length) return succYs;
+
+          // Priority 2: direct predecessor ops
+          const predYs = (pred.get(nodeId) || []).filter(id => newY.has(id)).map(id => newY.get(id));
+          if (predYs.length) return predYs;
+
+          // Priority 3: 2-hop BFS
+          const ys = [];
+          const neighbors = [...(succ.get(nodeId) || []), ...(pred.get(nodeId) || [])];
+          for (const nb of neighbors) {
+            for (const n2 of [...(succ.get(nb) || []), ...(pred.get(nb) || [])]) {
+              if (newY.has(n2)) ys.push(newY.get(n2));
+            }
+          }
+          return ys;
+        }
+
+        // 为所有非op节点（以及没被分配的cat:MEMORY操作）计算Y坐标
+        for (const n of nodes) {
+          if (n.type === 'op' && getSemanticKey(n) !== 'cat:MEMORY') continue;
+          if (newY.has(n.id)) continue;
+
+          const ys = collectOpYs(n.id);
+          if (ys.length > 0) {
+            // 使用平均值，但偏向于最小值（更靠近顶部）
+            const avgY = ys.reduce((a, b) => a + b, 0) / ys.length;
+            const minY = Math.min(...ys);
+            // 偏向最小值，但不要过于极端
+            newY.set(n.id, Math.min(avgY, minY + 20));
+          } else {
+            newY.set(n.id, positions.get(n.id)?.y ?? PAD);
+          }
+        }
+
+        // Refined collision resolution:
+        // Instead of forcing everything down by cursor, we respect the calculated newY.
+        // We only nudge nodes down if they literally overlap, and we try to keep pipeline nodes 
+        // exactly on their lane if possible.
+        // Refined collision resolution:
+        // Separate layer nodes into "Strict" (pipeline specific ops or MEMORY ops specifically aligned)
+        // and "Flexible" (tensors, outcast, or miscellaneous ops).
+        for (const ids of layerNodes) {
+          const strictNodes = [];
+          const flexNodes = [];
+
+          for (const id of ids) {
+            const node = nodes.find(n => n.id === id);
+            const isPipeline = nodePipeline.has(id);
+            const isMemory = node?.type === 'op' && getSemanticKey(node) === 'cat:MEMORY';
+            if (isPipeline || isMemory) {
+              strictNodes.push(id);
+            } else {
+              flexNodes.push(id);
+            }
+          }
+
+          strictNodes.sort((a, b) => (newY.get(a) ?? 0) - (newY.get(b) ?? 0));
+          flexNodes.sort((a, b) => (newY.get(a) ?? 0) - (newY.get(b) ?? 0));
+
+          const occupiedBlocks = [];
+
+          // 1. Lock strict nodes 
+          for (const id of strictNodes) {
+            const h = positions.get(id)?.h ?? 44;
+            let y = newY.get(id) ?? PAD;
+
+            // Prevent strict nodes from overlapping each other by nudging slightly if needed
+            for (const block of occupiedBlocks) {
+              if (y < block.end && y + h > block.start) {
+                y = block.end + 8;
+              }
+            }
+
+            newY.set(id, y);
+            occupiedBlocks.push({ start: y, end: y + h, id });
+            occupiedBlocks.sort((a, b) => a.start - b.start);
+          }
+
+          // 2. Flow flex nodes around strict nodes
+          for (const id of flexNodes) {
+            const h = positions.get(id)?.h ?? 44;
+            let y = newY.get(id) ?? PAD;
+
+            // Push y down until it clears all occupied blocks
+            let conflict = true;
+            while (conflict) {
+              conflict = false;
+              for (const block of occupiedBlocks) {
+                // overlap check
+                if (y < block.end && y + h > block.start) {
+                  y = block.end + 8;
+                  conflict = true;
+                  break;
+                }
+              }
+            }
+
+            newY.set(id, y);
+            occupiedBlocks.push({ start: y, end: y + h, id });
+            occupiedBlocks.sort((a, b) => a.start - b.start);
+          }
+        }
+
+        const newPositions = new Map(positions);
+        for (const [id, y] of newY) {
+          const pos = newPositions.get(id);
+          if (pos) newPositions.set(id, { ...pos, y });
+        }
+        const maxBottom = Math.max(...[...newPositions.values()].map(p => p.y + p.h));
+        return { ...layoutResult, positions: newPositions, canvasH: maxBottom + PAD };
+      }
+
+    })();
+  </script>
+</body>
+
+</html>

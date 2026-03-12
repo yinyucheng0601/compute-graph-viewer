@@ -27,8 +27,16 @@ function parseSampleGraph(data) {
   const nodes = [];
   const edges = [];
   let incastIdx = 0, outcastIdx = 0;
+  const rawMeta = data.meta || {};
 
-  const TYPE_MAP = { Operation: 'op', Tensor: 'tensor', Incast: 'incast', Outcast: 'outcast' };
+  const TYPE_MAP = {
+    Operation: 'op',
+    Tensor: 'tensor',
+    Incast: 'incast',
+    Outcast: 'outcast',
+    Group: 'group',
+    Cluster: 'group',
+  };
 
   for (let i = 0; i < data.nodes.length; i++) {
     const n = data.nodes[i];
@@ -43,6 +51,20 @@ function parseSampleGraph(data) {
       dtype,
       format: 0,
       offset: n.offset || [],
+      sourceRef: n.source_ref || null,
+      sourceRefFiles: Array.isArray(n.source_files) ? n.source_files : [],
+      sourceRefLines: Array.isArray(n.source_lines) ? n.source_lines : [],
+      details: n.details || '',
+      formula: n.formula || '',
+      fusionNotes: n.fusion_notes || '',
+      weights: Array.isArray(n.weights) ? n.weights : [],
+      inputShape: n.input_shape || null,
+      outputShape: n.output_shape || null,
+      category: n.category || null,
+      layerId: n.layer_id ?? null,
+      blockType: n.block_type || null,
+      stage: n.stage || null,
+      submodule: n.submodule || null,
     };
 
     if (type === 'op') {
@@ -53,10 +75,29 @@ function parseSampleGraph(data) {
       nodeData.ioperands = [];
       nodeData.ooperands = [];
       nodeData.outShape = null;
-      nodeData.opAttr = {};
+      nodeData.opAttr = n.op_attr || {};
+      if (nodeData.formula) nodeData.opAttr.formula = nodeData.formula;
+      if (nodeData.fusionNotes) nodeData.opAttr.fusion_notes = nodeData.fusionNotes;
+      if (nodeData.details) nodeData.opAttr.details = nodeData.details;
+      if (nodeData.inputShape) nodeData.opAttr.input_shape = nodeData.inputShape;
+      if (nodeData.outputShape) nodeData.opAttr.output_shape = nodeData.outputShape;
+      if (nodeData.layerId != null) nodeData.opAttr.layer_id = nodeData.layerId;
+      if (nodeData.blockType) nodeData.opAttr.block_type = nodeData.blockType;
+      if (nodeData.stage) nodeData.opAttr.stage = nodeData.stage;
+      if (nodeData.submodule) nodeData.opAttr.submodule = nodeData.submodule;
+      if (nodeData.category) nodeData.opAttr.category = nodeData.category;
+    } else if (type === 'group') {
+      nodeData.groupType = n.group_type || n.groupType || 'tensor';
+      nodeData.members = n.members || n.member_ids || [];
+      nodeData.count = n.count ?? (Array.isArray(nodeData.members) ? nodeData.members.length : 0);
+      nodeData.title = n.title || n.name || 'Group';
+      nodeData.memFlow = n.mem_flow || n.memFlow || '';
+      nodeData.rows = n.rows || [];
+      nodeData.kind = null;
     } else {
       nodeData.symbol = n.name;
       nodeData.memId = -1;
+      nodeData.memType = n.mem_type || null;
       nodeData.kind = null;
       nodeData.lifeRange = null;
       if (type === 'incast')  { nodeData.slotIdx = incastIdx++;  nodeData.rawConnections = []; }
@@ -73,8 +114,11 @@ function parseSampleGraph(data) {
   return {
     nodes, edges,
     meta: {
-      name: data.graph_name || 'graph',
-      hash: '', funcId: 0, file: '',
+      ...rawMeta,
+      name: data.graph_name || rawMeta.name || 'graph',
+      hash: rawMeta.hash || '',
+      funcId: rawMeta.funcId || 0,
+      file: rawMeta.file || '',
       totalNodes: nodes.length, totalEdges: edges.length,
       incastCount: incastIdx, outcastCount: outcastIdx,
       opCount: nodes.filter(n => n.type === 'op').length,
@@ -162,6 +206,7 @@ function parseGraph(data) {
         format: rt.format ?? 0,
         offset: tensor.offset || [],
         memId: tensor.mem_id,
+        memType: tensor.mem_type || null,
         kind: tensor.kind,
         lifeRange: tensor.life_range,
         ...extra,
