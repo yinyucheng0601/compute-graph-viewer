@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek 架构分解 Demo</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.arch-shell {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 12px 28px;
+  background: radial-gradient(circle at 12% 12%, rgba(53, 119, 246, 0.12), transparent 32%),
+              radial-gradient(circle at 88% 16%, rgba(135, 200, 15, 0.08), transparent 34%),
+              #202020;
+}
+
+.arch-header {
+  max-width: 980px;
+  margin: 0 auto 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.arch-title {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.arch-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.arch-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.arch-flow {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.arch-link {
+  width: 2px;
+  height: 26px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06));
+  border-radius: 999px;
+}
+
+.arch-macro {
+  border: 1px solid var(--node-border);
+  background: linear-gradient(180deg, rgba(39, 39, 39, 0.96), rgba(31, 31, 31, 0.96));
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.arch-macro:hover {
+  border-color: var(--node-border-hover);
+}
+
+.arch-macro-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.arch-macro-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.arch-macro-desc {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.arch-meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.arch-expand {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--tag-border);
+  background: var(--tag-bg);
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.arch-expand:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.arch-modules {
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  display: none;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.arch-macro.open .arch-modules {
+  display: flex;
+}
+
+.arch-module {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--tag-border);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 9px 10px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.arch-module:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.arch-module.active {
+  border-color: rgba(53, 119, 246, 0.55);
+  background: rgba(53, 119, 246, 0.14);
+}
+
+.arch-module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.arch-module-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.arch-module-note {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.arch-detail {
+  margin-top: 10px;
+  border: 1px solid rgba(53, 119, 246, 0.45);
+  border-radius: 12px;
+  background: rgba(53, 119, 246, 0.08);
+  padding: 10px;
+  display: none;
+}
+
+.arch-detail.visible {
+  display: block;
+}
+
+.arch-detail-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: #d4e6ff;
+}
+
+.arch-detail-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #9ab6db;
+}
+
+.arch-kernel {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.arch-krow {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.arch-klabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.arch-kflow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.arch-kbox {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--tag-border);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+
+.arch-arrow {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.arch-hint {
+  margin-top: 9px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+@media (max-width: 860px) {
+  .arch-shell {
+    padding: 12px 10px 18px;
+  }
+
+  .arch-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .arch-chips {
+    justify-content: flex-start;
+  }
+
+  .arch-krow {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<header class="toolbar">
+  <div class="toolbar-l">
+    <a class="home-link" href="launch.html" title="Back To Home" aria-label="Back To Home">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <div class="toolbar-logo">DeepSeek 架构分解</div>
+    <span class="graph-title">Layer → Fusion → Op（Interactive Demo）</span>
+  </div>
+</header>
+
+<main class="arch-shell">
+  <section class="arch-header">
+    <div>
+      <div class="arch-title">Top-Down 架构视图：先看宏观层，再按需展开模块和关键融合细节</div>
+      <p class="arch-sub">数据来源：前端内置静态结构（v1 demo），用于演示 DeepSeek 整网层级认知路径。</p>
+    </div>
+    <div class="arch-chips">
+      <span class="stat-chip">Layers 61</span>
+      <span class="stat-chip">Dense 3 + MoE 58</span>
+      <span class="stat-chip">L3 Key Node 1</span>
+    </div>
+  </section>
+
+  <section class="arch-flow" id="archFlow"></section>
+</main>
+
+<script>
+const ARCH_DATA = [
+  {
+    id: "embedding",
+    title: "Embedding",
+    repeat: 1,
+    folded: "单次执行",
+    desc: "将输入文本转成 token 表示，并准备后续注意力所需的位置相关信号。",
+    modules: [
+      { id: "tokenize", name: "Tokenization", note: "文本切分为 token id" },
+      { id: "token-embedding", name: "Token Embedding", note: "id -> 向量表示" },
+      { id: "position-signal", name: "Position Signal", note: "位置相关信息在 Attention 内生效" }
+    ]
+  },
+  {
+    id: "attention",
+    title: "Attention",
+    repeat: 61,
+    folded: "Transformer Block ×61（折叠）",
+    desc: "在每个 block 内完成上下文建模，采用 MLA + RoPE 的注意力路径。",
+    modules: [
+      { id: "attn-rmsnorm", name: "RMSNorm", note: "注意力前归一化" },
+      { id: "attn-linear", name: "Q/KV Linear", note: "线性投影得到 Q、K、V 分支" },
+      { id: "attn-split", name: "Split", note: "拆分位置相关与非位置相关分量" },
+      { id: "attn-rope", name: "RoPE", note: "在位置相关维度注入旋转编码" },
+      { id: "attn-core", name: "Attention Core", note: "关键融合节点：PFA/ReshapeAndCache/PA" },
+      { id: "attn-out", name: "Output Linear", note: "输出投影回 hidden 维度" },
+      { id: "attn-add", name: "Residual Add", note: "与输入残差相加" }
+    ]
+  },
+  {
+    id: "ffn",
+    title: "FeedForwardNetwork",
+    repeat: 61,
+    folded: "Transformer Block ×61（折叠）",
+    desc: "逐 token 非线性变换：前 3 层 Dense FFN，后 58 层 MoE FFN。",
+    modules: [
+      { id: "ffn-rmsnorm", name: "RMSNorm", note: "FFN 前归一化" },
+      { id: "ffn-switch", name: "FFN Type Switch", note: "layer<3 走 Dense，否则走 MoE" },
+      { id: "ffn-dense", name: "Dense SwiGLU", note: "w2(silu(w1(x))*w3(x))" },
+      { id: "ffn-moe", name: "MoE Router + Experts", note: "top-k 路由到少量专家并汇总" },
+      { id: "ffn-add", name: "Residual Add", note: "输出与输入残差相加" }
+    ]
+  }
+];
+
+const state = {
+  open: new Set(),
+  activeModule: null
+};
+
+function macroChip(text) {
+  const chip = document.createElement("span");
+  chip.className = "stat-chip";
+  chip.textContent = text;
+  return chip;
+}
+
+function renderAttentionCoreDetail(container) {
+  const detail = document.createElement("div");
+  detail.className = `arch-detail${state.activeModule === "attn-core" ? " visible" : ""}`;
+  detail.innerHTML = `
+    <div class="arch-detail-title">Level 3 · Attention Core（关键节点细化）</div>
+    <div class="arch-detail-sub">推理融合算子路径：按序列长度分支执行</div>
+    <div class="arch-kernel">
+      <div class="arch-krow">
+        <div class="arch-klabel">Prefill（Q_S &gt; 1）</div>
+        <div class="arch-kflow">
+          <span class="arch-kbox">PromptFlashAttention</span>
+        </div>
+      </div>
+      <div class="arch-krow">
+        <div class="arch-klabel">Decode（Q_S = 1）</div>
+        <div class="arch-kflow">
+          <span class="arch-kbox">ReshapeAndCache</span>
+          <span class="arch-arrow">→</span>
+          <span class="arch-kbox">PagedAttention</span>
+        </div>
+      </div>
+    </div>
+    <div class="arch-hint">说明：这是推理执行融合路径（Kernel-level），不等价于论文中的宏观结构层。</div>
+  `;
+  container.appendChild(detail);
+}
+
+function render() {
+  const root = document.getElementById("archFlow");
+  root.innerHTML = "";
+
+  ARCH_DATA.forEach((layer, index) => {
+    const card = document.createElement("article");
+    card.className = `arch-macro${state.open.has(layer.id) ? " open" : ""}`;
+
+    const head = document.createElement("div");
+    head.className = "arch-macro-head";
+
+    const left = document.createElement("div");
+    left.innerHTML = `
+      <div class="arch-macro-title">${layer.title}</div>
+      <div class="arch-macro-desc">${layer.desc}</div>
+    `;
+
+    const btn = document.createElement("button");
+    btn.className = "arch-expand";
+    btn.type = "button";
+    btn.setAttribute("aria-label", `toggle ${layer.title}`);
+    btn.textContent = state.open.has(layer.id) ? "−" : "+";
+    btn.addEventListener("click", () => {
+      if (state.open.has(layer.id)) {
+        state.open.delete(layer.id);
+      } else {
+        state.open.add(layer.id);
+      }
+      render();
+    });
+
+    head.appendChild(left);
+    head.appendChild(btn);
+
+    const meta = document.createElement("div");
+    meta.className = "arch-meta";
+    meta.appendChild(macroChip(layer.repeat > 1 ? `repeat ×${layer.repeat}` : "repeat ×1"));
+    meta.appendChild(macroChip(layer.folded));
+    if (layer.id === "ffn") {
+      meta.appendChild(macroChip("Dense 3 + MoE 58"));
+    }
+
+    const modules = document.createElement("div");
+    modules.className = "arch-modules";
+
+    layer.modules.forEach((mod) => {
+      const modBtn = document.createElement("button");
+      modBtn.type = "button";
+      modBtn.className = `arch-module${state.activeModule === mod.id ? " active" : ""}`;
+      modBtn.innerHTML = `
+        <div class="arch-module-row">
+          <span class="arch-module-name">${mod.name}</span>
+          <span class="node-tag node-tag-id">L2</span>
+        </div>
+        <div class="arch-module-note">${mod.note}</div>
+      `;
+      modBtn.addEventListener("click", () => {
+        state.activeModule = state.activeModule === mod.id ? null : mod.id;
+        render();
+      });
+      modules.appendChild(modBtn);
+    });
+
+    if (layer.id === "attention") {
+      renderAttentionCoreDetail(modules);
+    }
+
+    card.appendChild(head);
+    card.appendChild(meta);
+    card.appendChild(modules);
+    root.appendChild(card);
+
+    if (index < ARCH_DATA.length - 1) {
+      const link = document.createElement("div");
+      link.className = "arch-link";
+      root.appendChild(link);
+    }
+  });
+}
+
+render();
+</script>
+</body>
+</html>

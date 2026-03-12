@@ -1,0 +1,151 @@
+{
+  "graph_name": "lightning_indexer_prolog_quant (source)",
+  "nodes": [
+    {"id": "in_x",            "type": "Incast",    "name": "x_in",               "dtype": "DT_BF16",  "shape": ["T", "H"]},
+    {"id": "in_q_norm",       "type": "Incast",    "name": "q_norm_in",           "dtype": "DT_INT8",  "shape": ["T", "q_lora_rank"]},
+    {"id": "in_q_norm_scale", "type": "Incast",    "name": "q_norm_scale_in",     "dtype": "DT_FP32",  "shape": ["T", "1"]},
+    {"id": "in_w_qb",         "type": "Incast",    "name": "w_qb_in",             "dtype": "DT_INT8",  "shape": ["q_lora_rank", "head_num*head_dim"]},
+    {"id": "in_w_qb_scale",   "type": "Incast",    "name": "w_qb_scale_in",       "dtype": "DT_FP32",  "shape": []},
+    {"id": "in_wk",           "type": "Incast",    "name": "wk_in",               "dtype": "DT_BF16",  "shape": ["H", "head_dim"]},
+    {"id": "in_w_proj",       "type": "Incast",    "name": "w_proj_in",           "dtype": "DT_BF16",  "shape": ["H", "head_num"]},
+    {"id": "in_ln_gamma_k",   "type": "Incast",    "name": "ln_gamma_k_in",       "dtype": "DT_BF16",  "shape": ["head_dim"]},
+    {"id": "in_ln_beta_k",    "type": "Incast",    "name": "ln_beta_k_in",        "dtype": "DT_BF16",  "shape": ["head_dim"]},
+    {"id": "in_cos_rope",     "type": "Incast",    "name": "cos_idx_rope_in",     "dtype": "DT_BF16",  "shape": ["T", "rope_head_dim"]},
+    {"id": "in_sin_rope",     "type": "Incast",    "name": "sin_idx_rope_in",     "dtype": "DT_BF16",  "shape": ["T", "rope_head_dim"]},
+    {"id": "in_hadamard_q",   "type": "Incast",    "name": "hadamard_q_in",       "dtype": "DT_BF16",  "shape": ["head_dim", "head_dim"]},
+    {"id": "in_hadamard_k",   "type": "Incast",    "name": "hadamard_k_in",       "dtype": "DT_BF16",  "shape": ["head_dim", "head_dim"]},
+    {"id": "in_k_cache",      "type": "Incast",    "name": "k_cache",             "dtype": "DT_INT8",  "shape": ["cache_len", "head_dim"]},
+    {"id": "in_k_cache_scale","type": "Incast",    "name": "k_cache_scale",       "dtype": "DT_FP32",  "shape": ["cache_len", "1"]},
+    {"id": "in_k_cache_idx",  "type": "Incast",    "name": "k_cache_index_in",    "dtype": "DT_INT32", "shape": ["T"]},
+
+    {"id": "op_reshape_w_qb",     "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+    {"id": "op_reshape_wk",       "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+    {"id": "op_reshape_w_proj",   "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+    {"id": "op_reshape_gamma",    "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+    {"id": "op_reshape_beta",     "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+    {"id": "op_reshape_qb_scale", "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
+
+    {"id": "t_w_qb",       "type": "Tensor", "name": "w_qb",       "dtype": "DT_INT8",  "shape": ["q_lora_rank", "head_num*head_dim"]},
+    {"id": "t_wk",         "type": "Tensor", "name": "wk",         "dtype": "DT_BF16",  "shape": ["H", "head_dim"]},
+    {"id": "t_w_proj",     "type": "Tensor", "name": "w_proj",     "dtype": "DT_BF16",  "shape": ["H", "head_num"]},
+    {"id": "t_gamma_2d",   "type": "Tensor", "name": "gamma_2d",   "dtype": "DT_BF16",  "shape": ["1", "head_dim"]},
+    {"id": "t_beta_2d",    "type": "Tensor", "name": "beta_2d",    "dtype": "DT_BF16",  "shape": ["1", "head_dim"]},
+    {"id": "t_w_qb_scale", "type": "Tensor", "name": "w_qb_scale", "dtype": "DT_FP32",  "shape": ["1", "1"]},
+
+    {"id": "op_q_linear",   "type": "Operation", "name": "MATMUL", "op_type": "A_MUL_B", "semantic_label": "Query-Linear"},
+    {"id": "t_q_s32",       "type": "Tensor",    "name": "q_s32",  "dtype": "DT_INT32", "shape": ["T", "head_num*head_dim"]},
+
+    {"id": "op_q_dequant",  "type": "Operation", "name": "CAST+MUL", "op_type": "MUL",    "semantic_label": "Query-Dequant"},
+    {"id": "t_q_cast",      "type": "Tensor",    "name": "q_cast",   "dtype": "DT_BF16",  "shape": ["T", "head_num*head_dim"]},
+
+    {"id": "op_q_hadamard", "type": "Operation", "name": "MATMUL", "op_type": "A_MUL_B", "semantic_label": "Query-Hadamard"},
+    {"id": "t_q_hadamard",  "type": "Tensor",    "name": "q_hadamard", "dtype": "DT_BF16","shape": ["T", "head_num*head_dim"]},
+
+    {"id": "op_q_prolog",   "type": "Operation", "name": "QUANT",   "op_type": "QUANT",   "semantic_label": "Prolog-Quant"},
+    {"id": "t_q_int8",      "type": "Tensor",    "name": "q_int8",  "dtype": "DT_INT8",   "shape": ["T", "head_num*head_dim"]},
+    {"id": "t_q_scale",     "type": "Tensor",    "name": "q_scale", "dtype": "DT_FP32",   "shape": ["T", "head_num"]},
+
+    {"id": "op_q_assemble", "type": "Operation", "name": "ASSEMBLE", "op_type": "ASSEMBLE", "semantic_label": "Query-Quant"},
+
+    {"id": "op_k_linear",   "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Key-Linear"},
+    {"id": "t_k_fp32",      "type": "Tensor",    "name": "k_fp32",    "dtype": "DT_FP32",    "shape": ["T", "head_dim"]},
+
+    {"id": "op_k_layernorm","type": "Operation", "name": "LAYERNORM", "op_type": "LAYERNORM","semantic_label": "Key-LayerNorm"},
+    {"id": "t_k_bf16",      "type": "Tensor",    "name": "k_bf16",    "dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
+
+    {"id": "op_k_rope",     "type": "Operation", "name": "ROPE2D",    "op_type": "ROPE2D",   "semantic_label": "Key-Rope2D"},
+    {"id": "t_k_roped",     "type": "Tensor",    "name": "k_roped",   "dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
+
+    {"id": "op_k_hadamard", "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Key-Hadamard"},
+    {"id": "t_k_hadamard",  "type": "Tensor",    "name": "k_hadamard","dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
+
+    {"id": "op_k_prolog",   "type": "Operation", "name": "QUANT",     "op_type": "QUANT",    "semantic_label": "Prolog-Quant"},
+    {"id": "t_k_int8",      "type": "Tensor",    "name": "k_int8",    "dtype": "DT_INT8",    "shape": ["T", "head_dim"]},
+    {"id": "t_k_scale",     "type": "Tensor",    "name": "k_scale",   "dtype": "DT_FP32",    "shape": ["T", "1"]},
+
+    {"id": "op_k_scatter",  "type": "Operation", "name": "SCATTER_UPDATE", "op_type": "SCATTER_UPDATE", "semantic_label": "Key-Quant"},
+
+    {"id": "op_w_linear",   "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Weight-Linear"},
+    {"id": "t_weights_fp32","type": "Tensor",    "name": "weights_fp32","dtype": "DT_FP32",   "shape": ["T", "head_num"]},
+
+    {"id": "op_w_cast",     "type": "Operation", "name": "MUL+CAST",  "op_type": "MUL",      "semantic_label": "Weight-Cast"},
+
+    {"id": "out_q_int8",    "type": "Outcast", "name": "q_int8_out",  "dtype": "DT_INT8",  "shape": ["T", "head_num*head_dim"]},
+    {"id": "out_q_scale",   "type": "Outcast", "name": "q_scale_out", "dtype": "DT_FP32",  "shape": ["T", "head_num"]},
+    {"id": "out_k_int8",    "type": "Outcast", "name": "k_int8_out",  "dtype": "DT_INT8",  "shape": ["T", "head_dim"]},
+    {"id": "out_k_scale",   "type": "Outcast", "name": "k_scale_out", "dtype": "DT_FP32",  "shape": ["T", "1"]},
+    {"id": "out_weights",   "type": "Outcast", "name": "weights_out", "dtype": "DT_BF16",  "shape": ["T", "head_num"]}
+  ],
+  "edges": [
+    {"source": "in_w_qb",         "target": "op_reshape_w_qb"},
+    {"source": "in_wk",           "target": "op_reshape_wk"},
+    {"source": "in_w_proj",       "target": "op_reshape_w_proj"},
+    {"source": "in_ln_gamma_k",   "target": "op_reshape_gamma"},
+    {"source": "in_ln_beta_k",    "target": "op_reshape_beta"},
+    {"source": "in_w_qb_scale",   "target": "op_reshape_qb_scale"},
+
+    {"source": "op_reshape_w_qb",     "target": "t_w_qb"},
+    {"source": "op_reshape_wk",       "target": "t_wk"},
+    {"source": "op_reshape_w_proj",   "target": "t_w_proj"},
+    {"source": "op_reshape_gamma",    "target": "t_gamma_2d"},
+    {"source": "op_reshape_beta",     "target": "t_beta_2d"},
+    {"source": "op_reshape_qb_scale", "target": "t_w_qb_scale"},
+
+    {"source": "in_q_norm",       "target": "op_q_linear"},
+    {"source": "t_w_qb",          "target": "op_q_linear"},
+    {"source": "op_q_linear",     "target": "t_q_s32"},
+
+    {"source": "t_q_s32",         "target": "op_q_dequant"},
+    {"source": "in_q_norm_scale", "target": "op_q_dequant"},
+    {"source": "t_w_qb_scale",    "target": "op_q_dequant"},
+    {"source": "op_q_dequant",    "target": "t_q_cast"},
+
+    {"source": "t_q_cast",        "target": "op_q_hadamard"},
+    {"source": "in_hadamard_q",   "target": "op_q_hadamard"},
+    {"source": "op_q_hadamard",   "target": "t_q_hadamard"},
+
+    {"source": "t_q_hadamard",    "target": "op_q_prolog"},
+    {"source": "op_q_prolog",     "target": "t_q_int8"},
+    {"source": "op_q_prolog",     "target": "t_q_scale"},
+
+    {"source": "t_q_int8",        "target": "op_q_assemble"},
+    {"source": "t_q_scale",       "target": "op_q_assemble"},
+    {"source": "op_q_assemble",   "target": "out_q_int8"},
+    {"source": "op_q_assemble",   "target": "out_q_scale"},
+
+    {"source": "in_x",            "target": "op_k_linear"},
+    {"source": "t_wk",            "target": "op_k_linear"},
+    {"source": "op_k_linear",     "target": "t_k_fp32"},
+
+    {"source": "t_k_fp32",        "target": "op_k_layernorm"},
+    {"source": "t_gamma_2d",      "target": "op_k_layernorm"},
+    {"source": "t_beta_2d",       "target": "op_k_layernorm"},
+    {"source": "op_k_layernorm",  "target": "t_k_bf16"},
+
+    {"source": "t_k_bf16",        "target": "op_k_rope"},
+    {"source": "in_cos_rope",     "target": "op_k_rope"},
+    {"source": "in_sin_rope",     "target": "op_k_rope"},
+    {"source": "op_k_rope",       "target": "t_k_roped"},
+
+    {"source": "t_k_roped",       "target": "op_k_hadamard"},
+    {"source": "in_hadamard_k",   "target": "op_k_hadamard"},
+    {"source": "op_k_hadamard",   "target": "t_k_hadamard"},
+
+    {"source": "t_k_hadamard",    "target": "op_k_prolog"},
+    {"source": "op_k_prolog",     "target": "t_k_int8"},
+    {"source": "op_k_prolog",     "target": "t_k_scale"},
+
+    {"source": "t_k_int8",        "target": "op_k_scatter"},
+    {"source": "in_k_cache",      "target": "op_k_scatter"},
+    {"source": "in_k_cache_idx",  "target": "op_k_scatter"},
+    {"source": "op_k_scatter",    "target": "out_k_int8"},
+    {"source": "t_k_scale",       "target": "out_k_scale"},
+
+    {"source": "in_x",            "target": "op_w_linear"},
+    {"source": "t_w_proj",        "target": "op_w_linear"},
+    {"source": "op_w_linear",     "target": "t_weights_fp32"},
+
+    {"source": "t_weights_fp32",  "target": "op_w_cast"},
+    {"source": "op_w_cast",       "target": "out_weights"}
+  ]
+}
