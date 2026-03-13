@@ -1,13 +1,13 @@
 # 基于 DeepSeek V3.2 EXP 的 PyPTO 前端六步过程分析 —— Python 代码，是怎样一步步变成初始计算图的？
 
 本文主要基于以下官方材料和真实案例展开：
-- PyPTO 官方总览：`README.md`
-- PyPTO 前端开发文档：`python/pypto/frontend/developer_doc_zh.md`
-- `pypto.frontend.jit` 官方文档：`docs/api/pypto-frontend-jit.md`
-- `pypto.frontend.dynamic` 官方文档：`docs/api/pypto-frontend-dynamic.md`
-- 精度调试文档中关于 `tensor_graph` 的说明：`docs/tutorials/debug/precision.md`
-- 真实案例：`models/deepseek_v32_exp/README.md`
-- 真实代码：`models/deepseek_v32_exp/mla_prolog_quant_impl.py`
+- PyPTO 官方总览：[README.md](https://gitcode.com/cann/pypto/blob/master/README.md)
+- PyPTO 前端开发文档：[python/pypto/frontend/developer_doc_zh.md](https://gitcode.com/cann/pypto/blob/master/python/pypto/frontend/developer_doc_zh.md)
+- `pypto.frontend.jit` 官方文档：[docs/api/pypto-frontend-jit.md](https://gitcode.com/cann/pypto/blob/master/docs/api/pypto-frontend-jit.md)
+- `pypto.frontend.dynamic` 官方文档：[docs/api/pypto-frontend-dynamic.md](https://gitcode.com/cann/pypto/blob/master/docs/api/pypto-frontend-dynamic.md)
+- 精度调试文档中关于 `tensor_graph` 的说明：[docs/tutorials/debug/precision.md](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/debug/precision.md)
+- 真实案例：[models/deepseek_v32_exp/README.md](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/README.md)
+- 真实代码：[models/deepseek_v32_exp/mla_prolog_quant_impl.py](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/mla_prolog_quant_impl.py)
 
 ## 1. 背景
 
