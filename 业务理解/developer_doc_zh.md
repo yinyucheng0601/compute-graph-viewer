@@ -15,19 +15,18 @@
 
 这个问题对产品和调试都很重要。根据 PyPTO 官方 README，PyPTO 的核心工作方式是：开发者用接近算法思维的 Python 接口描述张量计算，框架再把这些高层描述逐步翻译成更接近硬件执行的中间表示，最终生成可运行代码。这意味着从 Python 到 Pass DAG 之间，存在一段完整的"前端解析链路"，而目前工具对这段链路是盲区。
 
-## 2. 术语表
+## 2. 术语表 ！！重要
 
 | 术语 | 解释 |
 |------|------|
-| **AST**（抽象语法树）| Python 代码的语法结构图。关心代码是怎么写的（函数定义、for 循环、函数调用），而不关心最终是否会发起一次 `matmul`。 |
-| **IR**（中间表示）| 编译器内部真正用于处理和优化的图。比源码更接近执行，比最终机器代码更容易分析。PyPTO 通过多层 IR 逐步向下编译。 |
-| **惰性执行**（Lazy Execution）| 不是"偷懒执行"，而是"先不编译，等第一次真正调用时再编译"。`JitCallableWrapper` 会把 parse 和 compile 延迟到第一次 `__call__`。 |
-| **kernel** | 被 `@pypto.frontend.jit` 修饰、可被编译并执行的算子入口函数。不是操作系统内核，也不是 CUDA kernel，而是 PyPTO 前端里"一个可以单独观察、单独编译、单独执行的计算单元"。 |
-| **动态维度** | 某个 shape 维度在运行时才知道具体数值，用 `pypto.frontend.dynamic()` 定义为 `SymbolicScalar`。典型场景是 batch size、序列长度等在不同请求间会变化的维度。 |
-| **X / token_x** | 数学公式里的隐藏状态矩阵 `X`，在代码里写作 `token_x` 或 `x_in`。两者是同一个东西，不是新的算法对象。DeepSeek README 明确写了：MLA Prolog 的输入是 hidden state `X`，`token_x` 是它的代码变量名。 |
-| **隐藏状态** | 大模型在当前阶段对一个 token 的内部数值表达——不是汉字或 token id，而是一串浮点数。模型每往后算一层，这串数都会被更新一次。路径：原始文本 → tokenizer → embedding → 若干层网络 → 当前层看到的 hidden state。 |
-| **tensor（开发阶段）** | 计算图节点，是声明式描述。有四个属性：`dtype`、`shape`、`format`（内存排布）、`name`。`a + b` 这行代码不会立即执行，而是在图里留下一个加法节点。 |
-| **tensor（运行阶段）** | 内存里真实的数值块。第一次调用触发 JIT 编译，走完整链路：Tensor Graph → Tile Graph → Block Graph → Execute Graph → NPU 可执行代码，最终以 MPMD 方式调度到 NPU 各处理器核。框架在 Tile Graph 阶段自动把大 tensor 切成能放进 L1/UB 缓存的小块。数值来源分四类：① 输入激活（如 `token_x`）：前面层的计算输出；② 权重（如 `w_dq`, `w_uk`）：checkpoint 加载；③ 缓存（如 `kv_cache`）：前面时间步写入；④ 辅助配置（如 `cos/sin`, `cache_index`）：按位置规则预生成。 |
+| `AST`（抽象语法树）| 可以把它理解成"Python 代码的语法结构图"。它关心的是代码是怎么写的，比如这里是一个函数定义，那里是一个 `for` 循环，这里是一个函数调用，而不是关心最终要不要发起一次 `matmul`。 |
+| `IR`（中间表示）| 可以把它理解成"编译器内部真正拿来处理和优化的图"。它比源码更接近执行，也比最终机器代码更容易分析。官方 README 里也强调了 PyPTO 是通过多层 IR 逐步向下编译的。 |
+| `惰性执行`（Lazy Execution）| 指的不是偷懒执行，而是"先不编译，等第一次真正调用时再编译"。官方前端开发文档和 `entry.py` 都明确说明了这一点：`JitCallableWrapper` 会把真正的 parse 和 compile 延迟到第一次 `__call__`。 |
+| `kernel` | 在这里不是操作系统里的"内核"，而是"一个被 `@pypto.frontend.jit` 修饰、可以被编译并执行的算子入口函数"。对产品经理来说，可以把它理解为"一个可以单独观察、单独编译、单独执行的计算单元"。例如 `mla_prolog_quant_kernel(...)` 就是一个 kernel。 |
+| `动态维度` | 指的是某个 shape 维度在运行时才知道具体数值。官方 `pypto.frontend.dynamic` 文档把它定义为 `SymbolicScalar`，典型场景就是 batch size、序列长度这类在不同请求间会变化的维度。 |
+| `X`（token_x / x_in）| `X` 是数学公式里的记号，表示隐藏状态矩阵。到了代码里，它通常会写成 `token_x` 或 `x_in`。这两个名字不是新的算法对象，只是数学公式 `X` 的代码变量名。DeepSeek README 已经明确写了：MLA Prolog 的输入是 hidden state `X`，而代码里的 `token_x` 是这个输入张量的实现名。 |
+| `隐藏状态` | 可以理解成"大模型在当前阶段对一个 token 的内部数值理解"。它不是汉字、单词，也不是 token id，而是一串浮点数。模型每往后算一层，这串数都会被更新一次，所以叫"状态"。<br><br>如果非常粗暴地类比：大模型收到用户输入的原始文本 → tokenizer 变成 token → embedding 变成第一版向量 → 经过前面若干层网络处理 → 得到当前这一层看到的 hidden state。<br><br>所以代码里的 `X` 本质上是在说：这不是原始文本数据，而是"模型当前拿在手里的特征向量集合"。`上层网络` 就是"在这个算子之前，模型已经算过的那些部分"。对 `mla_prolog_quant_compute(...)` 来说，`X` 是它的输入，说明在它之前，已经有别的模块把文本一路处理成了 `[t,h]` 的张量，然后把这个结果交给它。 |
+| `tensor` | **开发阶段** → tensor 是"计算图节点"，开发者写的是声明式描述，有四个属性：`dtype`、`shape`、`format`（内存排布）、`name`。<br><br>**运行阶段** → tensor 是"内存里真实的数值块"。第一次调用时触发编译，走完整链路：Tensor Graph → Tile Graph → Block Graph → Execute Graph → NPU 可执行代码，最终以 MPMD 方式调度到 NPU 各处理器核。tensor 变成真实内存地址上的数组，框架在 Tile Graph 阶段自动把大 tensor 切分成能放进 L1/UB 缓存的小块执行。<br><br>**内存里的数值从哪来？** 数值来源分四类：① 输入激活（如 `token_x`）：前面层的计算输出，原始文本 → tokenizer → embedding → 若干层网络 → 当前算子；② 权重（如 `w_dq`, `w_uk`）：checkpoint 文件，运行前加载到设备内；③ 缓存（如 `kv_cache`）：前面时间步写入的状态；④ 辅助配置（如 `cos/sin`, `cache_index`）：按位置规则预生成，或运行时根据当前 token 位置算出。 |
 
 ## 3. 为什么选 DeepSeek V3.2 EXP 这个案例
 
