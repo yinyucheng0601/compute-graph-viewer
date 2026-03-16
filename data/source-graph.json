@@ -1,151 +1,3270 @@
 {
-  "graph_name": "lightning_indexer_prolog_quant (source)",
+  "graph_name": "lightning_indexer_prolog_quant · Initial IR",
+  "initialExpanded": [],
   "nodes": [
-    {"id": "in_x",            "type": "Incast",    "name": "x_in",               "dtype": "DT_BF16",  "shape": ["T", "H"]},
-    {"id": "in_q_norm",       "type": "Incast",    "name": "q_norm_in",           "dtype": "DT_INT8",  "shape": ["T", "q_lora_rank"]},
-    {"id": "in_q_norm_scale", "type": "Incast",    "name": "q_norm_scale_in",     "dtype": "DT_FP32",  "shape": ["T", "1"]},
-    {"id": "in_w_qb",         "type": "Incast",    "name": "w_qb_in",             "dtype": "DT_INT8",  "shape": ["q_lora_rank", "head_num*head_dim"]},
-    {"id": "in_w_qb_scale",   "type": "Incast",    "name": "w_qb_scale_in",       "dtype": "DT_FP32",  "shape": []},
-    {"id": "in_wk",           "type": "Incast",    "name": "wk_in",               "dtype": "DT_BF16",  "shape": ["H", "head_dim"]},
-    {"id": "in_w_proj",       "type": "Incast",    "name": "w_proj_in",           "dtype": "DT_BF16",  "shape": ["H", "head_num"]},
-    {"id": "in_ln_gamma_k",   "type": "Incast",    "name": "ln_gamma_k_in",       "dtype": "DT_BF16",  "shape": ["head_dim"]},
-    {"id": "in_ln_beta_k",    "type": "Incast",    "name": "ln_beta_k_in",        "dtype": "DT_BF16",  "shape": ["head_dim"]},
-    {"id": "in_cos_rope",     "type": "Incast",    "name": "cos_idx_rope_in",     "dtype": "DT_BF16",  "shape": ["T", "rope_head_dim"]},
-    {"id": "in_sin_rope",     "type": "Incast",    "name": "sin_idx_rope_in",     "dtype": "DT_BF16",  "shape": ["T", "rope_head_dim"]},
-    {"id": "in_hadamard_q",   "type": "Incast",    "name": "hadamard_q_in",       "dtype": "DT_BF16",  "shape": ["head_dim", "head_dim"]},
-    {"id": "in_hadamard_k",   "type": "Incast",    "name": "hadamard_k_in",       "dtype": "DT_BF16",  "shape": ["head_dim", "head_dim"]},
-    {"id": "in_k_cache",      "type": "Incast",    "name": "k_cache",             "dtype": "DT_INT8",  "shape": ["cache_len", "head_dim"]},
-    {"id": "in_k_cache_scale","type": "Incast",    "name": "k_cache_scale",       "dtype": "DT_FP32",  "shape": ["cache_len", "1"]},
-    {"id": "in_k_cache_idx",  "type": "Incast",    "name": "k_cache_index_in",    "dtype": "DT_INT32", "shape": ["T"]},
-
-    {"id": "op_reshape_w_qb",     "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-    {"id": "op_reshape_wk",       "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-    {"id": "op_reshape_w_proj",   "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-    {"id": "op_reshape_gamma",    "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-    {"id": "op_reshape_beta",     "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-    {"id": "op_reshape_qb_scale", "type": "Operation", "name": "RESHAPE", "op_type": "RESHAPE"},
-
-    {"id": "t_w_qb",       "type": "Tensor", "name": "w_qb",       "dtype": "DT_INT8",  "shape": ["q_lora_rank", "head_num*head_dim"]},
-    {"id": "t_wk",         "type": "Tensor", "name": "wk",         "dtype": "DT_BF16",  "shape": ["H", "head_dim"]},
-    {"id": "t_w_proj",     "type": "Tensor", "name": "w_proj",     "dtype": "DT_BF16",  "shape": ["H", "head_num"]},
-    {"id": "t_gamma_2d",   "type": "Tensor", "name": "gamma_2d",   "dtype": "DT_BF16",  "shape": ["1", "head_dim"]},
-    {"id": "t_beta_2d",    "type": "Tensor", "name": "beta_2d",    "dtype": "DT_BF16",  "shape": ["1", "head_dim"]},
-    {"id": "t_w_qb_scale", "type": "Tensor", "name": "w_qb_scale", "dtype": "DT_FP32",  "shape": ["1", "1"]},
-
-    {"id": "op_q_linear",   "type": "Operation", "name": "MATMUL", "op_type": "A_MUL_B", "semantic_label": "Query-Linear"},
-    {"id": "t_q_s32",       "type": "Tensor",    "name": "q_s32",  "dtype": "DT_INT32", "shape": ["T", "head_num*head_dim"]},
-
-    {"id": "op_q_dequant",  "type": "Operation", "name": "CAST+MUL", "op_type": "MUL",    "semantic_label": "Query-Dequant"},
-    {"id": "t_q_cast",      "type": "Tensor",    "name": "q_cast",   "dtype": "DT_BF16",  "shape": ["T", "head_num*head_dim"]},
-
-    {"id": "op_q_hadamard", "type": "Operation", "name": "MATMUL", "op_type": "A_MUL_B", "semantic_label": "Query-Hadamard"},
-    {"id": "t_q_hadamard",  "type": "Tensor",    "name": "q_hadamard", "dtype": "DT_BF16","shape": ["T", "head_num*head_dim"]},
-
-    {"id": "op_q_prolog",   "type": "Operation", "name": "QUANT",   "op_type": "QUANT",   "semantic_label": "Prolog-Quant"},
-    {"id": "t_q_int8",      "type": "Tensor",    "name": "q_int8",  "dtype": "DT_INT8",   "shape": ["T", "head_num*head_dim"]},
-    {"id": "t_q_scale",     "type": "Tensor",    "name": "q_scale", "dtype": "DT_FP32",   "shape": ["T", "head_num"]},
-
-    {"id": "op_q_assemble", "type": "Operation", "name": "ASSEMBLE", "op_type": "ASSEMBLE", "semantic_label": "Query-Quant"},
-
-    {"id": "op_k_linear",   "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Key-Linear"},
-    {"id": "t_k_fp32",      "type": "Tensor",    "name": "k_fp32",    "dtype": "DT_FP32",    "shape": ["T", "head_dim"]},
-
-    {"id": "op_k_layernorm","type": "Operation", "name": "LAYERNORM", "op_type": "LAYERNORM","semantic_label": "Key-LayerNorm"},
-    {"id": "t_k_bf16",      "type": "Tensor",    "name": "k_bf16",    "dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
-
-    {"id": "op_k_rope",     "type": "Operation", "name": "ROPE2D",    "op_type": "ROPE2D",   "semantic_label": "Key-Rope2D"},
-    {"id": "t_k_roped",     "type": "Tensor",    "name": "k_roped",   "dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
-
-    {"id": "op_k_hadamard", "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Key-Hadamard"},
-    {"id": "t_k_hadamard",  "type": "Tensor",    "name": "k_hadamard","dtype": "DT_BF16",    "shape": ["T", "head_dim"]},
-
-    {"id": "op_k_prolog",   "type": "Operation", "name": "QUANT",     "op_type": "QUANT",    "semantic_label": "Prolog-Quant"},
-    {"id": "t_k_int8",      "type": "Tensor",    "name": "k_int8",    "dtype": "DT_INT8",    "shape": ["T", "head_dim"]},
-    {"id": "t_k_scale",     "type": "Tensor",    "name": "k_scale",   "dtype": "DT_FP32",    "shape": ["T", "1"]},
-
-    {"id": "op_k_scatter",  "type": "Operation", "name": "SCATTER_UPDATE", "op_type": "SCATTER_UPDATE", "semantic_label": "Key-Quant"},
-
-    {"id": "op_w_linear",   "type": "Operation", "name": "MATMUL",    "op_type": "A_MUL_B",  "semantic_label": "Weight-Linear"},
-    {"id": "t_weights_fp32","type": "Tensor",    "name": "weights_fp32","dtype": "DT_FP32",   "shape": ["T", "head_num"]},
-
-    {"id": "op_w_cast",     "type": "Operation", "name": "MUL+CAST",  "op_type": "MUL",      "semantic_label": "Weight-Cast"},
-
-    {"id": "out_q_int8",    "type": "Outcast", "name": "q_int8_out",  "dtype": "DT_INT8",  "shape": ["T", "head_num*head_dim"]},
-    {"id": "out_q_scale",   "type": "Outcast", "name": "q_scale_out", "dtype": "DT_FP32",  "shape": ["T", "head_num"]},
-    {"id": "out_k_int8",    "type": "Outcast", "name": "k_int8_out",  "dtype": "DT_INT8",  "shape": ["T", "head_dim"]},
-    {"id": "out_k_scale",   "type": "Outcast", "name": "k_scale_out", "dtype": "DT_FP32",  "shape": ["T", "1"]},
-    {"id": "out_weights",   "type": "Outcast", "name": "weights_out", "dtype": "DT_BF16",  "shape": ["T", "head_num"]}
+    {
+      "id": "in_x_in",
+      "type": "Incast",
+      "name": "x_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "T",
+        "H"
+      ]
+    },
+    {
+      "id": "in_q_norm_in",
+      "type": "Incast",
+      "name": "q_norm_in",
+      "dtype": "DT_INT8",
+      "shape": [
+        "T",
+        "q_lora_rank"
+      ]
+    },
+    {
+      "id": "in_q_norm_scale_in",
+      "type": "Incast",
+      "name": "q_norm_scale_in",
+      "dtype": "DT_FP32",
+      "shape": [
+        "T",
+        "1"
+      ]
+    },
+    {
+      "id": "in_w_qb_in",
+      "type": "Incast",
+      "name": "w_qb_in",
+      "dtype": "DT_INT8",
+      "shape": [
+        "q_lora_rank",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "in_w_qb_scale_in",
+      "type": "Incast",
+      "name": "w_qb_scale_in",
+      "dtype": "DT_FP32",
+      "shape": [
+        "head_num*head_dim",
+        "1"
+      ]
+    },
+    {
+      "id": "in_wk_in",
+      "type": "Incast",
+      "name": "wk_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "H",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_w_proj_in",
+      "type": "Incast",
+      "name": "w_proj_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "H",
+        "head_num"
+      ]
+    },
+    {
+      "id": "in_ln_gamma_k_in",
+      "type": "Incast",
+      "name": "ln_gamma_k_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_ln_beta_k_in",
+      "type": "Incast",
+      "name": "ln_beta_k_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_cos_idx_rope_in",
+      "type": "Incast",
+      "name": "cos_idx_rope_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "T",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "in_sin_idx_rope_in",
+      "type": "Incast",
+      "name": "sin_idx_rope_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "T",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "in_hadamard_q_in",
+      "type": "Incast",
+      "name": "hadamard_q_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "head_dim",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_hadamard_k_in",
+      "type": "Incast",
+      "name": "hadamard_k_in",
+      "dtype": "DT_BF16",
+      "shape": [
+        "head_dim",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_k_cache",
+      "type": "Incast",
+      "name": "k_cache",
+      "dtype": "DT_INT8",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "in_k_cache_scale",
+      "type": "Incast",
+      "name": "k_cache_scale",
+      "dtype": "DT_FP16",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "1"
+      ]
+    },
+    {
+      "id": "in_k_cache_index_in",
+      "type": "Incast",
+      "name": "k_cache_index_in",
+      "dtype": "DT_INT64",
+      "shape": [
+        "T"
+      ]
+    },
+    {
+      "id": "out_q_int8_out",
+      "type": "Outcast",
+      "name": "q_int8_out",
+      "dtype": "DT_INT8",
+      "shape": [
+        "T",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "out_q_scale_out",
+      "type": "Outcast",
+      "name": "q_scale_out",
+      "dtype": "DT_FP16",
+      "shape": [
+        "T",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "out_k_int8_out",
+      "type": "Outcast",
+      "name": "k_int8_out",
+      "dtype": "DT_INT8",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "out_k_scale_out",
+      "type": "Outcast",
+      "name": "k_scale_out",
+      "dtype": "DT_FP16",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "1"
+      ]
+    },
+    {
+      "id": "out_weights_out",
+      "type": "Outcast",
+      "name": "weights_out",
+      "dtype": "DT_FP16",
+      "shape": [
+        "T",
+        "head_num"
+      ]
+    },
+    {
+      "id": "grp_loop_reshape",
+      "type": "Group",
+      "name": "LOOP_RESHAPE"
+    },
+    {
+      "id": "grp_main_loop",
+      "type": "Group",
+      "name": "loop_unroll · IndexerPrologQuantQuantLoop"
+    },
+    {
+      "id": "grp_tile_prep",
+      "type": "Group",
+      "name": "Tile 准备",
+      "parentId": "grp_main_loop"
+    },
+    {
+      "id": "grp_query",
+      "type": "Group",
+      "name": "Query 支路",
+      "parentId": "grp_main_loop"
+    },
+    {
+      "id": "grp_q_linear",
+      "type": "Group",
+      "name": "Query-Linear",
+      "parentId": "grp_query"
+    },
+    {
+      "id": "grp_q_dequant",
+      "type": "Group",
+      "name": "Query-Dequant",
+      "parentId": "grp_query"
+    },
+    {
+      "id": "grp_q_rope3d",
+      "type": "Group",
+      "name": "Query-Rope3D",
+      "parentId": "grp_query"
+    },
+    {
+      "id": "grp_q_hadamard",
+      "type": "Group",
+      "name": "Query-Hadamard",
+      "parentId": "grp_query"
+    },
+    {
+      "id": "grp_q_quant",
+      "type": "Group",
+      "name": "Query-Quant",
+      "parentId": "grp_query"
+    },
+    {
+      "id": "grp_key",
+      "type": "Group",
+      "name": "Key 支路",
+      "parentId": "grp_main_loop"
+    },
+    {
+      "id": "grp_k_linear",
+      "type": "Group",
+      "name": "Key-Linear",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_k_layernorm",
+      "type": "Group",
+      "name": "Key-LayerNorm",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_k_rope2d",
+      "type": "Group",
+      "name": "Key-Rope2D",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_k_hadamard",
+      "type": "Group",
+      "name": "Key-Hadamard",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_k_quant",
+      "type": "Group",
+      "name": "Key-Quant",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_k_scatter",
+      "type": "Group",
+      "name": "Key-ScatterUpdate",
+      "parentId": "grp_key"
+    },
+    {
+      "id": "grp_weight",
+      "type": "Group",
+      "name": "Weight 支路",
+      "parentId": "grp_main_loop"
+    },
+    {
+      "id": "op_reshape",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_k_cache_index",
+      "type": "Tensor",
+      "name": "k_cache_index",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_INT64",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_reshape_1",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_w_qb_scale",
+      "type": "Tensor",
+      "name": "w_qb_scale",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_FP32",
+      "shape": [
+        "1",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_2",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_gamma_2d",
+      "type": "Tensor",
+      "name": "gamma_2d",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_BF16",
+      "shape": [
+        "1",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_3",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_beta_2d",
+      "type": "Tensor",
+      "name": "beta_2d",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_BF16",
+      "shape": [
+        "1",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_4",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_w_qb",
+      "type": "Tensor",
+      "name": "w_qb",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_INT8",
+      "shape": [
+        "q_lora_rank",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_5",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_wk",
+      "type": "Tensor",
+      "name": "wk",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_BF16",
+      "shape": [
+        "H",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_6",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_loop_reshape",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_w_proj",
+      "type": "Tensor",
+      "name": "w_proj",
+      "parentId": "grp_loop_reshape",
+      "dtype": "DT_BF16",
+      "shape": [
+        "H",
+        "head_num"
+      ]
+    },
+    {
+      "id": "op_view",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_tile_prep",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_norm",
+      "type": "Tensor",
+      "name": "q_norm",
+      "parentId": "grp_tile_prep",
+      "dtype": "DT_INT8",
+      "shape": [
+        "t_tile",
+        "q_lora_rank"
+      ]
+    },
+    {
+      "id": "op_view_1",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_tile_prep",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_norm_scale",
+      "type": "Tensor",
+      "name": "q_norm_scale",
+      "parentId": "grp_tile_prep",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_view_2",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_tile_prep",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_x_tile",
+      "type": "Tensor",
+      "name": "x_tile",
+      "parentId": "grp_tile_prep",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "H"
+      ]
+    },
+    {
+      "id": "op_view_3",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_tile_prep",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_rope_cos",
+      "type": "Tensor",
+      "name": "rope_cos",
+      "parentId": "grp_tile_prep",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_view_4",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_tile_prep",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_rope_sin",
+      "type": "Tensor",
+      "name": "rope_sin",
+      "parentId": "grp_tile_prep",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_a_mul_b",
+      "type": "Operation",
+      "name": "MATMUL",
+      "parentId": "grp_q_linear",
+      "op_type": "A_MUL_B",
+      "semantic_label": "Query-Linear"
+    },
+    {
+      "id": "t_q_s32",
+      "type": "Tensor",
+      "name": "q_s32",
+      "parentId": "grp_q_linear",
+      "dtype": "DT_INT32",
+      "shape": [
+        "t_tile",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_cast",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_dequant",
+      "op_type": "CAST",
+      "semantic_label": "Query-Dequant"
+    },
+    {
+      "id": "t_q_f32",
+      "type": "Tensor",
+      "name": "q_f32",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_mul",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_dequant",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_f32_normed",
+      "type": "Tensor",
+      "name": "q_f32_normed",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_1",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_dequant",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_f32_wt",
+      "type": "Tensor",
+      "name": "q_f32_wt",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_1",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_dequant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_cast",
+      "type": "Tensor",
+      "name": "q_cast",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num*head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_7",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_q_dequant",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_q_bf16",
+      "type": "Tensor",
+      "name": "q_bf16",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_view_5",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_q_dequant",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_rope_slice",
+      "type": "Tensor",
+      "name": "q_rope_slice",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_view_6",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_q_dequant",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_nope_slice",
+      "type": "Tensor",
+      "name": "q_nope_slice",
+      "parentId": "grp_q_dequant",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_2",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_cos_fp32",
+      "type": "Tensor",
+      "name": "q_cos_fp32",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_3",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_sin_fp32",
+      "type": "Tensor",
+      "name": "q_sin_fp32",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_4",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_rope_fp32",
+      "type": "Tensor",
+      "name": "q_rope_fp32",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_8",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_q_rope3d",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_q_cos_3d",
+      "type": "Tensor",
+      "name": "q_cos_3d",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_9",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_q_rope3d",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_q_sin_3d",
+      "type": "Tensor",
+      "name": "q_sin_3d",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_view_7",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_q_rope3d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_rh_x1",
+      "type": "Tensor",
+      "name": "q_rh_x1",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_view_8",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_q_rope3d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_q_rh_x2",
+      "type": "Tensor",
+      "name": "q_rh_x2",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_mul_2",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_rope3d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_rh_neg",
+      "type": "Tensor",
+      "name": "q_rh_neg",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_concat",
+      "type": "Operation",
+      "name": "CONCAT",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CONCAT"
+    },
+    {
+      "id": "t_q_rh",
+      "type": "Tensor",
+      "name": "q_rh",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_3",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_rope3d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_x_cos",
+      "type": "Tensor",
+      "name": "q_x_cos",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_4",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_rope3d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_rh_sin",
+      "type": "Tensor",
+      "name": "q_rh_sin",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_add",
+      "type": "Operation",
+      "name": "ADD",
+      "parentId": "grp_q_rope3d",
+      "op_type": "ADD"
+    },
+    {
+      "id": "t_q_embed",
+      "type": "Tensor",
+      "name": "q_embed",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_5",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_roped",
+      "type": "Tensor",
+      "name": "q_roped",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_6",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_nope_fp32",
+      "type": "Tensor",
+      "name": "q_nope_fp32",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_7",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_nope_bf16",
+      "type": "Tensor",
+      "name": "q_nope_bf16",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_concat_1",
+      "type": "Operation",
+      "name": "CONCAT",
+      "parentId": "grp_q_rope3d",
+      "op_type": "CONCAT"
+    },
+    {
+      "id": "t_q_concat",
+      "type": "Tensor",
+      "name": "q_concat",
+      "parentId": "grp_q_rope3d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_10",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_q_hadamard",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_hadamard_q",
+      "type": "Tensor",
+      "name": "hadamard_q",
+      "parentId": "grp_q_hadamard",
+      "dtype": "DT_BF16",
+      "shape": [
+        "1",
+        "head_dim",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_a_mul_b_1",
+      "type": "Operation",
+      "name": "MATMUL",
+      "parentId": "grp_q_hadamard",
+      "op_type": "A_MUL_B",
+      "semantic_label": "Query-Hadamard"
+    },
+    {
+      "id": "t_q_hadamard",
+      "type": "Tensor",
+      "name": "q_hadamard",
+      "parentId": "grp_q_hadamard",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_8",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_quant",
+      "op_type": "CAST",
+      "semantic_label": "Query-Quant"
+    },
+    {
+      "id": "t_q_hd_fp32",
+      "type": "Tensor",
+      "name": "q_hd_fp32",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_abs",
+      "type": "Operation",
+      "name": "ABS",
+      "parentId": "grp_q_quant",
+      "op_type": "ABS"
+    },
+    {
+      "id": "t_q_abs",
+      "type": "Tensor",
+      "name": "q_abs",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_amax",
+      "type": "Operation",
+      "name": "AMAX",
+      "parentId": "grp_q_quant",
+      "op_type": "AMAX"
+    },
+    {
+      "id": "t_q_amax",
+      "type": "Tensor",
+      "name": "q_amax",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_full",
+      "type": "Operation",
+      "name": "FULL",
+      "parentId": "grp_q_quant",
+      "op_type": "FULL"
+    },
+    {
+      "id": "t_q_127",
+      "type": "Tensor",
+      "name": "q_127",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_div",
+      "type": "Operation",
+      "name": "DIV",
+      "parentId": "grp_q_quant",
+      "op_type": "DIV"
+    },
+    {
+      "id": "t_q_sq",
+      "type": "Tensor",
+      "name": "q_sq",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_mul_5",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_q_quant",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_q_qscaled",
+      "type": "Tensor",
+      "name": "q_qscaled",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_9",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_qi32",
+      "type": "Tensor",
+      "name": "q_qi32",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_INT32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_10",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_qf16",
+      "type": "Tensor",
+      "name": "q_qf16",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_11",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_int8",
+      "type": "Tensor",
+      "name": "q_int8",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_INT8",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_full_1",
+      "type": "Operation",
+      "name": "FULL",
+      "parentId": "grp_q_quant",
+      "op_type": "FULL"
+    },
+    {
+      "id": "t_q_one",
+      "type": "Tensor",
+      "name": "q_one",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_div_1",
+      "type": "Operation",
+      "name": "DIV",
+      "parentId": "grp_q_quant",
+      "op_type": "DIV"
+    },
+    {
+      "id": "t_q_deq",
+      "type": "Tensor",
+      "name": "q_deq",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_cast_12",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_q_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_q_scale_fp16",
+      "type": "Tensor",
+      "name": "q_scale_fp16",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_assemble",
+      "type": "Operation",
+      "name": "ASSEMBLE",
+      "parentId": "grp_q_quant",
+      "op_type": "ASSEMBLE",
+      "semantic_label": "Query-Quant"
+    },
+    {
+      "id": "t_q_asm_int8",
+      "type": "Tensor",
+      "name": "q_asm_int8",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_INT8",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_assemble_1",
+      "type": "Operation",
+      "name": "ASSEMBLE",
+      "parentId": "grp_q_quant",
+      "op_type": "ASSEMBLE",
+      "semantic_label": "Query-Quant"
+    },
+    {
+      "id": "t_q_asm_scale",
+      "type": "Tensor",
+      "name": "q_asm_scale",
+      "parentId": "grp_q_quant",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_num",
+        "1"
+      ]
+    },
+    {
+      "id": "op_a_mul_b_2",
+      "type": "Operation",
+      "name": "MATMUL",
+      "parentId": "grp_k_linear",
+      "op_type": "A_MUL_B",
+      "semantic_label": "Key-Linear"
+    },
+    {
+      "id": "t_k_fp32",
+      "type": "Tensor",
+      "name": "k_fp32",
+      "parentId": "grp_k_linear",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_13",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_layernorm",
+      "op_type": "CAST",
+      "semantic_label": "Key-LayerNorm"
+    },
+    {
+      "id": "t_ln_x",
+      "type": "Tensor",
+      "name": "ln_x",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_6",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_layernorm",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_ln_xs",
+      "type": "Tensor",
+      "name": "ln_xs",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_sum",
+      "type": "Operation",
+      "name": "SUM",
+      "parentId": "grp_k_layernorm",
+      "op_type": "SUM"
+    },
+    {
+      "id": "t_ln_mean",
+      "type": "Tensor",
+      "name": "ln_mean",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_sub",
+      "type": "Operation",
+      "name": "SUB",
+      "parentId": "grp_k_layernorm",
+      "op_type": "SUB"
+    },
+    {
+      "id": "t_ln_diff",
+      "type": "Tensor",
+      "name": "ln_diff",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_7",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_layernorm",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_ln_diff2",
+      "type": "Tensor",
+      "name": "ln_diff2",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_8",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_layernorm",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_ln_var_s",
+      "type": "Tensor",
+      "name": "ln_var_s",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_sum_1",
+      "type": "Operation",
+      "name": "SUM",
+      "parentId": "grp_k_layernorm",
+      "op_type": "SUM"
+    },
+    {
+      "id": "t_ln_var",
+      "type": "Tensor",
+      "name": "ln_var",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_add_1",
+      "type": "Operation",
+      "name": "ADD",
+      "parentId": "grp_k_layernorm",
+      "op_type": "ADD"
+    },
+    {
+      "id": "t_ln_var_eps",
+      "type": "Tensor",
+      "name": "ln_var_eps",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_sqrt",
+      "type": "Operation",
+      "name": "SQRT",
+      "parentId": "grp_k_layernorm",
+      "op_type": "SQRT"
+    },
+    {
+      "id": "t_ln_std",
+      "type": "Tensor",
+      "name": "ln_std",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_div_2",
+      "type": "Operation",
+      "name": "DIV",
+      "parentId": "grp_k_layernorm",
+      "op_type": "DIV"
+    },
+    {
+      "id": "t_ln_norm",
+      "type": "Tensor",
+      "name": "ln_norm",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_14",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_layernorm",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_ln_gamma_fp32",
+      "type": "Tensor",
+      "name": "ln_gamma_fp32",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "1",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_15",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_layernorm",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_ln_beta_fp32",
+      "type": "Tensor",
+      "name": "ln_beta_fp32",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "1",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_9",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_layernorm",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_ln_rg",
+      "type": "Tensor",
+      "name": "ln_rg",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_add_2",
+      "type": "Operation",
+      "name": "ADD",
+      "parentId": "grp_k_layernorm",
+      "op_type": "ADD"
+    },
+    {
+      "id": "t_ln_rgb",
+      "type": "Tensor",
+      "name": "ln_rgb",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_16",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_layernorm",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_bf16",
+      "type": "Tensor",
+      "name": "k_bf16",
+      "parentId": "grp_k_layernorm",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_view_9",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_k_rope2d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_k_rope_slice",
+      "type": "Tensor",
+      "name": "k_rope_slice",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_view_10",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_k_rope2d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_k_nope_slice",
+      "type": "Tensor",
+      "name": "k_nope_slice",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_17",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST",
+      "semantic_label": "Key-Rope2D"
+    },
+    {
+      "id": "t_k_cos_fp32",
+      "type": "Tensor",
+      "name": "k_cos_fp32",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_18",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_sin_fp32",
+      "type": "Tensor",
+      "name": "k_sin_fp32",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_19",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_rope_fp32",
+      "type": "Tensor",
+      "name": "k_rope_fp32",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_view_11",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_k_rope2d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_k_rh_x1",
+      "type": "Tensor",
+      "name": "k_rh_x1",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_view_12",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_k_rope2d",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_k_rh_x2",
+      "type": "Tensor",
+      "name": "k_rh_x2",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_mul_10",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_rope2d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_k_rh_neg",
+      "type": "Tensor",
+      "name": "k_rh_neg",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim//2"
+      ]
+    },
+    {
+      "id": "op_concat_2",
+      "type": "Operation",
+      "name": "CONCAT",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CONCAT"
+    },
+    {
+      "id": "t_k_rh",
+      "type": "Tensor",
+      "name": "k_rh",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_11",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_rope2d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_k_x_cos",
+      "type": "Tensor",
+      "name": "k_x_cos",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_mul_12",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_rope2d",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_k_rh_sin",
+      "type": "Tensor",
+      "name": "k_rh_sin",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_add_3",
+      "type": "Operation",
+      "name": "ADD",
+      "parentId": "grp_k_rope2d",
+      "op_type": "ADD"
+    },
+    {
+      "id": "t_k_embed",
+      "type": "Tensor",
+      "name": "k_embed",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_20",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_roped",
+      "type": "Tensor",
+      "name": "k_roped",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_21",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_nope_fp32",
+      "type": "Tensor",
+      "name": "k_nope_fp32",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_22",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_nope_bf16",
+      "type": "Tensor",
+      "name": "k_nope_bf16",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_dim-rope_head_dim"
+      ]
+    },
+    {
+      "id": "op_concat_3",
+      "type": "Operation",
+      "name": "CONCAT",
+      "parentId": "grp_k_rope2d",
+      "op_type": "CONCAT"
+    },
+    {
+      "id": "t_k_concat",
+      "type": "Tensor",
+      "name": "k_concat",
+      "parentId": "grp_k_rope2d",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_a_mul_b_3",
+      "type": "Operation",
+      "name": "MATMUL",
+      "parentId": "grp_k_hadamard",
+      "op_type": "A_MUL_B",
+      "semantic_label": "Key-Hadamard"
+    },
+    {
+      "id": "t_hadamard_k",
+      "type": "Tensor",
+      "name": "hadamard_k",
+      "parentId": "grp_k_hadamard",
+      "dtype": "DT_BF16",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_23",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_quant",
+      "op_type": "CAST",
+      "semantic_label": "Key-Quant"
+    },
+    {
+      "id": "t_k_hd_fp32",
+      "type": "Tensor",
+      "name": "k_hd_fp32",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_abs_1",
+      "type": "Operation",
+      "name": "ABS",
+      "parentId": "grp_k_quant",
+      "op_type": "ABS"
+    },
+    {
+      "id": "t_k_abs",
+      "type": "Tensor",
+      "name": "k_abs",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_amax_1",
+      "type": "Operation",
+      "name": "AMAX",
+      "parentId": "grp_k_quant",
+      "op_type": "AMAX"
+    },
+    {
+      "id": "t_k_amax",
+      "type": "Tensor",
+      "name": "k_amax",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_full_2",
+      "type": "Operation",
+      "name": "FULL",
+      "parentId": "grp_k_quant",
+      "op_type": "FULL"
+    },
+    {
+      "id": "t_k_127",
+      "type": "Tensor",
+      "name": "k_127",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_div_3",
+      "type": "Operation",
+      "name": "DIV",
+      "parentId": "grp_k_quant",
+      "op_type": "DIV"
+    },
+    {
+      "id": "t_k_sq",
+      "type": "Tensor",
+      "name": "k_sq",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_mul_13",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_k_quant",
+      "op_type": "MUL"
+    },
+    {
+      "id": "t_k_qscaled",
+      "type": "Tensor",
+      "name": "k_qscaled",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_24",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_qi32",
+      "type": "Tensor",
+      "name": "k_qi32",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_INT32",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_25",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_qf16",
+      "type": "Tensor",
+      "name": "k_qf16",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_cast_26",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_int8",
+      "type": "Tensor",
+      "name": "k_int8",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_INT8",
+      "shape": [
+        "t_tile",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_full_3",
+      "type": "Operation",
+      "name": "FULL",
+      "parentId": "grp_k_quant",
+      "op_type": "FULL"
+    },
+    {
+      "id": "t_k_one",
+      "type": "Tensor",
+      "name": "k_one",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_div_4",
+      "type": "Operation",
+      "name": "DIV",
+      "parentId": "grp_k_quant",
+      "op_type": "DIV"
+    },
+    {
+      "id": "t_k_deq",
+      "type": "Tensor",
+      "name": "k_deq",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_cast_27",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_k_quant",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_k_scale_fp16",
+      "type": "Tensor",
+      "name": "k_scale_fp16",
+      "parentId": "grp_k_quant",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_reshape_11",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_k_scatter",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_k_cache_4d",
+      "type": "Tensor",
+      "name": "k_cache_4d",
+      "parentId": "grp_k_scatter",
+      "dtype": "DT_INT8",
+      "shape": [
+        "t_tile",
+        "1",
+        "1",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_reshape_12",
+      "type": "Operation",
+      "name": "RESHAPE",
+      "parentId": "grp_k_scatter",
+      "op_type": "RESHAPE"
+    },
+    {
+      "id": "t_k_scale_4d",
+      "type": "Tensor",
+      "name": "k_scale_4d",
+      "parentId": "grp_k_scatter",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "1",
+        "1",
+        "1"
+      ]
+    },
+    {
+      "id": "op_view_13",
+      "type": "Operation",
+      "name": "VIEW",
+      "parentId": "grp_k_scatter",
+      "op_type": "VIEW"
+    },
+    {
+      "id": "t_k_idx_tile",
+      "type": "Tensor",
+      "name": "k_idx_tile",
+      "parentId": "grp_k_scatter",
+      "dtype": "DT_INT64",
+      "shape": [
+        "t_tile",
+        "1"
+      ]
+    },
+    {
+      "id": "op_scatter_update",
+      "type": "Operation",
+      "name": "SCATTER_UPDATE",
+      "parentId": "grp_k_scatter",
+      "op_type": "SCATTER_UPDATE",
+      "semantic_label": "Key-Quant"
+    },
+    {
+      "id": "t_k_sc_int8",
+      "type": "Tensor",
+      "name": "k_sc_int8",
+      "parentId": "grp_k_scatter",
+      "dtype": "DT_INT8",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "head_dim"
+      ]
+    },
+    {
+      "id": "op_scatter_update_1",
+      "type": "Operation",
+      "name": "SCATTER_UPDATE",
+      "parentId": "grp_k_scatter",
+      "op_type": "SCATTER_UPDATE",
+      "semantic_label": "Key-Quant"
+    },
+    {
+      "id": "t_k_sc_scale",
+      "type": "Tensor",
+      "name": "k_sc_scale",
+      "parentId": "grp_k_scatter",
+      "dtype": "DT_FP16",
+      "shape": [
+        "blockNum",
+        "blockSize",
+        "nKv",
+        "1"
+      ]
+    },
+    {
+      "id": "op_a_mul_b_4",
+      "type": "Operation",
+      "name": "MATMUL",
+      "parentId": "grp_weight",
+      "op_type": "A_MUL_B",
+      "semantic_label": "Weight-Linear"
+    },
+    {
+      "id": "t_w_fp32",
+      "type": "Tensor",
+      "name": "w_fp32",
+      "parentId": "grp_weight",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num"
+      ]
+    },
+    {
+      "id": "op_mul_14",
+      "type": "Operation",
+      "name": "MUL",
+      "parentId": "grp_weight",
+      "op_type": "MUL",
+      "semantic_label": "Weight-Linear"
+    },
+    {
+      "id": "t_w_scaled",
+      "type": "Tensor",
+      "name": "w_scaled",
+      "parentId": "grp_weight",
+      "dtype": "DT_FP32",
+      "shape": [
+        "t_tile",
+        "head_num"
+      ]
+    },
+    {
+      "id": "op_cast_28",
+      "type": "Operation",
+      "name": "CAST",
+      "parentId": "grp_weight",
+      "op_type": "CAST"
+    },
+    {
+      "id": "t_w_f16",
+      "type": "Tensor",
+      "name": "w_f16",
+      "parentId": "grp_weight",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_num"
+      ]
+    },
+    {
+      "id": "op_assemble_2",
+      "type": "Operation",
+      "name": "ASSEMBLE",
+      "parentId": "grp_weight",
+      "op_type": "ASSEMBLE",
+      "semantic_label": "Weight-Linear"
+    },
+    {
+      "id": "t_w_asm",
+      "type": "Tensor",
+      "name": "w_asm",
+      "parentId": "grp_weight",
+      "dtype": "DT_FP16",
+      "shape": [
+        "t_tile",
+        "head_num"
+      ]
+    }
   ],
   "edges": [
-    {"source": "in_w_qb",         "target": "op_reshape_w_qb"},
-    {"source": "in_wk",           "target": "op_reshape_wk"},
-    {"source": "in_w_proj",       "target": "op_reshape_w_proj"},
-    {"source": "in_ln_gamma_k",   "target": "op_reshape_gamma"},
-    {"source": "in_ln_beta_k",    "target": "op_reshape_beta"},
-    {"source": "in_w_qb_scale",   "target": "op_reshape_qb_scale"},
-
-    {"source": "op_reshape_w_qb",     "target": "t_w_qb"},
-    {"source": "op_reshape_wk",       "target": "t_wk"},
-    {"source": "op_reshape_w_proj",   "target": "t_w_proj"},
-    {"source": "op_reshape_gamma",    "target": "t_gamma_2d"},
-    {"source": "op_reshape_beta",     "target": "t_beta_2d"},
-    {"source": "op_reshape_qb_scale", "target": "t_w_qb_scale"},
-
-    {"source": "in_q_norm",       "target": "op_q_linear"},
-    {"source": "t_w_qb",          "target": "op_q_linear"},
-    {"source": "op_q_linear",     "target": "t_q_s32"},
-
-    {"source": "t_q_s32",         "target": "op_q_dequant"},
-    {"source": "in_q_norm_scale", "target": "op_q_dequant"},
-    {"source": "t_w_qb_scale",    "target": "op_q_dequant"},
-    {"source": "op_q_dequant",    "target": "t_q_cast"},
-
-    {"source": "t_q_cast",        "target": "op_q_hadamard"},
-    {"source": "in_hadamard_q",   "target": "op_q_hadamard"},
-    {"source": "op_q_hadamard",   "target": "t_q_hadamard"},
-
-    {"source": "t_q_hadamard",    "target": "op_q_prolog"},
-    {"source": "op_q_prolog",     "target": "t_q_int8"},
-    {"source": "op_q_prolog",     "target": "t_q_scale"},
-
-    {"source": "t_q_int8",        "target": "op_q_assemble"},
-    {"source": "t_q_scale",       "target": "op_q_assemble"},
-    {"source": "op_q_assemble",   "target": "out_q_int8"},
-    {"source": "op_q_assemble",   "target": "out_q_scale"},
-
-    {"source": "in_x",            "target": "op_k_linear"},
-    {"source": "t_wk",            "target": "op_k_linear"},
-    {"source": "op_k_linear",     "target": "t_k_fp32"},
-
-    {"source": "t_k_fp32",        "target": "op_k_layernorm"},
-    {"source": "t_gamma_2d",      "target": "op_k_layernorm"},
-    {"source": "t_beta_2d",       "target": "op_k_layernorm"},
-    {"source": "op_k_layernorm",  "target": "t_k_bf16"},
-
-    {"source": "t_k_bf16",        "target": "op_k_rope"},
-    {"source": "in_cos_rope",     "target": "op_k_rope"},
-    {"source": "in_sin_rope",     "target": "op_k_rope"},
-    {"source": "op_k_rope",       "target": "t_k_roped"},
-
-    {"source": "t_k_roped",       "target": "op_k_hadamard"},
-    {"source": "in_hadamard_k",   "target": "op_k_hadamard"},
-    {"source": "op_k_hadamard",   "target": "t_k_hadamard"},
-
-    {"source": "t_k_hadamard",    "target": "op_k_prolog"},
-    {"source": "op_k_prolog",     "target": "t_k_int8"},
-    {"source": "op_k_prolog",     "target": "t_k_scale"},
-
-    {"source": "t_k_int8",        "target": "op_k_scatter"},
-    {"source": "in_k_cache",      "target": "op_k_scatter"},
-    {"source": "in_k_cache_idx",  "target": "op_k_scatter"},
-    {"source": "op_k_scatter",    "target": "out_k_int8"},
-    {"source": "t_k_scale",       "target": "out_k_scale"},
-
-    {"source": "in_x",            "target": "op_w_linear"},
-    {"source": "t_w_proj",        "target": "op_w_linear"},
-    {"source": "op_w_linear",     "target": "t_weights_fp32"},
-
-    {"source": "t_weights_fp32",  "target": "op_w_cast"},
-    {"source": "op_w_cast",       "target": "out_weights"}
+    {
+      "source": "in_k_cache_index_in",
+      "target": "op_reshape"
+    },
+    {
+      "source": "op_reshape",
+      "target": "t_k_cache_index"
+    },
+    {
+      "source": "in_w_qb_scale_in",
+      "target": "op_reshape_1"
+    },
+    {
+      "source": "op_reshape_1",
+      "target": "t_w_qb_scale"
+    },
+    {
+      "source": "in_ln_gamma_k_in",
+      "target": "op_reshape_2"
+    },
+    {
+      "source": "op_reshape_2",
+      "target": "t_gamma_2d"
+    },
+    {
+      "source": "in_ln_beta_k_in",
+      "target": "op_reshape_3"
+    },
+    {
+      "source": "op_reshape_3",
+      "target": "t_beta_2d"
+    },
+    {
+      "source": "in_w_qb_in",
+      "target": "op_reshape_4"
+    },
+    {
+      "source": "op_reshape_4",
+      "target": "t_w_qb"
+    },
+    {
+      "source": "in_wk_in",
+      "target": "op_reshape_5"
+    },
+    {
+      "source": "op_reshape_5",
+      "target": "t_wk"
+    },
+    {
+      "source": "in_w_proj_in",
+      "target": "op_reshape_6"
+    },
+    {
+      "source": "op_reshape_6",
+      "target": "t_w_proj"
+    },
+    {
+      "source": "in_q_norm_in",
+      "target": "op_view"
+    },
+    {
+      "source": "op_view",
+      "target": "t_q_norm"
+    },
+    {
+      "source": "in_q_norm_scale_in",
+      "target": "op_view_1"
+    },
+    {
+      "source": "op_view_1",
+      "target": "t_q_norm_scale"
+    },
+    {
+      "source": "in_x_in",
+      "target": "op_view_2"
+    },
+    {
+      "source": "op_view_2",
+      "target": "t_x_tile"
+    },
+    {
+      "source": "in_cos_idx_rope_in",
+      "target": "op_view_3"
+    },
+    {
+      "source": "op_view_3",
+      "target": "t_rope_cos"
+    },
+    {
+      "source": "in_sin_idx_rope_in",
+      "target": "op_view_4"
+    },
+    {
+      "source": "op_view_4",
+      "target": "t_rope_sin"
+    },
+    {
+      "source": "t_q_norm",
+      "target": "op_a_mul_b"
+    },
+    {
+      "source": "t_w_qb",
+      "target": "op_a_mul_b"
+    },
+    {
+      "source": "op_a_mul_b",
+      "target": "t_q_s32"
+    },
+    {
+      "source": "t_q_s32",
+      "target": "op_cast"
+    },
+    {
+      "source": "op_cast",
+      "target": "t_q_f32"
+    },
+    {
+      "source": "t_q_f32",
+      "target": "op_mul"
+    },
+    {
+      "source": "t_q_norm_scale",
+      "target": "op_mul"
+    },
+    {
+      "source": "op_mul",
+      "target": "t_q_f32_normed"
+    },
+    {
+      "source": "t_q_f32_normed",
+      "target": "op_mul_1"
+    },
+    {
+      "source": "t_w_qb_scale",
+      "target": "op_mul_1"
+    },
+    {
+      "source": "op_mul_1",
+      "target": "t_q_f32_wt"
+    },
+    {
+      "source": "t_q_f32_wt",
+      "target": "op_cast_1"
+    },
+    {
+      "source": "op_cast_1",
+      "target": "t_q_cast"
+    },
+    {
+      "source": "t_q_cast",
+      "target": "op_reshape_7"
+    },
+    {
+      "source": "op_reshape_7",
+      "target": "t_q_bf16"
+    },
+    {
+      "source": "t_q_bf16",
+      "target": "op_view_5"
+    },
+    {
+      "source": "op_view_5",
+      "target": "t_q_rope_slice"
+    },
+    {
+      "source": "t_q_bf16",
+      "target": "op_view_6"
+    },
+    {
+      "source": "op_view_6",
+      "target": "t_q_nope_slice"
+    },
+    {
+      "source": "t_rope_cos",
+      "target": "op_cast_2"
+    },
+    {
+      "source": "op_cast_2",
+      "target": "t_q_cos_fp32"
+    },
+    {
+      "source": "t_rope_sin",
+      "target": "op_cast_3"
+    },
+    {
+      "source": "op_cast_3",
+      "target": "t_q_sin_fp32"
+    },
+    {
+      "source": "t_q_rope_slice",
+      "target": "op_cast_4"
+    },
+    {
+      "source": "op_cast_4",
+      "target": "t_q_rope_fp32"
+    },
+    {
+      "source": "t_q_cos_fp32",
+      "target": "op_reshape_8"
+    },
+    {
+      "source": "op_reshape_8",
+      "target": "t_q_cos_3d"
+    },
+    {
+      "source": "t_q_sin_fp32",
+      "target": "op_reshape_9"
+    },
+    {
+      "source": "op_reshape_9",
+      "target": "t_q_sin_3d"
+    },
+    {
+      "source": "t_q_rope_fp32",
+      "target": "op_view_7"
+    },
+    {
+      "source": "op_view_7",
+      "target": "t_q_rh_x1"
+    },
+    {
+      "source": "t_q_rope_fp32",
+      "target": "op_view_8"
+    },
+    {
+      "source": "op_view_8",
+      "target": "t_q_rh_x2"
+    },
+    {
+      "source": "t_q_rh_x2",
+      "target": "op_mul_2"
+    },
+    {
+      "source": "op_mul_2",
+      "target": "t_q_rh_neg"
+    },
+    {
+      "source": "t_q_rh_neg",
+      "target": "op_concat"
+    },
+    {
+      "source": "t_q_rh_x1",
+      "target": "op_concat"
+    },
+    {
+      "source": "op_concat",
+      "target": "t_q_rh"
+    },
+    {
+      "source": "t_q_rope_fp32",
+      "target": "op_mul_3"
+    },
+    {
+      "source": "t_q_cos_3d",
+      "target": "op_mul_3"
+    },
+    {
+      "source": "op_mul_3",
+      "target": "t_q_x_cos"
+    },
+    {
+      "source": "t_q_rh",
+      "target": "op_mul_4"
+    },
+    {
+      "source": "t_q_sin_3d",
+      "target": "op_mul_4"
+    },
+    {
+      "source": "op_mul_4",
+      "target": "t_q_rh_sin"
+    },
+    {
+      "source": "t_q_x_cos",
+      "target": "op_add"
+    },
+    {
+      "source": "t_q_rh_sin",
+      "target": "op_add"
+    },
+    {
+      "source": "op_add",
+      "target": "t_q_embed"
+    },
+    {
+      "source": "t_q_embed",
+      "target": "op_cast_5"
+    },
+    {
+      "source": "op_cast_5",
+      "target": "t_q_roped"
+    },
+    {
+      "source": "t_q_nope_slice",
+      "target": "op_cast_6"
+    },
+    {
+      "source": "op_cast_6",
+      "target": "t_q_nope_fp32"
+    },
+    {
+      "source": "t_q_nope_fp32",
+      "target": "op_cast_7"
+    },
+    {
+      "source": "op_cast_7",
+      "target": "t_q_nope_bf16"
+    },
+    {
+      "source": "t_q_roped",
+      "target": "op_concat_1"
+    },
+    {
+      "source": "t_q_nope_bf16",
+      "target": "op_concat_1"
+    },
+    {
+      "source": "op_concat_1",
+      "target": "t_q_concat"
+    },
+    {
+      "source": "in_hadamard_q_in",
+      "target": "op_reshape_10"
+    },
+    {
+      "source": "op_reshape_10",
+      "target": "t_hadamard_q"
+    },
+    {
+      "source": "t_q_concat",
+      "target": "op_a_mul_b_1"
+    },
+    {
+      "source": "t_hadamard_q",
+      "target": "op_a_mul_b_1"
+    },
+    {
+      "source": "op_a_mul_b_1",
+      "target": "t_q_hadamard"
+    },
+    {
+      "source": "t_q_hadamard",
+      "target": "op_cast_8"
+    },
+    {
+      "source": "op_cast_8",
+      "target": "t_q_hd_fp32"
+    },
+    {
+      "source": "t_q_hd_fp32",
+      "target": "op_abs"
+    },
+    {
+      "source": "op_abs",
+      "target": "t_q_abs"
+    },
+    {
+      "source": "t_q_abs",
+      "target": "op_amax"
+    },
+    {
+      "source": "op_amax",
+      "target": "t_q_amax"
+    },
+    {
+      "source": "op_full",
+      "target": "t_q_127"
+    },
+    {
+      "source": "t_q_127",
+      "target": "op_div"
+    },
+    {
+      "source": "t_q_amax",
+      "target": "op_div"
+    },
+    {
+      "source": "op_div",
+      "target": "t_q_sq"
+    },
+    {
+      "source": "t_q_hd_fp32",
+      "target": "op_mul_5"
+    },
+    {
+      "source": "t_q_sq",
+      "target": "op_mul_5"
+    },
+    {
+      "source": "op_mul_5",
+      "target": "t_q_qscaled"
+    },
+    {
+      "source": "t_q_qscaled",
+      "target": "op_cast_9"
+    },
+    {
+      "source": "op_cast_9",
+      "target": "t_q_qi32"
+    },
+    {
+      "source": "t_q_qi32",
+      "target": "op_cast_10"
+    },
+    {
+      "source": "op_cast_10",
+      "target": "t_q_qf16"
+    },
+    {
+      "source": "t_q_qf16",
+      "target": "op_cast_11"
+    },
+    {
+      "source": "op_cast_11",
+      "target": "t_q_int8"
+    },
+    {
+      "source": "op_full_1",
+      "target": "t_q_one"
+    },
+    {
+      "source": "t_q_one",
+      "target": "op_div_1"
+    },
+    {
+      "source": "t_q_sq",
+      "target": "op_div_1"
+    },
+    {
+      "source": "op_div_1",
+      "target": "t_q_deq"
+    },
+    {
+      "source": "t_q_deq",
+      "target": "op_cast_12"
+    },
+    {
+      "source": "op_cast_12",
+      "target": "t_q_scale_fp16"
+    },
+    {
+      "source": "t_q_int8",
+      "target": "op_assemble"
+    },
+    {
+      "source": "op_assemble",
+      "target": "t_q_asm_int8"
+    },
+    {
+      "source": "t_q_asm_int8",
+      "target": "out_q_int8_out"
+    },
+    {
+      "source": "t_q_scale_fp16",
+      "target": "op_assemble_1"
+    },
+    {
+      "source": "op_assemble_1",
+      "target": "t_q_asm_scale"
+    },
+    {
+      "source": "t_q_asm_scale",
+      "target": "out_q_scale_out"
+    },
+    {
+      "source": "t_x_tile",
+      "target": "op_a_mul_b_2"
+    },
+    {
+      "source": "t_wk",
+      "target": "op_a_mul_b_2"
+    },
+    {
+      "source": "op_a_mul_b_2",
+      "target": "t_k_fp32"
+    },
+    {
+      "source": "t_k_fp32",
+      "target": "op_cast_13"
+    },
+    {
+      "source": "op_cast_13",
+      "target": "t_ln_x"
+    },
+    {
+      "source": "t_ln_x",
+      "target": "op_mul_6"
+    },
+    {
+      "source": "op_mul_6",
+      "target": "t_ln_xs"
+    },
+    {
+      "source": "t_ln_xs",
+      "target": "op_sum"
+    },
+    {
+      "source": "op_sum",
+      "target": "t_ln_mean"
+    },
+    {
+      "source": "t_ln_x",
+      "target": "op_sub"
+    },
+    {
+      "source": "t_ln_mean",
+      "target": "op_sub"
+    },
+    {
+      "source": "op_sub",
+      "target": "t_ln_diff"
+    },
+    {
+      "source": "t_ln_diff",
+      "target": "op_mul_7"
+    },
+    {
+      "source": "t_ln_diff",
+      "target": "op_mul_7"
+    },
+    {
+      "source": "op_mul_7",
+      "target": "t_ln_diff2"
+    },
+    {
+      "source": "t_ln_diff2",
+      "target": "op_mul_8"
+    },
+    {
+      "source": "op_mul_8",
+      "target": "t_ln_var_s"
+    },
+    {
+      "source": "t_ln_var_s",
+      "target": "op_sum_1"
+    },
+    {
+      "source": "op_sum_1",
+      "target": "t_ln_var"
+    },
+    {
+      "source": "t_ln_var",
+      "target": "op_add_1"
+    },
+    {
+      "source": "op_add_1",
+      "target": "t_ln_var_eps"
+    },
+    {
+      "source": "t_ln_var_eps",
+      "target": "op_sqrt"
+    },
+    {
+      "source": "op_sqrt",
+      "target": "t_ln_std"
+    },
+    {
+      "source": "t_ln_diff",
+      "target": "op_div_2"
+    },
+    {
+      "source": "t_ln_std",
+      "target": "op_div_2"
+    },
+    {
+      "source": "op_div_2",
+      "target": "t_ln_norm"
+    },
+    {
+      "source": "t_gamma_2d",
+      "target": "op_cast_14"
+    },
+    {
+      "source": "op_cast_14",
+      "target": "t_ln_gamma_fp32"
+    },
+    {
+      "source": "t_beta_2d",
+      "target": "op_cast_15"
+    },
+    {
+      "source": "op_cast_15",
+      "target": "t_ln_beta_fp32"
+    },
+    {
+      "source": "t_ln_norm",
+      "target": "op_mul_9"
+    },
+    {
+      "source": "t_ln_gamma_fp32",
+      "target": "op_mul_9"
+    },
+    {
+      "source": "op_mul_9",
+      "target": "t_ln_rg"
+    },
+    {
+      "source": "t_ln_rg",
+      "target": "op_add_2"
+    },
+    {
+      "source": "t_ln_beta_fp32",
+      "target": "op_add_2"
+    },
+    {
+      "source": "op_add_2",
+      "target": "t_ln_rgb"
+    },
+    {
+      "source": "t_ln_rgb",
+      "target": "op_cast_16"
+    },
+    {
+      "source": "op_cast_16",
+      "target": "t_k_bf16"
+    },
+    {
+      "source": "t_k_bf16",
+      "target": "op_view_9"
+    },
+    {
+      "source": "op_view_9",
+      "target": "t_k_rope_slice"
+    },
+    {
+      "source": "t_k_bf16",
+      "target": "op_view_10"
+    },
+    {
+      "source": "op_view_10",
+      "target": "t_k_nope_slice"
+    },
+    {
+      "source": "t_rope_cos",
+      "target": "op_cast_17"
+    },
+    {
+      "source": "op_cast_17",
+      "target": "t_k_cos_fp32"
+    },
+    {
+      "source": "t_rope_sin",
+      "target": "op_cast_18"
+    },
+    {
+      "source": "op_cast_18",
+      "target": "t_k_sin_fp32"
+    },
+    {
+      "source": "t_k_rope_slice",
+      "target": "op_cast_19"
+    },
+    {
+      "source": "op_cast_19",
+      "target": "t_k_rope_fp32"
+    },
+    {
+      "source": "t_k_rope_fp32",
+      "target": "op_view_11"
+    },
+    {
+      "source": "op_view_11",
+      "target": "t_k_rh_x1"
+    },
+    {
+      "source": "t_k_rope_fp32",
+      "target": "op_view_12"
+    },
+    {
+      "source": "op_view_12",
+      "target": "t_k_rh_x2"
+    },
+    {
+      "source": "t_k_rh_x2",
+      "target": "op_mul_10"
+    },
+    {
+      "source": "op_mul_10",
+      "target": "t_k_rh_neg"
+    },
+    {
+      "source": "t_k_rh_neg",
+      "target": "op_concat_2"
+    },
+    {
+      "source": "t_k_rh_x1",
+      "target": "op_concat_2"
+    },
+    {
+      "source": "op_concat_2",
+      "target": "t_k_rh"
+    },
+    {
+      "source": "t_k_rope_fp32",
+      "target": "op_mul_11"
+    },
+    {
+      "source": "t_k_cos_fp32",
+      "target": "op_mul_11"
+    },
+    {
+      "source": "op_mul_11",
+      "target": "t_k_x_cos"
+    },
+    {
+      "source": "t_k_rh",
+      "target": "op_mul_12"
+    },
+    {
+      "source": "t_k_sin_fp32",
+      "target": "op_mul_12"
+    },
+    {
+      "source": "op_mul_12",
+      "target": "t_k_rh_sin"
+    },
+    {
+      "source": "t_k_x_cos",
+      "target": "op_add_3"
+    },
+    {
+      "source": "t_k_rh_sin",
+      "target": "op_add_3"
+    },
+    {
+      "source": "op_add_3",
+      "target": "t_k_embed"
+    },
+    {
+      "source": "t_k_embed",
+      "target": "op_cast_20"
+    },
+    {
+      "source": "op_cast_20",
+      "target": "t_k_roped"
+    },
+    {
+      "source": "t_k_nope_slice",
+      "target": "op_cast_21"
+    },
+    {
+      "source": "op_cast_21",
+      "target": "t_k_nope_fp32"
+    },
+    {
+      "source": "t_k_nope_fp32",
+      "target": "op_cast_22"
+    },
+    {
+      "source": "op_cast_22",
+      "target": "t_k_nope_bf16"
+    },
+    {
+      "source": "t_k_roped",
+      "target": "op_concat_3"
+    },
+    {
+      "source": "t_k_nope_bf16",
+      "target": "op_concat_3"
+    },
+    {
+      "source": "op_concat_3",
+      "target": "t_k_concat"
+    },
+    {
+      "source": "t_k_concat",
+      "target": "op_a_mul_b_3"
+    },
+    {
+      "source": "in_hadamard_k_in",
+      "target": "op_a_mul_b_3"
+    },
+    {
+      "source": "op_a_mul_b_3",
+      "target": "t_hadamard_k"
+    },
+    {
+      "source": "t_hadamard_k",
+      "target": "op_cast_23"
+    },
+    {
+      "source": "op_cast_23",
+      "target": "t_k_hd_fp32"
+    },
+    {
+      "source": "t_k_hd_fp32",
+      "target": "op_abs_1"
+    },
+    {
+      "source": "op_abs_1",
+      "target": "t_k_abs"
+    },
+    {
+      "source": "t_k_abs",
+      "target": "op_amax_1"
+    },
+    {
+      "source": "op_amax_1",
+      "target": "t_k_amax"
+    },
+    {
+      "source": "op_full_2",
+      "target": "t_k_127"
+    },
+    {
+      "source": "t_k_127",
+      "target": "op_div_3"
+    },
+    {
+      "source": "t_k_amax",
+      "target": "op_div_3"
+    },
+    {
+      "source": "op_div_3",
+      "target": "t_k_sq"
+    },
+    {
+      "source": "t_k_hd_fp32",
+      "target": "op_mul_13"
+    },
+    {
+      "source": "t_k_sq",
+      "target": "op_mul_13"
+    },
+    {
+      "source": "op_mul_13",
+      "target": "t_k_qscaled"
+    },
+    {
+      "source": "t_k_qscaled",
+      "target": "op_cast_24"
+    },
+    {
+      "source": "op_cast_24",
+      "target": "t_k_qi32"
+    },
+    {
+      "source": "t_k_qi32",
+      "target": "op_cast_25"
+    },
+    {
+      "source": "op_cast_25",
+      "target": "t_k_qf16"
+    },
+    {
+      "source": "t_k_qf16",
+      "target": "op_cast_26"
+    },
+    {
+      "source": "op_cast_26",
+      "target": "t_k_int8"
+    },
+    {
+      "source": "op_full_3",
+      "target": "t_k_one"
+    },
+    {
+      "source": "t_k_one",
+      "target": "op_div_4"
+    },
+    {
+      "source": "t_k_sq",
+      "target": "op_div_4"
+    },
+    {
+      "source": "op_div_4",
+      "target": "t_k_deq"
+    },
+    {
+      "source": "t_k_deq",
+      "target": "op_cast_27"
+    },
+    {
+      "source": "op_cast_27",
+      "target": "t_k_scale_fp16"
+    },
+    {
+      "source": "t_k_int8",
+      "target": "op_reshape_11"
+    },
+    {
+      "source": "op_reshape_11",
+      "target": "t_k_cache_4d"
+    },
+    {
+      "source": "t_k_scale_fp16",
+      "target": "op_reshape_12"
+    },
+    {
+      "source": "op_reshape_12",
+      "target": "t_k_scale_4d"
+    },
+    {
+      "source": "t_k_cache_index",
+      "target": "op_view_13"
+    },
+    {
+      "source": "op_view_13",
+      "target": "t_k_idx_tile"
+    },
+    {
+      "source": "in_k_cache",
+      "target": "op_scatter_update"
+    },
+    {
+      "source": "t_k_idx_tile",
+      "target": "op_scatter_update"
+    },
+    {
+      "source": "t_k_cache_4d",
+      "target": "op_scatter_update"
+    },
+    {
+      "source": "op_scatter_update",
+      "target": "t_k_sc_int8"
+    },
+    {
+      "source": "t_k_sc_int8",
+      "target": "out_k_int8_out"
+    },
+    {
+      "source": "in_k_cache_scale",
+      "target": "op_scatter_update_1"
+    },
+    {
+      "source": "t_k_idx_tile",
+      "target": "op_scatter_update_1"
+    },
+    {
+      "source": "t_k_scale_4d",
+      "target": "op_scatter_update_1"
+    },
+    {
+      "source": "op_scatter_update_1",
+      "target": "t_k_sc_scale"
+    },
+    {
+      "source": "t_k_sc_scale",
+      "target": "out_k_scale_out"
+    },
+    {
+      "source": "t_x_tile",
+      "target": "op_a_mul_b_4"
+    },
+    {
+      "source": "t_w_proj",
+      "target": "op_a_mul_b_4"
+    },
+    {
+      "source": "op_a_mul_b_4",
+      "target": "t_w_fp32"
+    },
+    {
+      "source": "t_w_fp32",
+      "target": "op_mul_14"
+    },
+    {
+      "source": "op_mul_14",
+      "target": "t_w_scaled"
+    },
+    {
+      "source": "t_w_scaled",
+      "target": "op_cast_28"
+    },
+    {
+      "source": "op_cast_28",
+      "target": "t_w_f16"
+    },
+    {
+      "source": "t_w_f16",
+      "target": "op_assemble_2"
+    },
+    {
+      "source": "op_assemble_2",
+      "target": "t_w_asm"
+    },
+    {
+      "source": "t_w_asm",
+      "target": "out_weights_out"
+    }
   ]
 }
