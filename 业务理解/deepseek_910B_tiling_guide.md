@@ -74,16 +74,61 @@ cube_freq   = 1850 MHz
 
 这也是为什么官方文档会强调，tiling 既要满足空间约束，又要兼顾算数强度、带宽利用率和分核数。参见：[`pypto-set_cube_tile_shapes.md`](https://gitcode.com/cann/pypto/blob/master/docs/api/config/pypto-set_cube_tile_shapes.md)、[`matmul_performance_guide.md`](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/debug/matmul_performance_guide.md)
 
-## 3. DeepSeek 开发者不是直接"算最优解"，而是先定义代表场景
+## 3. Dynamic shape 是 tiling 的上游约束
+
+在理解"为什么要准备多套 tile"之前，需要先理解大模型侧的一个基本事实：**输入维度在写代码时是不确定的**。
+
+### 3.1 模型侧：维度先以符号形式存在
+
+LLM 开发者写 kernel 时，不知道将来每次请求会处理多少 token。因此维度用符号表示：
+
+```python
+t = pypto.frontend.dynamic("t")
+
+token_x:    pypto.Tensor((t, h),            pypto.DT_BF16)
+cos:        pypto.Tensor((t, qk_rope_dim),  pypto.DT_BF16)
+cache_index:pypto.Tensor((t,),              pypto.DT_INT64)
+```
+
+`t` 不是随便定义的占位符，它是把一批运行时对象串起来的**公共锚点**：
+
+```text
+t
+├─ token_x:     [t, h]         — 本次要处理的 token 特征
+├─ cos / sin:   [t, rope_dim]  — 对应的旋转位置编码
+└─ cache_index: [t]            — 本次要往 cache 哪些位置写
+```
+
+真正调用时，`parser.bind_dynamic_dims_to_input_tensors()` 才把 `t` 绑定到真实值。例如传入 `token_x.shape = [128, 7168]`，则本次运行里 `t = 128`。参见：[`pypto-frontend-dynamic.md`](https://gitcode.com/cann/pypto/blob/master/docs/api/pypto-frontend-dynamic.md)
+
+### 3.2 硬件侧：t 的不同取值决定了最优 tiling 不同
+
+`t` 不只是数据形状的变量，它直接影响"在 910B 上怎么切最合算"：
+
+| 场景 | t 的典型值 | 矩阵形态 | 瓶颈 | tiling 倾向 |
+|------|-----------|---------|------|------------|
+| `decode` | 1–8 | 极扁（M 很小） | 搬运 bound | m 方向切小，k 拉大，优先 L1Reuse 减少重复搬运 |
+| `prefill` | 32–512 | 趋方 | compute bound | m/n 方向都加大，吃满 24 个 Cube Core |
+
+同一套 tile 参数，对 `t=4` 和 `t=128` 来说很可能一个跑得好、一个跑得差。这就是为什么**不存在一套对所有 shape 都最优的 tile**。
+
+### 3.3 连接点：shape bucket
+
+dynamic shape → shape bucket → 多套 tiling profile，这条链是关键：
+
+```text
+t 的变化范围（运行时动态）
+    ↓
+把范围分成若干 shape bucket（小 batch decode / 大 batch prefill / ...）
+    ↓
+每个 bucket 各自编译一套最优 tiling profile
+    ↓
+运行时按实际 t 命中对应 profile
+```
+
+### 3.4 DeepSeek 开发者不是直接"算最优解"，而是先定义代表场景
 
 真实部署里，最先确定的往往不是 tile，而是"我要优化哪一类请求"。
-
-这是因为 DeepSeek 的不同阶段，问题规模差异很大。
-
-| 场景 | 特征 | 瓶颈倾向 |
-|------|------|---------|
-| `decode` | token 数 `t` 小，KV cache 长，单次计算量小 | 搬运 bound |
-| `prefill` | token 数多，matmul 更重 | compute bound |
 
 因此，开发者通常先把线上会出现的请求分成若干 shape bucket，再分别调每一类 bucket。
 
@@ -564,6 +609,8 @@ Profile B：修改后的 tile
 | 资源 | 链接 |
 |------|------|
 | PyPTO 官方总览 | [README.md](https://gitcode.com/cann/pypto/blob/master/README.md) |
+| dynamic() API 说明 | [pypto-frontend-dynamic.md](https://gitcode.com/cann/pypto/blob/master/docs/api/pypto-frontend-dynamic.md) |
+| 前端 parser（动态维度绑定） | [parser.py](https://gitcode.com/cann/pypto/blob/master/python/pypto/frontend/parser/parser.py) |
 | `pypto.set_cube_tile_shapes` API | [pypto-set_cube_tile_shapes.md](https://gitcode.com/cann/pypto/blob/master/docs/api/config/pypto-set_cube_tile_shapes.md) |
 | Matmul 高性能编程指南 | [matmul_performance_guide.md](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/debug/matmul_performance_guide.md) |
 | 性能调优总览 | [performance.md](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/debug/performance.md) |
