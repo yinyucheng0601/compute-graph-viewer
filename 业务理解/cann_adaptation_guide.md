@@ -308,3 +308,150 @@ Card 0 ──AllReduce──► Card 1
 目前没有工具能同时做到"计算图结构（算子级）+ 通信拓扑（卡间依赖）"的联合可视化。现有工具要么只看时间轴（timeline），要么只看单卡计算图。这是一个真实的空白——工程师排查多卡推理性能问题时，往往要在 Nsight 的 timeline 和自己画的拓扑图之间来回对照。
 
 对 PyPTO 来说，这是一个潜在的差异化方向，但难点在于通信数据（HCCL trace）的获取和格式解析，不是纯前端可以独立完成的。
+
+---
+
+## 具体案例：DeepSeek 部署到 910B 全流程
+
+> 口径说明：官方文档中 910B 很少以裸芯片规格表出现，更多以产品形态（Atlas 800I A2、Atlas 300I A2）出现。本节把两类信息合并：产品侧规格来自官方公开页和 DeepSeek 部署 FAQ，编译器/算子侧规格来自官方仓 910B 平台配置。
+
+---
+
+### 910B 规格
+
+**产品侧（Atlas 300I A2 单卡）**
+
+| 指标 | 数值 |
+|------|------|
+| FP16 / BF16 算力 | 280 TFLOPS |
+| INT8 算力 | 560 TOPS |
+| HBM 带宽 | 最高 1.6 TB/s |
+| 单卡显存（Atlas 800I A2） | 64 GB |
+| 服务器标准配置 | 8 NPU / 台，卡间 HCCS 高速互连 |
+
+**芯片侧（Ascend910B1.ini，编译器视角）**
+
+| 资源 | 规格 |
+|------|------|
+| Cube Core | 24 |
+| Vector Core | 48 |
+| AI CPU | 4 |
+| 内存 | 64 GiB |
+| L2 | 192 MiB |
+| L1 | 512 KB |
+| UB | 192 KB |
+| Cube 主频 | 1850 MHz |
+
+这些数字决定了 DeepSeek 适配时要不要量化、怎么分卡、怎么切 tile、为什么某些 kernel 的瓶颈是搬运而非算力。
+
+---
+
+### 容量适配：先算装不装得下
+
+把 DeepSeek-R1 / V3 全量模型部署到 910B，第一个现实问题不是能不能编译，而是一台 8 卡服务器装不装得下。
+
+官方 FAQ 给出的最低配置（64K 上下文）：
+
+| 精度路线 | 最少机器数 | 显存估算 |
+|----------|-----------|---------|
+| BF16 | 4 台 Atlas 800I A2 | 4 × 8 × 64 GB = 2 TB |
+| W8A8 | 2 台 Atlas 800I A2 | 2 × 8 × 64 GB = 1 TB |
+
+容量预算公式：
+
+```
+模型参数 + KV Cache + 中间激活 + workspace + 通信缓冲 ≤ 总显存
+```
+
+910B 规格先决定了"能跑哪种精度、要几台机器"，然后才轮到图编译和 kernel 调优。
+
+---
+
+### 拓扑适配：为什么 tp=8 是最自然的切法
+
+官方 DeepSeek 部署文档中，一个典型参数是 `tp=8`，背后直接对应 910B 产品形态：
+
+```
+一台 Atlas 800I A2 = 8 个 NPU
+tp=8 = 一个 tensor parallel group 正好落满一台服务器
+```
+
+这样做的收益：
+
+- Attention 和 MLP 的张量并行通信全在单机 HCCS 内部完成
+- 最重的通信不走跨机网络
+- 如果再叠加专家并行（EP），官方文档明确限制：**大规模 EP 只支持 64GB HCCS 形态，需要 200G 光模块；32GB HCCS 和 32GB PCIe 不支持**
+
+拓扑适配的本质：把最重的通信收在互连带宽最高的层级内，而这个层级由 910B 的硬件拓扑决定。
+
+---
+
+### 实现适配：原始 DeepSeek 路径需要改动
+
+DeepSeek 的原始实现假设了另一套硬件生态，直接跑在 910B/CANN 上需要修改：
+
+| 改动点 | 原因 |
+|--------|------|
+| 删除 `load_format="dummy"` | CANN 不支持该加载方式 |
+| 注释掉 `flash_attn` | 910B 有自己的高性能 Attention 实现路径 |
+| FP8 权重加载/推理路径替换 | 910B 当前精度支持与原始路径不兼容 |
+
+本质是：把不兼容的实现替换掉 → 把精度路线换成 910B 更适合的路线 → 把图和运行时配置换成 CANN/MindIE 能接受的方式。
+
+---
+
+### Kernel 适配：910B 片上存储层级逼着你做 tile 和 reuse
+
+以 DeepSeek 中的 QuantIndexerProlog（MLA 相关）为例，在 Batch=4、KV Cache=64K 典型场景下，主要瓶颈不是算力不够，而是搬运瓶颈：
+
+| 问题 | 原因 |
+|------|------|
+| Vector 任务多而稀疏，子图之间有气泡 | 24 Cube + 48 Vector 需要精细调度才能打满 |
+| 右矩阵重复搬运 | L1=512KB，大矩阵无法整块片上驻留 |
+| 不同 kernel 段之间搬运浪费 | UB=192KB，中间数据必须分级搬运 |
+
+对应优化手段：
+
+```
+统一 TileShape
+  → Cube Tile 调整
+    → L1 Reuse（右矩阵复用）
+      → cube/vector 子图合并
+        → Prefill / Decode 两阶段分开调度策略
+```
+
+官方 matmul 指南给出的 910B 24 核典型配置建议：
+
+```
+L2 带宽 ≈ HBM 带宽 × 3
+优先让 tile 配置提高 L2 命中率
+典型可取 mDim=6, nDim=4 或 mDim=8, nDim=3
+```
+
+---
+
+### 四层适配总结
+
+| 层级 | 约束来源 | 典型决策 |
+|------|---------|---------|
+| 容量适配 | 64 GB/卡 × 8 卡/机 | BF16 还是 W8A8，需要 2 台还是 4 台 |
+| 拓扑适配 | 8 NPU + HCCS 单机互连 | tp=8，重通信收在单机内，EP 需 64GB HCCS |
+| 实现适配 | CANN/MindIE 运行时约束 | 替换 flash_attn、FP8 路径、加载配置 |
+| Kernel 适配 | 24 Cube + 48 Vector + 192MiB L2 + 512KB L1 | tile 切分、L1 Reuse、子图合并、Prefill/Decode 分策略 |
+
+> "DeepSeek 适配 910B"本质上是把 DeepSeek 的模型表示、并行方式和 kernel 实现，重新对齐到 910B 的内存规模、互连拓扑、精度能力和片上缓存层级。
+
+---
+
+### 参考文档
+
+| 文档 | 链接 |
+|------|------|
+| Atlas 300I A2 产品页 | https://www.hiascend.com/hardware/accelerator-cards/atlas-300i-a2 |
+| MindIE DeepSeek FAQ | https://www.hiascend.com/document/detail/zh/mindie/100/faq/mindie_service0005.html |
+| DeepSeek-R1/V3 昇腾部署文档 | https://www.hiascend.com/document/detail/zh/mindie/100/mindieservice/Thirdpartyservitization/mindie_openthird_0016.html |
+| DeepSeek-V3.1 迁移文档 | https://www.hiascend.com/document/detail/zh/mindie/100/mindieservice/Thirdpartyservitization/mindie_openthird_0015.html |
+| DeepSeek-V3.1 部署文档（EP） | https://www.hiascend.com/document/detail/zh/mindie/100/mindieservice/Thirdpartyservitization/mindie_openthird_0019.html |
+| Ascend910B1.ini（编译器芯片配置） | 官方 PyPTO 仓 |
+| matmul_performance_guide.md | 官方 PyPTO 仓 |
+| performance_case_quantindexerprolog.md | 官方 PyPTO 仓 |
