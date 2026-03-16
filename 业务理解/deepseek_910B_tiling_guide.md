@@ -210,6 +210,43 @@ mla_tile_config.unroll_list = [32, 16, 8, 4, 2, 1]
 
 ## 5. 为什么 tile 会反过来影响"子图分割"
 
+### 5.1 先把三个对象分清楚
+
+讨论这件事时，三个概念很容易被混在一起，需要先明确区分：
+
+| 概念 | 定义 | 在工具里的体现 |
+|------|------|--------------|
+| **tile** | 切块策略。决定一块张量在 L0/L1/UB 等片上资源里怎么被切开。对 matmul 体现为 `[mL0, mL1, kL0, kL1, nL0, nL1]`，对 vector 操作体现为若干维度上的切分大小 | Tile Graph 展开结果 |
+| **子图** | 编译器在 Tile Graph 之后，为了调度和执行而形成的执行单元。Tile Graph 继续被切成 Block Graph 子图，Execute Graph 再把这些子图组织成可调度调用节点 | Block Graph / Execute Graph |
+| **泳道图** | 执行单元真正被调度到 AIC/AIV 线程之后的时间展开图。展示的是"任务什么时候开始、持续多久、前后有什么空隙"，而不是逻辑依赖关系 | Swimlane |
+
+三者的关系可以压缩成一句话：
+
+```text
+tile 决定怎么切块
+子图决定怎么组织成执行单元
+泳道图决定这些执行单元最终怎么在时间轴上跑
+```
+
+### 5.2 tile 的影响沿编译链路向后传导
+
+在工具文档里，PyPTO 计算图分为四个主要阶段，tile 会从 Tile Graph 开始，一路影响到最终的泳道图形态：
+
+```mermaid
+flowchart LR
+    A["Tensor Graph<br/>逻辑计算图"]
+    B["Tile Graph<br/>按 tile 展开后的图"]
+    C["Block Graph<br/>切成执行子图"]
+    D["Execute Graph<br/>可调度调用节点"]
+    E["Swimlane<br/>实际任务时间轴"]
+
+    A --> B --> C --> D --> E
+```
+
+**tile 不只属于 Tile Graph，它的影响会一路向后传导到 Block Graph、Execute Graph 和 Swimlane。** 如果工具只在 Tile Graph 阶段显示 tile，而不把它和后面的子图、任务关联起来，开发者仍然看不到最关键的因果关系。参见：[`查看计算图.md`](https://gitcode.com/cann/pypto/blob/master/docs/tools/computation_graph/查看计算图.md)
+
+### 5.3 tile 影响子图的具体机制
+
 如果只从字面理解，tile 好像只是"算子内部切块大小"。但在 PyPTO 这套体系里，tile 还会影响：
 
 - 哪些 op 会被认为是同构、可合并
@@ -230,15 +267,39 @@ tile 至少影响两层：
 | 微观执行效率 | 单个 matmul / rope / dequant 在单个 tile 上的速度 |
 | 图结构形态 | 编译器最终生成几个子图、每个子图大小、子图之间气泡、是否能做复用合并 |
 
-因此 tiling 对开发者来说，是一个同时改写以下五项的联合控制杆：
+因此 tiling 对开发者来说，是一个同时改写以下六项的联合控制杆：
 
 ```text
 算子内部切块方式
 + 子图切分边界
-+ 子图合并机会
++ 子图同构率（影响合并机会）
++ 任务数和调度空隙
 + 数据搬运次数
 + 最终泳道图形态
 ```
+
+### 5.4 除 tile 外，还有哪些 pass 参数共同影响子图
+
+在 DeepSeek 的样例里，开发者不是只改 tile，还会一起改若干 pass 选项。这些参数同样是"怎么切子图、怎么合子图"的控制杆：
+
+| 参数 | 类型 | 影响方向 |
+|------|------|---------|
+| `cube_l1_reuse_setting` | AIC cube 子图 | 控制右矩阵 GM→L1 的复用与子图合并 |
+| `vec_nbuffer_mode` / `vec_nbuffer_setting` | AIV vector 子图 | 控制向量子图的双缓冲和合并数 |
+| `pg_upper_bound` / `pg_lower_bound` / `pg_skip_partition` | 子图切分 | 控制 partition graph 的切分上下界和跳过条件 |
+| `mg_copyin_upper_bound` | 搬运上限 | 限制子图合并时允许的最大搬入量 |
+
+从实现侧看，[`n_buffer_merge.cpp`](https://gitcode.com/cann/pypto/blob/master/framework/src/passes/tile_graph_pass/graph_partition/n_buffer_merge.cpp) 这类 pass 已经在根据 hash、输入搬运量、mergeNum 等信息做子图合并。
+
+对产品来说，这意味着调优界面不能只做"Tile 配置面板"。最终子图形态是：
+
+```text
+当前这组 tile
++ 当前这组 pass 配置
+= 最终子图形态
+```
+
+参见：[`performance.md`](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/debug/performance.md)
 
 ## 6. 真实例子：QuantIndexerProlog 是怎样一步步调出来的
 
@@ -381,7 +442,111 @@ AI 当然可以自动做 tiling
 而不是"一个万能的全局公式"
 ```
 
-## 10. 最后，把整件事压缩成一句业务结论
+## 10. 对工具产品的启示：这条因果链需要什么可视化能力
+
+研究这条"tile → 子图 → 泳道图"因果链，最终必须落到"前端怎么画、工具能说什么"。当前最缺的不是更多图，而是**跨层解释能力**。
+
+现在已经能看到 Pass DAG、局部源码图、架构图，但还缺：
+
+```text
+这组 tile 为什么导致 Tile Graph 这样展开
+这组展开为什么导致 Block Graph 切成这些子图
+这些子图为什么在泳道图上变成这样的气泡和长条
+```
+
+### 10.1 做"Profile Diff"视图，而不是只看单一泳道图
+
+性能调优真正需要的，不是只看一张泳道图，而是比较"改参数前"和"改参数后"：
+
+```text
+Profile A：默认 tile
+Profile B：修改后的 tile
+```
+
+建议在同一语义标签下，能同时展示：
+
+- 子图数变化
+- 同构率变化
+- 任务数变化
+- 气泡长度变化
+- 关键语义标签对应任务时长变化
+
+这个能力的价值在于，它第一次把"改参数"和"看结果"直接连了起来。
+
+### 10.2 在 Execute Graph 和 Swimlane 之间做稳定跨层跳转
+
+官方工具里已经有从泳道图跳回计算图的机制，核心锚点包括：
+
+| 锚点字段 | 用途 |
+|---------|------|
+| `rootHash` | 子图根节点标识 |
+| `leafHash` | 子图叶节点标识 |
+| `callOpMagic` | Execute Graph 调用节点唯一标识 |
+| `subgraphId` | Block Graph 子图 ID |
+| `semantic_label` | 语义标签，可跨层对齐 |
+
+参见：[`泳道图跳转到计算图.md`](https://gitcode.com/cann/pypto/blob/master/docs/tools/swimlane_graph/泳道图跳转到计算图.md)、[`查看泳道图.md`](https://gitcode.com/cann/pypto/blob/master/docs/tools/swimlane_graph/查看泳道图.md)
+
+第一版至少做到：
+
+- 在泳道图点一个任务，能高亮对应 Execute Graph 调用节点
+- 再从调用节点下钻到对应 Block Graph
+- 在 Block Graph 上高亮这一批任务所属的语义标签
+
+### 10.3 做一张"原因卡片"，明确告诉用户为什么会碎
+
+当用户点到气泡多、任务碎的区域时，工具应该尽量生成可读的原因说明，例如：
+
+```text
+当前 Sa_V0 / Sa_V1 相关 vector op 未合并到同构子图
+可能原因：
+1. 相邻 op 的 vec tile 不一致
+2. vec_nbuffer_mode 当前关闭或合并数过小
+3. pg_upper_bound 限制了更大的子图合并
+```
+
+哪怕第一版解释不够完整，只要能做到"现象 → 可能原因"的桥接，就已经比只展示图和时长有价值很多。
+
+### 10.4 工具侧需要采集的数据字段
+
+要把上述能力做出来，前端至少需要采集以下四类字段：
+
+**第一类：tile 配置快照**
+
+- `cube_tile_shapes`
+- `vec_tile_shapes`
+- `unroll_list`
+- `tile_bs`
+
+**第二类：pass 配置快照**
+
+- `cube_l1_reuse_setting`
+- `vec_nbuffer_mode` / `vec_nbuffer_setting`
+- `pg_upper_bound` / `pg_lower_bound` / `pg_skip_partition`
+- `mg_copyin_upper_bound`
+
+**第三类：跨层映射锚点**
+
+- `semantic_label`
+- `subgraph_id`
+- `rootHash`
+- `leafHash`
+- `callOpMagic`
+
+**第四类：结果指标**
+
+- 子图总数
+- 同构率
+- Block Graph / Execute Graph 健康报告
+- 泳道图任务总数
+- 气泡密度
+- 某语义标签任务总时长
+
+这四类数据一旦齐全，"tile → 子图 → 泳道图"因果链就能从研究稿转成可用的产品原型。
+
+---
+
+## 11. 最后，把整件事压缩成一句业务结论
 
 **DeepSeek 适配 910B 时，tiling 不是单个算子的局部参数，而是同时影响算子切块、子图分割、数据复用和最终性能的一组场景化执行策略。**
 
@@ -413,3 +578,10 @@ AI 当然可以自动做 tiling
 | 启发式 tiling pass | [set_heuristic_tile_shapes.cpp](https://gitcode.com/cann/pypto/blob/master/framework/src/passes/tensor_graph_pass/set_heuristic_tile_shapes.cpp) |
 | Tile 推导 pass | [derivation_tile_shape.cpp](https://gitcode.com/cann/pypto/blob/master/framework/src/passes/tensor_graph_pass/derivation_tile_shape.cpp) |
 | 编译缓存 key 生成 | [entry.py](https://gitcode.com/cann/pypto/blob/master/python/pypto/frontend/parser/entry.py) |
+| 查看计算图（四阶段说明） | [查看计算图.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/computation_graph/查看计算图.md) |
+| 查看健康报告 | [查看健康报告.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/computation_graph/查看健康报告.md) |
+| 查看泳道图 | [查看泳道图.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/swimlane_graph/查看泳道图.md) |
+| 查看性能报告 | [查看性能报告.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/swimlane_graph/查看性能报告.md) |
+| 泳道图跳转到计算图（跨层锚点） | [泳道图跳转到计算图.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/swimlane_graph/泳道图跳转到计算图.md) |
+| 三栏联动视图 | [三栏联动视图.md](https://gitcode.com/cann/pypto/blob/master/docs/tools/three_column/三栏联动视图.md) |
+| n_buffer_merge pass 实现 | [n_buffer_merge.cpp](https://gitcode.com/cann/pypto/blob/master/framework/src/passes/tile_graph_pass/graph_partition/n_buffer_merge.cpp) |
