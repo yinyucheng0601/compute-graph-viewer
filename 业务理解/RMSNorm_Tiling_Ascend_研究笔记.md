@@ -36,7 +36,13 @@ UB 容量有限（几十 KB），而一个 RMSNorm 的输入 tensor 可能几百
 
 ## 三、Tiling 的两个维度
 
-![RMSNorm Tiling on Ascend NPU](./rmsnorm_tiling_ascend.svg)
+**图 1　跨 Core 切分**
+
+![图1 跨 Core 切分](./rmsnorm_fig1_core_split.svg)
+
+**图 2　两趟 Pass 循环结构**
+
+![图2 两趟 Pass](./rmsnorm_fig2_two_pass.svg)
 
 ### 维度 1：跨 Core 切分（多核并行）
 
@@ -144,6 +150,10 @@ class RMSNormKernel {
 ```
 
 ---
+
+**图 3　UB 布局 · 参数推导 · Kernel 主循环**
+
+![图3 UB布局与Kernel主循环](./rmsnorm_fig3_ub_kernel.svg)
 
 ## 七、开发者手画的图是在算什么
 

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 图2：两趟 Pass 循环结构 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="500" viewBox="0 0 860 500">
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#888"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#f97316"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#7c3aed"/>
+    </marker>
+  </defs>
+
+  <rect width="860" height="500" fill="#f8f8f8"/>
+
+  <!-- Title -->
+  <text x="430" y="34" style="font:bold 15px 'SF Pro Display',sans-serif;fill:#111;text-anchor:middle">② 两趟 Pass：单 Core 内沿 hidden_dim 切 tile</text>
+  <text x="430" y="54" style="font:11px monospace;fill:#666;text-anchor:middle">hidden_dim 轴分成多个 tile，Pass 1 累加平方和，Pass 2 归一化（x 读两遍）</text>
+
+  <!-- ── Row header ── -->
+  <rect x="30" y="72" width="800" height="38" rx="5" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.2"/>
+  <text x="430" y="87" style="font:11px monospace;fill:#1d4ed8;text-anchor:middle">单行（一个 token），hidden_dim 个元素</text>
+  <text x="430" y="102" style="font:10px monospace;fill:#3b82f6;text-anchor:middle">← 可能比 UB 大，需要沿此方向切成 num_tiles 个 tile 分批处理 →</text>
+
+  <!-- hidden_dim axis arrow -->
+  <line x1="30" y1="122" x2="830" y2="122" stroke="#cbd5e1" stroke-width="1" marker-end="url(#arr)"/>
+  <text x="830" y="119" style="font:10px monospace;fill:#94a3b8;text-anchor:start"> hidden_dim</text>
+
+  <!-- ══ Pass 1 label ══ -->
+  <text x="30" y="152" style="font:bold 13px monospace;fill:#ea580c">Pass 1　累加 Σ x²</text>
+
+  <!-- Pass 1 tiles -->
+  <!-- tile 0 -->
+  <rect x="30" y="162" width="210" height="88" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="135" y="184" style="font:bold 11px monospace;fill:#c2410c;text-anchor:middle">tile 0</text>
+  <text x="135" y="201" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[0 : tile_k]</text>
+  <text x="135" y="218" style="font:10px monospace;fill:#9a3412;text-anchor:middle">HBM → UB</text>
+  <text x="135" y="235" style="font:10px monospace;fill:#9a3412;text-anchor:middle">sq_sum += Σ xᵢ²</text>
+
+  <!-- tile 1 -->
+  <rect x="250" y="162" width="210" height="88" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="355" y="184" style="font:bold 11px monospace;fill:#c2410c;text-anchor:middle">tile 1</text>
+  <text x="355" y="201" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[tile_k : 2·tile_k]</text>
+  <text x="355" y="218" style="font:10px monospace;fill:#9a3412;text-anchor:middle">HBM → UB</text>
+  <text x="355" y="235" style="font:10px monospace;fill:#9a3412;text-anchor:middle">sq_sum += Σ xᵢ²</text>
+
+  <text x="488" y="210" style="font:20px monospace;fill:#d1d5db;text-anchor:middle">…</text>
+
+  <!-- tile n -->
+  <rect x="510" y="162" width="210" height="88" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="615" y="184" style="font:bold 11px monospace;fill:#c2410c;text-anchor:middle">tile n　（尾块）</text>
+  <text x="615" y="201" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[n·tile_k : end]</text>
+  <text x="615" y="218" style="font:10px monospace;fill:#9a3412;text-anchor:middle">HBM → UB</text>
+  <text x="615" y="235" style="font:10px monospace;fill:#9a3412;text-anchor:middle">sq_sum += Σ xᵢ²</text>
+
+  <!-- rms result -->
+  <rect x="730" y="162" width="120" height="88" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="790" y="192" style="font:bold 11px monospace;fill:#15803d;text-anchor:middle">rms</text>
+  <text x="790" y="212" style="font:10px monospace;fill:#16a34a;text-anchor:middle">= sqrt(</text>
+  <text x="790" y="228" style="font:10px monospace;fill:#16a34a;text-anchor:middle">sq_sum/n)</text>
+  <text x="790" y="244" style="font:10px monospace;fill:#15803d;text-anchor:middle">标量 fp32</text>
+
+  <!-- arrow from tiles to rms -->
+  <line x1="720" y1="206" x2="730" y2="206" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Pass 1 summary bar -->
+  <rect x="30" y="260" width="800" height="24" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+  <text x="430" y="276" style="font:bold 10px monospace;fill:#92400e;text-anchor:middle">Pass 1 结束 → 得到 rms 标量；接下来 Pass 2 要把 x 再读一遍</text>
+
+  <!-- ══ Pass 2 label ══ -->
+  <text x="30" y="310" style="font:bold 13px monospace;fill:#7c3aed">Pass 2　归一化  x / rms × γ</text>
+
+  <!-- Pass 2 tiles -->
+  <!-- tile 0 -->
+  <rect x="30" y="320" width="210" height="100" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="135" y="342" style="font:bold 11px monospace;fill:#6d28d9;text-anchor:middle">tile 0</text>
+  <text x="135" y="359" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[0 : tile_k]</text>
+  <text x="135" y="376" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[0 : tile_k]</text>
+  <text x="135" y="393" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">out = x / rms × γ</text>
+  <text x="135" y="410" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <!-- tile 1 -->
+  <rect x="250" y="320" width="210" height="100" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="355" y="342" style="font:bold 11px monospace;fill:#6d28d9;text-anchor:middle">tile 1</text>
+  <text x="355" y="359" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[tile_k : 2·tile_k]</text>
+  <text x="355" y="376" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[tile_k : 2·tile_k]</text>
+  <text x="355" y="393" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">out = x / rms × γ</text>
+  <text x="355" y="410" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <text x="488" y="375" style="font:20px monospace;fill:#d1d5db;text-anchor:middle">…</text>
+
+  <!-- tile n -->
+  <rect x="510" y="320" width="210" height="100" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="615" y="342" style="font:bold 11px monospace;fill:#6d28d9;text-anchor:middle">tile n</text>
+  <text x="615" y="359" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[n·tile_k : end]</text>
+  <text x="615" y="376" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[n·tile_k : end]</text>
+  <text x="615" y="393" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">out = x / rms × γ</text>
+  <text x="615" y="410" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <!-- rms feeds Pass 2 -->
+  <rect x="730" y="340" width="120" height="60" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="790" y="366" style="font:bold 11px monospace;fill:#15803d;text-anchor:middle">rms</text>
+  <text x="790" y="384" style="font:10px monospace;fill:#16a34a;text-anchor:middle">广播给所有 tile</text>
+  <line x1="730" y1="370" x2="720" y2="370" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- x reads twice warning -->
+  <line x1="30" y1="432" x2="830" y2="432" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="430" y="450" style="font:bold 11px monospace;fill:#dc2626;text-anchor:middle">⚠  x 被读两遍 — HBM 带宽主要代价，tile_k 越大，循环次数越少</text>
+  <text x="430" y="468" style="font:10px monospace;fill:#9ca3af;text-anchor:middle">num_tiles = ceil( hidden_dim / tile_k )　　tile_k = UB_available / sizeof(dtype)</text>
+
+</svg>

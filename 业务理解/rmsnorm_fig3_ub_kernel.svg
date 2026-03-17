@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 图3：UB 内存布局 + 参数推导 + Kernel 伪代码 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="520" viewBox="0 0 860 520">
+
+  <rect width="860" height="520" fill="#f8f8f8"/>
+
+  <!-- Title -->
+  <text x="430" y="34" style="font:bold 15px 'SF Pro Display',sans-serif;fill:#111;text-anchor:middle">③ UB 布局 · 参数推导 · Kernel 主循环</text>
+
+  <!-- ── UB Layout ── -->
+  <text x="30" y="64" style="font:bold 12px monospace;fill:#374151">UB 内存布局（单 Core 视角）</text>
+
+  <rect x="30" y="74" width="390" height="100" rx="7" fill="#fff" stroke="#6b7280" stroke-width="1.8"/>
+  <text x="225" y="94" style="font:bold 11px monospace;fill:#374151;text-anchor:middle">Unified Buffer　~64 KB</text>
+
+  <!-- ubBuf_x -->
+  <rect x="42" y="100" width="148" height="62" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
+  <text x="116" y="122" style="font:bold 11px monospace;fill:#c2410c;text-anchor:middle">ubBuf_x</text>
+  <text x="116" y="139" style="font:10px monospace;fill:#ea580c;text-anchor:middle">tile_k × 2 B</text>
+  <text x="116" y="154" style="font:10px monospace;fill:#9a3412;text-anchor:middle">≈ 32 KB</text>
+
+  <!-- ubBuf_gamma -->
+  <rect x="200" y="100" width="148" height="62" rx="4" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="274" y="122" style="font:bold 11px monospace;fill:#6d28d9;text-anchor:middle">ubBuf_γ</text>
+  <text x="274" y="139" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">tile_k × 2 B</text>
+  <text x="274" y="154" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">≈ 32 KB</text>
+
+  <!-- sq_sum -->
+  <rect x="358" y="100" width="50" height="62" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.4"/>
+  <text x="383" y="122" style="font:10px monospace;fill:#15803d;text-anchor:middle">sq</text>
+  <text x="383" y="138" style="font:10px monospace;fill:#15803d;text-anchor:middle">sum</text>
+  <text x="383" y="154" style="font:10px monospace;fill:#15803d;text-anchor:middle">f32</text>
+
+  <text x="225" y="186" style="font:11px monospace;fill:#6b7280;text-anchor:middle">2 × tile_k × sizeof(dtype)  ≤  UB_size  ✓</text>
+
+  <!-- ── Param table ── -->
+  <text x="450" y="64" style="font:bold 12px monospace;fill:#374151">参数推导</text>
+
+  <rect x="450" y="74" width="380" height="212" rx="7" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+
+  <!-- header -->
+  <rect x="450" y="74" width="380" height="28" rx="7" fill="#f1f5f9" stroke="#c8c8c8" stroke-width="1.5"/>
+  <text x="560" y="91" style="font:bold 10px monospace;fill:#475569">参数</text>
+  <text x="720" y="91" style="font:bold 10px monospace;fill:#475569;text-anchor:middle">公式</text>
+
+  <line x1="450" y1="102" x2="830" y2="102" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="464" y="119" style="font:11px monospace;fill:#64748b">rows_per_core</text>
+  <text x="640" y="119" style="font:11px monospace;fill:#111;text-anchor:middle">seq_len  /  GetBlockNum()</text>
+
+  <line x1="450" y1="128" x2="830" y2="128" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="464" y="145" style="font:11px monospace;fill:#64748b">tile_k</text>
+  <text x="640" y="145" style="font:11px monospace;fill:#111;text-anchor:middle">UB_available  /  sizeof(dtype)</text>
+
+  <line x1="450" y1="154" x2="830" y2="154" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="464" y="171" style="font:11px monospace;fill:#64748b">num_tiles</text>
+  <text x="640" y="171" style="font:11px monospace;fill:#111;text-anchor:middle">ceil( hidden_dim  /  tile_k )</text>
+
+  <line x1="450" y1="180" x2="830" y2="180" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="464" y="197" style="font:11px monospace;fill:#64748b">HBM reads/Core</text>
+  <text x="640" y="197" style="font:11px monospace;fill:#111;text-anchor:middle">rows × hidden_dim × dtype × 2趟</text>
+
+  <line x1="450" y1="206" x2="830" y2="206" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="464" y="223" style="font:11px monospace;fill:#64748b">UB check</text>
+  <text x="640" y="223" style="font:11px monospace;fill:#111;text-anchor:middle">2 × tile_k × dtype  ≤  UB_size</text>
+
+  <line x1="450" y1="232" x2="830" y2="232" stroke="#e2e8f0" stroke-width="1"/>
+  <!-- Example row -->
+  <rect x="452" y="234" width="376" height="50" rx="0" fill="#f8fafc"/>
+  <text x="464" y="252" style="font:bold 10px monospace;fill:#475569">示例  seq=4096, hidden=8192, fp16, UB=64KB, 8Core</text>
+  <text x="464" y="269" style="font:10px monospace;fill:#64748b">rows=512　tile_k=16384　num_tiles=1　reads≈16MB/Core</text>
+
+  <!-- ── Kernel pseudocode ── -->
+  <text x="30" y="218" style="font:bold 12px monospace;fill:#374151">Kernel 主循环（AscendC 伪码）</text>
+
+  <rect x="30" y="228" width="390" height="278" rx="7" fill="#1e1e2e" stroke="#444" stroke-width="1.5"/>
+
+  <text x="50" y="252" style="font:11px monospace;fill:#89dceb">void</text>
+  <text x="86" y="252" style="font:11px monospace;fill:#cdd6f4">Process() {</text>
+
+  <text x="50" y="272" style="font:11px monospace;fill:#89dceb">  for</text>
+  <text x="86" y="272" style="font:11px monospace;fill:#cdd6f4">(row = 0; row &lt; rows_per_core; row++) {</text>
+
+  <text x="50" y="292" style="font:11px monospace;fill:#6c7086">    // Pass 1：累加平方和</text>
+  <text x="50" y="312" style="font:11px monospace;fill:#cba6f7">    float</text>
+  <text x="104" y="312" style="font:11px monospace;fill:#cdd6f4">sq_sum = 0;</text>
+  <text x="50" y="332" style="font:11px monospace;fill:#89dceb">    for</text>
+  <text x="86" y="332" style="font:11px monospace;fill:#cdd6f4">(t = 0; t &lt; num_tiles; t++) {</text>
+  <text x="50" y="352" style="font:11px monospace;fill:#a6e3a1">      CopyIn</text>
+  <text x="122" y="352" style="font:11px monospace;fill:#cdd6f4">(x, offset + row, t * tile_k);</text>
+  <text x="50" y="372" style="font:11px monospace;fill:#cdd6f4">      sq_sum +=</text>
+  <text x="148" y="372" style="font:11px monospace;fill:#f9e2af">ReduceSumSq</text>
+  <text x="268" y="372" style="font:11px monospace;fill:#cdd6f4">(ubBuf);</text>
+  <text x="50" y="392" style="font:11px monospace;fill:#cdd6f4">    }</text>
+  <text x="50" y="412" style="font:11px monospace;fill:#cba6f7">    float</text>
+  <text x="104" y="412" style="font:11px monospace;fill:#cdd6f4">rms = sqrt(sq_sum / hidden_dim);</text>
+
+  <text x="50" y="432" style="font:11px monospace;fill:#6c7086">    // Pass 2：归一化</text>
+  <text x="50" y="452" style="font:11px monospace;fill:#89dceb">    for</text>
+  <text x="86" y="452" style="font:11px monospace;fill:#cdd6f4">(t = 0; t &lt; num_tiles; t++) {</text>
+  <text x="50" y="472" style="font:11px monospace;fill:#a6e3a1">      CopyIn</text>
+  <text x="122" y="472" style="font:11px monospace;fill:#cdd6f4">(x, γ, offset + row, t * tile_k);</text>
+  <text x="50" y="492" style="font:11px monospace;fill:#f9e2af">      Normalize</text>
+  <text x="140" y="492" style="font:11px monospace;fill:#cdd6f4">(ubBuf, rms, gammaBuf);</text>
+  <text x="50" y="508" style="font:11px monospace;fill:#a6e3a1">      CopyOut</text>
+  <text x="128" y="508" style="font:11px monospace;fill:#cdd6f4">(output, offset + row, t * tile_k);</text>
+
+  <!-- ── right bottom: note ── -->
+  <rect x="450" y="298" width="380" height="208" rx="7" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+  <text x="640" y="320" style="font:bold 12px monospace;fill:#374151;text-anchor:middle">关键权衡</text>
+
+  <!-- tile_k tradeoff -->
+  <rect x="464" y="330" width="352" height="54" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.2"/>
+  <text x="640" y="350" style="font:bold 11px monospace;fill:#c2410c;text-anchor:middle">tile_k 越大</text>
+  <text x="640" y="367" style="font:10px monospace;fill:#9a3412;text-anchor:middle">→ 循环次数少，HBM 访问效率高</text>
+  <text x="640" y="381" style="font:10px monospace;fill:#9a3412;text-anchor:middle">→ 受限于 UB 容量上限</text>
+
+  <!-- two-pass tradeoff -->
+  <rect x="464" y="394" width="352" height="54" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.2"/>
+  <text x="640" y="414" style="font:bold 11px monospace;fill:#6d28d9;text-anchor:middle">两趟必须分开</text>
+  <text x="640" y="431" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">→ Pass 1 全跑完才能算 rms</text>
+  <text x="640" y="447" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">→ x 一定读两遍，无法避免</text>
+
+  <!-- fusion note -->
+  <rect x="464" y="458" width="352" height="40" rx="5" fill="#f0fdf4" stroke="#86efac" stroke-width="1.2"/>
+  <text x="640" y="474" style="font:10px monospace;fill:#15803d;text-anchor:middle">优化方向：与前序矩阵乘算子 kernel fusion，</text>
+  <text x="640" y="490" style="font:10px monospace;fill:#15803d;text-anchor:middle">复用已在 UB 中的 x，省去 Pass 1 的搬运</text>
+
+</svg>

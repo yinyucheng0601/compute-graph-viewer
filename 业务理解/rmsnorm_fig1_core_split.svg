@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 图1：跨 Core 切分 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="440" viewBox="0 0 560 440">
+
+  <rect width="560" height="440" fill="#f8f8f8"/>
+
+  <!-- Title -->
+  <text x="280" y="34" style="font:bold 15px 'SF Pro Display',sans-serif;fill:#111;text-anchor:middle">① 跨 Core 切分</text>
+  <text x="280" y="54" style="font:11px monospace;fill:#666;text-anchor:middle">seq_len 轴均分给多个 AI Core，行与行之间无依赖，天然并行</text>
+
+  <!-- Tensor grid outer box -->
+  <rect x="60" y="75" width="440" height="240" rx="8" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+
+  <!-- Axis labels inside box -->
+  <text x="280" y="94" style="font:11px monospace;fill:#999;text-anchor:middle">HBM　[seq_len × hidden_dim]</text>
+
+  <!-- Core 0 -->
+  <rect x="72" y="102" width="416" height="46" rx="4" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.2"/>
+  <text x="160" y="122" style="font:bold 12px monospace;fill:#1d4ed8">Core 0</text>
+  <text x="160" y="138" style="font:10px monospace;fill:#3b82f6">row 0  →  M−1</text>
+
+  <!-- Core 1 -->
+  <rect x="72" y="154" width="416" height="46" rx="4" fill="#dcfce7" stroke="#86efac" stroke-width="1.2"/>
+  <text x="160" y="174" style="font:bold 12px monospace;fill:#15803d">Core 1</text>
+  <text x="160" y="190" style="font:10px monospace;fill:#16a34a">row M  →  2M−1</text>
+
+  <!-- Core 2 -->
+  <rect x="72" y="206" width="416" height="46" rx="4" fill="#fef9c3" stroke="#fde047" stroke-width="1.2"/>
+  <text x="160" y="226" style="font:bold 12px monospace;fill:#854d0e">Core 2</text>
+  <text x="160" y="242" style="font:10px monospace;fill:#a16207">row 2M  →  3M−1</text>
+
+  <!-- Core 3 -->
+  <rect x="72" y="258" width="416" height="46" rx="4" fill="#fce7f3" stroke="#f9a8d4" stroke-width="1.2"/>
+  <text x="160" y="278" style="font:bold 12px monospace;fill:#9d174d">Core 3</text>
+  <text x="160" y="294" style="font:10px monospace;fill:#be185d">row 3M  →  4M−1</text>
+
+  <!-- Axis arrows -->
+  <!-- hidden_dim →  (horizontal) -->
+  <line x1="72" y1="326" x2="488" y2="326" stroke="#888" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="280" y="342" style="font:11px monospace;fill:#666;text-anchor:middle">hidden_dim</text>
+
+  <!-- seq_len ↓ (vertical) -->
+  <line x1="40" y1="102" x2="40" y2="304" stroke="#888" stroke-width="1.2" marker-end="url(#arr)"/>
+  <text x="20" y="210" style="font:11px monospace;fill:#666;text-anchor:middle" transform="rotate(-90,20,210)">seq_len</text>
+
+  <defs>
+    <marker id="arr" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0,7 2.5,0 5" fill="#888"/>
+    </marker>
+  </defs>
+
+  <!-- Formula box -->
+  <rect x="60" y="358" width="440" height="62" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/>
+  <text x="280" y="378" style="font:12px monospace;fill:#1e40af;text-anchor:middle">rows_per_core  =  seq_len  /  GetBlockNum()</text>
+  <text x="280" y="398" style="font:12px monospace;fill:#1e40af;text-anchor:middle">row_offset  =  rows_per_core  ×  GetBlockIdx()</text>
+  <text x="280" y="414" style="font:10px monospace;fill:#6b7280;text-anchor:middle">每个 Core 通过这两个值确定自己处理的行范围</text>
+
+</svg>
