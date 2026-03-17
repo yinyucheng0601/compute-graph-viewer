@@ -549,18 +549,193 @@ else:
 
 ---
 
-## 8. 第四层：编译后的 controlflow，不等于源码 AST
+## 8. 第四层：编译后的 controlflow
 
-很多人第一次看控制流图时，会下意识以为它就是 Python `for/if` 的图形版。实际上不是。
+很多人第一次看控制流图时，会下意识以为它就是 Python `for/if` 的图形版。实际上不是。中间至少发生了几件事：
 
-中间至少发生了几件事：
+1. **普通 `range/list/tuple` 循环，前端直接展开** ——不是每个 Python `for` 都会留下来
+2. **前端可能补一层隐式 `pypto.loop(1)`** ——源码没写 loop，也不代表后面没有 loop 骨架
+3. **`loop_unroll` 把一条 loop 变成多条 path** ——控制流里的 path 数可能远多于源码里的循环层数
+4. **tile 遍历继续放大任务数** ——控制流和执行图通常比源码"更碎"
 
-1. **普通 `range/list/tuple` 这类循环，很多时候前端就直接展开了** ——不是每个 Python `for` 都会留下来
-2. **前端可能补一层隐式 `pypto.loop(1)`** ——源码没写 loop，也不代表后面一定没有 loop 骨架
-3. **`loop_unroll` 会把一条 loop 变成多条 path** ——控制流里看到的 path 数，可能比源码表面上看到的循环层数更多
-4. **tile 遍历会继续放大任务数** ——控制流和执行图，通常会比源码"更碎"
+以下基于真实编译产物
+`output_deepseek/kernel_aicpu/controlFlow_dev_13801420179101682564.cpp`
+做逐层拆解。
 
-> **controlflow 不是源码 AST 的复印件，而是"前端保留下来的动态控制骨架 + path 展开 + tile 遍历结果"的合成物。**
+---
+
+### 8.1 controlflow 编译成什么
+
+controlflow 被编译成一个独立的 **ARM64 共享库**（`.so`），在 AI CPU 上运行，入口函数签名是：
+
+```cpp
+// controlFlow_dev_13801420179101682564.cpp
+uint64_t ControlFlowEntry(
+    void        *ctx,              // 设备执行上下文
+    uint64_t    *symbolTable,      // 动态状态表：存 loop 变量、形状维度等
+    CallRootEntryType callRootList[3], // 三个运行时回调函数指针
+    DevStartArgsBase *startArgs    // 输入输出 tensor 指针和 workspace
+)
+```
+
+三个回调函数（`callRootList`）是 controlflow 唯一能调用外部的通道：
+
+| 索引 | 宏名 | 作用 |
+|-----|------|------|
+| `[0]` | `RUNTIME_RootAlloc(funcKey)` | 为指定 path 分配一个 expression buffer（exprList） |
+| `[1]` | `RUNTIME_RootStitch(funcKey)` | 把填好 exprList 的 path 提交给设备执行队列 |
+| `[2]` | `RUNTIME_CallLog(...)` | 日志 |
+
+这个函数没有传统 AI Core 的 cube/vec 指令，**它本身在 CPU 上顺序执行，只负责组织 path 的分发顺序和数据参数**，AI Core 上的实际计算在 `RootStitch` 提交后异步进行。
+
+---
+
+### 8.2 Path 是什么
+
+对照 Indexer Prolog 的 `unroll_list=[32, 16, 8, 4, 2, 1]`，编译器生成了 7 条 path（PATH0 是初始化路径，PATH1–PATH6 对应 6 种展开档位）：
+
+| funcKey | 对应 path | loop step | loop 范围 |
+|--------|----------|----------|---------|
+| 0 | PATH0 | — | `[0, 1)` 只跑一次，初始化用 |
+| 1 | PATH1 | 32 | `[0, (size/32)*32)` |
+| 2 | PATH2 | 16 | `[(size/32)*32, (size/16)*16)` |
+| 3 | PATH3 | 8  | `[(size/32)*32, (size/8)*8)` |
+| 4 | PATH4 | 4  | `[(size/32)*32, (size/4)*4)` |
+| 5 | PATH5 | 2  | `[(size/32)*32, (size/2)*2)` |
+| 6 | PATH6 | 1  | `[(size/32)*32, size)` |
+
+运行时，controlflow 会按顺序从 PATH1 开始跑尽量大步长的档位，逐步缩小 step 处理尾部剩余，最终 PATH6（step=1）兜底，做到完整覆盖任意大小的 `size`。
+
+这也解释了为什么文件名里 `PATH0_6 / PATH0_8 / PATH0_10...` 是 magic 编号而不是展开因子本身——magic 是 funcKey，真正的 step 藏在 controlflow 代码的循环步长里。
+
+---
+
+### 8.3 数据如何流动：expression buffer
+
+每次 `RootStitch` 提交 path 时，需要告诉 AI Core 这次迭代的所有参数——tensor 指针、loop 变量当前值、派生下标等。这些参数通过 **expression buffer（exprList）** 传递。
+
+```cpp
+// 以 PATH1（step=32）为例，每次迭代：
+LOOP(VAR_tIdx, 0, (size / 32) * 32, 32) {           // C++ for 循环，step=32
+    uint64_t *exprList1 = RUNTIME_RootAlloc(1ULL);   // 为 PATH1 分配 exprList
+
+    RUNTIME_SetExpr(exprList1,  0, ARG_IN_0);        // 输入 tensor 0 的指针
+    RUNTIME_SetExpr(exprList1,  1, ARG_IN_1);        // 输入 tensor 1 的指针
+    RUNTIME_SetExpr(exprList1, 10, VAR_tIdx);         // 当前 tIdx 值
+    RUNTIME_SetExpr(exprList1, 11, VAR_tIdx + 1);    // tIdx+1（展开后的派生下标）
+    RUNTIME_SetExpr(exprList1, 12, VAR_tIdx + 2);
+    // ... 一直到 tIdx+31，共 50 个 expression（PATH1 比其他 path 多，因为展开了 32 次）
+    RUNTIME_SetExpr(exprList1, 41, VAR_tIdx + 31);
+
+    RUNTIME_RootStitch(1ULL);                         // 提交，AI Core 异步执行
+}
+```
+
+`symbolTable` 是跨迭代的全局状态表，存储动态运行时值：
+
+| symbolTable 索引 | 含义 |
+|----------------|------|
+| `[9]` | `VAR_dummy`（初始化 loop 的虚拟变量） |
+| `[10]` | `VAR_tIdx`（当前 tile index，每次 step 后更新） |
+| `[11]` | `ARG_IN_0` 的 shape dim[0]（`size`），用于计算各 path 的循环边界 |
+| `[12+]` | 其他输入的 shape 维度和常量 |
+
+循环边界本身也是动态计算的，来自 `expression_0.h` 里的宏：
+
+```cpp
+// 计算 (size - 0) / 32 * 32，即 PATH1 的 end
+#define EXPR_LOOP_BES_5_0_CALC  (RUNTIME_GetInputShapeDim(ARG_IN_0, 0))  // size
+#define EXPR_LOOP_BES_5_1_CALC  (EXPR_LOOP_BES_5_0_USE - 0)
+#define EXPR_LOOP_BES_5_2_CALC  (EXPR_LOOP_BES_5_1_USE / 32)
+#define EXPR_LOOP_BES_5_3_CALC  (EXPR_LOOP_BES_5_2_USE * 32)
+```
+
+这套机制让同一份 controlflow binary 能处理任意动态 shape 的输入。
+
+---
+
+### 8.4 "指令"是什么
+
+controlflow 没有传统意义上的 `CALL / JUMP / IF` 硬件指令集，它本质上是一段在 ARM CPU 上跑的 C++ 程序，"指令"是三类 C++ 函数调用：
+
+| 操作 | 对应代码 | 语义 |
+|-----|---------|------|
+| 分配参数槽 | `RUNTIME_RootAlloc(funcKey)` | 为 funcKey 对应的 path 申请一块 exprList 内存 |
+| 填参数 | `RUNTIME_SetExpr(exprList, idx, value)` | 把 tensor 指针或 loop 变量写进 exprList |
+| 提交执行 | `RUNTIME_RootStitch(funcKey)` | 把 exprList 连同 path 一起提交到 AI Core 任务队列 |
+| 结束信号 | `RUNTIME_RootStitch(-1)` | 告知运行时所有 path 已提交完毕 |
+| 提前退出 | 返回值 `CACHESTOP_RETURN` | 运行时发现可以复用缓存结果，提前终止 |
+
+`RootStitch` 是唯一的同步点：它提交后可以立即返回继续下一个 loop 迭代，也可以因 `CACHESTOP` 提前中止整个 controlflow。
+
+---
+
+### 8.5 从 ARM64 汇编看执行过程
+
+编译产物同时生成了 `.s` 汇编，PATH1 的核心 loop 在汇编里的样子：
+
+```asm
+.L8:                               ; loop 顶部
+    ldr  x3,  [x20]               ; 加载 runtimeCallList[0]（RootAlloc）
+    mov  x1,  1                   ; funcKey = 1（PATH1）
+    str  x22, [x28, 80]           ; symbolTable[10] = tIdx（更新 VAR_tIdx）
+    mov  x0,  x21                 ; ctx
+    blr  x3                       ; 调用 RootAlloc(ctx, 1) → 返回 exprList 指针到 x0
+
+    cbz  x0,  .L2                 ; 若 alloc 失败则跳出
+
+    ldr  x1,  [x28, 80]           ; 读 tIdx
+    add  x1,  x1, 1               ; tIdx + 1
+    str  x1,  [x0, 144]           ; exprList[18] = tIdx+1
+    ; ... 依次计算并存入 tIdx+2 ~ tIdx+31
+
+    ldr  x3,  [x20, 8]            ; 加载 runtimeCallList[1]（RootStitch）
+    mov  x1,  1                   ; funcKey = 1
+    mov  x0,  x21                 ; ctx
+    blr  x3                       ; 调用 RootStitch(ctx, 1) → 提交 PATH1
+
+    add  x22, x22, 32             ; tIdx += 32
+    cmp  x19, x22                 ; 比较 tIdx 与 end
+    bls  .L80                     ; tIdx >= end → 退出循环
+    b    .L8                      ; 继续下一次迭代
+
+; 最后提交 FINISH
+    mov  x1,  -1                  ; RUNTIME_FUNCKEY_FINISH
+    blr  x3                       ; RootStitch(ctx, -1)
+    mov  x0,  0
+    ret
+```
+
+可以看到 controlflow 在汇编层面就是普通的 ARM `blr`（函数调用）和 `b / bls`（条件跳转），没有任何 AI Core 专有指令，因为这段代码完全在 AI CPU 上执行。
+
+---
+
+### 8.6 编译流水线
+
+从 PyPTO 源码到可运行的 controlflow `.so`，经过以下阶段（来源：`compile_control_bin.cpp`）：
+
+```
+PyPTO 前端 IR
+  ↓ codegen
+controlFlow_dev_*.cpp          ← 生成的 C++ controlflow
+control_flow_kernel.cpp        ← 生成的 tiling wrapper
+expression_0.h                 ← 动态 shape 计算宏
+  ↓ aarch64-target-linux-gnu-g++ -O2 -fPIC -c
+*.o 目标文件
+  ↓ 链接 libpypto_ctrl_server.a（提供 RootAlloc/RootStitch 实现）
+lib<funcName>_control.so       ← 最终加载到 AI CPU 上执行
+```
+
+---
+
+> **总结：controlflow 不是源码 AST 的复印件。它是一段在 AI CPU 上顺序执行的 C++ 程序，通过 RootAlloc + SetExpr + RootStitch 三个动作，把"哪条 path、这次迭代的 loop 变量值、所有 tensor 指针"打包提交给 AI Core 异步执行。loop 结构、path 分发、expression 计算都在 CPU 侧发生；AI Core 只负责接收 exprList 并执行对应的 kernel。**
+
+真实文件：
+- `output_deepseek/kernel_aicpu/controlFlow_dev_13801420179101682564.cpp`
+- `output_deepseek/kernel_aicpu/controlFlow_dev_13801420179101682564.cpp.s`
+- `output_deepseek/kernel_aicpu/expression_0.h`
+- `pypto-master/framework/src/machine/compile/compile_control_bin.cpp`
+- `pypto-master/framework/src/interface/machine/device/tilefwk/aicpu_runtime.h`
 
 ---
 
