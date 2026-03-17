@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tiled Flash-Attention 2.0 Flow -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1400" viewBox="0 0 1400 1400">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+
+  <text x="20" y="28" style="font:bold 18px sans-serif;fill:#111">Tiled Flash-Attention 2.0 Flow</text>
+  <text x="20" y="52" style="font:12px monospace;fill:#333">compute_qk → QK_tile → compute_p → P_tile + running_global_sum → compute_pv → PV_tile → compute_gu ↔ O_partial → O</text>
+  <text x="20" y="72" style="font:12px monospace;fill:#333">Notation: S0 rows, HEAD=head dim, S1 cols; tiles: CubeS0 (S0 axis), CubeS1 (S1 axis)</text>
+
+  <rect x="40" y="100" width="320" height="80" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="60" y="130" style="font:14px monospace;fill:#111">Q (Seqlen × HEAD)</text>
+  <text x="60" y="152" style="font:12px monospace;fill:#333">fp16</text>
+
+  <rect x="430" y="100" width="320" height="80" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="450" y="130" style="font:14px monospace;fill:#111">K (Seqlen × HEAD)</text>
+  <text x="450" y="152" style="font:12px monospace;fill:#333">fp16</text>
+
+  <rect x="820" y="100" width="320" height="80" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="840" y="130" style="font:14px monospace;fill:#111">V (Seqlen × HEAD)</text>
+  <text x="840" y="152" style="font:12px monospace;fill:#333">fp16</text>
+
+  <rect x="80" y="220" width="180" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="92" y="256" style="font:14px monospace;fill:#111">Q_tile</text>
+  <text x="92" y="276" style="font:12px monospace;fill:#333">(CubeS0×HEAD) fp16</text>
+
+  <rect x="320" y="220" width="180" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="332" y="256" style="font:14px monospace;fill:#111">K_tile</text>
+  <text x="332" y="276" style="font:12px monospace;fill:#333">(CubeS1×HEAD) fp16</text>
+
+  <rect x="560" y="220" width="180" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="572" y="256" style="font:14px monospace;fill:#111">V_tile</text>
+  <text x="572" y="276" style="font:12px monospace;fill:#333">(CubeS1×HEAD) fp16</text>
+
+  <path d="M200 180 L170 220" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M560 180 L380 220" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M980 180 L620 220" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <path d="M120 300 C80 300, 80 320, 80 360 L80 980 C80 1020, 80 1040, 120 1040" style="stroke:#666;stroke-width:2;fill:none;stroke-dasharray:6 4"/>
+  <text x="20" y="420" style="font:13px monospace;fill:#111">Loop S1 / CubeS1</text>
+  <text x="20" y="440" style="font:13px monospace;fill:#111">(iterate K_tile/V_tile)</text>
+
+  <rect x="180" y="320" width="320" height="88" rx="6" style="fill:#f8f9fa;stroke:#333;stroke-width:2"/>
+  <text x="200" y="352" style="font:14px monospace;fill:#111">compute_qk()</text>
+  <text x="200" y="374" style="font:12px monospace;fill:#333">Q_tile × K_tileᵀ</text>
+
+  <path d="M170 300 L210 320" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M440 300 L460 320" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="180" y="420" width="240" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="192" y="456" style="font:14px monospace;fill:#111">QK_tile</text>
+  <text x="192" y="476" style="font:12px monospace;fill:#333">(CubeS0×CubeS1) fp32</text>
+
+  <path d="M300 400 L300 420" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M300 492 L300 520" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="180" y="520" width="320" height="80" rx="6" style="fill:#f8f9fa;stroke:#333;stroke-width:2"/>
+  <text x="200" y="552" style="font:14px monospace;fill:#111">compute_p()</text>
+  <text x="200" y="572" style="font:12px monospace;fill:#333">SoftMax</text>
+
+  <rect x="180" y="608" width="240" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="192" y="644" style="font:14px monospace;fill:#111">P_tile</text>
+  <text x="192" y="664" style="font:12px monospace;fill:#333">(CubeS0×CubeS1) fp32</text>
+
+  <rect x="540" y="520" width="200" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="552" y="556" style="font:14px monospace;fill:#111">running_global_sum</text>
+  <text x="552" y="576" style="font:12px monospace;fill:#333">(CubeS0) fp32</text>
+
+  <path d="M300 600 L300 608" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M420 548 L540 548" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <path d="M300 680 L300 720" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="180" y="720" width="320" height="88" rx="6" style="fill:#f8f9fa;stroke:#333;stroke-width:2"/>
+  <text x="200" y="752" style="font:14px monospace;fill:#111">compute_pv()</text>
+  <text x="200" y="774" style="font:12px monospace;fill:#333">P_tile × V_tile</text>
+
+  <path d="M640 252 L520 760" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="180" y="820" width="240" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="192" y="856" style="font:14px monospace;fill:#111">PV_tile</text>
+  <text x="192" y="876" style="font:12px monospace;fill:#333">(CubeS0×HEAD) fp32</text>
+
+  <path d="M300 804 L300 820" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <path d="M300 892 L300 920" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="180" y="920" width="360" height="88" rx="6" style="fill:#f8f9fa;stroke:#333;stroke-width:2"/>
+  <text x="200" y="952" style="font:14px monospace;fill:#111">compute_gu()</text>
+  <text x="200" y="974" style="font:12px monospace;fill:#333">Global update</text>
+
+  <path d="M740 556 L560 980" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+
+  <rect x="560" y="920" width="240" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="572" y="956" style="font:14px monospace;fill:#111">O_partial</text>
+  <text x="572" y="976" style="font:12px monospace;fill:#333">(CubeS0×HEAD) fp32</text>
+
+  <path d="M540 996 L560 996" style="stroke:#333;stroke-width:2;fill:none;marker-start:url(#arrowhead);marker-end:url(#arrowhead)" />
+
+  <path d="M300 1012 L300 1060" style="stroke:#333;stroke-width:2;fill:none;marker-end:url(#arrowhead)" />
+  <rect x="180" y="1060" width="320" height="72" rx="6" style="fill:#eef;stroke:#333;stroke-width:2"/>
+  <text x="200" y="1090" style="font:14px monospace;fill:#111">O (S0 × HEAD)</text>
+  <text x="200" y="1110" style="font:12px monospace;fill:#333">fp16/fp32</text>
+
+  <rect x="40" y="1200" width="1300" height="100" rx="6" style="fill:#f8f9fa;stroke:#333;stroke-width:2"/>
+  <text x="60" y="1228" style="font:14px monospace;fill:#111">Iteration semantics</text>
+  <text x="60" y="1248" style="font:12px monospace;fill:#333">• For each Q_tile: loop over K_tile/V_tile (S1 / CubeS1) performing compute_qk → compute_p → compute_pv → compute_gu (update running O_partial and running_global_sum).</text>
+  <text x="60" y="1268" style="font:12px monospace;fill:#333">• After finishing all K_tiles for a Q_tile, compute_gu emits final O rows (CubeS0 × HEAD) into O.</text>
+</svg>
