@@ -36,7 +36,7 @@ UB 容量有限（几十 KB），而一个 RMSNorm 的输入 tensor 可能几百
 
 ## 三、Tiling 的两个维度
 
-见配图 `rmsnorm_tiling_ascend.svg`。
+![RMSNorm Tiling on Ascend NPU](./rmsnorm_tiling_ascend.svg)
 
 ### 维度 1：跨 Core 切分（多核并行）
 
