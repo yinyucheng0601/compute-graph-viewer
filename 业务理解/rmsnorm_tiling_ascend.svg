@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3b82f6"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#f97316"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#f8f8f8"/>
+
+  <!-- Title -->
+  <text x="40" y="38" style="font:bold 18px 'SF Pro Display',sans-serif;fill:#111">RMSNorm Tiling on Ascend NPU</text>
+  <text x="40" y="60" style="font:12px monospace;fill:#666">输入 [seq_len, hidden_dim]，两趟 Pass，跨 Core 均分行，UB 内按列切 tile</text>
+
+  <!-- ═══════════════════════════════════════════════
+       LEFT PANEL: 跨 Core 切分（行方向）
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Section label -->
+  <text x="40" y="100" style="font:bold 13px monospace;fill:#3b82f6">① 跨 Core 切分（seq_len 轴均分给多个 AI Core）</text>
+
+  <!-- HBM tensor grid -->
+  <!-- Grid background -->
+  <rect x="40" y="115" width="340" height="260" rx="6" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+  <text x="210" y="133" style="font:11px monospace;fill:#888;text-anchor:middle">HBM  [seq_len × hidden_dim]</text>
+
+  <!-- Row bands for 4 cores -->
+  <rect x="52" y="140" width="316" height="46" rx="3" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+  <text x="64" y="158" style="font:11px monospace;fill:#1d4ed8">Core 0</text>
+  <text x="64" y="174" style="font:10px monospace;fill:#3b82f6">row 0 → M-1</text>
+
+  <rect x="52" y="192" width="316" height="46" rx="3" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+  <text x="64" y="210" style="font:11px monospace;fill:#15803d">Core 1</text>
+  <text x="64" y="226" style="font:10px monospace;fill:#16a34a">row M → 2M-1</text>
+
+  <rect x="52" y="244" width="316" height="46" rx="3" fill="#fef9c3" stroke="#fde047" stroke-width="1"/>
+  <text x="64" y="262" style="font:11px monospace;fill:#854d0e">Core 2</text>
+  <text x="64" y="278" style="font:10px monospace;fill:#a16207">row 2M → 3M-1</text>
+
+  <rect x="52" y="296" width="316" height="46" rx="3" fill="#fce7f3" stroke="#f9a8d4" stroke-width="1"/>
+  <text x="64" y="314" style="font:11px monospace;fill:#9d174d">Core 3</text>
+  <text x="64" y="330" style="font:10px monospace;fill:#be185d">row 3M → 4M-1</text>
+
+  <!-- Axis labels -->
+  <text x="210" y="365" style="font:11px monospace;fill:#555;text-anchor:middle">← hidden_dim →</text>
+  <text x="22" y="230" style="font:11px monospace;fill:#555;text-anchor:middle" transform="rotate(-90,22,230)">← seq_len →</text>
+
+  <!-- Formula: rows_per_core -->
+  <rect x="40" y="380" width="340" height="48" rx="6" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+  <text x="210" y="400" style="font:12px monospace;fill:#1e40af;text-anchor:middle">rows_per_core = seq_len / GetBlockNum()</text>
+  <text x="210" y="418" style="font:12px monospace;fill:#1e40af;text-anchor:middle">offset = rows_per_core × GetBlockIdx()</text>
+
+  <!-- ═══════════════════════════════════════════════
+       RIGHT PANEL: UB 内切分（列方向）
+  ═══════════════════════════════════════════════ -->
+
+  <text x="440" y="100" style="font:bold 13px monospace;fill:#f97316">② UB 内切分（hidden_dim 轴分 tile，Core 内循环）</text>
+
+  <!-- One core's rows -->
+  <rect x="440" y="115" width="720" height="56" rx="6" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="800" y="138" style="font:11px monospace;fill:#1d4ed8;text-anchor:middle">Core 0 负责的行（rows_per_core 行）</text>
+  <text x="800" y="157" style="font:10px monospace;fill:#3b82f6;text-anchor:middle">hidden_dim 可能很长，需要在列方向切 tile</text>
+
+  <!-- Tile breakdown -->
+  <!-- tile 0 -->
+  <rect x="440" y="190" width="210" height="100" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="545" y="215" style="font:11px monospace;fill:#c2410c;text-anchor:middle">tile 0</text>
+  <text x="545" y="232" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[0 : tile_k]</text>
+  <text x="545" y="249" style="font:10px monospace;fill:#9a3412;text-anchor:middle">→ UB → partial sum(x²)</text>
+  <text x="545" y="266" style="font:10px monospace;fill:#9a3412;text-anchor:middle">累加到 sq_sum</text>
+  <text x="545" y="283" style="font:10px monospace;fill:#555;text-anchor:middle">tile_k = UB_size / dtype</text>
+
+  <!-- tile 1 -->
+  <rect x="660" y="190" width="210" height="100" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="765" y="215" style="font:11px monospace;fill:#c2410c;text-anchor:middle">tile 1</text>
+  <text x="765" y="232" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[tile_k : 2·tile_k]</text>
+  <text x="765" y="249" style="font:10px monospace;fill:#9a3412;text-anchor:middle">→ UB → partial sum(x²)</text>
+  <text x="765" y="266" style="font:10px monospace;fill:#9a3412;text-anchor:middle">累加到 sq_sum</text>
+
+  <!-- tile n -->
+  <rect x="880" y="190" width="210" height="100" rx="5" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+  <text x="985" y="215" style="font:11px monospace;fill:#c2410c;text-anchor:middle">tile n</text>
+  <text x="985" y="232" style="font:10px monospace;fill:#ea580c;text-anchor:middle">x[n·tile_k : end]</text>
+  <text x="985" y="249" style="font:10px monospace;fill:#9a3412;text-anchor:middle">→ UB → partial sum(x²)</text>
+  <text x="985" y="266" style="font:10px monospace;fill:#9a3412;text-anchor:middle">累加到 sq_sum</text>
+
+  <!-- "..." between tiles -->
+  <text x="648" y="245" style="font:16px monospace;fill:#aaa;text-anchor:middle">…</text>
+  <text x="868" y="245" style="font:16px monospace;fill:#aaa;text-anchor:middle">…</text>
+
+  <!-- Pass 1 label -->
+  <rect x="440" y="302" width="650" height="26" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+  <text x="765" y="319" style="font:bold 11px monospace;fill:#92400e;text-anchor:middle">Pass 1 结束：rms = sqrt(sq_sum / hidden_dim)　←　一个标量</text>
+
+  <!-- ═════════ Pass 2 ═════════ -->
+
+  <text x="440" y="358" style="font:bold 12px monospace;fill:#7c3aed">Pass 2：用 rms 归一化（x 再读一遍）</text>
+
+  <!-- tile 0 pass2 -->
+  <rect x="440" y="372" width="210" height="110" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="545" y="396" style="font:11px monospace;fill:#6d28d9;text-anchor:middle">tile 0</text>
+  <text x="545" y="413" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[0 : tile_k]</text>
+  <text x="545" y="430" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[0 : tile_k]</text>
+  <text x="545" y="447" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">x / rms × γ</text>
+  <text x="545" y="464" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <!-- tile 1 pass2 -->
+  <rect x="660" y="372" width="210" height="110" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="765" y="396" style="font:11px monospace;fill:#6d28d9;text-anchor:middle">tile 1</text>
+  <text x="765" y="413" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[tile_k : 2·tile_k]</text>
+  <text x="765" y="430" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[tile_k : 2·tile_k]</text>
+  <text x="765" y="447" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">x / rms × γ</text>
+  <text x="765" y="464" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <!-- tile n pass2 -->
+  <rect x="880" y="372" width="210" height="110" rx="5" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+  <text x="985" y="396" style="font:11px monospace;fill:#6d28d9;text-anchor:middle">tile n</text>
+  <text x="985" y="413" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">再搬 x[n·tile_k : end]</text>
+  <text x="985" y="430" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">搬 γ[n·tile_k : end]</text>
+  <text x="985" y="447" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">x / rms × γ</text>
+  <text x="985" y="464" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">CopyOut → HBM</text>
+
+  <!-- "..." between tiles pass2 -->
+  <text x="648" y="430" style="font:16px monospace;fill:#aaa;text-anchor:middle">…</text>
+  <text x="868" y="430" style="font:16px monospace;fill:#aaa;text-anchor:middle">…</text>
+
+  <!-- x reads twice annotation -->
+  <line x1="440" y1="500" x2="1090" y2="500" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="765" y="516" style="font:bold 11px monospace;fill:#dc2626;text-anchor:middle">⚠ x 被读两遍（Pass 1 一次，Pass 2 一次）← HBM 带宽的主要代价</text>
+
+  <!-- ═══════════════════════════════════════════════
+       BOTTOM: UB 布局图
+  ═══════════════════════════════════════════════ -->
+
+  <text x="40" y="565" style="font:bold 13px monospace;fill:#374151">③ UB 内存布局（单 Core 视角）</text>
+
+  <!-- UB box -->
+  <rect x="40" y="580" width="520" height="110" rx="8" fill="#fff" stroke="#6b7280" stroke-width="2"/>
+  <text x="300" y="600" style="font:bold 12px monospace;fill:#374151;text-anchor:middle">UB（Unified Buffer，~64KB）</text>
+
+  <!-- ubBuf_x -->
+  <rect x="52" y="608" width="180" height="68" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+  <text x="142" y="630" style="font:11px monospace;fill:#c2410c;text-anchor:middle">ubBuf_x</text>
+  <text x="142" y="647" style="font:10px monospace;fill:#ea580c;text-anchor:middle">tile_k × 2B</text>
+  <text x="142" y="663" style="font:10px monospace;fill:#9a3412;text-anchor:middle">≈ 32KB</text>
+
+  <!-- ubBuf_gamma -->
+  <rect x="242" y="608" width="180" height="68" rx="4" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="332" y="630" style="font:11px monospace;fill:#6d28d9;text-anchor:middle">ubBuf_γ</text>
+  <text x="332" y="647" style="font:10px monospace;fill:#7c3aed;text-anchor:middle">tile_k × 2B</text>
+  <text x="332" y="663" style="font:10px monospace;fill:#4c1d95;text-anchor:middle">≈ 32KB</text>
+
+  <!-- sq_sum scalar -->
+  <rect x="432" y="608" width="116" height="68" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="490" y="630" style="font:11px monospace;fill:#15803d;text-anchor:middle">sq_sum</text>
+  <text x="490" y="647" style="font:10px monospace;fill:#16a34a;text-anchor:middle">scalar</text>
+  <text x="490" y="663" style="font:10px monospace;fill:#15803d;text-anchor:middle">fp32</text>
+
+  <!-- Total label -->
+  <text x="300" y="706" style="font:12px monospace;fill:#555;text-anchor:middle">合计 ≤ UB 容量 ✓　　（需在 tiling 参数计算时验证）</text>
+
+  <!-- ═══════════════════════════════════════════════
+       BOTTOM RIGHT: 参数推导
+  ═══════════════════════════════════════════════ -->
+
+  <rect x="600" y="565" width="560" height="250" rx="8" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+  <text x="880" y="588" style="font:bold 13px monospace;fill:#374151;text-anchor:middle">④ 参数推导（开发者手画的核心计算）</text>
+
+  <!-- param table rows -->
+  <line x1="616" y1="600" x2="1144" y2="600" stroke="#e5e7eb" stroke-width="1"/>
+
+  <text x="624" y="618" style="font:11px monospace;fill:#6b7280">rows_per_core</text>
+  <text x="880" y="618" style="font:11px monospace;fill:#111;text-anchor:middle">=  seq_len  /  GetBlockNum()</text>
+
+  <line x1="616" y1="626" x2="1144" y2="626" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="624" y="644" style="font:11px monospace;fill:#6b7280">tile_k</text>
+  <text x="880" y="644" style="font:11px monospace;fill:#111;text-anchor:middle">=  UB_available  /  sizeof(dtype)</text>
+
+  <line x1="616" y1="652" x2="1144" y2="652" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="624" y="670" style="font:11px monospace;fill:#6b7280">num_tiles</text>
+  <text x="880" y="670" style="font:11px monospace;fill:#111;text-anchor:middle">=  ceil( hidden_dim  /  tile_k )</text>
+
+  <line x1="616" y1="678" x2="1144" y2="678" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="624" y="696" style="font:11px monospace;fill:#6b7280">HBM reads/Core</text>
+  <text x="880" y="696" style="font:11px monospace;fill:#111;text-anchor:middle">=  rows_per_core × hidden_dim × 2  ×  2趟</text>
+
+  <line x1="616" y1="704" x2="1144" y2="704" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="624" y="722" style="font:11px monospace;fill:#6b7280">UB check</text>
+  <text x="880" y="722" style="font:11px monospace;fill:#111;text-anchor:middle">2 × tile_k × sizeof(dtype)  ≤  UB_size</text>
+
+  <line x1="616" y1="730" x2="1144" y2="730" stroke="#e5e7eb" stroke-width="1"/>
+
+  <!-- Example box -->
+  <rect x="616" y="736" width="528" height="68" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="632" y="754" style="font:bold 10px monospace;fill:#475569">示例：seq=4096, hidden=8192, fp16, UB=64KB, 8 Core</text>
+  <text x="632" y="770" style="font:10px monospace;fill:#64748b">rows_per_core = 512　　tile_k = 16384　　num_tiles = 1（一 tile 能装下整行）</text>
+  <text x="632" y="786" style="font:10px monospace;fill:#64748b">每 Core 读 HBM：512 × 8192 × 2B × 2趟 ≈ 16MB</text>
+
+  <!-- ═══════════════════════════════════════════════
+       BOTTOM: loop pseudo-structure
+  ═══════════════════════════════════════════════ -->
+
+  <rect x="40" y="730" width="520" height="155" rx="8" fill="#1e1e2e" stroke="#444" stroke-width="1.5"/>
+  <text x="60" y="752" style="font:bold 11px monospace;fill:#cdd6f4">Kernel 主循环结构</text>
+  <text x="60" y="772" style="font:10px monospace;fill:#89dceb">for</text>
+  <text x="96" y="772" style="font:10px monospace;fill:#cdd6f4">row in rows_per_core:</text>
+  <text x="60" y="789" style="font:10px monospace;fill:#a6e3a1">  // Pass 1</text>
+  <text x="60" y="806" style="font:10px monospace;fill:#89dceb">  for</text>
+  <text x="96" y="806" style="font:10px monospace;fill:#cdd6f4">t in num_tiles:  CopyIn x → UB;  sq_sum += ReduceSumSq(UB)</text>
+  <text x="60" y="823" style="font:10px monospace;fill:#cba6f7">  rms</text>
+  <text x="96" y="823" style="font:10px monospace;fill:#cdd6f4">= sqrt(sq_sum / hidden_dim)</text>
+  <text x="60" y="840" style="font:10px monospace;fill:#a6e3a1">  // Pass 2</text>
+  <text x="60" y="857" style="font:10px monospace;fill:#89dceb">  for</text>
+  <text x="96" y="857" style="font:10px monospace;fill:#cdd6f4">t in num_tiles:  CopyIn x,γ → UB;  out = x/rms×γ;  CopyOut</text>
+
+</svg>
