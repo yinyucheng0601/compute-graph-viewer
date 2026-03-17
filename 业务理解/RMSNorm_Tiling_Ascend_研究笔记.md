@@ -8,11 +8,11 @@
 
 | 来源 | 说明 | 链接 |
 |------|------|------|
-| DeepSeek V3.2 推理源码 | `model.py` RMSNorm 实现，含 fused residual 变体 | 本地 `deepseekv3.2源码/inference_副本/model.py` L272–306 |
+| DeepSeek V3.2 推理源码 | `model.py` RMSNorm 实现，含 fused residual 变体，L272–306 | https://github.com/deepseek-ai/DeepSeek-V3/blob/main/inference/model.py |
 | GitCode cann-recipes-infer | 华为官方 CANN 推理配方仓库，含多个模型的真实 AscendC kernel | https://gitcode.com/cann/cann-recipes-infer |
-| RMSNormGated kernel（Qwen3） | `CustVec.h`，含 tiling 计算、double buffer、Group Norm 融合实现 | `cann-recipes-infer/models/qwen3-next/ops/gated_delta_net/rmsnormgated/op_kernel/CustVec.h` |
+| RMSNormGated kernel（Qwen3） | `CustVec.h`，含 tiling 计算、double buffer、Group Norm 融合实现 | https://gitcode.com/cann/cann-recipes-infer/blob/master/models/qwen3-next/ops/gated_delta_net/rmsnormgated/op_kernel/CustVec.h |
 | CANN 高阶 API 文档（RmsNorm Tiling） | `GetRmsNormTilingInfo` / `RmsNormTiling` 结构字段说明 | https://www.hiascend.com/document/detail/zh/canncommercial/80RC3/apiref/ascendcopapi/atlasascendc_api_07_0738.html |
-| DeepSeek V3.2 AscendC 算子指南 | DeepSeek V3.2 在 910B 上的算子开发说明（PyPTO / TileLang / AscendC 三条路径） | `cann-recipes-infer/docs/models/deepseek-v3.2-exp/deepseek_v3.2_exp_ascendc_operator_guide.md` |
+| DeepSeek V3.2 AscendC 算子指南 | DeepSeek V3.2 在 910B 上的算子开发说明（PyPTO / TileLang / AscendC 三条路径） | https://gitcode.com/cann/cann-recipes-infer/blob/master/docs/models/deepseek-v3.2-exp/deepseek_v3.2_exp_ascendc_operator_guide.md |
 | MindSpore AscendC 自定义算子开发 | AscendC kernel 开发官方教程，含 tiling / CopyIn / CopyOut 用法 | https://www.mindspore.cn/tutorials/experts/zh-CN/r2.3.1/operation/op_custom_ascendc.html |
 
 ---
