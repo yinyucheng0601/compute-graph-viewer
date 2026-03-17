@@ -222,102 +222,187 @@
     {
       "id": "grp_loop_reshape",
       "type": "Group",
-      "name": "LOOP_RESHAPE"
+      "name": "LOOP_RESHAPE",
+      "source_code": "for _ in pypto.loop(0, 1, 1,\n    name=\"LOOP_RESHAPE\", idx_name=\"dummy\"):\n    k_cache_index = pypto.reshape(k_cache_index_in, [t, 1], inplace=True)          # L240\n    w_qb_scale    = pypto.reshape(w_qb_scale_in, [1, head_num*head_dim], ...)       # L242\n    gamma_2d      = pypto.reshape(ln_gamma_k_in, [1, ln_gamma_k_in.shape[0]], ...)  # L243\n    beta_2d       = pypto.reshape(ln_beta_k_in,  [1, ln_beta_k_in.shape[0]],  ...)  # L245\n    w_qb          = pypto.reshape(w_qb_in,  [q_lora_rank, head_num*head_dim], ...)  # L247\n    wk            = pypto.reshape(wk_in,   [h, head_dim], inplace=True)             # L248\n    w_proj        = pypto.reshape(w_proj_in, [h, head_num], inplace=True)           # L249",
+      "source_lines": [
+        237,
+        249
+      ]
     },
     {
       "id": "grp_main_loop",
       "type": "Group",
-      "name": "loop_unroll · IndexerPrologQuantQuantLoop"
+      "name": "loop_unroll · IndexerPrologQuantQuantLoop",
+      "source_code": "for tIdx, unrollLength in pypto.loop_unroll(\n    0, t, 1,\n    name=\"IndexerPrologQuantQuantLoop\",\n    idx_name=\"tIdx\",\n    unroll_list=unroll_list):   # L252–253\n    # 每次处理 t_tile 个 token，tIdx 为当前 tile 起始偏移",
+      "source_lines": [
+        252,
+        253
+      ]
     },
     {
       "id": "grp_tile_prep",
       "type": "Group",
       "name": "Tile 准备",
-      "parentId": "grp_main_loop"
+      "parentId": "grp_main_loop",
+      "source_code": "# IR 生成器从主循环体各处汇聚所有 tile 切片操作\nq_norm       = pypto.view(q_norm_in,       [t_tile, q_lora_rank],   [tIdx, 0], ...)  # L266\nq_norm_scale = pypto.view(q_norm_scale_in, [t_tile, 1],             [tIdx, 0], ...)  # L267\nrope_cos     = pypto.view(cos_idx_rope_in, [t_tile, rope_head_dim], [tIdx, 0], ...)  # L287\nrope_sin     = pypto.view(sin_idx_rope_in, [t_tile, rope_head_dim], [tIdx, 0], ...)  # L289\nx            = pypto.view(x_in,            [t_tile, h],             [tIdx, 0], ...)  # L317",
+      "source_lines": [
+        266,
+        317
+      ]
     },
     {
       "id": "grp_query",
       "type": "Group",
       "name": "Query 支路",
-      "parentId": "grp_main_loop"
+      "parentId": "grp_main_loop",
+      "source_code": "# Query 计算支路（L266–L309）\n# 含五个语义阶段：Linear → Dequant → Rope3D → Hadamard → Quant",
+      "source_lines": [
+        268,
+        309
+      ]
     },
     {
       "id": "grp_q_linear",
       "type": "Group",
       "name": "Query-Linear",
-      "parentId": "grp_query"
+      "parentId": "grp_query",
+      "source_code": "pypto.set_semantic_label(\"Query-Linear\")              # L268\npypto.set_cube_tile_shapes([L0M,L1M],[L0K,L1K],[L0N,L1N], True)  # L269\nq_s32 = pypto.matmul(q_norm, w_qb, pypto.DT_INT32)   # L272\n# q_norm: INT8 [t_tile, q_lora_rank]\n# w_qb:   INT8 [q_lora_rank, head_num*head_dim]\n# → q_s32: INT32 [t_tile, head_num*head_dim]",
+      "source_lines": [
+        268,
+        272
+      ]
     },
     {
       "id": "grp_q_dequant",
       "type": "Group",
       "name": "Query-Dequant",
-      "parentId": "grp_query"
+      "parentId": "grp_query",
+      "source_code": "pypto.set_semantic_label(\"Query-Dequant\")             # L274\nq_f32  = pypto.cast(q_s32, pypto.DT_FP32)            # L276\nq_f32  = q_f32 * q_norm_scale                        # L277\nq_f32  = q_f32 * w_qb_scale                          # L278\nq_cast = pypto.cast(q_f32, x_dtype)                  # L279  → BF16\nq_bf16 = pypto.reshape(q_cast, [t_tile,head_num,head_dim], ...)  # L281\nq_rope = pypto.view(q_bf16, [t_tile,head_num,rope_head_dim], [0,0,0], ...)       # L283\nq_nope = pypto.view(q_bf16, [t_tile,head_num,head_dim-rope_head_dim], [0,0,R], ...)  # L285",
+      "source_lines": [
+        274,
+        286
+      ]
     },
     {
       "id": "grp_q_rope3d",
       "type": "Group",
       "name": "Query-Rope3D",
-      "parentId": "grp_query"
+      "parentId": "grp_query",
+      "source_code": "q_roped = rope_3d(q_rope, rope_cos, rope_sin)        # L292  → 内联展开\n\ndef rope_3d(x, cos, sin):  # L181–202\n    cast_cos = pypto.cast(cos, pypto.DT_FP32)        # L193\n    cast_sin = pypto.cast(sin, pypto.DT_FP32)        # L194\n    x_view   = pypto.cast(x,   pypto.DT_FP32)        # L196\n    cast_cos = pypto.reshape(cast_cos, [t_tile,1,rope_dim])  # L197\n    cast_sin = pypto.reshape(cast_sin, [t_tile,1,rope_dim])  # L198\n    # rotate_half 内联（L176–178）\n    x_embed  = (x_view * cast_cos) + (rotate_half(x_view) * cast_sin)  # L200\n    return pypto.cast(x_embed, x_dtype)              # L201\n\nq_nope = pypto.cast(pypto.cast(q_nope, DT_FP32), q_bf16.dtype)  # L294\nq_concat = pypto.concat([q_roped, q_nope], -1)       # L295",
+      "source_lines": [
+        292,
+        295
+      ]
     },
     {
       "id": "grp_q_hadamard",
       "type": "Group",
       "name": "Query-Hadamard",
-      "parentId": "grp_query"
+      "parentId": "grp_query",
+      "source_code": "pypto.set_semantic_label(\"Query-Hadamard\")            # L298\nhadamard_q = pypto.reshape(hadamard_q_in, [1,head_dim,head_dim], ...)  # L296\nq_hadamard = pypto.matmul(q_concat, hadamard_q, x_dtype)  # L301\n# q_concat:   BF16 [t_tile, head_num, head_dim]\n# hadamard_q: BF16 [1, head_dim, head_dim]\n# → q_hadamard: BF16 [t_tile, head_num, head_dim]",
+      "source_lines": [
+        296,
+        301
+      ]
     },
     {
       "id": "grp_q_quant",
       "type": "Group",
       "name": "Query-Quant",
-      "parentId": "grp_query"
+      "parentId": "grp_query",
+      "source_code": "pypto.set_semantic_label(\"Query-Quant\")               # L303\nq_res = prolog_quant(q_hadamard)                      # L305  → 内联展开\n\ndef prolog_quant(input):  # L146–163\n    input_fp32 = pypto.cast(input, pypto.DT_FP32)    # L150\n    abs_res    = pypto.abs(input_fp32)                # L152\n    max_value  = pypto.amax(abs_res, dim=-1, keepdim=True)  # L153\n    scale_q    = pypto.full(..., 127.0) / max_value   # L154–156\n    out_fp32   = input_fp32 * scale_q                 # L157\n    out_int8   = cast→INT32→FP16→INT8                 # L158–160\n    scale_deq  = pypto.full(..., 1.0) / scale_q       # L161–162\n    return (out_int8, scale_deq)\n\npypto.assemble(q_res[0], [tIdx,0,0], q_int8_out)      # L308\npypto.assemble(q_scale,  [tIdx,0,0], q_scale_out)     # L309",
+      "source_lines": [
+        303,
+        309
+      ]
     },
     {
       "id": "grp_key",
       "type": "Group",
       "name": "Key 支路",
-      "parentId": "grp_main_loop"
+      "parentId": "grp_main_loop",
+      "source_code": "# Key 计算支路（L313–L341）\n# 含六个语义阶段：Linear → LayerNorm → Rope2D → Hadamard → Quant → ScatterUpdate",
+      "source_lines": [
+        313,
+        341
+      ]
     },
     {
       "id": "grp_k_linear",
       "type": "Group",
       "name": "Key-Linear",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "pypto.set_semantic_label(\"Key-Linear\")                # L313\nx = pypto.view(x_in, [t_tile, h], [tIdx, 0], ...)    # L317\nk = pypto.matmul(x, wk, pypto.DT_FP32)               # L318\n# x:  BF16 [t_tile, H]\n# wk: BF16 [H, head_dim]\n# → k: FP32 [t_tile, head_dim]",
+      "source_lines": [
+        313,
+        318
+      ]
     },
     {
       "id": "grp_k_layernorm",
       "type": "Group",
       "name": "Key-LayerNorm",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "k_bf16 = pypto.cast(\n    quant_layer_norm(k, gamma_2d, beta_2d, -1, attrs.eps),\n    x_dtype)  # L321  → 内联展开\n\ndef quant_layer_norm(x, gamma, beta, dim, epsilon):  # L102–124\n    pypto.set_semantic_label(\"Key-LayerNorm\")        # L103\n    x_fp32   = pypto.cast(x, pypto.DT_FP32)         # L108\n    x_scaled = x_fp32 * (1.0 / dim)                 # L110\n    mean     = pypto.sum(x_scaled, dim, keepdim=True)# L111\n    diff     = x_fp32 - mean                         # L113\n    var      = pypto.sum(diff*diff*(1/dim), dim, keepdim=True)  # L115–116\n    std      = pypto.sqrt(var + epsilon)             # L119\n    res32    = diff / std                            # L120\n    return pypto.cast(res32*gamma + beta, x.dtype)  # L122–124",
+      "source_lines": [
+        321,
+        321
+      ]
     },
     {
       "id": "grp_k_rope2d",
       "type": "Group",
       "name": "Key-Rope2D",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "k_roped = quant_rope_2d(k_rope, rope_cos, rope_sin)  # L326  → 内联展开\n\ndef quant_rope_2d(x, cos, sin):  # L127–143\n    pypto.set_semantic_label(\"Key-Rope2D\")           # L128\n    cast_cos = pypto.cast(cos, pypto.DT_FP32)        # L136\n    cast_sin = pypto.cast(sin, pypto.DT_FP32)        # L137\n    x_view   = pypto.cast(x,   pypto.DT_FP32)        # L138\n    # rotate_half 内联（L176–178）\n    x_embed  = (x_view * cast_cos) + (rotate_half(x_view) * cast_sin)  # L141\n    return pypto.cast(x_embed, x.dtype)              # L142",
+      "source_lines": [
+        326,
+        329
+      ]
     },
     {
       "id": "grp_k_hadamard",
       "type": "Group",
       "name": "Key-Hadamard",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "pypto.set_semantic_label(\"Key-Hadamard\")             # L330\nhadamard_k = pypto.matmul(k_concat, hadamard_k_in, x_dtype)  # L331\n# k_concat:    BF16 [t_tile, head_dim]\n# hadamard_k_in: BF16 [head_dim, head_dim]\n# → hadamard_k: BF16 [t_tile, head_dim]",
+      "source_lines": [
+        330,
+        331
+      ]
     },
     {
       "id": "grp_k_quant",
       "type": "Group",
       "name": "Key-Quant",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "pypto.set_semantic_label(\"Key-Quant\")                # L332\nk_res = prolog_quant(hadamard_k)                     # L333  → 内联展开\n# prolog_quant() 同 Query-Quant，见 L146–163",
+      "source_lines": [
+        332,
+        336
+      ]
     },
     {
       "id": "grp_k_scatter",
       "type": "Group",
       "name": "Key-ScatterUpdate",
-      "parentId": "grp_key"
+      "parentId": "grp_key",
+      "source_code": "k_cache_4D = pypto.reshape(k_res[0], [t_tile,1,1,head_dim], ...)  # L334\nk_scale_4D = pypto.reshape(cast(k_res[1],FP16), [t_tile,1,1,1], ...)  # L335\nindex = pypto.view(k_cache_index, [t_tile,1], [tIdx,0], ...)  # L338\nk_int8_out.move(\n    pypto.scatter_update(k_cache, SCATTER_DIM, index, k_cache_4D))   # L340\nk_scale_out.move(\n    pypto.scatter_update(k_cache_scale, SCATTER_DIM, index, k_scale_4D))  # L341",
+      "source_lines": [
+        338,
+        341
+      ]
     },
     {
       "id": "grp_weight",
       "type": "Group",
       "name": "Weight 支路",
-      "parentId": "grp_main_loop"
+      "parentId": "grp_main_loop",
+      "source_code": "pypto.set_semantic_label(\"Weight-Linear\")            # L343\nweights   = pypto.cast(\n    pypto.matmul(x, w_proj, x_dtype), pypto.DT_FP32)# L349\nweights   = pypto.mul(weights,\n    1.0/(math.sqrt(head_num)*math.sqrt(head_dim)))   # L350\nweights_f16 = pypto.cast(weights, pypto.DT_FP16)    # L351\npypto.assemble(weights_f16, [tIdx,0], weights_out)   # L352",
+      "source_lines": [
+        343,
+        352
+      ]
     },
     {
       "id": "op_reshape",
@@ -450,7 +535,14 @@
       "type": "Operation",
       "name": "VIEW",
       "parentId": "grp_tile_prep",
-      "op_type": "VIEW"
+      "op_type": "VIEW",
+      "source_ref": {
+        "lines": [
+          266,
+          266
+        ],
+        "code": "q_norm = pypto.view(q_norm_in, [t_tile, q_lora_rank], [tIdx, 0], valid_shape=[t_tile, q_lora_rank])"
+      }
     },
     {
       "id": "t_q_norm",
@@ -468,7 +560,14 @@
       "type": "Operation",
       "name": "VIEW",
       "parentId": "grp_tile_prep",
-      "op_type": "VIEW"
+      "op_type": "VIEW",
+      "source_ref": {
+        "lines": [
+          267,
+          267
+        ],
+        "code": "q_norm_scale = pypto.view(q_norm_scale_in, [t_tile, 1], [tIdx, 0], valid_shape=[t_tile, 1])"
+      }
     },
     {
       "id": "t_q_norm_scale",
@@ -486,7 +585,14 @@
       "type": "Operation",
       "name": "VIEW",
       "parentId": "grp_tile_prep",
-      "op_type": "VIEW"
+      "op_type": "VIEW",
+      "source_ref": {
+        "lines": [
+          317,
+          317
+        ],
+        "code": "x = pypto.view(x_in, [t_tile, h], [tIdx, 0], valid_shape=[t_tile, h])"
+      }
     },
     {
       "id": "t_x_tile",
@@ -504,7 +610,14 @@
       "type": "Operation",
       "name": "VIEW",
       "parentId": "grp_tile_prep",
-      "op_type": "VIEW"
+      "op_type": "VIEW",
+      "source_ref": {
+        "lines": [
+          287,
+          288
+        ],
+        "code": "rope_cos = pypto.view(cos_idx_rope_in, [t_tile, rope_head_dim],\n               [tIdx, 0], valid_shape=[t_tile, rope_head_dim])"
+      }
     },
     {
       "id": "t_rope_cos",
@@ -522,7 +635,14 @@
       "type": "Operation",
       "name": "VIEW",
       "parentId": "grp_tile_prep",
-      "op_type": "VIEW"
+      "op_type": "VIEW",
+      "source_ref": {
+        "lines": [
+          289,
+          290
+        ],
+        "code": "rope_sin = pypto.view(sin_idx_rope_in, [t_tile, rope_head_dim],\n               [tIdx, 0], valid_shape=[t_tile, rope_head_dim])"
+      }
     },
     {
       "id": "t_rope_sin",
@@ -541,7 +661,14 @@
       "name": "MATMUL",
       "parentId": "grp_q_linear",
       "op_type": "A_MUL_B",
-      "semantic_label": "Query-Linear"
+      "semantic_label": "Query-Linear",
+      "source_ref": {
+        "lines": [
+          272,
+          272
+        ],
+        "code": "q_s32 = pypto.matmul(q_norm, w_qb, pypto.DT_INT32)  # [t_tile, head_num * head_dim]"
+      }
     },
     {
       "id": "t_q_s32",
@@ -1011,7 +1138,14 @@
       "name": "MATMUL",
       "parentId": "grp_q_hadamard",
       "op_type": "A_MUL_B",
-      "semantic_label": "Query-Hadamard"
+      "semantic_label": "Query-Hadamard",
+      "source_ref": {
+        "lines": [
+          301,
+          301
+        ],
+        "code": "q_hadamard = pypto.matmul(q_concat, hadamard_q, x_dtype)  # [t_tile, head_num, head_dim]"
+      }
     },
     {
       "id": "t_q_hadamard",
@@ -1260,7 +1394,14 @@
       "name": "ASSEMBLE",
       "parentId": "grp_q_quant",
       "op_type": "ASSEMBLE",
-      "semantic_label": "Query-Quant"
+      "semantic_label": "Query-Quant",
+      "source_ref": {
+        "lines": [
+          308,
+          308
+        ],
+        "code": "pypto.assemble(q_res[0], [tIdx, 0, 0], q_int8_out)"
+      }
     },
     {
       "id": "t_q_asm_int8",
@@ -1280,7 +1421,14 @@
       "name": "ASSEMBLE",
       "parentId": "grp_q_quant",
       "op_type": "ASSEMBLE",
-      "semantic_label": "Query-Quant"
+      "semantic_label": "Query-Quant",
+      "source_ref": {
+        "lines": [
+          309,
+          309
+        ],
+        "code": "pypto.assemble(q_scale, [tIdx, 0, 0], q_scale_out)"
+      }
     },
     {
       "id": "t_q_asm_scale",
@@ -1300,7 +1448,14 @@
       "name": "MATMUL",
       "parentId": "grp_k_linear",
       "op_type": "A_MUL_B",
-      "semantic_label": "Key-Linear"
+      "semantic_label": "Key-Linear",
+      "source_ref": {
+        "lines": [
+          318,
+          318
+        ],
+        "code": "k = pypto.matmul(x, wk, pypto.DT_FP32)  # [t_tile, head_dim]"
+      }
     },
     {
       "id": "t_k_fp32",
@@ -1879,7 +2034,14 @@
       "name": "MATMUL",
       "parentId": "grp_k_hadamard",
       "op_type": "A_MUL_B",
-      "semantic_label": "Key-Hadamard"
+      "semantic_label": "Key-Hadamard",
+      "source_ref": {
+        "lines": [
+          331,
+          331
+        ],
+        "code": "hadamard_k = pypto.matmul(k_concat, hadamard_k_in, x_dtype)  # [t_tile, head_dim]"
+      }
     },
     {
       "id": "t_hadamard_k",
@@ -2173,7 +2335,14 @@
       "name": "SCATTER_UPDATE",
       "parentId": "grp_k_scatter",
       "op_type": "SCATTER_UPDATE",
-      "semantic_label": "Key-Quant"
+      "semantic_label": "Key-Quant",
+      "source_ref": {
+        "lines": [
+          340,
+          340
+        ],
+        "code": "k_int8_out.move(pypto.scatter_update(k_cache, SCATTER_DIM, index, k_cache_4D))"
+      }
     },
     {
       "id": "t_k_sc_int8",
@@ -2194,7 +2363,14 @@
       "name": "SCATTER_UPDATE",
       "parentId": "grp_k_scatter",
       "op_type": "SCATTER_UPDATE",
-      "semantic_label": "Key-Quant"
+      "semantic_label": "Key-Quant",
+      "source_ref": {
+        "lines": [
+          341,
+          341
+        ],
+        "code": "k_scale_out.move(pypto.scatter_update(k_cache_scale, SCATTER_DIM, index, k_scale_4D))"
+      }
     },
     {
       "id": "t_k_sc_scale",
@@ -2215,7 +2391,14 @@
       "name": "MATMUL",
       "parentId": "grp_weight",
       "op_type": "A_MUL_B",
-      "semantic_label": "Weight-Linear"
+      "semantic_label": "Weight-Linear",
+      "source_ref": {
+        "lines": [
+          349,
+          349
+        ],
+        "code": "weights = pypto.cast(pypto.matmul(x, w_proj, x_dtype), pypto.DT_FP32)"
+      }
     },
     {
       "id": "t_w_fp32",
@@ -2271,7 +2454,14 @@
       "name": "ASSEMBLE",
       "parentId": "grp_weight",
       "op_type": "ASSEMBLE",
-      "semantic_label": "Weight-Linear"
+      "semantic_label": "Weight-Linear",
+      "source_ref": {
+        "lines": [
+          352,
+          352
+        ],
+        "code": "pypto.assemble(weights_f16, [tIdx, 0], weights_out)"
+      }
     },
     {
       "id": "t_w_asm",

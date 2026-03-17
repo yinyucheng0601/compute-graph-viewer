@@ -157,6 +157,7 @@ function parseSourceSampleGraph(data, context) {
         details: rawNode.details || "",
         sourceRef: rawNode.source_ref || null,
         sourceLines: rawNode.source_lines || [],
+        sourceCode: rawNode.source_code || "",
         index,
       },
     });
