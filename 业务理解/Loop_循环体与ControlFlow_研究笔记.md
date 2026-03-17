@@ -190,7 +190,7 @@ for idx in pypto.loop(b_loop):
   <text x="60" y="1268" class="small">• After finishing all K_tiles for a Q_tile, compute_gu emits final O rows (CubeS0 × HEAD) into O.</text>
 </svg>
 
-模型层 loop离具体源码最远，但对产品理解最重要，因为它解释了"为什么同一类 kernel 会在整网里反复出现"。
+模型层 loop 离具体源码最远，但对产品理解最重要，因为它解释了"为什么同一类 kernel 会在整网里反复出现"。
 
 在大模型里，最典型的有两类：
 
@@ -198,6 +198,8 @@ for idx in pypto.loop(b_loop):
 - **时间步重复：** decode 阶段每生成一个 token，都会再跑一轮 attention、MLP、norm 等计算
 
 这一层的 loop 不一定对应源码里真的写了一个 `for`，更多是一种架构级重复关系。
+
+> **注：** 上图（Tiled Flash-Attention 2.0 Flow）描述的并不是模型层 loop，而是源码层 loop + tile 遍历 loop——Flash Attention 的内层 KV block 遍历。具体分析见 §7。
 
 ---
 
@@ -400,22 +402,146 @@ pypto.set_vec_tile_shapes(...)
 
 ## 7. DeepSeek 真实案例二：Sparse Flash Attention 的多层嵌套 loop
 
-如果说 Indexer Prolog 更适合解释"一维 token loop"，那么
-[sparse_flash_attention_quant_impl.py](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/sparse_flash_attention_quant_impl.py)
-更适合解释"为什么 controlflow 看上去往往比源码还复杂"。
+源码：[sparse_flash_attention_quant_impl.py](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/sparse_flash_attention_quant_impl.py)
 
-源码里有 5 层嵌套：
+这个文件同时说明两件事：为什么循环直接在 tile 上而不是 tensor 上，以及 `is_loop_begin / is_loop_end` 在真实 kernel 里到底解决什么问题。
+
+### 7.1 为什么直接在 tile 上而不是 tensor 上
+
+**标准 Attention 的内存问题：**
+
+做 `softmax(Q·Kᵀ)·V` 时，朴素做法是先把完整的 `Q·Kᵀ` 中间矩阵算出来，再做 softmax，再乘 V。但这个矩阵大小是 `S × S`。序列长度 4096 时，一个 head 的中间矩阵就是 4096 × 4096 × 4 bytes ≈ 64MB，远超 AI Core 片上 SRAM 容量（通常 ≤ 1MB 量级）。
+
+**Flash Attention 的解法：**
+
+Flash Attention 不存这个大矩阵。改成每次只取一小块 K 和 V 进来，用"在线 softmax"公式把这一块的贡献叠加到 running state 上，跑完所有块后得到等价于全局 softmax 的正确结果。
+
+这意味着：**tile 遍历本身就是算法**，不是对算法的优化包装，没有它就没有 Flash Attention。
+
+### 7.2 五层嵌套 loop 的业务语义
+
+`sparse_flash_attention_quant_compute_flash` 函数（第 271 行起）有 5 层：
 
 ```python
-for batch_idx in pypto.loop(...):           # 第几条请求
-    for slc_idx in pypto.loop(...):         # 当前 query 的第几个位置
-        for n_kv_idx in pypto.loop(...):    # 第几个 key/value 头
-            for group_idx in pypto.loop(...): # 第几个 group
-                for s2_idx, _ in pypto.loop_unroll(...): # 第几个历史 KV block 区间
+for batch_idx in pypto.loop(0, batch_size_sym, 1, name="FLASH_LOOP_L0_idx"):
+    # L0: 第几条请求（batch 维）
+    for slc_idx in pypto.loop(0, s1_sym, 1, name="FLASH_LOOP_L1_s1_SA"):
+        # L1: 当前 query 在 sequence 上的第几个位置
+        for n_kv_idx in pypto.loop(0, n_kv_sym, 1, name="FLASH_LOOP_L2_n_kv_SA"):
+            # L2: 第几个 KV head
+            for group_idx in pypto.loop(0, g_loop_sym, 1, name="FLASH_LOOP_L3_g_SA"):
+                # L3: head 内第几个 group（GQA / MQA 的 query group）
+                # ↑ running state 在这一层定义，跨 L4 迭代持久
+                oi_update = pypto.tensor([cur_group_tile, dn], pypto.DT_FP32, "oi_update")
+                li_update = pypto.tensor([1, cur_group_tile], pypto.DT_FP32, "li_update")
+                mi_update = pypto.tensor([1, cur_group_tile], pypto.DT_FP32, "mi_update")
+
+                for s2_idx, _ in pypto.loop_unroll(0, bn_per_batch, 1,
+                    name="FLASH_LOOP_L4_s2_SA", unroll_list={1}):
+                    # L4（最内层）: 第几个 KV cache block，这就是图里标注的 S1 loop
                     ...
 ```
 
-这 5 层循环的业务含义完全不同，同时扫描 batch / query 位置 / head / group / 历史 cache block。这也是 attention controlflow 往往比一般算子更复杂的原因。
+L0–L3 是业务维度的外层循环，**running state 在 L3 外面定义**，说明它跨越了整个 L4 的所有迭代，是 Flash Attention 在线累积的核心。
+
+L4 是 `loop_unroll`，`unroll_list={1}` 表示这里没有多档位展开（KV block 数量是动态的，固定为 1），每次迭代处理一个大小为 `s2_tile` 的 KV block。
+
+### 7.3 每次 L4 迭代的循环体（"模板"）
+
+每次迭代取一块 K 和 V，固定做四步：
+
+```python
+# 步骤 1：取这块 K 和 V（Sparse PagedAttention：按 topk_indices 从 KV cache 中 gather）
+kn = gather_in_ub(k_nope_2d_view, cur_topk_indices, cur_block_table, ...)
+kr = gather_in_l1(key_rope_2d, cur_topk_indices, cur_block_table, ...)
+
+# 步骤 2：Q × Kᵀ，算这块的 attention score
+sij = pypto.matmul(qi, kj_view, pypto.DT_FP32, a_trans=False, b_trans=True)
+# sij shape: (cur_group_tile, cur_s2_tile)
+
+# 步骤 3：这块的局部 softmax 统计量
+sij_scale = pypto.mul(sij, softmax_scale)
+tilda_mij = pypto.amax(sij_scale, dim=-1, keepdim=True)  # 当前块的行最大值 (group_tile, 1)
+tilda_pij = pypto.exp(pypto.sub(sij_scale, tilda_mij))   # exp(score - max)
+tilda_lij = pypto.sum(tilda_pij, dim=-1, keepdim=True)   # 当前块的 exp sum (group_tile, 1)
+
+# 步骤 4：P × V，算这块对输出的贡献
+q1 = pypto.matmul(tilda_pij_f16, vj, pypto.DT_FP32)
+# q1 shape: (cur_group_tile, dn)
+```
+
+步骤 1–4 是每次迭代结构相同的"模板"。**分叉只发生在步骤 4 之后**：如何把这块的贡献合并进 running state。
+
+### 7.4 is_loop_begin / is_loop_end 在这里的真实逻辑
+
+running state 的读写策略因迭代位置而不同（第 374 行起）：
+
+**首块（`is_loop_begin`）——不需要在线修正，直接初始化：**
+
+```python
+if pypto.cond(pypto.is_loop_begin(s2_idx)):
+    oi_tmp = q1                   # 直接用这块结果，无需和之前合并
+    oi_update[:] = oi_tmp         # 存进 running state，尚未归一化
+    li_update[:] = tilda_lij      # 记录这块的 exp sum
+    mi_update[:] = tilda_mij      # 记录这块的行最大值
+```
+
+**中间块和尾块（`else`）——在线 softmax 修正（第 389 行）：**
+
+```python
+else:
+    oi = oi_update   # 读出之前所有块的累积输出
+    li = li_update   # 读出之前的 exp sum
+    mi = mi_update   # 读出之前的行最大值
+
+    # 用当前块的 max 重新校准之前所有块的贡献
+    mi_new = pypto.maximum(mi, tilda_mij)
+    t2 = pypto.exp(pypto.sub(mi, mi_new))        # 老结果的衰减系数
+    t4 = pypto.exp(pypto.sub(tilda_mij, mi_new)) # 新这块的放缩系数
+
+    li_new = pypto.add(pypto.mul(t2, li), pypto.mul(t4, tilda_lij))  # 修正后的 exp sum
+    q3 = pypto.mul(oi, pypto.reshape(t2, [cur_group_tile, 1]))        # 老 O 按新 max 重新缩放
+    q2 = pypto.mul(q1, pypto.reshape(t4, [cur_group_tile, 1]))        # 新这块的贡献
+    oi_tmp = pypto.add(q3, q2)   # 合并，仍未归一化
+
+    oi_update[:] = oi_tmp
+    li_update[:] = li_new
+    mi_update[:] = mi_new
+```
+
+**尾块额外归一化并写出（`is_loop_end`，嵌套在首块和 else 两个分支内）：**
+
+```python
+    if pypto.cond(pypto.is_loop_end(s2_idx)):
+        oi_update[:] = pypto.div(oi_tmp, pypto.reshape(li_new, [cur_group_tile, 1]))
+        # ↑ 除以最终 exp sum，才是真正的 softmax 归一化输出
+        oi_update_4_dim = pypto.cast(pypto.reshape(oi_update, [1, 1, cur_group_tile, dn]), dtype)
+        pypto.assemble(oi_update_4_dim, oi_offset, attention_out)  # 写入全局输出
+```
+
+**特殊情况：首块 = 尾块（只有一个 KV block）：**
+
+首块分支内嵌套了 `is_loop_end` 判断，处理 `bn_per_batch == 1` 的情况：直接用 `tilda_lij_reduce` 归一化，跳过在线修正。
+
+汇总成一张表：
+
+| 迭代位置 | 读 running state | 写 running state | 归一化并写出 |
+|---------|----------------|----------------|------------|
+| 首块（begin，非 end） | ✗ 不读 | ✓ 初始化写入 | ✗ |
+| 首块 = 尾块（begin & end） | ✗ 不读 | ✓ 写入 | ✓ 除以 `tilda_lij_reduce` |
+| 中间块（非 begin，非 end） | ✓ 读入并在线修正 | ✓ 更新 | ✗ |
+| 尾块（非 begin，end） | ✓ 读入并在线修正 | ✓ 更新 | ✓ 除以 `li_new` |
+
+### 7.5 这张图对应四层分类里的哪层
+
+§3 的图和这里的 L4 loop 都描述同一件事：
+
+| 层级 | 对应情况 |
+|-----|---------|
+| **源码层 loop（第二层）** | `FLASH_LOOP_L4_s2_SA`，`pypto.loop_unroll(0, bn_per_batch, 1, unroll_list={1})` |
+| **tile 遍历 loop（第三层）** | 每次迭代取一个 `s2_tile × dn` 的 KV block，正是 tile 遍历的含义 |
+
+**两层在这里是重叠的**——源码 loop 本身就在遍历 KV tile，不是两件分开的事。图里的"S1 / CubeS1 loop"是硬件感知的 tile 粒度视角，源码里的 `FLASH_LOOP_L4_s2_SA` 是业务视角，描述的是同一个循环。
 
 ---
 
@@ -445,35 +571,47 @@ for batch_idx in pypto.loop(...):           # 第几条请求
 官方用途：「为了支持关键算子 FA 的编译优化，提供了两个特殊的函数 `pypto.is_loop_begin()` 和 `pypto.is_loop_end()` 用于优化条件分支」
 ——[faq.md](https://gitcode.com/cann/pypto/blob/master/docs/tutorials/appendix/faq.md)
 
-在
-[page_attention.cpp](https://gitcode.com/cann/pypto/blob/master/framework/src/operator/models/deepseek/page_attention.cpp)
-里能直接看到这种低层表达：
+**Python 层（sparse_flash_attention_quant_impl.py，第 374 行）：**
+
+```python
+if pypto.cond(pypto.is_loop_begin(s2_idx)):
+    oi_update[:] = q1                     # 首块：直接存，不修正
+    if pypto.cond(pypto.is_loop_end(s2_idx)):
+        oi_update[:] = q1 / tilda_lij_reduce  # 首块=尾块：立即归一化写出
+else:
+    # 中间/尾块：在线 softmax 修正，合并老结果和新结果
+    oi_update[:] = ...
+    if pypto.cond(pypto.is_loop_end(s2_idx)):
+        oi_update[:] = oi_tmp / li_new    # 尾块：归一化并写出 attention_out
+```
+
+**C++ 层（incre_flash_attention.cpp，第 80 行）——等价逻辑，更清晰：**
 
 ```cpp
-LOOP("LOOP_L2_bn", FunctionType::DYNAMIC_LOOP, bn, LoopRange(0, bnPerBatch, 1), PowersOf2(maxUnrollTimes)) {
-    IF (IsLoopBegin(bn, 0)) {
-        ...
-        IF (IsLoopEnd(bn, bnPerBatch)) {
-            ...  // 首块 = 最后块：初始化 + 收尾
-        } ELSE {
-            ...  // 首块但不是最后块：初始化
-        }
-    } ELSE {
-        ...
-        IF (IsLoopEnd(bn, bnPerBatch)) {
-            ...  // 中间块到最后一块：收尾
-        } ELSE {
-            ...  // 普通中间块：累计
-        }
+for (int bn = 0; bn < bnPerBatch; bn++) {
+    // ... 取 K/V tile，算 sij、tildaPij、tildaLij ...
+
+    if (bn == 0) {
+        // 首块：初始化 running state
+        oiUpdate = (bnPerBatch == 1 ? Div(oiTmp, tildaLij) : oiTmp);
+        liUpdate = tildaLij;
+        miUpdate = tildaMij;
+        continue;
     }
+    // 中间/尾块：在线修正
+    auto miNew = Maximum(mi, tildaMij);
+    auto t2 = Exp(Sub(mi, miNew));     // 老结果衰减系数
+    auto t4 = Exp(Sub(tildaMij, miNew)); // 新贡献放缩系数
+    auto liNew = Add(Mul(t2, li), Mul(t4, tildaLij));
+    auto oiTmp = Add(Mul(oi, t2), Mul(q1, t4));
+    oiUpdate = (bn == bnPerBatch - 1 ? Div(oiTmp, liNew) : oiTmp);
+    // ↑ 只有最后一块才除以 liNew 归一化
+    liUpdate = liNew;
+    miUpdate = miNew;
 }
 ```
 
-逻辑很直观：
-
-- 首块 → 初始化逻辑
-- 中间块 → 累计逻辑
-- 尾块 → 收尾和写回
+C++ 版本里，`is_loop_begin` 对应 `bn == 0`，`is_loop_end` 对应 `bn == bnPerBatch - 1`。Python 版本用 `pypto.cond(pypto.is_loop_begin/end)` 表达同样的语义，让编译器能感知边界并做针对性优化。
 
 > **controlflow 里很多 IF，本质上不是"业务判断"，而是同一个循环在首块、中间块、尾块位置上，执行模板不同。** 这也是为什么 controlflow 图往往比源码表面看到的 `if` 更多。
 
@@ -519,6 +657,7 @@ LOOP("LOOP_L2_bn", FunctionType::DYNAMIC_LOOP, bn, LoopRange(0, bnPerBatch, 1), 
 | deepseekv32_lightning_indexer_prolog_quant.py | [gitcode.com](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/deepseekv32_lightning_indexer_prolog_quant.py) |
 | sparse_flash_attention_quant_impl.py | [gitcode.com](https://gitcode.com/cann/pypto/blob/master/models/deepseek_v32_exp/sparse_flash_attention_quant_impl.py) |
 | page_attention.cpp | [gitcode.com](https://gitcode.com/cann/pypto/blob/master/framework/src/operator/models/deepseek/page_attention.cpp) |
+| incre_flash_attention.cpp | [gitcode.com](https://gitcode.com/cann/pypto/blob/master/framework/src/operator/models/deepseek/incre_flash_attention.cpp) |
 
 本地真实产物（仅本地可用）：
 
