@@ -1,215 +1,198 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 图3：UB 布局（对齐真实 CustVec.h）+ Double Buffer + Kernel 伪码 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
 
-  <rect width="960" height="620" fill="#f8f8f8"/>
+  <rect width="960" height="600" fill="#f8f8f8"/>
 
   <!-- Title -->
-  <text x="480" y="34" style="font:bold 15px 'SF Pro Display',sans-serif;fill:#111;text-anchor:middle">③ UB 内存布局 · Double Buffer · Kernel 计算步骤</text>
-  <text x="480" y="54" style="font:11px monospace;fill:#666;text-anchor:middle">基于 GitCode cann-recipes-infer / Qwen3 RMSNormGated 真实源码（CustVec.h）</text>
+  <text x="480" y="32" text-anchor="middle" font-size="15" font-weight="bold" font-family="monospace" fill="#111">UB Layout · Double Buffer · Kernel Steps</text>
+  <text x="480" y="50" text-anchor="middle" font-size="10" font-family="monospace" fill="#666">based on CustVec.h (cann-recipes-infer / Qwen3 RMSNormGated)</text>
 
-  <!-- ══════════════ LEFT: UB 布局 ══════════════ -->
-  <text x="30" y="80" style="font:bold 12px monospace;fill:#374151">UB 实际 Buffer 布局（BASED = 2048 fp32 = 8KB 每块）</text>
+  <!-- ═══ LEFT: UB buffer layout ═══ -->
 
-  <!-- UB outer box -->
-  <rect x="30" y="90" width="290" height="470" rx="8" fill="#fff" stroke="#6b7280" stroke-width="2"/>
-  <text x="175" y="110" style="font:bold 11px monospace;fill:#374151;text-anchor:middle">Unified Buffer  ≈ 64 KB</text>
+  <text x="30" y="74" font-size="11" font-weight="bold" font-family="monospace" fill="#374151">UB Buffer Layout (BASED=2048 fp32 = 8KB each)</text>
 
-  <!-- fp32 buffers - left column -->
-  <!-- fp32_xbuf -->
-  <rect x="42" y="118" width="118" height="46" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
-  <text x="101" y="136" style="font:bold 10px monospace;fill:#c2410c;text-anchor:middle">fp32_xbuf</text>
-  <text x="101" y="150" style="font:9px monospace;fill:#ea580c;text-anchor:middle">原始 x  8 KB</text>
-  <text x="101" y="162" style="font:8px monospace;fill:#9a3412;text-anchor:middle">BASED floats</text>
+  <rect x="30" y="82" width="290" height="460" rx="6" fill="#fff" stroke="#6b7280" stroke-width="2"/>
+  <text x="175" y="100" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#374151">Unified Buffer ~64 KB</text>
 
-  <!-- fp32_normbuf -->
-  <rect x="42" y="170" width="118" height="46" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
-  <text x="101" y="188" style="font:bold 10px monospace;fill:#c2410c;text-anchor:middle">fp32_normbuf</text>
-  <text x="101" y="202" style="font:9px monospace;fill:#ea580c;text-anchor:middle">norm(x)  8 KB</text>
-  <text x="101" y="214" style="font:8px monospace;fill:#9a3412;text-anchor:middle">BASED floats</text>
+  <!-- fp32 left col -->
+  <rect x="42" y="108" width="116" height="44" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
+  <text x="100" y="125" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#c2410c">fp32_xbuf</text>
+  <text x="100" y="140" text-anchor="middle" font-size="9" font-family="monospace" fill="#ea580c">x  8 KB</text>
 
-  <!-- fp32_zbuf -->
-  <rect x="42" y="222" width="118" height="46" rx="4" fill="#fdf4ff" stroke="#c026d3" stroke-width="1.4"/>
-  <text x="101" y="240" style="font:bold 10px monospace;fill:#86198f;text-anchor:middle">fp32_zbuf</text>
-  <text x="101" y="254" style="font:9px monospace;fill:#a21caf;text-anchor:middle">门控 z  8 KB</text>
-  <text x="101" y="266" style="font:8px monospace;fill:#86198f;text-anchor:middle">BASED floats</text>
+  <rect x="42" y="158" width="116" height="44" rx="4" fill="#fff7ed" stroke="#f97316" stroke-width="1.4"/>
+  <text x="100" y="175" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#c2410c">fp32_normbuf</text>
+  <text x="100" y="190" text-anchor="middle" font-size="9" font-family="monospace" fill="#ea580c">norm(x)  8 KB</text>
 
-  <!-- fp32_silubuf -->
-  <rect x="42" y="274" width="118" height="46" rx="4" fill="#fdf4ff" stroke="#c026d3" stroke-width="1.4"/>
-  <text x="101" y="292" style="font:bold 10px monospace;fill:#86198f;text-anchor:middle">fp32_silubuf</text>
-  <text x="101" y="306" style="font:9px monospace;fill:#a21caf;text-anchor:middle">SiLU(z)  8 KB</text>
-  <text x="101" y="318" style="font:8px monospace;fill:#86198f;text-anchor:middle">BASED floats</text>
+  <rect x="42" y="208" width="116" height="44" rx="4" fill="#fdf4ff" stroke="#c026d3" stroke-width="1.4"/>
+  <text x="100" y="225" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#86198f">fp32_zbuf</text>
+  <text x="100" y="240" text-anchor="middle" font-size="9" font-family="monospace" fill="#a21caf">z  8 KB</text>
 
-  <!-- fp32_squarebuf -->
-  <rect x="42" y="326" width="118" height="46" rx="4" fill="#fef9c3" stroke="#d97706" stroke-width="1.4"/>
-  <text x="101" y="344" style="font:bold 10px monospace;fill:#92400e;text-anchor:middle">fp32_squarebuf</text>
-  <text x="101" y="358" style="font:9px monospace;fill:#b45309;text-anchor:middle">x²  8 KB</text>
-  <text x="101" y="370" style="font:8px monospace;fill:#92400e;text-anchor:middle">BASED floats</text>
+  <rect x="42" y="258" width="116" height="44" rx="4" fill="#fdf4ff" stroke="#c026d3" stroke-width="1.4"/>
+  <text x="100" y="275" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#86198f">fp32_silubuf</text>
+  <text x="100" y="290" text-anchor="middle" font-size="9" font-family="monospace" fill="#a21caf">SiLU(z)  8 KB</text>
 
-  <!-- small buffers -->
-  <rect x="42" y="378" width="118" height="36" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.4"/>
-  <text x="101" y="394" style="font:bold 10px monospace;fill:#15803d;text-anchor:middle">fp32_meanbuf</text>
-  <text x="101" y="408" style="font:9px monospace;fill:#16a34a;text-anchor:middle">均值  ~BASEG × 4B</text>
+  <rect x="42" y="308" width="116" height="44" rx="4" fill="#fef9c3" stroke="#d97706" stroke-width="1.4"/>
+  <text x="100" y="325" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#92400e">fp32_squarebuf</text>
+  <text x="100" y="340" text-anchor="middle" font-size="9" font-family="monospace" fill="#b45309">x&#178;  8 KB</text>
 
-  <rect x="42" y="420" width="118" height="36" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.4"/>
-  <text x="101" y="436" style="font:bold 10px monospace;fill:#15803d;text-anchor:middle">fp32_wbuf</text>
-  <text x="101" y="450" style="font:9px monospace;fill:#16a34a;text-anchor:middle">权重 γ  BASED/G×4B</text>
+  <rect x="42" y="358" width="116" height="36" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.4"/>
+  <text x="100" y="372" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#15803d">fp32_meanbuf</text>
+  <text x="100" y="386" text-anchor="middle" font-size="9" font-family="monospace" fill="#16a34a">mean  ~BASEG x 4B</text>
 
-  <!-- bf16 buffers - right column -->
-  <rect x="168" y="118" width="140" height="46" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
-  <text x="238" y="136" style="font:bold 10px monospace;fill:#1d4ed8;text-anchor:middle">bf16_xbuf</text>
-  <text x="238" y="150" style="font:9px monospace;fill:#2563eb;text-anchor:middle">x 搬运暂存  4 KB</text>
-  <text x="238" y="162" style="font:8px monospace;fill:#1e40af;text-anchor:middle">BASED × bf16</text>
+  <rect x="42" y="400" width="116" height="36" rx="4" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.4"/>
+  <text x="100" y="414" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#15803d">fp32_wbuf</text>
+  <text x="100" y="428" text-anchor="middle" font-size="9" font-family="monospace" fill="#16a34a">gamma  BASED/G x 4B</text>
 
-  <rect x="168" y="170" width="140" height="46" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
-  <text x="238" y="188" style="font:bold 10px monospace;fill:#1d4ed8;text-anchor:middle">bf16_zbuf</text>
-  <text x="238" y="202" style="font:9px monospace;fill:#2563eb;text-anchor:middle">z 搬运暂存  4 KB</text>
-  <text x="238" y="214" style="font:8px monospace;fill:#1e40af;text-anchor:middle">BASED × bf16</text>
+  <!-- bf16 right col -->
+  <rect x="164" y="108" width="144" height="44" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
+  <text x="236" y="125" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#1d4ed8">bf16_xbuf</text>
+  <text x="236" y="140" text-anchor="middle" font-size="9" font-family="monospace" fill="#2563eb">x transfer  4 KB</text>
 
-  <rect x="168" y="222" width="140" height="46" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
-  <text x="238" y="240" style="font:bold 10px monospace;fill:#1d4ed8;text-anchor:middle">bf16_outbuf</text>
-  <text x="238" y="254" style="font:9px monospace;fill:#2563eb;text-anchor:middle">输出暂存  4 KB</text>
-  <text x="238" y="266" style="font:8px monospace;fill:#1e40af;text-anchor:middle">BASED × bf16</text>
+  <rect x="164" y="158" width="144" height="44" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
+  <text x="236" y="175" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#1d4ed8">bf16_zbuf</text>
+  <text x="236" y="190" text-anchor="middle" font-size="9" font-family="monospace" fill="#2563eb">z transfer  4 KB</text>
 
-  <rect x="168" y="274" width="140" height="46" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
-  <text x="238" y="292" style="font:bold 10px monospace;fill:#1d4ed8;text-anchor:middle">bf16_wbuf</text>
-  <text x="238" y="306" style="font:9px monospace;fill:#2563eb;text-anchor:middle">γ 搬运暂存  4 KB</text>
-  <text x="238" y="318" style="font:8px monospace;fill:#1e40af;text-anchor:middle">BASED/G × bf16</text>
+  <rect x="164" y="208" width="144" height="44" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
+  <text x="236" y="225" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#1d4ed8">bf16_outbuf</text>
+  <text x="236" y="240" text-anchor="middle" font-size="9" font-family="monospace" fill="#2563eb">output  4 KB</text>
 
-  <!-- total -->
-  <rect x="42" y="464" width="266" height="84" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="175" y="482" style="font:bold 10px monospace;fill:#475569;text-anchor:middle">合计</text>
-  <text x="175" y="498" style="font:10px monospace;fill:#64748b;text-anchor:middle">fp32: 5 × 8KB + 小量  ≈ 44 KB</text>
-  <text x="175" y="514" style="font:10px monospace;fill:#64748b;text-anchor:middle">bf16: 4 × 4KB          ≈ 16 KB</text>
-  <text x="175" y="530" style="font:bold 10px monospace;fill:#15803d;text-anchor:middle">≈ 60 KB  ≤  UB ✓</text>
-  <text x="175" y="545" style="font:9px monospace;fill:#9ca3af;text-anchor:middle">BASED = 2048（硬编码，开发者手工拍定）</text>
+  <rect x="164" y="258" width="144" height="44" rx="4" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.4"/>
+  <text x="236" y="275" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#1d4ed8">bf16_wbuf</text>
+  <text x="236" y="290" text-anchor="middle" font-size="9" font-family="monospace" fill="#2563eb">gamma  4 KB</text>
 
-  <!-- ══════════════ MIDDLE: Double Buffer ══════════════ -->
-  <text x="360" y="80" style="font:bold 12px monospace;fill:#374151">Double Buffer 流水线（DEvent 驱动）</text>
+  <!-- total box -->
+  <rect x="42" y="448" width="266" height="82" rx="4" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="175" y="466" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#475569">Total</text>
+  <text x="175" y="482" text-anchor="middle" font-size="10" font-family="monospace" fill="#64748b">fp32: 5 x 8KB + small  ~44 KB</text>
+  <text x="175" y="498" text-anchor="middle" font-size="10" font-family="monospace" fill="#64748b">bf16: 4 x 4KB           ~16 KB</text>
+  <text x="175" y="516" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#15803d">~60 KB  &lt;= UB  OK</text>
+  <text x="175" y="530" text-anchor="middle" font-size="9" font-family="monospace" fill="#9ca3af">BASED=2048 hand-tuned by developer</text>
 
-  <!-- timeline box -->
-  <rect x="340" y="90" width="290" height="300" rx="8" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
+  <!-- ═══ MIDDLE: Double Buffer ═══ -->
 
-  <!-- streams labels -->
-  <text x="360" y="112" style="font:bold 10px monospace;fill:#1d4ed8">MTE2（搬运）</text>
-  <text x="360" y="128" style="font:9px monospace;fill:#6b7280">HBM → UB</text>
+  <text x="355" y="74" font-size="11" font-weight="bold" font-family="monospace" fill="#374151">Double Buffer Pipeline (DEvent)</text>
 
-  <text x="360" y="170" style="font:bold 10px monospace;fill:#7c3aed">Vector（计算）</text>
-  <text x="360" y="186" style="font:9px monospace;fill:#6b7280">UB 内运算</text>
+  <rect x="340" y="82" width="290" height="290" rx="6" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
 
-  <text x="360" y="228" style="font:bold 10px monospace;fill:#15803d">MTE3（写回）</text>
-  <text x="360" y="244" style="font:9px monospace;fill:#6b7280">UB → HBM</text>
+  <!-- stream rows -->
+  <text x="358" y="106" font-size="10" font-weight="bold" font-family="monospace" fill="#1d4ed8">MTE2 (copy in)</text>
+  <text x="358" y="120" font-size="9" font-family="monospace" fill="#6b7280">HBM to UB</text>
+
+  <text x="358" y="162" font-size="10" font-weight="bold" font-family="monospace" fill="#7c3aed">Vector (compute)</text>
+  <text x="358" y="176" font-size="9" font-family="monospace" fill="#6b7280">in UB</text>
+
+  <text x="358" y="218" font-size="10" font-weight="bold" font-family="monospace" fill="#15803d">MTE3 (copy out)</text>
+  <text x="358" y="232" font-size="9" font-family="monospace" fill="#6b7280">UB to HBM</text>
 
   <!-- tile A -->
-  <rect x="450" y="100" width="80" height="28" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
-  <text x="490" y="118" style="font:10px monospace;fill:#1d4ed8;text-anchor:middle">tile A (cnt=0)</text>
+  <rect x="446" y="94" width="78" height="28" rx="3" fill="#dbeafe" stroke="#3b82f6"/>
+  <text x="485" y="112" text-anchor="middle" font-size="9" font-family="monospace" fill="#1d4ed8">tile A  cnt=0</text>
 
-  <rect x="450" y="158" width="80" height="28" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1"/>
-  <text x="490" y="176" style="font:10px monospace;fill:#6d28d9;text-anchor:middle">计算 tile A</text>
+  <rect x="446" y="150" width="78" height="28" rx="3" fill="#f5f3ff" stroke="#7c3aed"/>
+  <text x="485" y="168" text-anchor="middle" font-size="9" font-family="monospace" fill="#6d28d9">compute A</text>
 
-  <rect x="450" y="216" width="80" height="28" rx="3" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
-  <text x="490" y="234" style="font:10px monospace;fill:#15803d;text-anchor:middle">写回 A</text>
+  <rect x="446" y="206" width="78" height="28" rx="3" fill="#dcfce7" stroke="#22c55e"/>
+  <text x="485" y="224" text-anchor="middle" font-size="9" font-family="monospace" fill="#15803d">write A</text>
 
   <!-- tile B -->
-  <rect x="540" y="100" width="80" height="28" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="1"/>
-  <text x="580" y="118" style="font:10px monospace;fill:#1d4ed8;text-anchor:middle">tile B (cnt=1)</text>
+  <rect x="534" y="94" width="78" height="28" rx="3" fill="#dbeafe" stroke="#3b82f6"/>
+  <text x="573" y="112" text-anchor="middle" font-size="9" font-family="monospace" fill="#1d4ed8">tile B  cnt=1</text>
 
-  <rect x="540" y="158" width="80" height="28" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1"/>
-  <text x="580" y="176" style="font:10px monospace;fill:#6d28d9;text-anchor:middle">计算 tile B</text>
+  <rect x="534" y="150" width="78" height="28" rx="3" fill="#f5f3ff" stroke="#7c3aed"/>
+  <text x="573" y="168" text-anchor="middle" font-size="9" font-family="monospace" fill="#6d28d9">compute B</text>
 
-  <rect x="540" y="216" width="80" height="28" rx="3" fill="#dcfce7" stroke="#22c55e" stroke-width="1"/>
-  <text x="580" y="234" style="font:10px monospace;fill:#15803d;text-anchor:middle">写回 B</text>
+  <rect x="534" y="206" width="78" height="28" rx="3" fill="#dcfce7" stroke="#22c55e"/>
+  <text x="573" y="224" text-anchor="middle" font-size="9" font-family="monospace" fill="#15803d">write B</text>
 
-  <!-- vertical alignment lines -->
-  <line x1="448" y1="96" x2="448" y2="250" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,2"/>
-  <line x1="538" y1="96" x2="538" y2="250" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,2"/>
-  <line x1="622" y1="96" x2="622" y2="250" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3,2"/>
+  <!-- guide lines -->
+  <line x1="444" y1="90" x2="444" y2="242" stroke="#e2e8f0" stroke-dasharray="3,2"/>
+  <line x1="532" y1="90" x2="532" y2="242" stroke="#e2e8f0" stroke-dasharray="3,2"/>
+  <line x1="614" y1="90" x2="614" y2="242" stroke="#e2e8f0" stroke-dasharray="3,2"/>
 
-  <!-- overlap annotation -->
-  <rect x="340" y="260" width="290" height="120" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="485" y="278" style="font:bold 10px monospace;fill:#475569;text-anchor:middle">4 个 DEvent 控制同步</text>
+  <!-- DEvent legend -->
+  <rect x="342" y="252" width="286" height="112" rx="4" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="485" y="270" text-anchor="middle" font-size="10" font-weight="bold" font-family="monospace" fill="#475569">4 DEvent controls</text>
+  <text x="356" y="290" font-size="10" font-family="monospace" fill="#1d4ed8">in_ready</text>
+  <text x="430" y="290" font-size="9" font-family="monospace" fill="#64748b">MTE2-&gt;Vec: copy done</text>
+  <text x="356" y="308" font-size="10" font-family="monospace" fill="#1d4ed8">in_empty</text>
+  <text x="430" y="308" font-size="9" font-family="monospace" fill="#64748b">Vec-&gt;MTE2: buf free</text>
+  <text x="356" y="326" font-size="10" font-family="monospace" fill="#15803d">out_ready</text>
+  <text x="430" y="326" font-size="9" font-family="monospace" fill="#64748b">Vec-&gt;MTE3: result ready</text>
+  <text x="356" y="344" font-size="10" font-family="monospace" fill="#15803d">out_empty</text>
+  <text x="430" y="344" font-size="9" font-family="monospace" fill="#64748b">MTE3-&gt;Vec: buf free</text>
+  <text x="485" y="358" text-anchor="middle" font-size="9" font-family="monospace" fill="#9ca3af">cnt switches 0/1 (ping-pong)</text>
 
-  <text x="355" y="298" style="font:10px monospace;fill:#1d4ed8">in_ready</text>
-  <text x="440" y="298" style="font:9px monospace;fill:#64748b">MTE2 → Vector：搬完通知计算</text>
+  <!-- Tiling params box -->
+  <text x="355" y="398" font-size="11" font-weight="bold" font-family="monospace" fill="#374151">Tiling Parameters</text>
 
-  <text x="355" y="316" style="font:10px monospace;fill:#1d4ed8">in_empty</text>
-  <text x="440" y="316" style="font:9px monospace;fill:#64748b">Vector → MTE2：算完释放 buf</text>
+  <rect x="340" y="408" width="290" height="150" rx="6" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
 
-  <text x="355" y="334" style="font:10px monospace;fill:#15803d">out_ready</text>
-  <text x="440" y="334" style="font:9px monospace;fill:#64748b">Vector → MTE3：结果准备好</text>
+  <line x1="340" y1="426" x2="630" y2="426" stroke="#e2e8f0"/>
+  <text x="356" y="442" font-size="10" font-family="monospace" fill="#64748b">BASED</text>
+  <text x="485" y="442" text-anchor="middle" font-size="10" font-family="monospace" fill="#111">= 2048  (8KB, hardcoded)</text>
 
-  <text x="355" y="352" style="font:10px monospace;fill:#15803d">out_empty</text>
-  <text x="440" y="352" style="font:9px monospace;fill:#64748b">MTE3 → Vector：写完释放 buf</text>
+  <line x1="340" y1="450" x2="630" y2="450" stroke="#e2e8f0"/>
+  <text x="356" y="466" font-size="10" font-family="monospace" fill="#64748b">BASEG</text>
+  <text x="485" y="466" text-anchor="middle" font-size="10" font-family="monospace" fill="#111">= BASED / group_size</text>
 
-  <text x="485" y="372" style="font:9px monospace;fill:#9ca3af;text-anchor:middle">cnt 在 0/1 间切换，控制用哪半块 UB（ping-pong）</text>
+  <line x1="340" y1="474" x2="630" y2="474" stroke="#e2e8f0"/>
+  <text x="356" y="490" font-size="10" font-family="monospace" fill="#64748b">loopnum</text>
+  <text x="485" y="490" text-anchor="middle" font-size="10" font-family="monospace" fill="#111">= ceil(B*S / (Cores*2))</text>
 
-  <!-- ══════════════ RIGHT: 计算步骤 ══════════════ -->
-  <text x="660" y="80" style="font:bold 12px monospace;fill:#374151">Process_calc 计算步骤</text>
+  <line x1="340" y1="498" x2="630" y2="498" stroke="#e2e8f0"/>
+  <text x="356" y="514" font-size="10" font-family="monospace" fill="#64748b">vec_d</text>
+  <text x="485" y="514" text-anchor="middle" font-size="10" font-family="monospace" fill="#111">= loopnum * D</text>
 
-  <rect x="648" y="90" width="292" height="470" rx="8" fill="#1e1e2e" stroke="#444" stroke-width="1.5"/>
+  <line x1="340" y1="522" x2="630" y2="522" stroke="#e2e8f0"/>
+  <text x="356" y="538" font-size="10" font-family="monospace" fill="#64748b">*2 reason</text>
+  <text x="485" y="538" text-anchor="middle" font-size="10" font-family="monospace" fill="#111">double buffer: 2 rows/iter</text>
 
-  <text x="665" y="112" style="font:bold 10px monospace;fill:#a6e3a1">// Step 1: RMSNorm(x)</text>
+  <text x="485" y="553" text-anchor="middle" font-size="9" font-family="monospace" fill="#9ca3af">src: CustVec.h tilingShapeCustVec()</text>
 
-  <text x="665" y="132" style="font:10px monospace;fill:#cdd6f4">Mul(squarebuf, x, x)</text>
-  <text x="665" y="148" style="font:9px monospace;fill:#6c7086">  → x²</text>
+  <!-- ═══ RIGHT: compute steps ═══ -->
 
-  <text x="665" y="168" style="font:10px monospace;fill:#cdd6f4">ReduceSum(meanbuf, squarebuf,</text>
-  <text x="665" y="183" style="font:10px monospace;fill:#cdd6f4">          group_size)</text>
-  <text x="665" y="198" style="font:9px monospace;fill:#6c7086">  → Σx² 按 group（不是整行！）</text>
+  <text x="660" y="74" font-size="11" font-weight="bold" font-family="monospace" fill="#374151">Process_calc Steps</text>
 
-  <text x="665" y="218" style="font:10px monospace;fill:#cdd6f4">Muls(meanbuf, 1.0/group_size)</text>
-  <text x="665" y="233" style="font:10px monospace;fill:#cdd6f4">Adds(meanbuf, eps)</text>
-  <text x="665" y="248" style="font:10px monospace;fill:#cdd6f4">Sqrt(meanbuf)</text>
-  <text x="665" y="263" style="font:10px monospace;fill:#cdd6f4">Div(meanbuf, 1.0, meanbuf)</text>
-  <text x="665" y="278" style="font:9px monospace;fill:#6c7086">  → rstd = 1/sqrt(mean+ε)</text>
+  <rect x="648" y="82" width="292" height="478" rx="6" fill="#1e1e2e" stroke="#444" stroke-width="1.5"/>
 
-  <text x="665" y="298" style="font:10px monospace;fill:#cdd6f4">Brcb(normscale, meanbuf)</text>
-  <text x="665" y="313" style="font:9px monospace;fill:#6c7086">  → 广播 rstd 到每个元素</text>
+  <text x="664" y="106" font-size="10" font-weight="bold" font-family="monospace" fill="#a6e3a1">// Step 1: RMSNorm(x)</text>
 
-  <text x="665" y="333" style="font:10px monospace;fill:#cdd6f4">Mul(normbuf, normscale, x)</text>
-  <text x="665" y="348" style="font:10px monospace;fill:#cdd6f4">Mul(normbuf, normbuf, γ)</text>
-  <text x="665" y="363" style="font:9px monospace;fill:#6c7086">  → norm_x × γ</text>
+  <text x="664" y="124" font-size="10" font-family="monospace" fill="#cdd6f4">Mul(sqbuf, x, x)</text>
+  <text x="664" y="138" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; x squared</text>
 
-  <line x1="660" y1="378" x2="936" y2="378" stroke="#313244" stroke-width="1"/>
-  <text x="665" y="396" style="font:bold 10px monospace;fill:#cba6f7">// Step 2: SiLU(z)</text>
+  <text x="664" y="156" font-size="10" font-family="monospace" fill="#cdd6f4">ReduceSum(meanbuf, sqbuf,</text>
+  <text x="664" y="170" font-size="10" font-family="monospace" fill="#cdd6f4">          group_size)</text>
+  <text x="664" y="184" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; sum per group (not full row)</text>
 
-  <text x="665" y="416" style="font:10px monospace;fill:#cdd6f4">Muls(silu, z, -1.0)</text>
-  <text x="665" y="431" style="font:10px monospace;fill:#cdd6f4">Exp(silu) → Adds(silu, 1.0)</text>
-  <text x="665" y="446" style="font:10px monospace;fill:#cdd6f4">Div(silu, 1.0, silu)</text>
-  <text x="665" y="461" style="font:10px monospace;fill:#cdd6f4">Mul(silu, silu, z)</text>
-  <text x="665" y="476" style="font:9px monospace;fill:#6c7086">  → z / (1 + exp(-z))</text>
+  <text x="664" y="202" font-size="10" font-family="monospace" fill="#cdd6f4">Muls(mean, 1.0/group_size)</text>
+  <text x="664" y="216" font-size="10" font-family="monospace" fill="#cdd6f4">Adds(mean, eps)</text>
+  <text x="664" y="230" font-size="10" font-family="monospace" fill="#cdd6f4">Sqrt(mean)</text>
+  <text x="664" y="244" font-size="10" font-family="monospace" fill="#cdd6f4">Div(mean, 1.0, mean)</text>
+  <text x="664" y="258" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; rstd = 1/sqrt(mean+eps)</text>
 
-  <line x1="660" y1="490" x2="936" y2="490" stroke="#313244" stroke-width="1"/>
-  <text x="665" y="508" style="font:bold 10px monospace;fill:#f9e2af">// Step 3: out = norm_x × silu</text>
-  <text x="665" y="528" style="font:10px monospace;fill:#cdd6f4">Mul(out, normbuf, silubuf)</text>
+  <text x="664" y="276" font-size="10" font-family="monospace" fill="#cdd6f4">Brcb(normscale, mean)</text>
+  <text x="664" y="290" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; broadcast rstd to each elem</text>
 
-  <text x="665" y="548" style="font:9px monospace;fill:#6c7086">  Group Norm：group 内 reduce</text>
-  <text x="665" y="561" style="font:9px monospace;fill:#6c7086">  → 无需两趟，单趟完成 ✓</text>
+  <text x="664" y="308" font-size="10" font-family="monospace" fill="#cdd6f4">Mul(normbuf, normscale, x)</text>
+  <text x="664" y="322" font-size="10" font-family="monospace" fill="#cdd6f4">Mul(normbuf, normbuf, gamma)</text>
+  <text x="664" y="336" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; norm_x * gamma</text>
 
-  <!-- ══════════════ BOTTOM: Tiling params ══════════════ -->
-  <rect x="340" y="404" width="290" height="156" rx="8" fill="#fff" stroke="#c8c8c8" stroke-width="1.5"/>
-  <text x="485" y="424" style="font:bold 12px monospace;fill:#374151;text-anchor:middle">Tiling 参数（tilingShapeCustVec）</text>
+  <line x1="650" y1="350" x2="938" y2="350" stroke="#313244"/>
+  <text x="664" y="368" font-size="10" font-weight="bold" font-family="monospace" fill="#cba6f7">// Step 2: SiLU(z)</text>
 
-  <line x1="340" y1="432" x2="630" y2="432" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="356" y="448" style="font:10px monospace;fill:#64748b">BASED</text>
-  <text x="485" y="448" style="font:10px monospace;fill:#111;text-anchor:middle">= 2048　（硬编码，8 KB）</text>
+  <text x="664" y="386" font-size="10" font-family="monospace" fill="#cdd6f4">Muls(silu, z, -1.0)</text>
+  <text x="664" y="400" font-size="10" font-family="monospace" fill="#cdd6f4">Exp(silu)</text>
+  <text x="664" y="414" font-size="10" font-family="monospace" fill="#cdd6f4">Adds(silu, 1.0)</text>
+  <text x="664" y="428" font-size="10" font-family="monospace" fill="#cdd6f4">Div(silu, 1.0, silu)</text>
+  <text x="664" y="442" font-size="10" font-family="monospace" fill="#cdd6f4">Mul(silu, silu, z)</text>
+  <text x="664" y="456" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; z / (1 + exp(-z))</text>
 
-  <line x1="340" y1="456" x2="630" y2="456" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="356" y="472" style="font:10px monospace;fill:#64748b">BASEG</text>
-  <text x="485" y="472" style="font:10px monospace;fill:#111;text-anchor:middle">= BASED / group_size</text>
+  <line x1="650" y1="470" x2="938" y2="470" stroke="#313244"/>
+  <text x="664" y="488" font-size="10" font-weight="bold" font-family="monospace" fill="#f9e2af">// Step 3: output</text>
+  <text x="664" y="506" font-size="10" font-family="monospace" fill="#cdd6f4">Mul(out, normbuf, silubuf)</text>
+  <text x="664" y="520" font-size="9" font-family="monospace" fill="#6c7086">  -&gt; norm_x * SiLU(z)</text>
 
-  <line x1="340" y1="480" x2="630" y2="480" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="356" y="496" style="font:10px monospace;fill:#64748b">loopnum</text>
-  <text x="485" y="496" style="font:10px monospace;fill:#111;text-anchor:middle">= ceil(B×S / (Cores × 2))</text>
-
-  <line x1="340" y1="504" x2="630" y2="504" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="356" y="520" style="font:10px monospace;fill:#64748b">vec_d</text>
-  <text x="485" y="520" style="font:10px monospace;fill:#111;text-anchor:middle">= loopnum × D</text>
-
-  <line x1="340" y1="528" x2="630" y2="528" stroke="#e2e8f0" stroke-width="1"/>
-  <text x="356" y="544" style="font:10px monospace;fill:#64748b">×2 含义</text>
-  <text x="485" y="544" style="font:10px monospace;fill:#111;text-anchor:middle">double buffer：每次处理 2 行</text>
-
-  <text x="485" y="556" style="font:9px monospace;fill:#9ca3af;text-anchor:middle">source: cann-recipes-infer / Qwen3 / CustVec.h</text>
+  <text x="664" y="542" font-size="9" font-family="monospace" fill="#a6e3a1">Group reduce: no 2-pass needed</text>
+  <text x="664" y="555" font-size="9" font-family="monospace" fill="#a6e3a1">single pass, no re-read of x</text>
 
 </svg>
