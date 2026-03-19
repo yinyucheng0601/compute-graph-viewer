@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IndexerPrologQuant — Computation Graph + Execution Overlay</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; background: #07090F; }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+/*
+ * ════════════════════════════════════════════════════════════════════
+ *  Computation Graph + Execution Overlay
+ *  IndexerPrologQuant on Ascend 910B
+ * 
+ *  DAG topology with overlaid per-node execution info:
+ *    • Duration heat-map coloring (cool→hot)
+ *    • Inline start/end timing waterfall bar
+ *    • Core assignment badge (AIC/AIV)
+ *    • Memory R/W indicators
+ *    • Execution progress during playback
+ *    • Edge wait-time annotations
+ *    • Pipeline color coding (Query / Key / Weight)
+ * ════════════════════════════════════════════════════════════════════
+ */
+
+// ─── Pipeline Colors ─────────────────────────────────────
+const PIPE = {
+  query:  { h: "#C084FC", accent: "#A855F7", bg: "#1C0A3A", dim: "#130828" },
+  key:    { h: "#34D399", accent: "#10B981", bg: "#082218", dim: "#051A10" },
+  weight: { h: "#FB923C", accent: "#F97316", bg: "#2A1508", dim: "#1A0D04" },
+  shared: { h: "#94A3B8", accent: "#64748B", bg: "#1A1F2E", dim: "#12151F" },
+};
+
+const UNIT = {
+  cube:   { border: "#A855F7", bg: "#18083A", text: "#D8B4FE", label: "CUBE" },
+  vector: { border: "#22C55E", bg: "#081E12", text: "#86EFAC", label: "VEC" },
+  memory: { border: "#06B6D4", bg: "#082830", text: "#67E8F9", label: "MEM" },
+  scatter:{ border: "#F59E0B", bg: "#2A2008", text: "#FDE68A", label: "SCAT" },
+};
+
+// ─── Duration heat: fraction of max duration → color ────
+function heatColor(fraction) {
+  // 0 = cool blue, 0.5 = teal, 1.0 = hot orange/red
+  const r = Math.round(30 + fraction * 200);
+  const g = Math.round(180 - fraction * 120);
+  const b = Math.round(220 - fraction * 180);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ─── Graph Nodes (DAG topology from real operator) ──────
+// Positions are hand-laid for DAG readability
+const NODES = [
+  // SHARED
+  { id: "reshape", name: "Reshape\nInputs", pipeline: "shared", unit: "vector", core: "AIV 0",
+    x: 60, y: 310, w: 120, h: 62, start: 0.000, duration: 0.020, memR: 0, memW: 0,
+    desc: "Reshape NZ→2D: w_qb, wk, w_proj, γ, β" },
+
+  // QUERY PIPELINE
+  { id: "q_view", name: "Q:View\nNorm", pipeline: "query", unit: "vector", core: "AIV 1",
+    x: 230, y: 120, w: 110, h: 62, start: 0.020, duration: 0.010, memR: 0, memW: 0,
+    desc: "View q_norm, q_norm_scale" },
+  { id: "q_linear", name: "Q:Linear\nMatMul", pipeline: "query", unit: "cube", core: "AIC 0-7",
+    x: 390, y: 120, w: 130, h: 62, start: 0.030, duration: 0.310, memR: 2048, memW: 2048,
+    desc: "8-tile Cube: q_norm × w_qb → INT32", status: "warning", tiles: 8 },
+  { id: "q_dequant", name: "Q:Dequant\nScale", pipeline: "query", unit: "vector", core: "AIV 2-5",
+    x: 570, y: 80, w: 120, h: 62, start: 0.345, duration: 0.065, memR: 0, memW: 0,
+    desc: "INT32→FP32 × scales → BF16" },
+  { id: "q_cossin", name: "Q:View\nCos/Sin", pipeline: "query", unit: "vector", core: "AIV 7",
+    x: 230, y: 20, w: 110, h: 52, start: 0.020, duration: 0.008, memR: 0, memW: 0,
+    desc: "View cos/sin rope tables" },
+  { id: "q_split", name: "Q:Split\nRoPE/NoPE", pipeline: "query", unit: "vector", core: "AIV 6",
+    x: 570, y: 175, w: 120, h: 52, start: 0.412, duration: 0.015, memR: 0, memW: 0,
+    desc: "Reshape 3D, view rope[:ropeDim] / nope[ropeDim:]" },
+  { id: "q_rope3d", name: "Q:RoPE\n3D", pipeline: "query", unit: "vector", core: "AIV 8-9",
+    x: 740, y: 50, w: 110, h: 62, start: 0.430, duration: 0.070, memR: 0, memW: 0,
+    desc: "rotate_half, ×cos + rot×sin" },
+  { id: "q_nope", name: "Q:NoPE\nCast", pipeline: "query", unit: "vector", core: "AIV 10",
+    x: 740, y: 150, w: 110, h: 52, start: 0.430, duration: 0.025, memR: 0, memW: 0,
+    desc: "BF16→FP32→BF16 dtype align" },
+  { id: "q_concat", name: "Q:Concat\nRoPE+NoPE", pipeline: "query", unit: "vector", core: "AIV 11",
+    x: 900, y: 95, w: 120, h: 52, start: 0.503, duration: 0.020, memR: 0, memW: 0,
+    desc: "Concat [roped, nope] dim=-1" },
+  { id: "q_hadamard", name: "Q:Hadamard\nMatMul", pipeline: "query", unit: "cube", core: "AIC 0-3",
+    x: 1070, y: 70, w: 130, h: 62, start: 0.528, duration: 0.195, memR: 512, memW: 512,
+    desc: "4-tile Cube: q × hadamard_q → BF16", tiles: 4 },
+  { id: "q_quant", name: "Q:Quant\nINT8", pipeline: "query", unit: "vector", core: "AIV 12-13",
+    x: 1250, y: 70, w: 110, h: 62, start: 0.726, duration: 0.060, memR: 0, memW: 0,
+    desc: "abs→amax→scale→INT8" },
+  { id: "q_assemble", name: "Q:Assemble\nOutput", pipeline: "query", unit: "memory", core: "AIV 14",
+    x: 1410, y: 70, w: 120, h: 52, start: 0.788, duration: 0.030, memR: 0, memW: 4096,
+    desc: "Write q_int8, q_scale → out" },
+
+  // KEY PIPELINE
+  { id: "k_view", name: "K:View\nX_in", pipeline: "key", unit: "vector", core: "AIV 16",
+    x: 230, y: 420, w: 110, h: 62, start: 0.020, duration: 0.010, memR: 0, memW: 0,
+    desc: "View x_in[tIdx:t_tile, h]" },
+  { id: "k_linear", name: "K:Linear\nMatMul", pipeline: "key", unit: "cube", core: "AIC 8-13",
+    x: 390, y: 420, w: 130, h: 62, start: 0.030, duration: 0.250, memR: 2048, memW: 1024,
+    desc: "6-tile Cube: x × wk → FP32", tiles: 6 },
+  { id: "k_layernorm", name: "K:Layer\nNorm", pipeline: "key", unit: "vector", core: "AIV 17-18",
+    x: 570, y: 420, w: 120, h: 62, start: 0.283, duration: 0.075, memR: 0, memW: 0,
+    desc: "mean, var, normalize, γ·x+β" },
+  { id: "k_split", name: "K:Split\nRoPE/NoPE", pipeline: "key", unit: "vector", core: "AIV 19",
+    x: 740, y: 365, w: 110, h: 52, start: 0.360, duration: 0.012, memR: 0, memW: 0,
+    desc: "View k_rope, k_nope" },
+  { id: "k_rope2d", name: "K:RoPE\n2D", pipeline: "key", unit: "vector", core: "AIV 20",
+    x: 740, y: 450, w: 110, h: 62, start: 0.374, duration: 0.055, memR: 0, memW: 0,
+    desc: "rotate_half, ×cos + rot×sin (2D)" },
+  { id: "k_nope", name: "K:NoPE\nCast", pipeline: "key", unit: "vector", core: "AIV 21",
+    x: 740, y: 540, w: 110, h: 52, start: 0.374, duration: 0.020, memR: 0, memW: 0,
+    desc: "BF16→FP32→BF16 align" },
+  { id: "k_concat", name: "K:Concat\nRoPE+NoPE", pipeline: "key", unit: "vector", core: "AIV 22",
+    x: 900, y: 460, w: 120, h: 52, start: 0.432, duration: 0.018, memR: 0, memW: 0,
+    desc: "Concat [k_roped, k_nope]" },
+  { id: "k_hadamard", name: "K:Hadamard\nMatMul", pipeline: "key", unit: "cube", core: "AIC 14-16",
+    x: 1070, y: 430, w: 130, h: 62, start: 0.454, duration: 0.155, memR: 256, memW: 256,
+    desc: "3-tile Cube: k × hadamard_k → BF16", tiles: 3 },
+  { id: "k_quant", name: "K:Quant\nINT8", pipeline: "key", unit: "vector", core: "AIV 23",
+    x: 1250, y: 430, w: 110, h: 62, start: 0.612, duration: 0.050, memR: 0, memW: 0,
+    desc: "abs→amax→scale→INT8, reshape 4D" },
+  { id: "k_scatter", name: "K:Scatter\nUpdate", pipeline: "key", unit: "scatter", core: "AIV 24",
+    x: 1410, y: 430, w: 120, h: 52, start: 0.664, duration: 0.060, memR: 0, memW: 8192,
+    desc: "scatter_update k_cache, k_scale" },
+
+  // WEIGHT PIPELINE
+  { id: "w_linear", name: "W:Linear\nMatMul", pipeline: "weight", unit: "cube", core: "AIC 17-20",
+    x: 390, y: 600, w: 130, h: 62, start: 0.030, duration: 0.230, memR: 2048, memW: 512,
+    desc: "4-tile Cube: x × w_proj → BF16", tiles: 4 },
+  { id: "w_scale", name: "W:Scale\n1/√(h·d)", pipeline: "weight", unit: "vector", core: "AIV 26-27",
+    x: 570, y: 600, w: 120, h: 62, start: 0.263, duration: 0.045, memR: 0, memW: 0,
+    desc: "Cast→FP32, ×scale, Cast→FP16" },
+  { id: "w_assemble", name: "W:Assemble\nOutput", pipeline: "weight", unit: "memory", core: "AIV 28",
+    x: 740, y: 600, w: 120, h: 52, start: 0.310, duration: 0.025, memR: 0, memW: 2048,
+    desc: "Write weights_f16 → out" },
+];
+
+const EDGES = [
+  // Shared → all pipelines
+  { from: "reshape", to: "q_view" },
+  { from: "reshape", to: "q_cossin" },
+  { from: "reshape", to: "k_view" },
+  { from: "reshape", to: "w_linear" },
+  // Query
+  { from: "q_view", to: "q_linear" },
+  { from: "q_linear", to: "q_dequant" },
+  { from: "q_dequant", to: "q_split" },
+  { from: "q_split", to: "q_rope3d" },
+  { from: "q_cossin", to: "q_rope3d" },
+  { from: "q_split", to: "q_nope" },
+  { from: "q_rope3d", to: "q_concat" },
+  { from: "q_nope", to: "q_concat" },
+  { from: "q_concat", to: "q_hadamard" },
+  { from: "q_hadamard", to: "q_quant" },
+  { from: "q_quant", to: "q_assemble" },
+  // Key
+  { from: "k_view", to: "k_linear" },
+  { from: "k_linear", to: "k_layernorm" },
+  { from: "k_layernorm", to: "k_split" },
+  { from: "k_split", to: "k_rope2d" },
+  { from: "q_cossin", to: "k_rope2d" },
+  { from: "k_split", to: "k_nope" },
+  { from: "k_rope2d", to: "k_concat" },
+  { from: "k_nope", to: "k_concat" },
+  { from: "k_concat", to: "k_hadamard" },
+  { from: "k_hadamard", to: "k_quant" },
+  { from: "k_quant", to: "k_scatter" },
+  // Weight
+  { from: "k_view", to: "w_linear" },
+  { from: "w_linear", to: "w_scale" },
+  { from: "w_scale", to: "w_assemble" },
+];
+
+const NODE_MAP = {}; NODES.forEach(n => NODE_MAP[n.id] = n);
+const TOTAL_TIME = Math.max(...NODES.map(n => n.start + n.duration));
+const MAX_DUR = Math.max(...NODES.map(n => n.duration));
+
+// ─── Components ──────────────────────────────────────────
+
+function GraphNode({ node, selected, hovered, onSelect, onHover, playhead, zoom, pan }) {
+  const pipe = PIPE[node.pipeline];
+  const unit = UNIT[node.unit];
+  const isSel = selected === node.id;
+  const isHov = hovered === node.id;
+  const isAct = isSel || isHov;
+  const durFrac = node.duration / MAX_DUR;
+  const heat = heatColor(durFrac);
+  const pctTotal = ((node.duration / TOTAL_TIME) * 100).toFixed(1);
+  const endTime = node.start + node.duration;
+
+  // Execution progress
+  let progress = 0;
+  let execState = "pending";
+  if (playhead !== null) {
+    if (playhead >= endTime) { progress = 1; execState = "done"; }
+    else if (playhead > node.start) { progress = (playhead - node.start) / node.duration; execState = "running"; }
+  }
+
+  const nodeLines = node.name.split("\n");
+
+  return (
+    <g onClick={(e) => { e.stopPropagation(); onSelect(isSel ? null : node.id); }}
+       onMouseEnter={() => onHover(node.id)} onMouseLeave={() => onHover(null)}
+       style={{ cursor: "pointer" }}>
+
+      {/* Outer glow on selection */}
+      {isAct && (
+        <rect x={node.x - 3} y={node.y - 3} width={node.w + 6} height={node.h + 6} rx={10}
+          fill="none" stroke={pipe.accent} strokeWidth={1.5} opacity={0.5}
+          style={{ filter: `drop-shadow(0 0 10px ${pipe.accent}60)` }} />
+      )}
+
+      {/* Main body */}
+      <rect x={node.x} y={node.y} width={node.w} height={node.h} rx={7}
+        fill={isAct ? pipe.bg : unit.bg}
+        stroke={isAct ? pipe.accent : node.status === "warning" ? "#F59E0B" : unit.border + "60"}
+        strokeWidth={isAct ? 1.5 : 0.8} />
+
+      {/* Pipeline accent stripe (top) */}
+      <rect x={node.x + 5} y={node.y} width={node.w - 10} height={2.5} rx={1}
+        fill={pipe.accent} opacity={0.8} />
+
+      {/* Duration heat bar (bottom) — width proportional to duration fraction */}
+      <rect x={node.x + 1} y={node.y + node.h - 5} width={(node.w - 2) * durFrac} height={4} rx={2}
+        fill={heat} opacity={0.7} />
+      {/* Heat bar background */}
+      <rect x={node.x + 1} y={node.y + node.h - 5} width={node.w - 2} height={4} rx={2}
+        fill="#FFFFFF" opacity={0.04} />
+
+      {/* Execution progress overlay */}
+      {playhead !== null && progress > 0 && (
+        <rect x={node.x} y={node.y} width={node.w * progress} height={node.h} rx={7}
+          fill={execState === "running" ? pipe.accent : "#FFFFFF"} opacity={execState === "running" ? 0.12 : 0.05}
+          style={{ pointerEvents: "none" }} />
+      )}
+
+      {/* Running indicator pulse */}
+      {execState === "running" && (
+        <rect x={node.x} y={node.y} width={node.w} height={node.h} rx={7}
+          fill="none" stroke={pipe.accent} strokeWidth={1.5} opacity={0.6}
+          style={{ animation: "none" }} />
+      )}
+
+      {/* Warning indicator */}
+      {node.status === "warning" && (
+        <g>
+          <rect x={node.x + node.w - 20} y={node.y + 4} width={16} height={14} rx={3}
+            fill="#78350F" stroke="#F59E0B" strokeWidth={0.6} />
+          <text x={node.x + node.w - 12} y={node.y + 13} fill="#FBBF24" fontSize={9}
+            textAnchor="middle" fontWeight="700">!</text>
+        </g>
+      )}
+
+      {/* Core badge (top-left) */}
+      <rect x={node.x + 4} y={node.y + 6} width={node.core.length * 5.2 + 8} height={13} rx={3}
+        fill={node.unit === "cube" ? "#A855F720" : "#22C55E20"} />
+      <text x={node.x + 8} y={node.y + 15} fill={node.unit === "cube" ? "#C084FC" : "#4ADE80"}
+        fontSize={7} fontFamily="'IBM Plex Mono',monospace" fontWeight="600">{node.core}</text>
+
+      {/* Tiles count badge (if applicable) */}
+      {node.tiles && (
+        <g>
+          <rect x={node.x + 4} y={node.y + 22} width={24} height={11} rx={2.5}
+            fill={pipe.accent + "25"} stroke={pipe.accent + "40"} strokeWidth={0.5} />
+          <text x={node.x + 16} y={node.y + 29.5} fill={pipe.h} fontSize={6.5}
+            fontFamily="'IBM Plex Mono',monospace" textAnchor="middle" fontWeight="600">×{node.tiles}</text>
+        </g>
+      )}
+
+      {/* Name */}
+      {nodeLines.map((line, i) => (
+        <text key={i} x={node.x + node.w / 2} y={node.y + 22 + i * 12}
+          fill={isAct ? "#F1F5F9" : unit.text} fontSize={9.5}
+          fontFamily="'IBM Plex Mono',monospace" textAnchor="middle" fontWeight="600"
+          dominantBaseline="middle">{line}</text>
+      ))}
+
+      {/* Timing info (bottom-left) */}
+      <text x={node.x + 5} y={node.y + node.h - 9} fill="#64748B" fontSize={6.5}
+        fontFamily="'IBM Plex Mono',monospace">
+        {node.start.toFixed(2)}→{endTime.toFixed(2)}ms
+      </text>
+
+      {/* Duration + % (bottom-right) */}
+      <text x={node.x + node.w - 5} y={node.y + node.h - 9} fill={heat} fontSize={7}
+        fontFamily="'IBM Plex Mono',monospace" textAnchor="end" fontWeight="600">
+        {node.duration.toFixed(3)}ms ({pctTotal}%)
+      </text>
+
+      {/* Memory badges */}
+      {(node.memR > 0 || node.memW > 0) && (
+        <g>
+          {node.memR > 0 && (
+            <g>
+              <rect x={node.x + node.w - 50} y={node.y + 5} width={44} height={11} rx={2.5}
+                fill="#06B6D420" />
+              <text x={node.x + node.w - 28} y={node.y + 12.5} fill="#67E8F9" fontSize={6}
+                fontFamily="'IBM Plex Mono',monospace" textAnchor="middle">R:{(node.memR / 1024).toFixed(0)}K</text>
+            </g>
+          )}
+          {node.memW > 0 && (
+            <g>
+              <rect x={node.x + node.w - 50} y={node.y + (node.memR > 0 ? 18 : 5)} width={44} height={11} rx={2.5}
+                fill="#F59E0B20" />
+              <text x={node.x + node.w - 28} y={node.y + (node.memR > 0 ? 25.5 : 12.5)} fill="#FDE68A" fontSize={6}
+                fontFamily="'IBM Plex Mono',monospace" textAnchor="middle">W:{(node.memW / 1024).toFixed(0)}K</text>
+            </g>
+          )}
+        </g>
+      )}
+    </g>
+  );
+}
+
+function GraphEdge({ edge, nodeMap, selected, hovered, playhead }) {
+  const from = nodeMap[edge.from];
+  const to = nodeMap[edge.to];
+  if (!from || !to) return null;
+
+  const fromEnd = from.start + from.duration;
+  const waitTime = Math.max(0, to.start - fromEnd);
+
+  // Highlight if connected to selected/hovered
+  const activeId = hovered || selected;
+  const isActive = activeId && (edge.from === activeId || edge.to === activeId);
+  const isInChain = activeId && (edge.from === activeId || edge.to === activeId);
+
+  // Bezier from right-center of source → left-center of target
+  const x1 = from.x + from.w;
+  const y1 = from.y + from.h / 2;
+  const x2 = to.x;
+  const y2 = to.y + to.h / 2;
+  const dx = x2 - x1;
+  const cp = Math.max(dx * 0.4, 30);
+
+  const fromPipe = PIPE[from.pipeline];
+
+  // Edge done state
+  let edgeDone = false;
+  if (playhead !== null && playhead >= to.start) edgeDone = true;
+
+  return (
+    <g>
+      <path
+        d={`M${x1},${y1} C${x1 + cp},${y1} ${x2 - cp},${y2} ${x2},${y2}`}
+        fill="none"
+        stroke={isActive ? fromPipe.accent : edgeDone ? "#334155" : "#1E293B"}
+        strokeWidth={isActive ? 1.5 : 0.7}
+        opacity={activeId ? (isActive ? 1 : 0.12) : 0.4}
+        markerEnd={isActive ? "url(#arrow-active)" : "url(#arrow)"}
+        strokeDasharray={from.pipeline !== to.pipeline ? "4,3" : "none"}
+      />
+      {/* Wait time annotation on active edges */}
+      {isActive && waitTime > 0.005 && (
+        <g>
+          <rect x={(x1 + x2) / 2 - 18} y={(y1 + y2) / 2 - 8} width={36} height={14} rx={3}
+            fill="#0F172A" stroke="#334155" strokeWidth={0.5} />
+          <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 + 0.5} fill="#F59E0B" fontSize={7}
+            fontFamily="'IBM Plex Mono',monospace" textAnchor="middle" dominantBaseline="middle">
+            +{waitTime.toFixed(2)}ms
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+// ─── Inspector ───────────────────────────────────────────
+function Inspector({ nodeId }) {
+  const node = nodeId ? NODE_MAP[nodeId] : null;
+  if (!node) return (
+    <div style={{ padding: 20, textAlign: "center", color: "#334155", fontSize: 10, fontFamily: "'IBM Plex Mono',monospace" }}>
+      <div style={{ fontSize: 24, marginBottom: 8, opacity: 0.25 }}>⬡</div>
+      Click any node to inspect<br/>
+      <span style={{ fontSize: 8, color: "#1E293B" }}>Hover to preview dependencies</span>
+    </div>
+  );
+  const pipe = PIPE[node.pipeline];
+  const unit = UNIT[node.unit];
+  const endTime = node.start + node.duration;
+
+  // Find deps and consumers
+  const deps = EDGES.filter(e => e.to === node.id).map(e => NODE_MAP[e.from]).filter(Boolean);
+  const consumers = EDGES.filter(e => e.from === node.id).map(e => NODE_MAP[e.to]).filter(Boolean);
+
+  return (
+    <div style={{ padding: 12, fontSize: 9, fontFamily: "'IBM Plex Mono',monospace" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <div style={{ width: 4, height: 22, borderRadius: 2, background: pipe.accent }} />
+        <div>
+          <div style={{ color: "#F1F5F9", fontSize: 12, fontWeight: 700 }}>{node.name.replace("\n", " ")}</div>
+          <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+            <span style={{ fontSize: 7, color: pipe.h, background: pipe.dim, padding: "2px 6px", borderRadius: 3 }}>{node.pipeline.toUpperCase()}</span>
+            <span style={{ fontSize: 7, color: unit.text, background: unit.bg, padding: "2px 6px", borderRadius: 3, border: `1px solid ${unit.border}30` }}>{unit.label}</span>
+            <span style={{ fontSize: 7, color: "#94A3B8", background: "#1E293B", padding: "2px 6px", borderRadius: 3 }}>{node.core}</span>
+          </div>
+        </div>
+      </div>
+
+      {node.status === "warning" && (
+        <div style={{ padding: "5px 7px", background: "#451A0320", border: "1px solid #92400E40", borderRadius: 5, color: "#FBBF24", fontSize: 8, marginBottom: 8, lineHeight: 1.5 }}>
+          ⚠ Duration anomaly detected — tiles T3, T7 slow
+        </div>
+      )}
+
+      <div style={{ color: "#64748B", fontSize: 8, marginBottom: 10, lineHeight: 1.6, padding: "5px 0", borderTop: "1px solid #151D2E", borderBottom: "1px solid #151D2E" }}>
+        {node.desc}
+      </div>
+
+      {/* Timing detail */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 10 }}>
+        {[
+          ["Start", `${node.start.toFixed(3)} ms`],
+          ["End", `${endTime.toFixed(3)} ms`],
+          ["Duration", `${node.duration.toFixed(3)} ms`],
+          ["% of Total", `${((node.duration / TOTAL_TIME) * 100).toFixed(1)}%`],
+          ["Core", node.core],
+          ["Unit", node.unit.toUpperCase()],
+          ...(node.memR > 0 ? [["Mem Read", `${node.memR} KB`]] : []),
+          ...(node.memW > 0 ? [["Mem Write", `${node.memW} KB`]] : []),
+          ...(node.tiles ? [["Tiles", `${node.tiles} parallel`]] : []),
+        ].map(([k, v]) => (
+          <div key={k} style={{ padding: "4px 6px", background: "#0C1018", borderRadius: 4, border: "1px solid #151D2E" }}>
+            <div style={{ color: "#334155", fontSize: 7 }}>{k}</div>
+            <div style={{ color: pipe.h, fontSize: 9, fontWeight: 500 }}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Inline waterfall bar */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 7, color: "#334155", letterSpacing: "0.08em", marginBottom: 4 }}>EXECUTION TIMELINE</div>
+        <div style={{ position: "relative", height: 14, background: "#0C1018", borderRadius: 3, border: "1px solid #151D2E", overflow: "hidden" }}>
+          <div style={{
+            position: "absolute",
+            left: `${(node.start / TOTAL_TIME) * 100}%`,
+            width: `${Math.max((node.duration / TOTAL_TIME) * 100, 1)}%`,
+            height: "100%",
+            background: `linear-gradient(90deg, ${pipe.accent}, ${heatColor(node.duration / MAX_DUR)})`,
+            borderRadius: 2,
+          }} />
+          <div style={{ position: "absolute", left: `${(node.start / TOTAL_TIME) * 100 + 2}%`, top: 1, fontSize: 7, color: "#FFF", fontWeight: 600 }}>
+            {node.duration.toFixed(3)}ms
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2, fontSize: 7, color: "#1E293B" }}>
+          <span>0ms</span><span>{TOTAL_TIME.toFixed(2)}ms</span>
+        </div>
+      </div>
+
+      {deps.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ color: "#334155", fontSize: 7, letterSpacing: "0.08em", marginBottom: 3 }}>DEPENDS ON ({deps.length})</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+            {deps.map(d => {
+              const dp = PIPE[d.pipeline];
+              return <span key={d.id} style={{ padding: "2px 6px", background: dp.dim, border: `1px solid ${dp.accent}30`, borderRadius: 3, color: dp.h, fontSize: 7.5, cursor: "pointer" }}>{d.name.replace("\n", " ")}</span>;
+            })}
+          </div>
+        </div>
+      )}
+      {consumers.length > 0 && (
+        <div>
+          <div style={{ color: "#334155", fontSize: 7, letterSpacing: "0.08em", marginBottom: 3 }}>FEEDS INTO ({consumers.length})</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+            {consumers.map(d => {
+              const dp = PIPE[d.pipeline];
+              return <span key={d.id} style={{ padding: "2px 6px", background: dp.dim, border: `1px solid ${dp.accent}30`, borderRadius: 3, color: dp.h, fontSize: 7.5, cursor: "pointer" }}>{d.name.replace("\n", " ")}</span>;
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────
+function App() {
+  const [selected, setSelected] = useState(null);
+  const [hovered, setHovered] = useState(null);
+  const [playhead, setPlayhead] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [zoom, setZoom] = useState(0.85);
+  const animRef = useRef(null);
+  const startRef = useRef(null);
+
+  // Dimming: compute connected set
+  const activeId = hovered || selected;
+  const connectedNodes = useMemo(() => {
+    if (!activeId) return new Set();
+    const s = new Set([activeId]);
+    const vU = new Set(), vD = new Set();
+    const up = (id) => { if (vU.has(id)) return; vU.add(id); s.add(id); EDGES.forEach(e => { if (e.to === id) { s.add(e.from); up(e.from); } }); };
+    const dn = (id) => { if (vD.has(id)) return; vD.add(id); s.add(id); EDGES.forEach(e => { if (e.from === id) { s.add(e.to); dn(e.to); } }); };
+    up(activeId); dn(activeId);
+    return s;
+  }, [activeId]);
+
+  // Playback
+  useEffect(() => {
+    if (!isPlaying) { if (animRef.current) cancelAnimationFrame(animRef.current); return; }
+    startRef.current = performance.now() - ((playhead || 0) * 700);
+    const tick = (ts) => {
+      const e = (ts - startRef.current) / 700;
+      if (e >= TOTAL_TIME) { setPlayhead(TOTAL_TIME); setIsPlaying(false); return; }
+      setPlayhead(e);
+      animRef.current = requestAnimationFrame(tick);
+    };
+    animRef.current = requestAnimationFrame(tick);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [isPlaying]);
+
+  const handleWheel = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(z => Math.max(0.3, Math.min(2.5, z - e.deltaY * 0.002))); }
+  }, []);
+
+  const svgW = 1600;
+  const svgH = 700;
+
+  const ctrl = { background: "none", border: "1px solid #1E293B", color: "#64748B", fontSize: 13, cursor: "pointer", padding: "3px 7px", borderRadius: 4, fontFamily: "'IBM Plex Mono',monospace" };
+
+  return (
+    <div style={{ width: "100%", height: "100vh", background: "#07090F", fontFamily: "'IBM Plex Mono','SF Mono',monospace", display: "flex", flexDirection: "column", overflow: "hidden", color: "#CBD5E1" }}>
+      {/* HEADER */}
+      <div style={{ height: 42, minHeight: 42, background: "#0C1018", borderBottom: "1px solid #1A2030", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="18" height="18" viewBox="0 0 16 16"><rect x="1" y="2" width="5" height="5" rx="1.5" fill="#A855F7" opacity="0.8" /><rect x="10" y="2" width="5" height="5" rx="1.5" fill="#10B981" opacity="0.7" /><rect x="5.5" y="9" width="5" height="5" rx="1.5" fill="#F97316" opacity="0.7" /><line x1="3.5" y1="7" x2="8" y2="9" stroke="#334155" strokeWidth="0.8" /><line x1="12.5" y1="7" x2="8" y2="9" stroke="#334155" strokeWidth="0.8" /></svg>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em" }}>IndexerPrologQuant</span>
+          <span style={{ fontSize: 8, color: "#334155", background: "#0C1018", border: "1px solid #1A2030", padding: "2px 8px", borderRadius: 4 }}>Computation Graph + Execution</span>
+          <span style={{ fontSize: 8, color: "#1E293B", padding: "2px 8px" }}>Ascend 910B · {NODES.length} nodes · {TOTAL_TIME.toFixed(3)}ms</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Heat legend */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 7.5, color: "#475569" }}>
+            <span>Fast</span>
+            <div style={{ width: 50, height: 5, borderRadius: 3, background: "linear-gradient(90deg, rgb(30,180,220), rgb(130,120,120), rgb(230,60,40))" }} />
+            <span>Slow</span>
+          </div>
+          <div style={{ width: 1, height: 16, background: "#1A2030" }} />
+          <div style={{ display: "flex", gap: 6, fontSize: 7.5 }}>
+            {[["Query", PIPE.query.accent], ["Key", PIPE.key.accent], ["Weight", PIPE.weight.accent]].map(([l, c]) => (
+              <div key={l} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <div style={{ width: 8, height: 3, borderRadius: 1, background: c }} /><span style={{ color: "#475569" }}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* Graph */}
+        <div style={{ flex: 1, overflow: "auto", position: "relative" }} onWheel={handleWheel} onClick={() => setSelected(null)}>
+          {/* Dot grid */}
+          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, #1A2030 0.8px, transparent 0.8px)", backgroundSize: "20px 20px", opacity: 0.4, pointerEvents: "none" }} />
+          <svg width={svgW * zoom} height={svgH * zoom} viewBox={`0 0 ${svgW} ${svgH}`}
+            style={{ display: "block", minWidth: "100%", minHeight: "100%" }}>
+            <defs>
+              <marker id="arrow" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><path d="M0,0L6,2.5L0,5" fill="#334155" /></marker>
+              <marker id="arrow-active" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><path d="M0,0L7,2.5L0,5" fill="#94A3B8" /></marker>
+            </defs>
+
+            {/* Pipeline region backgrounds */}
+            <rect x={200} y={0} width={1350} height={230} rx={12} fill="#A855F708" stroke="#A855F710" strokeWidth={0.5} strokeDasharray="6,4" />
+            <text x={215} y={18} fill="#A855F730" fontSize={10} fontFamily="'IBM Plex Mono',monospace" fontWeight="700">QUERY PIPELINE</text>
+            <rect x={200} y={340} width={1350} height={260} rx={12} fill="#10B98108" stroke="#10B98110" strokeWidth={0.5} strokeDasharray="6,4" />
+            <text x={215} y={358} fill="#10B98130" fontSize={10} fontFamily="'IBM Plex Mono',monospace" fontWeight="700">KEY PIPELINE</text>
+            <rect x={360} y={575} width={550} height={105} rx={12} fill="#F9731608" stroke="#F9731610" strokeWidth={0.5} strokeDasharray="6,4" />
+            <text x={375} y={593} fill="#F9731630" fontSize={10} fontFamily="'IBM Plex Mono',monospace" fontWeight="700">WEIGHT PIPELINE</text>
+
+            {/* Edges */}
+            {EDGES.map((e, i) => (
+              <GraphEdge key={i} edge={e} nodeMap={NODE_MAP} selected={selected} hovered={hovered} playhead={playhead} />
+            ))}
+
+            {/* Nodes */}
+            {NODES.map(n => {
+              const dimmed = connectedNodes.size > 0 && !connectedNodes.has(n.id);
+              return (
+                <g key={n.id} opacity={dimmed ? 0.12 : 1}>
+                  <GraphNode node={n} selected={selected} hovered={hovered}
+                    onSelect={setSelected} onHover={setHovered} playhead={playhead}
+                    zoom={zoom} />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        {/* RIGHT SIDEBAR */}
+        <div style={{ width: 260, minWidth: 260, background: "#0C1018", borderLeft: "1px solid #1A2030", display: "flex", flexDirection: "column", overflow: "auto" }}>
+          <div style={{ borderBottom: "1px solid #151D2E" }}>
+            <div style={{ padding: "8px 12px 4px", fontSize: 8, color: "#1E293B", letterSpacing: "0.1em" }}>NODE INSPECTOR</div>
+            <Inspector nodeId={selected || hovered} />
+          </div>
+
+          {/* Summary stats */}
+          <div style={{ padding: 12, borderBottom: "1px solid #151D2E" }}>
+            <div style={{ fontSize: 8, color: "#1E293B", letterSpacing: "0.1em", marginBottom: 8 }}>OPERATOR SUMMARY</div>
+            {[
+              ["Total Nodes", NODES.length],
+              ["Cube Ops", NODES.filter(n => n.unit === "cube").length],
+              ["Vector Ops", NODES.filter(n => n.unit === "vector").length],
+              ["Total Duration", `${TOTAL_TIME.toFixed(3)} ms`],
+              ["Critical Path", "Q pipeline"],
+              ["AIC Used", "0-20 (21 cores)"],
+              ["AIV Used", "0-28 (20 cores)"],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", fontSize: 8.5 }}>
+                <span style={{ color: "#475569" }}>{k}</span>
+                <span style={{ color: "#CBD5E1", fontWeight: 500 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Diagnostics */}
+          <div style={{ padding: 12, flex: 1 }}>
+            <div style={{ fontSize: 8, color: "#1E293B", letterSpacing: "0.1em", marginBottom: 8 }}>DIAGNOSTICS</div>
+            {[
+              { s: "warn", m: "Q:Linear tiles T3,T7 are 18% slower — L2 bank conflict on AIC 3,7" },
+              { s: "warn", m: "Q pipeline critical path: 0.818ms (dominates total)" },
+              { s: "opt", m: "Fuse Q:NoPE_Cast into Q:Concat to remove dtype round-trip" },
+              { s: "opt", m: "K:Rope2D + K:NoPE_Cast → same AIV to save 1 core" },
+              { s: "info", m: "Cross-pipeline dependency: Q:View_CosSin → K:Rope2D (shared cos/sin)" },
+            ].map((d, i) => (
+              <div key={i} style={{
+                padding: "5px 7px", marginBottom: 4, borderRadius: 4, fontSize: 8.5, lineHeight: 1.5,
+                background: d.s === "warn" ? "#451A0315" : d.s === "opt" ? "#0C2D3E15" : "#1E293B15",
+                border: `1px solid ${d.s === "warn" ? "#92400E25" : d.s === "opt" ? "#06B6D425" : "#1E293B25"}`,
+                color: d.s === "warn" ? "#FBBF24" : d.s === "opt" ? "#67E8F9" : "#64748B",
+              }}>
+                {d.s === "warn" ? "⚠ " : d.s === "opt" ? "⚡ " : "ℹ "}{d.m}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CONTROLS */}
+      <div style={{ height: 40, minHeight: 40, background: "#0C1018", borderTop: "1px solid #1A2030", display: "flex", alignItems: "center", padding: "0 14px", gap: 8 }}>
+        <button onClick={() => { setPlayhead(0); setIsPlaying(false); }} style={ctrl}>⏮</button>
+        <button onClick={() => setIsPlaying(!isPlaying)} style={{ ...ctrl, color: isPlaying ? "#EF4444" : "#34D399", borderColor: isPlaying ? "#7F1D1D" : "#064E3B" }}>{isPlaying ? "⏸" : "▶"}</button>
+        <div style={{ flex: 1, height: 4, background: "#1A2030", borderRadius: 2, cursor: "pointer" }}
+          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPlayhead(((e.clientX - r.left) / r.width) * TOTAL_TIME); }}>
+          <div style={{ height: "100%", borderRadius: 2, width: `${((playhead || 0) / TOTAL_TIME) * 100}%`, background: "linear-gradient(90deg, #A855F7, #10B981, #F97316)", transition: isPlaying ? "none" : "width .1s" }} />
+        </div>
+        <span style={{ fontSize: 9, color: "#475569", minWidth: 90, textAlign: "right" }}>{(playhead || 0).toFixed(3)} / {TOTAL_TIME.toFixed(3)} ms</span>
+        <div style={{ width: 1, height: 14, background: "#1A2030" }} />
+        <button onClick={() => setZoom(z => Math.min(2.5, z + 0.15))} style={ctrl}>+</button>
+        <span style={{ fontSize: 9, color: "#475569", minWidth: 32, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+        <button onClick={() => setZoom(z => Math.max(0.3, z - 0.15))} style={ctrl}>−</button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
