@@ -19,12 +19,12 @@ python3 -m http.server 8000
 Then open:
 
 ```text
-http://localhost:8000/test/
+http://localhost:8000/graph-prototype-lab/
 ```
 
 ## Samples
 
-- `MVP Layer 3 · Deep Groups`: synthetic deep hierarchy extracted from `mvp/data.js`
+- `MVP Layer 3 · Deep Groups`: synthetic deep hierarchy extracted from `model-architecture/data.js`
 - `MVP Layer 0 · Deep Groups`: dense-layer variant
 - `Ascend Pass Graph`: real compiler pass JSON
 - `Source Graph`: `data/source-graph.json`

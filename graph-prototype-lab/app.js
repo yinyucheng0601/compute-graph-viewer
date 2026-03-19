@@ -1,7 +1,7 @@
-import * as dataAdapters from "./data-adapters.js?v=20260317a";
-import {createInitialState, materializeVisibleGraph} from "./graph-ir.js?v=20260317a";
-import {computeLayout} from "./layout-engine.js?v=20260317a";
-import {GraphRenderer} from "./renderer.js?v=20260317a";
+import * as dataAdapters from "./data-adapters.js?v=20260317c";
+import {createInitialState, materializeVisibleGraph} from "./graph-ir.js?v=20260317c";
+import {computeLayout} from "./layout-engine.js?v=20260317c";
+import {GraphRenderer} from "./renderer.js?v=20260317c";
 
 const SAMPLE_CATALOG = dataAdapters.SAMPLE_CATALOG || [];
 const REAL_PASS_00_FILES = dataAdapters.REAL_PASS_00_FILES || [];

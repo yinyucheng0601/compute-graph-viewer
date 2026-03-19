@@ -221,7 +221,7 @@ export class GraphRenderer {
     subtitle.setAttribute("text-anchor", "start");
     group.appendChild(subtitle);
 
-    surface.addEventListener("click", (event) => {
+    group.addEventListener("click", (event) => {
       event.stopPropagation();
       this.callbacks.onSelectNode?.(node);
     });
@@ -302,7 +302,7 @@ export class GraphRenderer {
         group.appendChild(subtitle);
       }
 
-      surface.addEventListener("click", (event) => {
+      group.addEventListener("click", (event) => {
         event.stopPropagation();
         this.callbacks.onSelectNode?.(node);
       });
@@ -331,7 +331,7 @@ export class GraphRenderer {
         group.appendChild(subtitle);
       }
 
-      surface.addEventListener("click", (event) => {
+      group.addEventListener("click", (event) => {
         event.stopPropagation();
         this.callbacks.onSelectNode?.(node);
       });
@@ -345,7 +345,7 @@ export class GraphRenderer {
       "data-edge-id": edge.id,
     });
 
-    const thickness = 1 + Math.min(3, Math.log2((edge.weight || 0) + 1));
+    const thickness = 1;
     const pathData = buildPath(edgeLayout.points);
     const selected = this.selection?.kind === "edge" && this.selection.id === edge.id;
 
@@ -356,7 +356,8 @@ export class GraphRenderer {
     const path = createSvgElement("path", {
       class: `edge-path${edge.kind === "direct" ? " is-faint" : ""}`,
       d: pathData,
-      "stroke-width": thickness.toFixed(2),
+      "stroke-width": "1",
+      "vector-effect": "non-scaling-stroke",
     });
 
     hit.addEventListener("click", (event) => {

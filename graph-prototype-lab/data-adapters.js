@@ -3,7 +3,7 @@ const PASS_FALLBACK_URL =
 const REAL_PASS_BASE_URL =
   "../output_deepseek/Pass_00_RemoveRedundantReshape";
 const SOURCE_SAMPLE_URL = "../data/source-graph.json";
-const MVP_DATA_URL = "../mvp/data.js";
+const MVP_DATA_URL = "../model-architecture/data.js";
 
 export const DEFAULT_REAL_PASS_00_FILE =
   "After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json";
@@ -48,12 +48,12 @@ export const SAMPLE_CATALOG = [
   {
     key: "mvp-layer-3",
     label: "MVP Layer 3 · Deep Groups",
-    description: "Synthetic deep hierarchy extracted from mvp/data.js layer 3.",
+    description: "Synthetic deep hierarchy extracted from model-architecture/data.js layer 3.",
   },
   {
     key: "mvp-layer-0",
     label: "MVP Layer 0 · Deep Groups",
-    description: "Dense layer hierarchy extracted from mvp/data.js layer 0.",
+    description: "Dense layer hierarchy extracted from model-architecture/data.js layer 0.",
   },
   {
     key: "pass-graph",
@@ -346,7 +346,7 @@ function parseAscendPassGraph(data, context) {
 function buildDeepHierarchyFromMvp(data, layerIndex) {
   const layer = (data.layers || []).find((entry) => entry.layer_id === layerIndex) || (data.layers || [])[0];
   if (!layer) {
-    throw new Error(`Layer not found in mvp/data.js: ${layerIndex}`);
+    throw new Error(`Layer not found in model-architecture/data.js: ${layerIndex}`);
   }
 
   const nodes = [];
@@ -469,7 +469,7 @@ function buildDeepHierarchyFromMvp(data, layerIndex) {
     meta: {
       sampleLabel: `MVP Layer ${layer.layer_id}`,
       source: MVP_DATA_URL,
-      description: "Deep synthetic hierarchy extracted from mvp/data.js with explicit tensor bridges.",
+      description: "Deep synthetic hierarchy extracted from model-architecture/data.js with explicit tensor bridges.",
       stats: {
         groups: nodes.filter((node) => node.kind === "group").length,
         ops: nodes.filter((node) => node.kind === "op").length,

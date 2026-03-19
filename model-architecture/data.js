@@ -20100,3 +20100,45 @@ window.DEEPSEEK_INTERPRETABILITY_DATA = {
   }
 }
 ;
+window.DEEPSEEK_INTERPRETABILITY_DATA.parallel_view = {
+  "legend": [
+    {
+      "kind": "tp",
+      "label": "Tensor Parallel",
+      "description": "按隐藏维或中间维切 shard，常见于 Column / Row Parallel Linear。"
+    },
+    {
+      "kind": "ep",
+      "label": "Expert Parallel",
+      "description": "MoE experts 分布在不同 rank，token 经 router / dispatch 进入本地 expert。"
+    },
+    {
+      "kind": "collective",
+      "label": "Collective",
+      "description": "显式通信或汇总步骤，例如 AllReduce / AllGather / expert merge。"
+    },
+    {
+      "kind": "local",
+      "label": "Local Compute",
+      "description": "每个 rank 本地执行，不单独展开设备拓扑。"
+    }
+  ],
+  "groups": {
+    "attention": {
+      "badge": "TP",
+      "summary": "Q / KV 投影按列切分，输出投影按行切分，通信重点在输出归并。"
+    },
+    "v3_2_attention": {
+      "badge": "TP",
+      "summary": "MLA Prolog 与输出投影保留 TP 语义，Indexer 与 Sparse Attention 作为本地头分片计算。"
+    },
+    "dense_ffn": {
+      "badge": "TP",
+      "summary": "Dense MLP 使用 W1/W3 Column Parallel 与 W2 Row Parallel。"
+    },
+    "moe_ffn": {
+      "badge": "EP + TP",
+      "summary": "Routed experts 由 EP 放置，shared experts 保留 TP 语义，末端做结果汇总。"
+    }
+  }
+};
