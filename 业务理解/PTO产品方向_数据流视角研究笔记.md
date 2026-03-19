@@ -7,9 +7,9 @@
 ## 一、问题的起点：开发者在"开发"什么
 
 PTO 现在有三个模块：
-- 模型架构可视化（`mvp/`）—— 展示 L1→L4 的模型层级结构
-- 源码算子可视化（`visual-test.html`）—— 展示 PyPTO 源码的计算路径
-- IR 计算图（`index.html`）—— 展示编译后的 pass 图和 controlflow
+- 模型架构可视化（`model-architecture/`）—— 展示 L1→L4 的模型层级结构
+- 源码算子可视化（`source-flow/index.html`）—— 展示 PyPTO 源码的计算路径
+- IR 计算图（`pass-ir/index.html`）—— 展示编译后的 pass 图和 controlflow
 
 三个模块分别描述了"代码产物"的三个截面。但它们打通不了的根本原因，不是 UI 层的问题，而是**分模块的方式本身就错了**——它在切"代码"，而不是切"数据"。
 

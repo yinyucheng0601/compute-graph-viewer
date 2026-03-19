@@ -593,6 +593,131 @@ Cube / Vector = 更底层的算力/指令使用维度
 - `loop_unroll` 的写法有没有把循环体做大，还是反而引入过多路径
 - `if / cond` 和 `unroll` 叠加后，是否导致编译路径数激增
 
+以 `lightning_indexer_prolog_quant` 为例，这四类问题在 Initial IR 图里各自长什么样，以及开发者该怎么验收，分开说清楚。
+
+---
+
+**验收一：matmul 外面有没有多余的 reshape / transpose**
+
+在正确写法里，紧贴 `MATMUL` 节点的上游，只应该出现"为当前 tile 切片"的 `VIEW`，而不应该出现"为了凑形状而加的额外 `RESHAPE` 或 `TRANSPOSE`"。
+
+`lightning_indexer_prolog_quant` 里有三处 `MATMUL`，Initial IR 图里各自的上游链路如下：
+
+```text
+Query-Linear
+  in_q_norm_in  →  VIEW(tile 切片)  →  MATMUL
+  t_w_qb        ──────────────────────────↗
+  ✓ 没有多余 reshape，VIEW 只做 offset 取片
+
+Key-Linear
+  in_x_in  →  VIEW(tile 切片)  →  MATMUL
+  t_wk     ────────────────────────↗
+  ✓ 干净，同上
+
+Query-Hadamard
+  q_concat     ─────────────────────────────  MATMUL
+  hadamard_q_in  →  RESHAPE([1,hd,hd])  →  ↗
+  ✓ RESHAPE 是合法的 broadcast 扩维，不是多余的
+```
+
+对比一个典型的问题写法：
+
+```text
+x_in  →  RESHAPE  →  TRANSPOSE  →  RESHAPE  →  MATMUL
+```
+
+如果图里出现这种"三连"，开发者可以立刻定位：`TRANSPOSE` 本身说明矩阵方向在源码写的时候就不对，`RESHAPE` 是在围绕这个方向错误做补救；这种写法通常比直接在源码里把矩阵维度对齐要多出明显的搬运开销。
+
+**验收方式**：在 Initial IR 图里，点开任意一个 `MATMUL` 节点，向上追溯两到三跳。如果看到的全是 `VIEW`（offset 切片），问题不在这里；如果看到 `TRANSPOSE` 或连续两个 `RESHAPE`，需要回到源码确认矩阵维度是否写错。
+
+---
+
+**验收二：matmul 是不是被放在一个过小的 loop body 里**
+
+`lightning_indexer_prolog_quant` 里有两个 `for` loop，层级和体量差距很大：
+
+```text
+LOOP_RESHAPE（外层，单次执行）
+  body：7 个 RESHAPE op，处理权重张量的形状对齐
+  特点：只跑一次，开销可忽略，节点数少
+
+loop_unroll（主计算 loop）
+  body：约 100 个 op，覆盖 Q / K / W 三条支路的完整计算
+  特点：按 t_tile 分档，每档编译一条路径
+```
+
+"loop body 过小"的问题通常是开发者把原本可以合并进主 loop 的算子，单独拆成了一个只循环一两次的小 loop。Initial IR 图里这种问题的特征是：
+
+```text
+loop_A（body：2-3 op，迭代次数小）
+loop_B（body：80+ op，迭代次数大）
+```
+
+`loop_A` 的每次迭代都会产生一次调度唤醒和上下文切换开销。如果 `loop_A` 处理的结果只是给 `loop_B` 准备输入，而且 `loop_A` 的迭代次数极小（比如 `pypto.loop(0, 1, 1)` 只跑一次），那这个 loop 存在本身不是问题，但如果它的迭代次数和 `loop_B` 一样大，反而说明两者本应合并进同一个 loop body。
+
+**验收方式**：在 Initial IR 图里，展开每个 loop group，数一下 body 里的 op 节点数量和这个 loop 的迭代次数（来自源码的 `pypto.loop(start, end, step)` 参数）。op 数量 ÷ 迭代次数越小，调度开销占比越高。正常情况下，主计算 loop 的 body 应该包含最多的 op。
+
+---
+
+**验收三：loop_unroll 的写法有没有把路径数控制在合理范围**
+
+`loop_unroll` 的 `unroll_list` 参数决定了编译器会为这个 loop 生成几条独立的展开路径。每条路径对应一种 `t_tile` 取值，框架会分别为每种 `t_tile` 编译一套最优 tiling 参数。
+
+```python
+pypto.loop_unroll(0, t, 1,
+    name="IndexerPrologQuantQuantLoop",
+    idx_name="tIdx",
+    unroll_list=unroll_list)
+```
+
+如果 `unroll_list = [1, 2, 4]`，Initial IR 图里这个 loop group 会展开成 3 个子图，每个子图的 body 结构完全相同，只是 `t_tile` 的符号取值不同。3 条路径 × 约 100 个 op，编译时间和图的节点总量都在可接受范围内。
+
+问题出现在 `unroll_list` 过长时，例如：
+
+```python
+unroll_list = [1, 2, 3, 4, 5, 6, 7, 8, 16, 32]
+```
+
+10 条路径 × 100 op，Initial IR 图里会出现 10 个几乎完全相同的 loop body 子图，编译时间会线性增大，而实际运行时真正命中的路径往往只有 2-3 条。
+
+路径数过多还有另一个隐患：每条路径都需要独立的 Pass 优化，如果 `cycle_upper_bound` 或 `l1_reuse_map` 等参数在每条路径上的最优值不同，编译器需要为 10 条路径分别搜索，调优成本会明显上升。
+
+**验收方式**：在 Initial IR 图里，找到 `loop_unroll` group 的展开视图，数一下展开后的子图数量。通常 3-5 条路径是合理的；超过 6 条时，需要回到源码评估 `unroll_list` 的覆盖区间是否必要。
+
+---
+
+**验收四：if / cond 和 unroll 叠加后路径数是否激增**
+
+`lightning_indexer_prolog_quant` 的 loop body 里没有显式的 `if / cond`，这是这份代码写得比较干净的地方之一。但如果在循环体内加入条件分支，路径数会乘法式增长。
+
+假设循环体内有下面这段：
+
+```python
+if t_tile == 1:
+    # decode 路径：m 很小，搬运 bound
+    pypto.set_cube_tile_shapes([1, 1], [64, 128], [64, 128])
+else:
+    # prefill 路径：compute bound
+    pypto.set_cube_tile_shapes([4, 8], [64, 128], [64, 128])
+```
+
+配合 `unroll_list = [1, 2, 4]`，Initial IR 图里这个 loop group 就会展开成 `3 × 2 = 6` 条路径，而不是 3 条。每条路径都要经历完整的 Pass 优化，编译时间和图节点数翻倍。
+
+更常见的问题是多个 `if` 嵌套：
+
+```text
+loop_unroll(unroll_list=[1,2,4])
+  └─ if t_tile == 1:
+       └─ if h > 4096:
+            ...
+```
+
+`3 × 2 × 2 = 12` 条路径，图里会出现 12 个几乎完全重复的子图，而其中很多路径在真实推理时根本不会被执行。
+
+**验收方式**：在 Initial IR 图里，如果看到同一个 loop group 的展开子图数量 > `len(unroll_list)`，说明循环体内存在条件分支。展开子图数量除以 `len(unroll_list)` 的结果，就是循环体内分支带来的路径倍增系数。理想情况下这个系数为 1；超过 2 时，需要评估是否可以把分支移出循环体，或者通过 `set_cube_tile_shapes` 的参数动态化来消除显式 `if`。
+
+---
+
 这些问题如果只看最终 Pass 图，往往已经离源码太远了；而在 `Python AST + Initial IR` 的组合视图里，反而更容易看懂"性能问题到底是从哪种代码结构长出来的"。
 
 还有一个非常现实的价值，是区分"前端问题"还是"后端问题"。

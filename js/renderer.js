@@ -25,7 +25,9 @@ function semanticDisplayLabelFromData(d) {
 
 function assetUrl(path) {
   if (typeof window === 'undefined') return path;
-  const prefix = typeof window.PTO_ASSET_PREFIX === 'string' ? window.PTO_ASSET_PREFIX : '';
+  const prefix = typeof window.PTO_ASSET_PREFIX === 'string'
+    ? window.PTO_ASSET_PREFIX
+    : (typeof window.PTO_BASE_PREFIX === 'string' ? window.PTO_BASE_PREFIX : '');
   return prefix + path;
 }
 

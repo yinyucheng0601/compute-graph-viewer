@@ -6,13 +6,14 @@
 
 ---
 
-## 三个入口
+## 四个入口
 
 | 入口 | 文件 | 功能 |
 |------|------|------|
-| Pass IR 计算图 | `index.html` | 精度调试：逐 Pass 追踪编译优化，节点聚类，锁定计算流 |
-| 大模型整网架构 | `mvp/index.html` | 架构洞察：DeepSeek V3 L1→L2→L3→L4 折叠展开 |
-| 源码计算流 `beta` | `visual-test.html` | 性能调优：算子 Python 源码 → 计算路径 + 数据依赖 |
+| Pass IR 计算图 | `pass-ir/index.html` | 精度调试：逐 Pass 追踪编译优化，节点聚类，锁定计算流 |
+| 大模型整网架构 | `model-architecture/index.html` | 架构洞察：DeepSeek V3 L1→L2→L3→L4 折叠展开 |
+| 源码计算流 `beta` | `source-flow/index.html` | 性能调优：算子 Python 源码 → 计算路径 + 数据依赖 |
+| Swimlane 执行视图 | `swimlane/index.html` | 执行态观察：AIC / AIV 真实任务泳道，支持本地 `merged_swimlane.json` |
 
 ---
 
@@ -45,9 +46,17 @@ npx serve .
 
 ```
 pto/
-├── launch.html          # 启动页（三卡片导航）
-├── index.html           # 精度调试
-├── visual-test.html     # 源码计算流（beta）
+├── launch.html          # 启动页（四卡片导航）
+├── pass-ir/
+│   └── index.html       # 精度调试
+├── source-flow/
+│   └── index.html       # 源码计算流（beta）
+├── swimlane/
+│   ├── index.html       # Swimlane 执行视图
+│   ├── app.js           # Swimlane viewer 解析与渲染
+│   └── styles.css       # Swimlane 页面样式
+├── archive/
+│   └── unreferenced-20260319/ # 无引用旧文件归档
 ├── CHANGELOG.md         # 开发日志
 ├── css/style.css        # 主样式 + Design Token
 ├── js/
@@ -58,11 +67,12 @@ pto/
 │   ├── colormap.js      # 颜色映射（语义/时延/分区/执行单元）
 │   ├── nav.js           # Pass 导航条
 │   └── controlflow.js   # Controlflow 面板
-├── mvp/
+├── model-architecture/
 │   ├── index.html       # 大模型整网架构
 │   ├── app.js           # X6 封装（L1→L4）
 │   ├── data.js          # DeepSeek V3/V3.2 内置数据
 │   └── styles.css       # MVP 样式（与主站 Design Token 对齐）
+├── graph-prototype-lab/ # 图原型实验室（辅助入口）
 └── 业务理解/            # PRD + 设计文档
     └── PROJECT_INDEX.md # 完整模块索引
 ```
@@ -73,7 +83,7 @@ pto/
 
 - **前端**：纯 HTML + CSS + Vanilla JS，无构建依赖
 - **布局算法**：自研 Sugiyama 分层布局（`js/layout.js`）
-- **MVP 图库**：AntV X6（仅 `mvp/` 使用，bundle 隔离）
+- **MVP 图库**：AntV X6（仅 `model-architecture/` 使用，bundle 隔离）
 - **主题**：深色系，Design Token 集中于 `css/style.css`
 
 ---

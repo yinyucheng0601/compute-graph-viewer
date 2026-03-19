@@ -8,8 +8,23 @@
     return;
   }
 
-  root.innerHTML = '<div class="graph-shell"><div id="graph" class="graph-canvas"></div></div>';
+  const parallelView = data.parallel_view || { legend: [], groups: {} };
+
+  root.innerHTML = [
+    '<div class="graph-shell">',
+    '  <div id="graph" class="graph-canvas"></div>',
+    '  <aside class="view-panel" aria-live="polite">',
+    '    <div id="view-panel-title" class="view-panel-title"></div>',
+    '    <div id="view-panel-note" class="view-panel-note"></div>',
+    '    <div id="view-legend"></div>',
+    '  </aside>',
+    '</div>',
+  ].join("");
   const graphContainer = document.getElementById("graph");
+  const viewPanelTitle = document.getElementById("view-panel-title");
+  const viewPanelNote = document.getElementById("view-panel-note");
+  const viewLegend = document.getElementById("view-legend");
+  const graphTitleEl = document.querySelector(".graph-title");
 
   const BG        = "#1A1A1A";
   const INK       = "#e0e0e0";
@@ -18,11 +33,15 @@
   const PAPER_ALT = "#242424";
   const MUTED     = "#888888";
   const DASH      = "#555555";
+  const TP_COLOR  = "#3a89ff";
+  const EP_COLOR  = "#b765ff";
+  const COLLECTIVE_COLOR = "#ff9c3a";
+  const LOCAL_COLOR = "#6b778b";
 
-  // ── L4: compact op — matches .op-pill min-height: 44px ────────────────────
+  // ── L4: compact op ───────────────────────────────────────────────────────
   const L4_W         = 150;
-  const L4_H         = 44;
-  const L4_GAP       = 8;
+  const L4_H         = 40;
+  const L4_GAP       = 24;
 
   // ── L3: fusionNode collapsed pill ────────────────────────────────────────
   const L3_X_PAD      = 34;
@@ -30,15 +49,16 @@
   const L3_H          = 44;
   const L3_TOP_PAD    = 12;
   const L3_BOT_PAD    = 12;
-  const L3_GAP        = 14;
+  const L3_GAP        = 24;
   const L3_BRANCH_GAP = 24;
   const L3_CENTER_GAP = 20;
 
   // ── L2: expandable group container ───────────────────────────────────────
-  const L2_W         = 564;
+  const L2_W         = 620;
   const L2_H         = 54;
   const L2_TOP_PAD   = 18;
   const L2_BOT_PAD   = 18;
+  const HEADER_H     = L2_H;
 
   // ── L1: summary pills + IO ────────────────────────────────────────────────
   const L1_W         = L2_W;
@@ -46,8 +66,8 @@
   const IO_H         = L1_H;
 
   // ── Expand/collapse button: near-square rounded rectangle ────────────────
-  const BTN_W        = 26;
-  const BTN_H        = 26;
+  const BTN_W        = 24;
+  const BTN_H        = 24;
   const BTN_RX       = 8;
 
   // ── Pill visual system (all collapsed pills: rx + gradient + shadow) ───────
@@ -61,8 +81,8 @@
   const PLUS_PATH  = "M 6 13 20 13 M 13 6 13 20";
   const MINUS_PATH = "M 6 13 20 13";
 
-  // ── Pipeline coloring: blue hue arc 220°–260°, same domain as visual-test ──
-  // Stage order maps to getLaneColors(5, 220, 40) — attention(220°) → moe(260°)
+  // ── Pipeline coloring: blue hue arc 200°–280°, same domain as visual-test ──
+  // Stage order maps to getLaneColors(5, 200, 80) — attention(200°) → moe(280°)
   const MVP_PIPELINE_KEY = {
     attention: 0,
     norm:      1,
@@ -74,7 +94,7 @@
   // Lazily computed once injectPillDefs runs (needs getLaneColors from colormap.js)
   let _mvpLaneColors = null;
   function mvpLaneColors() {
-    if (!_mvpLaneColors) _mvpLaneColors = getLaneColors(5, 220, 40);
+    if (!_mvpLaneColors) _mvpLaneColors = getLaneColors(5, 200, 80);
     return _mvpLaneColors;
   }
 
@@ -155,7 +175,8 @@
   }
 
   function inferStage(id) {
-    if (id.startsWith('attention_')) return 'attention';
+    if (id.startsWith('attention_') || id.startsWith('mla_') ||
+        id.startsWith('lightning_') || id.startsWith('sparse_')) return 'attention';
     if (id.startsWith('ffn_'))       return 'ffn';
     if (id.startsWith('moe_'))       return 'moe';
     return null;
@@ -258,7 +279,7 @@
       buttonSign: {
         refX: 0,
         refY: 0,
-        stroke: MUTED,
+        stroke: "#ffffff",
         strokeWidth: 1.2,
         strokeLinecap: "square",
       },
@@ -269,6 +290,7 @@
     selectedLayerId: 0,
     expanded: {},
     modelVersion: "v3",
+    viewMode: "structure",
   };
 
   let renderScheduled = false;
@@ -362,6 +384,38 @@
 
   function isDense(layer) {
     return layer.block_type === "dense_ffn";
+  }
+
+  function inParallelView() {
+    return state.viewMode === "parallel";
+  }
+
+  function swatchColor(kind) {
+    if (kind === "tp") return TP_COLOR;
+    if (kind === "ep") return EP_COLOR;
+    if (kind === "collective") return COLLECTIVE_COLOR;
+    return LOCAL_COLOR;
+  }
+
+  function getParallelGroupMeta(key) {
+    return parallelView.groups?.[key] || null;
+  }
+
+  function getAttentionGroupMeta() {
+    return getParallelGroupMeta(state.modelVersion === "v3_2" ? "v3_2_attention" : "attention");
+  }
+
+  function getFeedforwardGroupMeta(layer) {
+    return getParallelGroupMeta(isDense(layer) ? "dense_ffn" : "moe_ffn");
+  }
+
+  function groupTitle(baseTitle, meta) {
+    if (!inParallelView() || !meta?.badge) return baseTitle;
+    return `${baseTitle} · ${meta.badge}`;
+  }
+
+  function summaryTitle(baseTitle) {
+    return inParallelView() ? `${baseTitle} · local` : baseTitle;
   }
 
   function getSelectedLayer() {
@@ -540,6 +594,18 @@
     });
   }
 
+  function parallelFusionNode(id, title, x, y, stage, details, options) {
+    return fusionNode(id, title, x, y, {
+      ...options,
+      stage,
+      details,
+    });
+  }
+
+  function collectiveNode(id, title, x, y, width) {
+    return rectNode(id, title, x, y, width || 164, 32, "parallel-collective");
+  }
+
   function addNode(id, x, y) {
     return circleNode(id, "+", x, y, 28);
   }
@@ -633,20 +699,16 @@
       moe_combine: ["Weighted combine", "Merge routed + shared"]
     },
     v3_2: {
-      attention_q_compress: ["Dq projection"],
-      attention_q_norm: ["RMSNorm Cq", "Dynamic quant", "Write q_norm"],
-      attention_q_expand: ["Read q_norm", "Dequant", "UQ projection"],
-      attention_q_split: ["UK projection", "Split q_nope", "Split q_rope"],
-      attention_kv_compress: ["DKV projection"],
-      attention_kv_split1: ["Split KV latent", "Split KR preimage"],
-      attention_kv_norm: ["RMSNorm Ckv"],
-      attention_kv_fp8_quant: ["FP8 quantize KV", "Dequant for compute", "Write kv_cache + pe_cache"],
-      attention_kv_cache_update: ["Write kv_cache"],
-      attention_kr_rope: ["KR projection", "RoPE", "Write kr_cache"],
-      attention_idx_topk: ["fp8_index QK matmul", "Add attention mask", "Top-k select"],
-      attention_rope_compose: ["Gather top-k KV", "Apply RoPE (Q_PE + K_PE)", "Assemble Q (noPE + PE)", "Assemble K (noPE + PE)"],
-      attention_sparse_attn: ["Sparse QK matmul", "Softmax", "Score × V matmul", "Output projection"],
+      // ── V3.2 EXP official operators (L3 level) ───────────────────────────
+      // mla_prolog_quant          → uses buildMlaPrologL4 (builder set in fusionNode options)
+      // lightning_indexer_prolog  → uses buildIndexerPrologL4 (builder set in fusionNode options)
+      lightning_indexer: ["QK matmul (int8×int8)", "ReLU gate", "W weighted sum", "Top-k select"],
+      sparse_flash_attention_quant: [
+        "Gather top-k KV", "Apply RoPE (Q_PE + K_PE)", "Assemble Q / K",
+        "Sparse QK matmul", "Softmax", "Score × V",
+      ],
       attention_out_projection: ["Project to hidden size"],
+      // ── FFN / MoE (unchanged) ─────────────────────────────────────────────
       ffn_gate_projection: ["Linear gate projection"],
       ffn_up_projection: ["Linear up projection"],
       ffn_swiglu: ["SiLU", "Elementwise multiply"],
@@ -657,7 +719,7 @@
       moe_dispatch: ["Token scatter", "Expert batch build"],
       moe_routed_experts: ["Gate projection", "Up projection", "SwiGLU", "Down projection"],
       moe_shared_experts: ["Shared gate projection", "Shared up projection", "SwiGLU", "Down projection"],
-      moe_combine: ["Weighted combine", "Merge routed + shared"]
+      moe_combine: ["Weighted combine", "Merge routed + shared"],
     }
   };
 
@@ -690,52 +752,103 @@
     const pathOriginY = originY + labelH + labelGap;
 
     const labels = [
-      rectNode(parentId + "__label_q", "Query", leftX, originY, columnWidth, labelH, "detail-label"),
-      rectNode(parentId + "__label_w", "Weight", middleX, originY, columnWidth, labelH, "detail-label"),
-      rectNode(parentId + "__label_k", "Key", rightX, originY, columnWidth, labelH, "detail-label"),
+      rectNode(parentId + "__label_q", "Query",  leftX,   originY, columnWidth, labelH, "detail-label"),
+      rectNode(parentId + "__label_k", "Key",    middleX, originY, columnWidth, labelH, "detail-label"),
+      rectNode(parentId + "__label_w", "Weight", rightX,  originY, columnWidth, labelH, "detail-label"),
     ];
 
     const queryPath = stackDetailNodes(parentId, "idx_q", leftX, pathOriginY, [
-      "Q matmul",
+      "Q-Linear (INT8×INT8)",
       "Dequant",
-      "Split",
-      "RoPE",
+      "Split q_rope / q_nope",
+      "RoPE (rope_3d)",
       "Concat",
       "Hadamard",
-      "Quant",
-      "Write Q",
+      "Quant (INT8)",
+      "Write q_int8 / q_scale",
     ], columnWidth, stage);
-    const weightPath = stackDetailNodes(parentId, "idx_w", middleX, pathOriginY, [
-      "Read x",
-      "W proj",
-      "Scale",
-      "Write W",
-    ], columnWidth, stage);
-    const keyPath = stackDetailNodes(parentId, "idx_k", rightX, pathOriginY, [
-      "Read x",
-      "K matmul",
+    const keyPath = stackDetailNodes(parentId, "idx_k", middleX, pathOriginY, [
+      "K-Linear (BF16)",
       "LayerNorm",
-      "Split",
-      "RoPE",
+      "Split k_rope / k_nope",
+      "RoPE (quant_rope_2d)",
       "Concat",
       "Hadamard",
-      "Quant",
-      "Write K",
+      "Quant (INT8)",
+      "scatter_update k_cache",
+    ], columnWidth, stage);
+    const weightPath = stackDetailNodes(parentId, "idx_w", rightX, pathOriginY, [
+      "W-Linear (BF16)",
+      "Scale ÷ √(h_n·h_d)",
+      "Cast FP16",
+      "Write weights",
     ], columnWidth, stage);
 
-    const nodes = [...labels, ...queryPath.nodes, ...weightPath.nodes, ...keyPath.nodes];
-    const edges = [...queryPath.edges, ...weightPath.edges, ...keyPath.edges];
+    const nodes = [...labels, ...queryPath.nodes, ...keyPath.nodes, ...weightPath.nodes];
+    const edges = [...queryPath.edges, ...keyPath.edges, ...weightPath.edges];
     // Three paths are parallel (no fan-in merge edges); exitPoint is a virtual bottom anchor only
-    const bottomY = Math.max(queryPath.bottom, weightPath.bottom, keyPath.bottom) + L4_GAP;
+    const bottomY = Math.max(queryPath.bottom, keyPath.bottom, weightPath.bottom) + L4_GAP;
     const exitPoint = point(centerX, bottomY);
 
     return {
       nodes,
       edges,
       height: exitPoint.y - originY,
-      entryPoints: [queryPath.firstNode, weightPath.firstNode, keyPath.firstNode]
+      entryPoints: [queryPath.firstNode, keyPath.firstNode, weightPath.firstNode]
         .filter(Boolean)
         .map((node) => anchor(node, "top")),
+      exitPoint,
+    };
+  }
+
+  function buildMlaPrologL4(parentId, centerX, originY, width, stage) {
+    const labelH = 16;
+    const labelGap = 10;
+    const columnGap = 10;
+    const columnWidth = Math.floor((width - columnGap) / 2);
+    const contentWidth = columnWidth * 2 + columnGap;
+    const leftX = centerX - Math.round(contentWidth / 2);
+    const rightX = leftX + columnWidth + columnGap;
+    const pathOriginY = originY + labelH + labelGap;
+
+    const labels = [
+      rectNode(parentId + "__label_q",  "Query",      leftX,  originY, columnWidth, labelH, "detail-label"),
+      rectNode(parentId + "__label_kv", "Key / Value", rightX, originY, columnWidth, labelH, "detail-label"),
+    ];
+
+    const queryPath = stackDetailNodes(parentId, "mla_q", leftX, pathOriginY, [
+      "Dq projection",
+      "RMSNorm Cq",
+      "Dynamic quant",
+      "Write q_norm",
+      "UQ projection",
+      "UK projection",
+      "QR projection",
+      "Split q_nope / q_rope",
+    ], columnWidth, stage);
+
+    const kvPath = stackDetailNodes(parentId, "mla_kv", rightX, pathOriginY, [
+      "DKV + KR projection",
+      "RMSNorm Ckv",
+      "FP8 quantize KV",
+      "Write kv_cache",
+      "KR projection",
+      "RoPE",
+      "Write kr_cache",
+    ], columnWidth, stage);
+
+    const nodes = [...labels, ...queryPath.nodes, ...kvPath.nodes];
+    const edges = [...queryPath.edges, ...kvPath.edges];
+    const bottomY = Math.max(queryPath.bottom, kvPath.bottom) + L4_GAP;
+    const exitPoint = point(centerX, bottomY);
+
+    return {
+      nodes,
+      edges,
+      height: exitPoint.y - originY,
+      entryPoints: [queryPath.firstNode, kvPath.firstNode]
+        .filter(Boolean)
+        .map((n) => anchor(n, "top")),
       exitPoint,
     };
   }
@@ -965,6 +1078,226 @@
     };
   }
 
+  function buildAttentionParallelCluster(centerX, originY) {
+    const colPad = 24;
+    const colGap = L2_W - 2 * L3_W - 2 * colPad;
+    const leftX = centerX - L2_W / 2 + colPad;
+    const rightX = leftX + L3_W + colGap;
+    const centerNodeX = centerX - L3_W / 2;
+
+    const qShard = parallelFusionNode(
+      "attention_q_tp",
+      "Q expand · Col TP",
+      leftX,
+      originY,
+      "attention",
+      ["Query projection weights are column-sharded.", "Each rank keeps a slice of attention heads."]
+    );
+    const kvShard = parallelFusionNode(
+      "attention_kv_tp",
+      "KV expand · Col TP",
+      rightX,
+      originY,
+      "attention",
+      ["KV expansion stays sharded across the same TP group.", "KV cache is written from each rank's local shard."]
+    );
+    const localCoreY = Math.max(nodeBottom(qShard), nodeBottom(kvShard)) + L3_BRANCH_GAP;
+    const localCore = parallelFusionNode(
+      "attention_local_core",
+      "Local heads attention",
+      centerNodeX,
+      localCoreY,
+      "attention",
+      ["Attention scores and value aggregation run on per-rank head slices.", "No extra topology is expanded in v1."]
+    );
+    const outProjection = parallelFusionNode(
+      "attention_out_tp",
+      "O projection · Row TP",
+      centerNodeX,
+      nodeBottom(localCore) + L3_CENTER_GAP,
+      "attention",
+      ["Output projection consumes sharded input rows.", "Final hidden state must be reduced across ranks."]
+    );
+    const collective = collectiveNode(
+      "attention_all_reduce",
+      "AllReduce hidden",
+      centerX - 82,
+      nodeBottom(outProjection) + L3_CENTER_GAP,
+      164
+    );
+    const fanInY = localCore.y - Math.round(L3_BRANCH_GAP / 2);
+
+    const nodes = [qShard, kvShard, localCore, outProjection, collective];
+    const edges = [
+      edgeFromTo("detail", qShard, "bottom", localCore, "top", [
+        point(anchor(qShard, "bottom").x, fanInY),
+        point(anchor(localCore, "top").x, fanInY),
+      ]),
+      edgeFromTo("detail", kvShard, "bottom", localCore, "top", [
+        point(anchor(kvShard, "bottom").x, fanInY),
+        point(anchor(localCore, "top").x, fanInY),
+      ]),
+      edgeFromTo("detail", localCore, "bottom", outProjection, "top"),
+      edgeFromTo("collective", outProjection, "bottom", collective, "top"),
+    ];
+
+    const bounds = measureBounds(nodes);
+    return {
+      nodes,
+      edges,
+      height: bounds.height,
+      entryNodes: [qShard, kvShard],
+      exitNode: collective,
+    };
+  }
+
+  function buildDenseParallelCluster(centerX, originY) {
+    const colPad = 24;
+    const colGap = L2_W - 2 * L3_W - 2 * colPad;
+    const leftX = centerX - L2_W / 2 + colPad;
+    const rightX = leftX + L3_W + colGap;
+    const centerNodeX = centerX - L3_W / 2;
+
+    const gateProjection = parallelFusionNode(
+      "ffn_gate_tp",
+      "W1 · Col TP",
+      leftX,
+      originY,
+      "ffn",
+      ["Gate projection is column-parallel over intermediate width.", "Each rank computes a partial activation slice."]
+    );
+    const upProjection = parallelFusionNode(
+      "ffn_up_tp",
+      "W3 · Col TP",
+      rightX,
+      originY,
+      "ffn",
+      ["Up projection follows the same TP partition as W1.", "Local outputs stay sharded before activation."]
+    );
+    const swigluY = Math.max(nodeBottom(gateProjection), nodeBottom(upProjection)) + L3_BRANCH_GAP;
+    const localSwiGLU = parallelFusionNode(
+      "ffn_local_swiglu",
+      "Local SwiGLU",
+      centerNodeX,
+      swigluY,
+      "ffn",
+      ["Elementwise SiLU and multiply stay rank-local.", "No collective is needed before W2."]
+    );
+    const downProjection = parallelFusionNode(
+      "ffn_down_tp",
+      "W2 · Row TP",
+      centerNodeX,
+      nodeBottom(localSwiGLU) + L3_CENTER_GAP,
+      "ffn",
+      ["Row-parallel output projection consumes sharded intermediate rows.", "Hidden output is reduced across the TP group."]
+    );
+    const collective = collectiveNode(
+      "ffn_all_reduce",
+      "AllReduce hidden",
+      centerX - 82,
+      nodeBottom(downProjection) + L3_CENTER_GAP,
+      164
+    );
+    const fanInY = localSwiGLU.y - Math.round(L3_BRANCH_GAP / 2);
+
+    const nodes = [gateProjection, upProjection, localSwiGLU, downProjection, collective];
+    const edges = [
+      edgeFromTo("detail", gateProjection, "bottom", localSwiGLU, "top", [
+        point(anchor(gateProjection, "bottom").x, fanInY),
+        point(anchor(localSwiGLU, "top").x, fanInY),
+      ]),
+      edgeFromTo("detail", upProjection, "bottom", localSwiGLU, "top", [
+        point(anchor(upProjection, "bottom").x, fanInY),
+        point(anchor(localSwiGLU, "top").x, fanInY),
+      ]),
+      edgeFromTo("detail", localSwiGLU, "bottom", downProjection, "top"),
+      edgeFromTo("collective", downProjection, "bottom", collective, "top"),
+    ];
+
+    const bounds = measureBounds(nodes);
+    return {
+      nodes,
+      edges,
+      height: bounds.height,
+      entryNodes: [gateProjection, upProjection],
+      exitNode: collective,
+    };
+  }
+
+  function buildMoeParallelCluster(centerX, originY) {
+    const colPad = 24;
+    const colGap = L2_W - 2 * L3_W - 2 * colPad;
+    const leftX = centerX - L2_W / 2 + colPad;
+    const rightX = leftX + L3_W + colGap;
+    const centerNodeX = centerX - L3_W / 2;
+
+    const router = parallelFusionNode(
+      "moe_router_parallel",
+      "Router + Top-k",
+      centerNodeX,
+      originY,
+      "moe",
+      ["Router scores tokens and selects top-k experts.", "Selection happens before token dispatch to expert ranks."]
+    );
+    const dispatch = parallelFusionNode(
+      "moe_dispatch_parallel",
+      "Dispatch · EP",
+      centerNodeX,
+      nodeBottom(router) + L3_GAP,
+      "moe",
+      ["Tokens are bucketed by expert id.", "Each rank receives the subset for its local experts."]
+    );
+    const branchY = nodeBottom(dispatch) + L3_BRANCH_GAP;
+    const localExperts = parallelFusionNode(
+      "moe_local_experts_parallel",
+      "Local experts · EP",
+      leftX,
+      branchY,
+      "moe",
+      ["Only a slice of routed experts resides on each rank.", "Activated tokens execute on local expert weights only."]
+    );
+    const sharedExperts = parallelFusionNode(
+      "moe_shared_tp_parallel",
+      "Shared experts · TP",
+      rightX,
+      branchY,
+      "moe",
+      ["Shared branch behaves like a TP MLP.", "W1/W3 are column-parallel; W2 is row-parallel."]
+    );
+    const merge = collectiveNode(
+      "moe_merge_parallel",
+      "AllReduce + merge",
+      centerX - 92,
+      Math.max(nodeBottom(localExperts), nodeBottom(sharedExperts)) + L3_BRANCH_GAP,
+      184
+    );
+    const dispatchFanY = branchY - Math.round(L3_BRANCH_GAP / 2);
+
+    const nodes = [router, dispatch, localExperts, sharedExperts, merge];
+    const edges = [
+      edgeFromTo("detail", router, "bottom", dispatch, "top"),
+      edgeFromTo("detail", dispatch, "bottom", localExperts, "top", [
+        point(anchor(dispatch, "bottom").x, dispatchFanY),
+        point(anchor(localExperts, "top").x, dispatchFanY),
+      ]),
+      edgeFromTo("detail", dispatch, "bottom", sharedExperts, "top", [
+        point(anchor(dispatch, "bottom").x, dispatchFanY),
+        point(anchor(sharedExperts, "top").x, dispatchFanY),
+      ]),
+      edgeFromTo("collective", localExperts, "bottom", merge, "top"),
+      edgeFromTo("collective", sharedExperts, "bottom", merge, "top"),
+    ];
+
+    const bounds = measureBounds(nodes);
+    return {
+      nodes,
+      edges,
+      height: bounds.height,
+      entryNodes: [router],
+      exitNode: merge,
+    };
+  }
+
   function buildExpandableGroup(id, title, key, x, y, expanded, builder, stage) {
     const centerX = x + L2_W / 2;
     const clusterOriginY = y + L2_H + L2_TOP_PAD;
@@ -1026,7 +1359,7 @@
 
     if (spec.variant === "io") {
       return {
-        fill: 'url(#mvp-grad-default)',
+        fill: '#BBBBBB',
         stroke: 'rgba(255,255,255,0.20)',
         strokeWidth: 1,
         rx: PILL_RX,
@@ -1129,6 +1462,19 @@
       };
     }
 
+    if (spec.variant === "parallel-collective") {
+      return {
+        fill: "rgba(255,156,58,0.16)",
+        stroke: COLLECTIVE_COLOR,
+        strokeWidth: 1.2,
+        rx: 10,
+        ry: 10,
+        fontSize: 11,
+        fontWeight: 700,
+        textFill: "#ffd7aa",
+      };
+    }
+
     if (spec.variant === "strip") {
       return {
         fill: BG,
@@ -1172,6 +1518,8 @@
           stroke:      spec.stroke ?? style.stroke,
           filter:      spec.filter ?? style.filter,
           strokeWidth: style.strokeWidth,
+          strokeDasharray: "none",
+          strokeLinejoin: "round",
           rx: style.rx,
           ry: style.ry,
           cursor: clickable ? "pointer" : "default",
@@ -1229,12 +1577,13 @@
     const vertices = rest.slice(0, -1);
     const isMain = spec.kind === "main";
     const isOperatorDetail = spec.kind === "operator-detail";
+    const isCollective = spec.kind === "collective";
 
     return graph.addEdge({
       source,
       target,
       vertices,
-      zIndex: isMain ? 10 : isOperatorDetail ? 19 : 8,
+      zIndex: isMain ? 10 : isOperatorDetail ? 19 : isCollective ? 16 : 8,
       connector: {
         name: "rounded",
         args: {
@@ -1243,11 +1592,12 @@
       },
       attrs: {
         line: {
-          stroke: '#BBBBBB',
-          strokeWidth: isMain ? 1.7 : 1.15,
+          stroke: isCollective ? COLLECTIVE_COLOR : '#BBBBBB',
+          strokeWidth: isMain ? 1.7 : isCollective ? 1.35 : 1.15,
+          strokeDasharray: isCollective ? "8 5" : "none",
           targetMarker: {
             name: "classic",
-            size: 7,
+            size: isCollective ? 8 : 7,
           },
         },
       },
@@ -1343,82 +1693,57 @@
 
   // ── V3.2 cluster builders ────────────────────────────────────────────────
 
-  function buildAttentionClusterV32(centerX, originY) {
-    const colPad = 20;
-    const colGap = L2_W - 2 * L3_W - 2 * colPad;
-    const leftX       = centerX - L2_W / 2 + colPad;
-    const rightX      = leftX + L3_W + colGap;
+  function buildAttentionParallelClusterV32(centerX, originY) {
     const centerNodeX = centerX - L3_W / 2;
-    const idxColumnGap = 10;
-    const idxPrologW   = 3 * L4_W + 2 * idxColumnGap + 2 * L3_X_PAD;  // 538: 3×L4_W columns fit exactly
-    const qColumn = stackFusionNodes(leftX, originY, [
-      { id: "attention_q_compress", title: "Q compress" },
-      { id: "attention_q_norm", title: "Q RMSNorm + quant" },
-      { id: "attention_q_expand", title: "Q expand" },
-      { id: "attention_q_split", title: "Q split" },
-    ], L3_GAP);
-    const kvColumn = stackFusionNodes(rightX, originY, [
-      { id: "attention_kv_compress", title: "KV compress" },
-      { id: "attention_kv_split1", title: "KV split" },
-      { id: "attention_kv_norm", title: "KV RMSNorm" },
-      { id: "attention_kv_fp8_quant", title: "FP8 KV quant" },
-      { id: "attention_kv_cache_update", title: "KV cache update" },
-      { id: "attention_kr_rope", title: "KR RoPE + cache" },
-    ], L3_GAP);
-    const [qCompress, qNorm, qExpand, qSplit] = qColumn.nodes;
-    const [kvCompress, kvSplit1, kvNorm, kvFp8Quant, kvCacheUpdate, krRope] = kvColumn.nodes;
-    const idxProlog = fusionNode(
-      "attention_idx_prolog",
-      "Indexer prolog + quant",
-      centerNodeX - Math.round((idxPrologW - L3_W) / 2),
-      Math.max(qColumn.bottom, kvColumn.bottom) + L3_BRANCH_GAP,
-      {
-        w: idxPrologW,
-        builder: buildIndexerPrologL4,
-      }
+    const prologWidth = 286;
+    const prologX = centerX - prologWidth / 2;
+
+    const mlaProlog = parallelFusionNode(
+      "mla_prolog_parallel",
+      "MLA Prolog · TP",
+      prologX,
+      originY,
+      "attention",
+      ["Query / KV preparation stays shard-aware before attention.", "Per-rank prolog writes local cache slices."]
     );
-    const idxTopk = fusionNode("attention_idx_topk", "Lightning Indexer Top-K", centerNodeX, nodeBottom(idxProlog) + L3_CENTER_GAP);
-    const ropeCompose = fusionNode("attention_rope_compose", "RoPE + Q/K assemble", centerNodeX, Math.max(nodeBottom(qSplit), nodeBottom(idxTopk)) + L3_BRANCH_GAP);
-    const sparseAttn = fusionNode("attention_sparse_attn", "Selected sparse attn", centerNodeX, nodeBottom(ropeCompose) + L3_CENTER_GAP);
-    const outProjection = fusionNode("attention_out_projection", "O projection", centerNodeX, nodeBottom(sparseAttn) + L3_CENTER_GAP);
-    const idxFanY = idxProlog.y - Math.round(L3_BRANCH_GAP / 2);
-    const qBranchX = anchor(qNorm, "right").x + 24;
-    const ropeFanY = ropeCompose.y - Math.round(L3_BRANCH_GAP / 2);
+    const indexer = parallelFusionNode(
+      "lightning_indexer_parallel",
+      "Lightning Indexer · local",
+      centerNodeX,
+      nodeBottom(mlaProlog) + L3_CENTER_GAP,
+      "attention",
+      ["Indexer top-k selection is shown as local compute in v1.", "Sequence sparsity is not expanded into SP / CP topology yet."]
+    );
+    const sparseAttention = parallelFusionNode(
+      "sparse_flash_attention_parallel",
+      "Sparse Flash Attention · local",
+      centerNodeX,
+      nodeBottom(indexer) + L3_CENTER_GAP,
+      "attention",
+      ["Attention runs on each rank's local head / cache shards.", "Cross-rank sequence routing is intentionally out of scope for v1."]
+    );
+    const outProjection = parallelFusionNode(
+      "attention_out_parallel_v32",
+      "O projection · Row TP",
+      centerNodeX,
+      nodeBottom(sparseAttention) + L3_CENTER_GAP,
+      "attention",
+      ["Output projection gathers contributions from row-parallel slices.", "Hidden state is reduced after projection."]
+    );
+    const collective = collectiveNode(
+      "attention_all_reduce_v32",
+      "AllReduce hidden",
+      centerX - 82,
+      nodeBottom(outProjection) + L3_CENTER_GAP,
+      164
+    );
 
-    const nodes = [
-      qCompress, qNorm, qExpand, qSplit,
-      kvCompress, kvSplit1, kvNorm, kvFp8Quant, kvCacheUpdate, krRope,
-      idxProlog, idxTopk,
-      ropeCompose, sparseAttn, outProjection,
-    ];
-
+    const nodes = [mlaProlog, indexer, sparseAttention, outProjection, collective];
     const edges = [
-      // Q chain
-      edgeFromTo("detail", qCompress, "bottom", qNorm, "top"),
-      edgeFromTo("detail", qNorm, "bottom", qExpand, "top"),
-      edgeFromTo("detail", qExpand, "bottom", qSplit, "top"),
-      // KV chain
-      edgeFromTo("detail", kvCompress, "bottom", kvSplit1, "top"),
-      edgeFromTo("detail", kvSplit1, "bottom", kvNorm, "top"),
-      edgeFromTo("detail", kvNorm, "bottom", kvFp8Quant, "top"),
-      edgeFromTo("detail", kvFp8Quant, "bottom", kvCacheUpdate, "top"),
-      edgeFromTo("detail", kvCacheUpdate, "bottom", krRope, "top"),
-      // qNorm.right → idxProlog: passes qr (Q low-rank normed) to Indexer; Indexer also reads x internally
-      edgeSpec("detail", [
-        anchor(qNorm, "right"),
-        point(qBranchX, anchor(qNorm, "right").y),
-        point(qBranchX, idxFanY),
-        point(anchor(idxProlog, "top").x, idxFanY),
-        anchor(idxProlog, "top"),
-      ]),
-      edgeFromTo("detail", idxProlog, "bottom", idxTopk, "top"),
-      edgeFromTo("detail", qSplit, "bottom", ropeCompose, "top", [
-        point(anchor(qSplit, "bottom").x, ropeFanY),
-        point(anchor(ropeCompose, "top").x, ropeFanY),
-      ]),
-      edgeFromTo("detail", idxTopk, "bottom", ropeCompose, "top"),
-      edgeFromTo("detail", ropeCompose, "bottom", sparseAttn, "top"),
-      edgeFromTo("detail", sparseAttn, "bottom", outProjection, "top"),
+      edgeFromTo("detail", mlaProlog, "bottom", indexer, "top"),
+      edgeFromTo("detail", indexer, "bottom", sparseAttention, "top"),
+      edgeFromTo("detail", sparseAttention, "bottom", outProjection, "top"),
+      edgeFromTo("collective", outProjection, "bottom", collective, "top"),
     ];
 
     const bounds = measureBounds(nodes);
@@ -1426,13 +1751,128 @@
       nodes,
       edges,
       height: bounds.height,
-      entryNodes: [qCompress, kvCompress],
-      exitNode: outProjection,
+      entryNodes: [mlaProlog],
+      exitNode: collective,
+    };
+  }
+
+  function buildAttentionClusterV32(centerX, originY) {
+    const idxColumnGap = 10;
+    const idxPrologW   = 3 * L4_W + 2 * idxColumnGap + 2 * L3_X_PAD;  // 538: inner 470 = 3×L4_W cols
+    const wideX        = centerX - Math.round(idxPrologW / 2);
+    const centerNodeX  = centerX - L3_W / 2;
+
+    // ── Block 1: MLA Prolog (mla_prolog_quant) ────────────────────────────
+    const mlaPrologNode = fusionNode(
+      "mla_prolog_quant", "MLA Prolog",
+      wideX, originY,
+      { w: idxPrologW, builder: buildMlaPrologL4, stage: 'attention' }
+    );
+
+    // ── Block 2: Lightning Indexer Prolog ─────────────────────────────────
+    const idxPrologY = nodeBottom(mlaPrologNode) + L3_CENTER_GAP;
+    const idxPrologNode = fusionNode(
+      "lightning_indexer_prolog_quant", "Lightning Indexer Prolog",
+      wideX, idxPrologY,
+      { w: idxPrologW, builder: buildIndexerPrologL4, stage: 'attention' }
+    );
+
+    // ── Fusion annotation: dashed frame spanning blocks 1+2 ───────────────
+    // Represents mla_indexer_prolog_quant (pipeline-parallel fusion of the two)
+    const fusionPad    = 12;
+    const fusionPadTop = 22;  // extra headroom for label at top inside frame
+    const fusionX   = wideX - fusionPad;
+    const fusionTop = originY - fusionPadTop;
+    const fusionW   = idxPrologW + 2 * fusionPad;
+    const fusionH   = nodeBottom(idxPrologNode) + fusionPad - fusionTop;
+    const fusionAnnotation = groupNode(
+      "mla_indexer_prolog_quant", "mla_indexer_prolog_quant",
+      fusionX, fusionTop, fusionW,
+      {
+        collapsible: false,
+        collapsedHeight: fusionH,
+        expandedHeight: fusionH,
+        fill: "none",
+        stroke: "rgba(255,255,255,0.18)",
+        strokeWidth: 1,
+        dashed: true,
+        radius: PILL_RX,
+        fontSize: 10,
+        fontWeight: 400,
+        showLabel: true,
+        labelY: 7,
+        children: [],
+        edges: [],
+        zIndex: 5,
+      }
+    );
+
+    // ── Block 3: Lightning Indexer (lightning_indexer) ────────────────────
+    const lightningIdxY  = nodeBottom(idxPrologNode) + L3_BRANCH_GAP;
+    const lightningIdxNode = fusionNode(
+      "lightning_indexer", "Lightning Indexer",
+      centerNodeX, lightningIdxY,
+      { stage: 'attention' }
+    );
+
+    // ── Block 4: Sparse Flash Attention (sparse_flash_attention_quant) ────
+    const sparseAttnY  = nodeBottom(lightningIdxNode) + L3_CENTER_GAP;
+    const sparseAttnNode = fusionNode(
+      "sparse_flash_attention_quant", "Sparse Flash Attention",
+      centerNodeX, sparseAttnY,
+      { stage: 'attention' }
+    );
+
+    // ── antiquant variant badge ───────────────────────────────────────────
+    const badgeY = nodeBottom(sparseAttnNode) + 4;
+    const antiquantBadge = rectNode(
+      "sparse_attn_antiquant_badge", "· sparse_attention_antiquant  (存8算16 优化变体)",
+      centerNodeX, badgeY, L3_W, 14, "annotation"
+    );
+
+    // ── Block 5: Output projection ────────────────────────────────────────
+    const outProjY   = badgeY + 14 + L3_CENTER_GAP;
+    const outProjNode = fusionNode(
+      "attention_out_projection", "O projection",
+      centerNodeX, outProjY,
+      { stage: 'attention' }
+    );
+
+    // ── Edges ─────────────────────────────────────────────────────────────
+    const bypassX = wideX + idxPrologW + 24;
+    const edges = [
+      // Main sequential chain
+      edgeFromTo("detail", mlaPrologNode,   "bottom", idxPrologNode,   "top"),
+      edgeFromTo("detail", idxPrologNode,   "bottom", lightningIdxNode, "top"),
+      edgeFromTo("detail", lightningIdxNode, "bottom", sparseAttnNode,  "top"),
+      edgeFromTo("detail", sparseAttnNode,  "bottom", outProjNode,     "top"),
+      // Bypass: mla_prolog q_nope/q_rope → sparse_flash_attention (right-side route)
+      edgeSpec("detail", [
+        point(wideX + idxPrologW, originY + L3_H / 2),
+        point(bypassX,            originY + L3_H / 2),
+        point(bypassX,            sparseAttnY + L3_H / 2),
+        point(centerNodeX + L3_W, sparseAttnY + L3_H / 2),
+      ]),
+    ];
+
+    const contentNodes = [mlaPrologNode, idxPrologNode, lightningIdxNode, sparseAttnNode, outProjNode];
+    return {
+      nodes: [fusionAnnotation, ...contentNodes, antiquantBadge],
+      edges,
+      height: nodeBottom(outProjNode) - originY,
+      entryNodes: [mlaPrologNode],
+      exitNode: outProjNode,
     };
   }
 
   function buildSceneV32(layer) {
     ensureExpanded(layer);
+    const attentionMeta = getAttentionGroupMeta();
+    const feedforwardMeta = getFeedforwardGroupMeta(layer);
+    const attentionBuilder = inParallelView() ? buildAttentionParallelClusterV32 : buildAttentionClusterV32;
+    const feedforwardBuilder = inParallelView()
+      ? (isDense(layer) ? buildDenseParallelCluster : buildMoeParallelCluster)
+      : (isDense(layer) ? buildDenseCluster : buildMoeCluster);
 
     const frameX = 144;
     const frameY = 88;
@@ -1475,36 +1915,36 @@
     );
 
     // V3.2 uses fused residual norm: attn_norm(x, residual) returns (normed, residual)
-    refs.inputNorm = summaryNode("input_norm", "RMSNorm (fused residual)", groupX, cursorY, 'norm');
+    refs.inputNorm = summaryNode("input_norm", summaryTitle("RMSNorm (fused residual)"), groupX, cursorY, 'norm');
     children.push(refs.inputNorm);
     cursorY += L1_H + rowGap;
 
     refs.attention = buildExpandableGroup(
       "attention_group",
-      "MLA + Lightning Indexer",
+      groupTitle("MLA + Lightning Indexer", attentionMeta),
       "attention",
       groupX,
       cursorY,
       state.expanded.attention,
-      buildAttentionClusterV32,
+      attentionBuilder,
       'attention'
     );
     children.push(refs.attention);
     cursorY += refs.attention.h + rowGap;
 
     // V3.2 fuses residual add into ffn_norm — show as a single fused norm node
-    refs.postNorm = summaryNode("post_norm", "RMSNorm (fused residual)", groupX, cursorY, 'norm');
+    refs.postNorm = summaryNode("post_norm", summaryTitle("RMSNorm (fused residual)"), groupX, cursorY, 'norm');
     children.push(refs.postNorm);
     cursorY += L1_H + rowGap;
 
     refs.feedforward = buildExpandableGroup(
       "feedforward_group",
-      isDense(layer) ? "Feed-Forward" : "MoE Feed-Forward",
+      groupTitle(isDense(layer) ? "Feed-Forward" : "MoE Feed-Forward", feedforwardMeta),
       "feedforward",
       groupX,
       cursorY,
       state.expanded.feedforward,
-      isDense(layer) ? buildDenseCluster : buildMoeCluster,
+      feedforwardBuilder,
       isDense(layer) ? 'ffn' : 'moe'
     );
     children.push(refs.feedforward);
@@ -1561,6 +2001,12 @@
 
   function buildScene(layer) {
     ensureExpanded(layer);
+    const attentionMeta = getAttentionGroupMeta();
+    const feedforwardMeta = getFeedforwardGroupMeta(layer);
+    const attentionBuilder = inParallelView() ? buildAttentionParallelCluster : buildAttentionCluster;
+    const feedforwardBuilder = inParallelView()
+      ? (isDense(layer) ? buildDenseParallelCluster : buildMoeParallelCluster)
+      : (isDense(layer) ? buildDenseCluster : buildMoeCluster);
 
     const frameX = 144;
     const frameY = 88;
@@ -1603,18 +2049,18 @@
       })
     );
 
-    refs.inputNorm = summaryNode("input_norm", "RMSNorm", groupX, cursorY, 'norm');
+    refs.inputNorm = summaryNode("input_norm", summaryTitle("RMSNorm"), groupX, cursorY, 'norm');
     children.push(refs.inputNorm);
     cursorY += L1_H + rowGap;
 
     refs.attention = buildExpandableGroup(
       "attention_group",
-      "Attention",
+      groupTitle("Attention", attentionMeta),
       "attention",
       groupX,
       cursorY,
       state.expanded.attention,
-      buildAttentionCluster,
+      attentionBuilder,
       'attention'
     );
     children.push(refs.attention);
@@ -1624,18 +2070,18 @@
     children.push(refs.addAttention);
     cursorY += 28 + rowGap;
 
-    refs.postNorm = summaryNode("post_norm", "RMSNorm", groupX, cursorY, 'norm');
+    refs.postNorm = summaryNode("post_norm", summaryTitle("RMSNorm"), groupX, cursorY, 'norm');
     children.push(refs.postNorm);
     cursorY += L1_H + rowGap;
 
     refs.feedforward = buildExpandableGroup(
       "feedforward_group",
-      isDense(layer) ? "Feed-Forward" : "MoE Feed-Forward",
+      groupTitle(isDense(layer) ? "Feed-Forward" : "MoE Feed-Forward", feedforwardMeta),
       "feedforward",
       groupX,
       cursorY,
       state.expanded.feedforward,
-      isDense(layer) ? buildDenseCluster : buildMoeCluster,
+      feedforwardBuilder,
       isDense(layer) ? 'ffn' : 'moe'
     );
     children.push(refs.feedforward);
@@ -1713,6 +2159,7 @@
 
   function render(resetView) {
     const layer = getSelectedLayer();
+    updateToolbarUi();
     const scene = state.modelVersion === "v3_2" ? buildSceneV32(layer) : buildScene(layer);
 
     clearGraph();
@@ -1797,11 +2244,91 @@
     });
   });
 
+  function renderViewPanel() {
+    const layer = getSelectedLayer();
+    const structureItems = [
+      {
+        kind: "local",
+        label: "Layer Skeleton",
+        description: "保持 L1 → L4 的模型结构递进，强调算子组织与数据路径。",
+      },
+      {
+        kind: "tp",
+        label: "Stage Colors",
+        description: "Attention / FFN / MoE 继续沿用语义色带，方便和其他页面保持一致。",
+      },
+    ];
+    const parallelItems = [
+      {
+        kind: "tp",
+        label: getAttentionGroupMeta()?.badge || "TP",
+        description: getAttentionGroupMeta()?.summary || "",
+      },
+      {
+        kind: isDense(layer) ? "tp" : "ep",
+        label: getFeedforwardGroupMeta(layer)?.badge || (isDense(layer) ? "TP" : "EP + TP"),
+        description: getFeedforwardGroupMeta(layer)?.summary || "",
+      },
+      ...(parallelView.legend || []),
+    ];
+    const items = inParallelView() ? parallelItems : structureItems;
+
+    if (viewPanelTitle) {
+      viewPanelTitle.textContent = inParallelView() ? "并行视图" : "结构视图";
+    }
+    if (viewPanelNote) {
+      viewPanelNote.textContent = inParallelView()
+        ? "保留 L1/L2 骨架，只在 L3/L4 局部切换为 TP / EP / Collective 语义布局。"
+        : "按模型层级展开算子结构，优先解释模块组成与计算流。";
+    }
+    if (viewLegend) {
+      viewLegend.className = inParallelView() ? "view-summary-list" : "view-legend";
+      viewLegend.innerHTML = items.map((item) => [
+        `<div class="${inParallelView() ? "view-summary-item" : "view-legend-item"}">`,
+        `  <span class="view-swatch" style="background:${swatchColor(item.kind)}"></span>`,
+        '  <span class="view-copy">',
+        `    <strong>${item.label}</strong>`,
+        `    <span>${item.description}</span>`,
+        "  </span>",
+        "</div>",
+      ].join("")).join("");
+    }
+  }
+
+  function updateGraphTitle() {
+    if (!graphTitleEl) return;
+    const modelLabel = state.modelVersion === "v3_2" ? "DeepSeek V3.2" : "DeepSeek V3";
+    const modeLabel = inParallelView() ? "并行视图" : "模型架构";
+    graphTitleEl.textContent = `${modelLabel} · ${modeLabel}`;
+  }
+
   function updateVersionPicker() {
     const v3Btn = document.getElementById("btn-v3");
     const v32Btn = document.getElementById("btn-v3_2");
     if (v3Btn) v3Btn.classList.toggle("active", state.modelVersion === "v3");
     if (v32Btn) v32Btn.classList.toggle("active", state.modelVersion === "v3_2");
+  }
+
+  function updateViewPicker() {
+    const structureBtn = document.getElementById("btn-structure");
+    const parallelBtn = document.getElementById("btn-parallel");
+    if (structureBtn) {
+      const active = state.viewMode === "structure";
+      structureBtn.classList.toggle("active", active);
+      structureBtn.setAttribute("aria-selected", active ? "true" : "false");
+    }
+    if (parallelBtn) {
+      const active = state.viewMode === "parallel";
+      parallelBtn.classList.toggle("active", active);
+      parallelBtn.setAttribute("aria-selected", active ? "true" : "false");
+    }
+  }
+
+  function updateToolbarUi() {
+    updateVersionPicker();
+    updateViewPicker();
+    updateGraphTitle();
+    renderViewPanel();
   }
 
   document.getElementById("btn-v3").addEventListener("click", () => {
@@ -1810,7 +2337,7 @@
       attention: state.expanded.attention,
       feedforward: state.expanded.feedforward,
     });
-    updateVersionPicker();
+    updateToolbarUi();
     scheduleRender(true);
   });
 
@@ -1820,11 +2347,26 @@
       attention: state.expanded.attention,
       feedforward: state.expanded.feedforward,
     });
-    updateVersionPicker();
+    updateToolbarUi();
+    scheduleRender(true);
+  });
+
+  document.getElementById("btn-structure").addEventListener("click", () => {
+    if (state.viewMode === "structure") return;
+    state.viewMode = "structure";
+    updateToolbarUi();
+    scheduleRender(true);
+  });
+
+  document.getElementById("btn-parallel").addEventListener("click", () => {
+    if (state.viewMode === "parallel") return;
+    state.viewMode = "parallel";
+    updateToolbarUi();
     scheduleRender(true);
   });
 
   setDefaultExpanded(data.layers[0]);
   injectPillDefs();
+  updateToolbarUi();
   render(true);
 })();

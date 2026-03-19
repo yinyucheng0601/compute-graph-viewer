@@ -5,6 +5,41 @@
 
 ---
 
+## v0.8 — 2026-03-13
+
+**主题：V3.2 Attention 集群重构为五个官方 PyPTO 算子**
+
+### `mvp/app.js`
+
+- **L4_H 44→36**：L4 细粒度节点高度减小，容纳更多算子不撑高画布
+- **`inferStage` 扩展**：新增 `mla_*` / `lightning_*` / `sparse_*` 前缀映射到 `attention` stage
+- **`buildAttentionClusterV32` 重构**：将原 10 个 Q/KV 细粒度 L3 节点 + 5 个中轴节点，重构为对应官方算子的 5 个 L3 块：
+  - `mla_prolog_quant`（宽块，双列 L4）— 替换原 qColumn × 4 + kvColumn × 6
+  - `lightning_indexer_prolog_quant`（宽块，3 列 L4）— 替换原 `attention_idx_prolog`
+  - `lightning_indexer`（标准 L3）— 替换原 `attention_idx_topk`
+  - `sparse_flash_attention_quant`（标准 L3，L4 展开 6 步）— 合并原 `rope_compose + sparse_attn`
+  - `attention_out_projection`（标准 L3，保持不变）
+- **`mla_indexer_prolog_quant` 融合标注**：虚线框环绕 mla_prolog + indexer_prolog 两块，表示可被此融合算子替代（流水并行）；标签定位在框底部 93%
+- **Bypass 连线**：从 `mla_prolog_quant` 右侧引出，绕过 indexer 路径直连 `sparse_flash_attention_quant`，表示 q_nope / q_rope 的直接数据流
+- **`sparse_attention_antiquant` 注解**：在 `sparse_flash_attention_quant` 下方添加 annotation 标注（存8算16 优化变体），无额外节点
+- **新增 `buildMlaPrologL4`**：双列 L4 builder（Query 路 8 步 | KV 路 7 步），类比现有 `buildIndexerPrologL4`
+- **更新 `L4_DETAILS.v3_2`**：移除已不作为 L3 顶层节点的旧 `attention_*` 键，新增 `lightning_indexer` / `sparse_flash_attention_quant` 的 L4 子步骤
+
+**层级关系**（数据来源：`deepseek_v32_exp/README.md`）：
+```
+L1: MLA + Lightning Indexer
+└── L2: 展开
+    ├── [mla_prolog_quant]             L3  →  L4: Q/KV 双路
+    ├── [lightning_indexer_prolog_quant] L3  →  L4: Q/W/K 三列
+    ├── ╌╌ mla_indexer_prolog_quant ╌╌  融合标注（虚线框，非节点）
+    ├── [lightning_indexer]            L3  →  L4: Top-k 流程
+    ├── [sparse_flash_attention_quant] L3  →  L4: gather+RoPE+attn
+    │    · sparse_attention_antiquant (注解)
+    └── [attention_out_projection]     L3
+```
+
+---
+
 ## v0.7 — 2026-03-12
 
 **主题：MVP Pill 视觉细节修复**

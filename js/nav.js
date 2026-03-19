@@ -2,6 +2,15 @@
  * nav.js — Inline pass navigator for index.html
  */
 (function () {
+  const PTO_BASE_PREFIX = typeof window.PTO_BASE_PREFIX === 'string' ? window.PTO_BASE_PREFIX : '';
+  const PTO_PASS_IR_ENTRY = typeof window.PTO_PASS_IR_ENTRY === 'string'
+    ? window.PTO_PASS_IR_ENTRY
+    : `${PTO_BASE_PREFIX}pass-ir/index.html`;
+
+  function ptoUrl(path) {
+    return `${PTO_BASE_PREFIX}${path}`;
+  }
+
   // ── DOM ──────────────────────────────────────────────────────────────────
   const navBar = document.getElementById('navBar');
   const navTimeline = document.getElementById('navTimeline');
@@ -53,7 +62,7 @@
       'Block/Execute': '#D8B900',
     };
 
-    fetch('nav_index.json')
+    fetch(ptoUrl('nav_index.json'))
       .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
       .then(data => { legacyIndex = data; buildLegacyTimeline(); })
       .catch(() => {
@@ -215,14 +224,14 @@
 
     openBtn?.addEventListener('click', () => {
       const f = openBtn.dataset.file;
-      if (f) window.open('index.html?file=' + encodeURIComponent(f), '_blank');
+      if (f) window.open(`${PTO_PASS_IR_ENTRY}?file=` + encodeURIComponent(f), '_blank');
     });
 
     detailContent.style.display = 'none';
     detailEmpty.style.display = 'flex';
   }
 
-  // Support both legacy nav.html and inline navigator in index.html.
+  // Support both standalone navigator fallback and inline navigator in pass-ir/index.html.
   if (!navBar || !navTimeline || !navPassWrap || !navPathWrap || !navSideWrap || !navSnapWrap) {
     initLegacyNavigator();
     return;
@@ -356,7 +365,7 @@
   window.navSelectPath = selectPath;
 
   // ── Initial load ─────────────────────────────────────────────────────────
-  fetch('nav_index.json')
+  fetch(ptoUrl('nav_index.json'))
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(data => setNavIndex(data, { sourceLabel: data.base_path }))
     .catch(() => { /* optional navigator; keep hidden without index */ });
