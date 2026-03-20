@@ -36,6 +36,42 @@
     barElements: new Map(),
     laneHeights: new Map(),
   };
+  const builtinSamples = window.SWIMLANE_BUILTIN_SAMPLES || {};
+
+  function normalizeBuiltinSampleKey(value) {
+    return String(value || '')
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^\.\/+/, '')
+      .replace(/^\/+/, '')
+      .replace(/^swimlane\//, '');
+  }
+
+  function listBuiltinSamples() {
+    return Object.values(builtinSamples).filter((sample) => sample && sample.data);
+  }
+
+  function getBuiltinSample(file) {
+    const samples = listBuiltinSamples();
+    if (!samples.length) return null;
+
+    const normalized = normalizeBuiltinSampleKey(file);
+    if (!normalized) return builtinSamples.defaultSample || samples[0];
+
+    return samples.find((sample) => {
+      const candidates = [sample.key, sample.name]
+        .map(normalizeBuiltinSampleKey)
+        .filter(Boolean);
+      return candidates.includes(normalized) || candidates.some((candidate) => normalized.endsWith(`/${candidate}`));
+    }) || null;
+  }
+
+  async function loadBuiltinSample(file) {
+    const sample = getBuiltinSample(file);
+    if (!sample) return false;
+    await loadFromObject(sample.data, sample.name || 'builtin-swimlane.json');
+    return true;
+  }
 
   function laneMetrics(threadKind, lineCount) {
     if (threadKind === 0) {
@@ -83,6 +119,28 @@
     return match ? match[1] : 'unknown';
   }
 
+  const categoricalPalette = [
+    '#7b61ff',
+    '#00a6fb',
+    '#00c48c',
+    '#ffb020',
+    '#ff647c',
+    '#a46bff',
+    '#2dd4bf',
+    '#f97316',
+    '#22c55e',
+    '#eab308'
+  ];
+
+  function stableHash(input) {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+      hash ^= input.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
   function colorForLabel(label) {
     const fixed = {
       'Prolog-Quant': '#9b6bde',
@@ -98,13 +156,18 @@
       'unknown': '#5c6370'
     };
     if (fixed[label]) return fixed[label];
-    let hash = 0;
+
     const input = String(label);
-    for (let i = 0; i < input.length; i += 1) {
-      hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+    const subGraphMatch = input.match(/^subGraph_(\d+)$/i);
+    if (subGraphMatch) {
+      return categoricalPalette[Number(subGraphMatch[1]) % categoricalPalette.length];
     }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue} 54% 56%)`;
+
+    const hash = stableHash(input);
+    const hue = Math.round((hash * 0.61803398875) % 360);
+    const saturation = 56 + (hash % 14);
+    const lightness = 50 + (Math.floor(hash / 17) % 10);
+    return `hsl(${hue} ${saturation}% ${lightness}%)`;
   }
 
   function formatNumber(num) {
@@ -235,6 +298,9 @@
         const end = Number(task?.execEnd) || ts;
         const subGraphId = task?.subGraphId ?? 'unknown';
         const taskId = task?.taskId ?? taskIndex;
+        const explicitLabel = task?.semanticLabel || task?.label || task?.taskLabel;
+        const label = String(explicitLabel || `subGraph_${subGraphId}`);
+        const explicitName = task?.taskName || task?.name || task?.rawName;
         return {
           id: `${threadName}-${taskId}-${taskIndex}`,
           pid: 0,
@@ -245,8 +311,8 @@
           threadKey: `${laneIndex}`,
           threadName,
           processName: 'Machine View',
-          rawName: `subGraph_${subGraphId} · task_${taskId}`,
-          label: `subGraph_${subGraphId}`,
+          rawName: String(explicitName || `${label} · task_${taskId}`),
+          label,
           line: 0,
         };
       }) : [];
@@ -494,6 +560,8 @@
   }
 
   async function loadFromQueryFile(file) {
+    if (await loadBuiltinSample(file)) return;
+
     const text = await new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', file);
@@ -563,14 +631,34 @@
 
     try {
       if (action === 'open-file') {
-        const loaded = await loadFromSessionStorage();
+        let loaded = false;
+        try {
+          loaded = await loadFromSessionStorage();
+        } catch (error) {
+          console.error(error);
+        }
+        if (!loaded) {
+          loaded = await loadBuiltinSample();
+        }
         if (!loaded) {
           fileMeta.textContent = '没有找到来自 Launcher 的本地文件内容，请重新选择。';
         }
         return;
       }
       if (file) {
-        await loadFromQueryFile(file);
+        try {
+          await loadFromQueryFile(file);
+        } catch (error) {
+          console.error(error);
+          const loaded = await loadBuiltinSample();
+          if (!loaded) throw error;
+        }
+        return;
+      }
+
+      const loaded = await loadBuiltinSample();
+      if (!loaded) {
+        fileMeta.textContent = '没有找到内置泳道样例，请选择本地文件。';
         return;
       }
     } catch (error) {
