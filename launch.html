@@ -203,12 +203,33 @@ body {
   background: #0e0f14;
 }
 
-.card-frame-body iframe {
+.card-frame-body iframe,
+.card-frame-body img {
   width: 100%;
   height: 100%;
-  border: none;
   display: block;
+}
+
+.card-frame-body iframe {
+  border: none;
   pointer-events: none;
+}
+
+.card-frame-body img {
+  object-fit: cover;
+  object-position: top center;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.card-poster--scaled-half {
+  transform: scale(0.72);
+  transform-origin: center center;
+}
+
+.card-poster--contain {
+  object-fit: contain !important;
+  object-position: center center;
 }
 
 .card-split-overlay {
@@ -318,7 +339,7 @@ body {
         <h2 class="card-title">模型算子层级架构图</h2>
       </div>
       <div class="card-frame-body">
-        <iframe src="model-architecture/index.html?embed" scrolling="no" tabindex="-1" title="模型算子层级架构图预览"></iframe>
+        <img class="card-poster--contain card-poster--scaled-half" src="assets/card1_deepseekv3.svg" alt="模型算子层级架构图静态预览" loading="lazy" decoding="async">
         <div class="card-split-overlay">
           <a class="card-split-btn" href="model-architecture/index.html">层级架构图</a>
           <a class="card-split-btn card-split-btn--alt" href="graph-prototype-lab/index.html">图结构实验室</a>
@@ -340,7 +361,7 @@ body {
         <h2 class="card-title">Swimlane 执行视图</h2>
       </div>
       <div class="card-frame-body">
-        <iframe src="swimlane/index.html?preview=1" scrolling="no" tabindex="-1" title="Swimlane 执行视图预览"></iframe>
+        <img src="assets/card3_swimlane.png" alt="Swimlane 执行视图静态预览" loading="lazy" decoding="async">
       </div>
     </article>
 
@@ -349,93 +370,11 @@ body {
         <h2 class="card-title">图执行叠加原型</h2>
       </div>
       <div class="card-frame-body">
-        <iframe src="indexer-exec/index.html?preview=1" scrolling="no" tabindex="-1" title="图执行叠加原型预览"></iframe>
+        <img class="card-poster--contain" src="assets/card4.png" alt="图执行叠加原型静态预览" loading="lazy" decoding="async">
       </div>
     </article>
 
   </section>
 </main>
-<script>
-(function () {
-  const openProjectFolderBtn = document.getElementById('openProjectFolderBtn');
-  const BRIDGE_DB = 'pto-launch-bridge';
-  const BRIDGE_STORE = 'pending-dir-handles';
-
-  function openBridgeDb() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(BRIDGE_DB, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(BRIDGE_STORE)) {
-          db.createObjectStore(BRIDGE_STORE);
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  async function saveDirHandle(handle) {
-    const token = `dir_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const db = await openBridgeDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(BRIDGE_STORE, 'readwrite');
-      tx.objectStore(BRIDGE_STORE).put(handle, token);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-    db.close();
-    return token;
-  }
-
-  async function openFolderFromLauncher() {
-    if (!window.showDirectoryPicker) {
-      location.href = 'pass-ir/index.html?action=open-folder';
-      return;
-    }
-    try {
-      const dirHandle = await window.showDirectoryPicker({ id: 'pto-pass-folder' });
-      const token = await saveDirHandle(dirHandle);
-      location.href = `pass-ir/index.html?action=consume-folder&token=${encodeURIComponent(token)}`;
-    } catch (err) {
-      if (err?.name !== 'AbortError') {
-        console.error('Launch folder picker failed:', err);
-        alert('Failed to open folder picker.');
-      }
-    }
-  }
-
-  openProjectFolderBtn?.addEventListener('click', openFolderFromLauncher);
-
-  const openSwimFileBtn = document.getElementById('openSwimFileBtn');
-  const swimFileInput = document.getElementById('swimFileInput');
-
-  openSwimFileBtn?.addEventListener('click', () => {
-    swimFileInput?.click();
-  });
-
-  swimFileInput?.addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const text = await file.text();
-        sessionStorage.setItem('swimSelectedFile', JSON.stringify({
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified
-        }));
-        sessionStorage.setItem('swimSelectedFileText', text);
-        location.href = 'swimlane/index.html?action=open-file';
-      } catch (err) {
-        console.error('Failed to read swimlane file:', err);
-        alert('Failed to read the selected .json file.');
-      }
-    }
-    swimFileInput.value = '';
-  });
-})();
-</script>
 </body>
 </html>
