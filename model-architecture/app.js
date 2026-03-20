@@ -98,6 +98,21 @@
     return _mvpLaneColors;
   }
 
+  // IndexerProlog column colors — matches computation graph PIPE hues
+  const IDX_COL_SPEC = {
+    idx_query:  { h: 215/360, s: 0.72, l: 0.50 },
+    idx_key:    { h: 265/360, s: 0.68, l: 0.50 },
+    idx_weight: { h: 145/360, s: 0.65, l: 0.50 },
+  };
+  function getIdxColColors(stage) {
+    const spec = IDX_COL_SPEC[stage];
+    if (!spec) return null;
+    const solid = hslToHex(spec);
+    const dark  = darkenHex(solid);
+    const { r, g, b } = hexToRgb(solid);
+    return { solid, dark, grad: `url(#mvp-grad-${stage})`, bg: `rgba(${r},${g},${b},0.20)`, stroke: 'rgba(255,255,255,0.20)' };
+  }
+
   function darkenHex(hex) {
     const { r, g, b } = hexToRgb(hex);
     const h = v => Math.round(v * 0.75).toString(16).padStart(2, '0');
@@ -105,6 +120,7 @@
   }
 
   function getPipelineColors(stage) {
+    if (IDX_COL_SPEC[stage]) return getIdxColColors(stage);
     const idx = MVP_PIPELINE_KEY[stage];
     if (idx == null) return null;
     const solid = mvpLaneColors()[idx];
@@ -154,9 +170,10 @@
     filt.appendChild(fds);
     defs.appendChild(filt);
 
-    // Per-stage gradients (blue arc) + default
+    // Per-stage gradients (blue arc) + default + idx column colors
     const gradEntries = [
       ...Object.keys(MVP_PIPELINE_KEY).map(stage => ({ id: `mvp-grad-${stage}`, solid: getPipelineColors(stage).solid })),
+      ...Object.keys(IDX_COL_SPEC).map(stage => ({ id: `mvp-grad-${stage}`, solid: getIdxColColors(stage).solid })),
       { id: 'mvp-grad-default', solid: mvpLaneColors()[0] },
     ];
     gradEntries.forEach(({ id, solid }) => {
@@ -202,7 +219,7 @@
 
       if (meta.pipelineColors) {
         this.attr("body", {
-          fill:   target ? meta.pipelineColors.grad : meta.pipelineColors.bg,
+          fill:   target ? meta.pipelineColors.grad : 'rgba(255,255,255,0.05)',
           filter: target ? PILL_FILTER : "none",
         });
       }
@@ -286,10 +303,11 @@
     },
   });
 
+  const _urlParams = new URLSearchParams(location.search);
   const state = {
     selectedLayerId: 0,
     expanded: {},
-    modelVersion: "v3",
+    modelVersion: _urlParams.get("model") === "v3_2" ? "v3_2" : "v3",
     viewMode: "structure",
   };
 
@@ -766,7 +784,7 @@
       "Hadamard",
       "Quant (INT8)",
       "Write q_int8 / q_scale",
-    ], columnWidth, stage);
+    ], columnWidth, 'idx_query');
     const keyPath = stackDetailNodes(parentId, "idx_k", middleX, pathOriginY, [
       "K-Linear (BF16)",
       "LayerNorm",
@@ -776,13 +794,13 @@
       "Hadamard",
       "Quant (INT8)",
       "scatter_update k_cache",
-    ], columnWidth, stage);
+    ], columnWidth, 'idx_key');
     const weightPath = stackDetailNodes(parentId, "idx_w", rightX, pathOriginY, [
       "W-Linear (BF16)",
       "Scale ÷ √(h_n·h_d)",
       "Cast FP16",
       "Write weights",
-    ], columnWidth, stage);
+    ], columnWidth, 'idx_weight');
 
     const nodes = [...labels, ...queryPath.nodes, ...keyPath.nodes, ...weightPath.nodes];
     const edges = [...queryPath.edges, ...keyPath.edges, ...weightPath.edges];
@@ -893,7 +911,7 @@
       collapsed: !expanded,
       collapsedHeight: L3_H,
       expandedHeight,
-      fill:        expanded ? pc.bg : pc.grad,
+      fill:        expanded ? 'rgba(255,255,255,0.05)' : pc.grad,
       stroke:      pc.stroke,
       strokeWidth: 1,
       radius:      PILL_RX,
@@ -1327,7 +1345,7 @@
       collapsed: !expanded,
       collapsedHeight: L2_H,
       expandedHeight,
-      fill:        expanded ? pc.bg : pc.grad,
+      fill:        expanded ? 'rgba(255,255,255,0.05)' : pc.grad,
       stroke:      pc.stroke,
       radius:      PILL_RX,
       children:    expanded ? cluster.nodes : [],
@@ -1359,8 +1377,8 @@
 
     if (spec.variant === "io") {
       return {
-        fill: '#BBBBBB',
-        stroke: 'rgba(255,255,255,0.20)',
+        fill: '#2A2A2A',
+        stroke: 'rgba(255,255,255,0.10)',
         strokeWidth: 1,
         rx: PILL_RX,
         ry: PILL_RX,

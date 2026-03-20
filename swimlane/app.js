@@ -128,13 +128,55 @@
     return 10 * power;
   }
 
-  function parseSwimlane(raw) {
+  function finalizeLaneTasks(lanes) {
+    let minTs = Infinity;
+    let maxTs = -Infinity;
+
+    lanes.forEach((lane) => {
+      lane.tasks.sort((a, b) => a.ts - b.ts || a.end - b.end);
+      const lineEnds = [];
+      lane.tasks.forEach((task) => {
+        let line = lineEnds.findIndex((value) => task.ts >= value);
+        if (line < 0) {
+          line = lineEnds.length;
+          lineEnds.push(task.end);
+        } else {
+          lineEnds[line] = task.end;
+        }
+        task.line = line;
+        minTs = Math.min(minTs, task.ts);
+        maxTs = Math.max(maxTs, task.end);
+      });
+      lane.taskCount = lane.tasks.length;
+      lane.lineCount = Math.max(1, lineEnds.length);
+    });
+
+    const sortedLanes = lanes.sort((a, b) => {
+      return laneRank(a.threadName) - laneRank(b.threadName) || laneNumber(a.threadName) - laneNumber(b.threadName);
+    });
+
+    const stats = {
+      fake: sortedLanes.filter((lane) => lane.threadKind === 0).length,
+      aic: sortedLanes.filter((lane) => lane.threadKind === 1).length,
+      aiv: sortedLanes.filter((lane) => lane.threadKind === 2).length,
+      aicpu: sortedLanes.filter((lane) => lane.threadKind === 3).length,
+      totalLanes: sortedLanes.length,
+      totalTasks: sortedLanes.reduce((sum, lane) => sum + lane.taskCount, 0)
+    };
+
+    if (!Number.isFinite(minTs) || !Number.isFinite(maxTs) || maxTs <= minTs) {
+      minTs = 0;
+      maxTs = 1;
+    }
+
+    return { lanes: sortedLanes, stats, minTs, maxTs, span: maxTs - minTs };
+  }
+
+  function parseTraceEventSwimlane(raw) {
     const traceEvents = Array.isArray(raw?.traceEvents) ? raw.traceEvents : [];
     const processNames = new Map();
     const threadNames = new Map();
     const grouped = new Map();
-    let minTs = Infinity;
-    let maxTs = -Infinity;
 
     traceEvents.forEach((event) => {
       if (event?.name === 'process_name' && event.args?.name) {
@@ -170,53 +212,59 @@
         line: 0
       };
 
-      minTs = Math.min(minTs, event.ts);
-      maxTs = Math.max(maxTs, end);
-
       if (!grouped.has(threadName)) grouped.set(threadName, []);
       grouped.get(threadName).push(task);
     });
 
     const lanes = [...grouped.entries()].map(([threadName, tasks]) => {
-      tasks.sort((a, b) => a.ts - b.ts || a.end - b.end);
-      const lineEnds = [];
-      tasks.forEach((task) => {
-        let line = lineEnds.findIndex((value) => task.ts >= value);
-        if (line < 0) {
-          line = lineEnds.length;
-          lineEnds.push(task.end);
-        } else {
-          lineEnds[line] = task.end;
-        }
-        task.line = line;
-      });
+      return {
+        threadName,
+        threadKind: laneRank(threadName),
+        tasks
+      };
+    });
+
+    return finalizeLaneTasks(lanes);
+  }
+
+  function parseCoreTaskSwimlane(raw) {
+    const lanes = raw.map((entry, laneIndex) => {
+      const threadName = String(entry?.coreType || `Core_${laneIndex}`);
+      const tasks = Array.isArray(entry?.tasks) ? entry.tasks.map((task, taskIndex) => {
+        const ts = Number(task?.execStart) || 0;
+        const end = Number(task?.execEnd) || ts;
+        const subGraphId = task?.subGraphId ?? 'unknown';
+        const taskId = task?.taskId ?? taskIndex;
+        return {
+          id: `${threadName}-${taskId}-${taskIndex}`,
+          pid: 0,
+          tid: laneIndex,
+          ts,
+          dur: Math.max(0, end - ts),
+          end,
+          threadKey: `${laneIndex}`,
+          threadName,
+          processName: 'Machine View',
+          rawName: `subGraph_${subGraphId} · task_${taskId}`,
+          label: `subGraph_${subGraphId}`,
+          line: 0,
+        };
+      }) : [];
 
       return {
         threadName,
         threadKind: laneRank(threadName),
-        taskCount: tasks.length,
-        lineCount: Math.max(1, lineEnds.length),
-        tasks
+        tasks,
       };
-    }).sort((a, b) => {
-      return laneRank(a.threadName) - laneRank(b.threadName) || laneNumber(a.threadName) - laneNumber(b.threadName);
     });
 
-    const stats = {
-      fake: lanes.filter((lane) => lane.threadKind === 0).length,
-      aic: lanes.filter((lane) => lane.threadKind === 1).length,
-      aiv: lanes.filter((lane) => lane.threadKind === 2).length,
-      aicpu: lanes.filter((lane) => lane.threadKind === 3).length,
-      totalLanes: lanes.length,
-      totalTasks: lanes.reduce((sum, lane) => sum + lane.taskCount, 0)
-    };
+    return finalizeLaneTasks(lanes);
+  }
 
-    if (!Number.isFinite(minTs) || !Number.isFinite(maxTs) || maxTs <= minTs) {
-      minTs = 0;
-      maxTs = 1;
-    }
-
-    return { lanes, stats, minTs, maxTs, span: maxTs - minTs };
+  function parseSwimlane(raw) {
+    if (Array.isArray(raw)) return parseCoreTaskSwimlane(raw);
+    if (Array.isArray(raw?.traceEvents)) return parseTraceEventSwimlane(raw);
+    throw new Error('Unsupported swimlane json format.');
   }
 
   function renderSummary() {

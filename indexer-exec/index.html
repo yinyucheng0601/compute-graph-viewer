@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IndexerPrologQuant — Execution Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+body { background: #111215; }
+
+/* ── Root shell ── */
+.eg-root {
+  width: 100%; height: 100vh;
+  background: #111215;
+  display: flex; flex-direction: column; overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Toolbar ── */
+.eg-toolbar {
+  background: rgba(14, 15, 19, 0.97) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+.eg-toolbar .home-link { color: rgba(255,255,255,0.45); }
+.eg-toolbar .home-link:hover { color: rgba(255,255,255,0.88); }
+.eg-title {
+  font-size: 13px; font-weight: 700; color: #F1F5F9;
+  letter-spacing: -0.02em;
+  font-family: 'JetBrains Mono', monospace;
+}
+.eg-badge {
+  font-size: 8px; color: #334155;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 2px 8px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.eg-meta {
+  font-size: 8px; color: #1E293B;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Main layout ── */
+.eg-main { flex: 1; display: flex; min-height: 0; overflow: hidden; position: relative; }
+
+/* ── Left panel ── */
+.eg-left {
+  position: relative;
+  flex-shrink: 0;
+  width: 520px;
+  min-width: 520px;
+  display: flex;
+  flex-direction: column;
+  background: #0c0e13;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  transition: width 0.22s cubic-bezier(.4,0,.2,1), min-width 0.22s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.eg-left.collapsed {
+  width: 28px !important;
+  min-width: 28px !important;
+}
+.eg-left iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  min-height: 0;
+  display: block;
+  transition: opacity 0.15s;
+}
+.eg-left.collapsed iframe {
+  visibility: hidden;
+  opacity: 0;
+}
+.eg-left-label {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #334155;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', monospace;
+}
+.eg-left.collapsed .eg-left-label { display: block; }
+.eg-left-toggle {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 22px;
+  height: 44px;
+  background: #161b26;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 0 6px 6px 0;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: color 0.12s, background 0.12s;
+  padding: 0;
+}
+.eg-left-toggle:hover { color: #94A3B8; background: #1e2535; }
+
+/* ── Canvas ── */
+.eg-canvas {
+  flex: 1; overflow: auto; position: relative;
+  background: #111215;
+}
+.eg-dot-grid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.07) 0.8px, transparent 0.8px);
+  background-size: 20px 20px; pointer-events: none;
+}
+
+/* ── Footer ── */
+.eg-footer {
+  height: 40px; min-height: 40px;
+  background: rgba(12, 16, 24, 0.97);
+  border-top: 1px solid #1A2030;
+  display: flex; align-items: center; padding: 0 14px; gap: 8px;
+}
+.eg-ctrl {
+  background: none; border: 1px solid #1E293B; color: #64748B;
+  font-size: 13px; cursor: pointer; padding: 3px 7px; border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: border-color 0.12s, color 0.12s;
+}
+.eg-ctrl:hover { border-color: #334155; color: #94A3B8; }
+
+/* ── pass-ir node overrides: compact sizing for dense DAG ── */
+.eg-root.pass-ir-page .node-card {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: #313135;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.40);
+  overflow: hidden;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+.eg-root.pass-ir-page .node-card:hover {
+  border-color: rgba(148, 163, 184, 0.32);
+  background: #363639;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+.eg-root.pass-ir-page .node-card.selected {
+  background: #3A3A3E;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45), 0 0 0 1.5px var(--node-accent, #4A8BF4);
+}
+
+/* node-head: compact */
+.eg-root .node-head { padding: 5px 8px 3px; gap: 4px; border-bottom: none; }
+.eg-root .node-tag { padding: 1px 5px; font-size: 9px; border-radius: 4px; }
+
+/* op-pill: compact */
+.eg-root .op-pill {
+  margin: 3px 6px 2px;
+  padding: 5px 8px;
+  min-height: 30px;
+  gap: 5px;
+  border-radius: 40px;
+}
+.eg-root .op-pill-icon { width: 18px; height: 18px; border-radius: 9px; }
+.eg-root .op-pill-name {
+  font-size: 11px; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.eg-root .op-pill-latency {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* node-rows: compact */
+.eg-root .node-rows { padding: 3px 8px 6px; gap: 2px; }
+.eg-root .node-row { min-height: 13px; gap: 5px; }
+.eg-root .row-key { font-size: 9.5px; min-width: 30px; }
+.eg-root .row-val { font-size: 9.5px; font-family: 'JetBrains Mono', monospace; }
+
+
+/* ── Detail panel: sits on the right, bottom stops at footer ── */
+.eg-root ~ .detail-panel,
+.eg-root .detail-panel { bottom: 40px; }
+.detail-panel {
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(18, 18, 22, 0.97) !important;
+  border-left: 1px solid rgba(255,255,255,0.07) !important;
+}
+.detail-panel .detail-section-title { font-family: 'JetBrains Mono', monospace; }
+.detail-panel .detail-row-key { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; min-width: 72px; }
+.detail-panel .detail-row-val { font-family: 'JetBrains Mono', monospace; }
+.detail-panel .detail-conn-chip { font-family: 'JetBrains Mono', monospace; }
+
+/* ── Heat + progress overlays (absolute within node card) ── */
+.node-heat-bar {
+  position: absolute; bottom: 0; left: 0;
+  height: 3px; pointer-events: none;
+  border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;
+}
+.node-exec-overlay {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  pointer-events: none;
+}
+</style>
+<script src="../js/colormap.js"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+// ── Palette from colormap.js ───────────────────────────────────────────────
+const PIPE = (() => {
+  const make = (h, s) => ({
+    h:      hslToHex({ h: h/360, s, l: 0.74 }),
+    accent: hslToHex({ h: h/360, s, l: 0.58 }),
+    bg:     hslToHex({ h: h/360, s: s*0.5, l: 0.10 }),
+    dim:    hslToHex({ h: h/360, s: s*0.5, l: 0.07 }),
+  });
+  return {
+    query:  make(215, 0.72),
+    key:    make(265, 0.68),
+    weight: make(145, 0.65),
+    shared: { h: '#94A3B8', accent: '#64748B', bg: '#1C2130', dim: '#141820' },
+  };
+})();
+
+const UNIT = {
+  cube:    { border: '#8B5CF6', text: '#C4B5FD', label: 'CUBE' },
+  vector:  { border: '#3B82F6', text: '#93C5FD', label: 'VEC'  },
+  memory:  { border: '#14B8A6', text: '#5EEAD4', label: 'MEM'  },
+  scatter: { border: '#C85001', text: '#FCA98A', label: 'SCAT' },
+};
+
+function heatColor(frac) {
+  const t = Math.max(0, Math.min(1, frac));
+  return hslToHex({ h: (1 - t) * 0.611, s: 0.70 + t * 0.15, l: 0.60 - t * 0.14 });
+}
+
+// ── Node positions: w=150, h=110, y-positions scaled ~1.6× original ───────
+const NODES = [
+  // SHARED
+  { id: "reshape",    name: "Reshape Inputs", pipeline: "shared",  unit: "vector",  core: "AIV 0",
+    x: 25,   y: 496, w: 150, h: 110, start: 0.000, duration: 0.020, memR: 0,    memW: 0,
+    desc: "Reshape NZ→2D: w_qb, wk, w_proj, γ, β" },
+  // QUERY
+  { id: "q_cossin",  name: "Q:View Cos/Sin",  pipeline: "query",   unit: "vector",  core: "AIV 7",
+    x: 205,  y: 32,  w: 150, h: 110, start: 0.020, duration: 0.008, memR: 0,    memW: 0,
+    desc: "View cos/sin rope tables" },
+  { id: "q_view",    name: "Q:View Norm",     pipeline: "query",   unit: "vector",  core: "AIV 1",
+    x: 205,  y: 192, w: 150, h: 110, start: 0.020, duration: 0.010, memR: 0,    memW: 0,
+    desc: "View q_norm, q_norm_scale" },
+  { id: "q_linear",  name: "Q:Linear MatMul", pipeline: "query",   unit: "cube",    core: "AIC 0-7",
+    x: 400,  y: 192, w: 150, h: 110, start: 0.030, duration: 0.310, memR: 2048, memW: 2048,
+    desc: "8-tile Cube: q_norm × w_qb → INT32", status: "warning", tiles: 8 },
+  { id: "q_dequant", name: "Q:Dequant Scale", pipeline: "query",   unit: "vector",  core: "AIV 2-5",
+    x: 595,  y: 128, w: 150, h: 110, start: 0.345, duration: 0.065, memR: 0,    memW: 0,
+    desc: "INT32→FP32 × scales → BF16" },
+  { id: "q_split",   name: "Q:Split RoPE/NoPE",pipeline: "query",  unit: "vector",  core: "AIV 6",
+    x: 595,  y: 280, w: 150, h: 110, start: 0.412, duration: 0.015, memR: 0,    memW: 0,
+    desc: "Reshape 3D, view rope[:ropeDim] / nope[ropeDim:]" },
+  { id: "q_rope3d",  name: "Q:RoPE 3D",       pipeline: "query",   unit: "vector",  core: "AIV 8-9",
+    x: 790,  y: 80,  w: 150, h: 110, start: 0.430, duration: 0.070, memR: 0,    memW: 0,
+    desc: "rotate_half, ×cos + rot×sin" },
+  { id: "q_nope",    name: "Q:NoPE Cast",      pipeline: "query",   unit: "vector",  core: "AIV 10",
+    x: 790,  y: 240, w: 150, h: 110, start: 0.430, duration: 0.025, memR: 0,    memW: 0,
+    desc: "BF16→FP32→BF16 dtype align" },
+  { id: "q_concat",  name: "Q:Concat RoPE+NoPE",pipeline: "query", unit: "vector",  core: "AIV 11",
+    x: 985,  y: 152, w: 150, h: 110, start: 0.503, duration: 0.020, memR: 0,    memW: 0,
+    desc: "Concat [roped, nope] dim=-1" },
+  { id: "q_hadamard",name: "Q:Hadamard MatMul",pipeline: "query",   unit: "cube",    core: "AIC 0-3",
+    x: 1180, y: 112, w: 150, h: 110, start: 0.528, duration: 0.195, memR: 512,  memW: 512,
+    desc: "4-tile Cube: q × hadamard_q → BF16", tiles: 4 },
+  { id: "q_quant",   name: "Q:Quant INT8",     pipeline: "query",   unit: "vector",  core: "AIV 12-13",
+    x: 1375, y: 112, w: 150, h: 110, start: 0.726, duration: 0.060, memR: 0,    memW: 0,
+    desc: "abs→amax→scale→INT8" },
+  { id: "q_assemble",name: "Q:Assemble Output",pipeline: "query",   unit: "memory",  core: "AIV 14",
+    x: 1570, y: 112, w: 150, h: 110, start: 0.788, duration: 0.030, memR: 0,    memW: 4096,
+    desc: "Write q_int8, q_scale → out" },
+  // KEY
+  { id: "k_view",    name: "K:View X_in",      pipeline: "key",     unit: "vector",  core: "AIV 16",
+    x: 205,  y: 680, w: 150, h: 110, start: 0.020, duration: 0.010, memR: 0,    memW: 0,
+    desc: "View x_in[tIdx:t_tile, h]" },
+  { id: "k_linear",  name: "K:Linear MatMul",  pipeline: "key",     unit: "cube",    core: "AIC 8-13",
+    x: 400,  y: 680, w: 150, h: 110, start: 0.030, duration: 0.250, memR: 2048, memW: 1024,
+    desc: "6-tile Cube: x × wk → FP32", tiles: 6 },
+  { id: "k_layernorm",name:"K:LayerNorm",       pipeline: "key",     unit: "vector",  core: "AIV 17-18",
+    x: 595,  y: 680, w: 150, h: 110, start: 0.283, duration: 0.075, memR: 0,    memW: 0,
+    desc: "mean, var, normalize, γ·x+β" },
+  { id: "k_split",   name: "K:Split RoPE/NoPE",pipeline: "key",     unit: "vector",  core: "AIV 19",
+    x: 790,  y: 590, w: 150, h: 110, start: 0.360, duration: 0.012, memR: 0,    memW: 0,
+    desc: "View k_rope, k_nope" },
+  { id: "k_rope2d",  name: "K:RoPE 2D",        pipeline: "key",     unit: "vector",  core: "AIV 20",
+    x: 790,  y: 740, w: 150, h: 110, start: 0.374, duration: 0.055, memR: 0,    memW: 0,
+    desc: "rotate_half, ×cos + rot×sin (2D)" },
+  { id: "k_nope",    name: "K:NoPE Cast",       pipeline: "key",     unit: "vector",  core: "AIV 21",
+    x: 790,  y: 892, w: 150, h: 110, start: 0.374, duration: 0.020, memR: 0,    memW: 0,
+    desc: "BF16→FP32→BF16 align" },
+  { id: "k_concat",  name: "K:Concat RoPE+NoPE",pipeline: "key",    unit: "vector",  core: "AIV 22",
+    x: 985,  y: 752, w: 150, h: 110, start: 0.432, duration: 0.018, memR: 0,    memW: 0,
+    desc: "Concat [k_roped, k_nope]" },
+  { id: "k_hadamard",name: "K:Hadamard MatMul", pipeline: "key",     unit: "cube",    core: "AIC 14-16",
+    x: 1180, y: 700, w: 150, h: 110, start: 0.454, duration: 0.155, memR: 256,  memW: 256,
+    desc: "3-tile Cube: k × hadamard_k → BF16", tiles: 3 },
+  { id: "k_quant",   name: "K:Quant INT8",      pipeline: "key",     unit: "vector",  core: "AIV 23",
+    x: 1375, y: 700, w: 150, h: 110, start: 0.612, duration: 0.050, memR: 0,    memW: 0,
+    desc: "abs→amax→scale→INT8, reshape 4D" },
+  { id: "k_scatter", name: "K:Scatter Update",  pipeline: "key",     unit: "scatter", core: "AIV 24",
+    x: 1570, y: 700, w: 150, h: 110, start: 0.664, duration: 0.060, memR: 0,    memW: 8192,
+    desc: "scatter_update k_cache, k_scale" },
+  // WEIGHT
+  { id: "w_linear",  name: "W:Linear MatMul",   pipeline: "weight",  unit: "cube",    core: "AIC 17-20",
+    x: 400,  y: 970, w: 150, h: 110, start: 0.030, duration: 0.230, memR: 2048, memW: 512,
+    desc: "4-tile Cube: x × w_proj → BF16", tiles: 4 },
+  { id: "w_scale",   name: "W:Scale 1/√(h·d)",  pipeline: "weight",  unit: "vector",  core: "AIV 26-27",
+    x: 595,  y: 970, w: 150, h: 110, start: 0.263, duration: 0.045, memR: 0,    memW: 0,
+    desc: "Cast→FP32, ×scale, Cast→FP16" },
+  { id: "w_assemble",name: "W:Assemble Output", pipeline: "weight",  unit: "memory",  core: "AIV 28",
+    x: 790,  y: 1020,w: 150, h: 110, start: 0.310, duration: 0.025, memR: 0,    memW: 2048,
+    desc: "Write weights_f16 → out" },
+];
+
+const EDGES = [
+  { from: "reshape",    to: "q_view"    }, { from: "reshape",    to: "q_cossin"  },
+  { from: "reshape",    to: "k_view"    }, { from: "reshape",    to: "w_linear"  },
+  { from: "q_view",    to: "q_linear"  }, { from: "q_linear",   to: "q_dequant" },
+  { from: "q_dequant",  to: "q_split"   }, { from: "q_split",    to: "q_rope3d"  },
+  { from: "q_cossin",   to: "q_rope3d"  }, { from: "q_split",    to: "q_nope"    },
+  { from: "q_rope3d",   to: "q_concat"  }, { from: "q_nope",     to: "q_concat"  },
+  { from: "q_concat",   to: "q_hadamard"}, { from: "q_hadamard", to: "q_quant"   },
+  { from: "q_quant",    to: "q_assemble"},
+  { from: "k_view",    to: "k_linear"  }, { from: "k_linear",   to: "k_layernorm"},
+  { from: "k_layernorm",to: "k_split"  }, { from: "k_split",    to: "k_rope2d"  },
+  { from: "q_cossin",   to: "k_rope2d"  }, { from: "k_split",    to: "k_nope"    },
+  { from: "k_rope2d",   to: "k_concat"  }, { from: "k_nope",     to: "k_concat"  },
+  { from: "k_concat",   to: "k_hadamard"}, { from: "k_hadamard", to: "k_quant"   },
+  { from: "k_quant",    to: "k_scatter" },
+  { from: "k_view",    to: "w_linear"  }, { from: "w_linear",   to: "w_scale"   },
+  { from: "w_scale",    to: "w_assemble"},
+];
+
+const NODE_MAP  = {};
+NODES.forEach(n => NODE_MAP[n.id] = n);
+const TOTAL_TIME = Math.max(...NODES.map(n => n.start + n.duration));
+const MAX_DUR    = Math.max(...NODES.map(n => n.duration));
+const SVG_W = 1760, SVG_H = 1170;
+
+// ── Unit icon ──────────────────────────────────────────────────────────────
+function UnitIcon({ unit }) {
+  const props = { width: 10, height: 10, viewBox: "0 0 10 10" };
+  switch (unit) {
+    case 'cube': return (
+      <svg {...props}><rect x="1" y="1" width="4" height="4" fill="none" stroke="white" strokeWidth="1.2"/><rect x="5" y="5" width="4" height="4" fill="none" stroke="white" strokeWidth="1.2"/><line x1="3" y1="3" x2="7" y2="7" stroke="white" strokeWidth="0.8" strokeOpacity="0.6"/></svg>
+    );
+    case 'vector': return (
+      <svg {...props}><path d="M1 5h8M6 2l3 3-3 3" stroke="white" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    );
+    case 'memory': return (
+      <svg {...props}><rect x="1" y="3" width="8" height="4" rx="1" stroke="white" strokeWidth="1.2" fill="none"/><line x1="3.5" y1="3" x2="3.5" y2="7" stroke="white" strokeWidth="0.8" strokeOpacity="0.55"/><line x1="6.5" y1="3" x2="6.5" y2="7" stroke="white" strokeWidth="0.8" strokeOpacity="0.55"/></svg>
+    );
+    case 'scatter': return (
+      <svg {...props}><circle cx="2" cy="2" r="1.2" fill="white" fillOpacity="0.7"/><circle cx="8" cy="5" r="1.2" fill="white" fillOpacity="0.7"/><circle cx="3" cy="8" r="1.2" fill="white" fillOpacity="0.7"/><line x1="2" y1="2" x2="8" y2="5" stroke="white" strokeWidth="0.8" strokeOpacity="0.45"/><line x1="8" y1="5" x2="3" y2="8" stroke="white" strokeWidth="0.8" strokeOpacity="0.45"/></svg>
+    );
+    default: return null;
+  }
+}
+
+// ── NodeCard (HTML, pass-ir classes) ──────────────────────────────────────
+function NodeCard({ node, selected, hovered, onSelect, onHover, playhead, dimmed }) {
+  const pipe    = PIPE[node.pipeline];
+  const unit    = UNIT[node.unit];
+  const isSel   = selected === node.id;
+  const durFrac = node.duration / MAX_DUR;
+  const heat    = heatColor(durFrac);
+  const endTime = node.start + node.duration;
+
+  let progress = 0, execState = 'pending';
+  if (playhead !== null) {
+    if (playhead >= endTime)       { progress = 1; execState = 'done'; }
+    else if (playhead > node.start){ progress = (playhead - node.start) / node.duration; execState = 'running'; }
+  }
+
+  // Data rows: core always, then tiles or memW (max 1 extra)
+  const rows = [['core', node.core]];
+  if (node.tiles)        rows.push(['tiles', `×${node.tiles}`]);
+  else if (node.memW > 0) rows.push(['mem W', `${(node.memW/1024).toFixed(0)}K`]);
+  else if (node.memR > 0) rows.push(['mem R', `${(node.memR/1024).toFixed(0)}K`]);
+
+  return (
+    <div
+      className={`node-card node-card-op${isSel ? ' selected' : ''}`}
+      style={{
+        position: 'absolute', left: node.x, top: node.y, width: node.w,
+        '--node-accent': pipe.accent,
+        opacity: dimmed ? 0.10 : 1,
+        transition: 'opacity 0.15s ease',
+      }}
+      onClick={(e) => { e.stopPropagation(); onSelect(isSel ? null : node.id); }}
+      onMouseEnter={() => onHover(node.id)}
+      onMouseLeave={() => onHover(null)}
+    >
+      {/* Tags row */}
+      <div className="node-head">
+        <span className="node-tag" style={{ background: pipe.dim, color: pipe.h, borderColor: pipe.accent + '28' }}>
+          {node.pipeline.toUpperCase()}
+        </span>
+        <span className="node-tag" style={{ background: unit.border + '18', color: unit.text, borderColor: unit.border + '20' }}>
+          {unit.label}
+        </span>
+        {node.status === 'warning' && (
+          <span className="node-tag" style={{ background: 'rgba(69,26,3,0.25)', color: '#FBBF24', borderColor: 'rgba(146,64,14,0.35)' }}>⚠</span>
+        )}
+      </div>
+
+      {/* Op pill */}
+      <div className="op-pill">
+        <div className="op-pill-icon">
+          <UnitIcon unit={node.unit} />
+        </div>
+        <span className="op-pill-name">{node.name}</span>
+        <span className="op-pill-latency">{node.duration.toFixed(3)}ms</span>
+      </div>
+
+      {/* Data rows */}
+      <div className="node-rows">
+        {rows.map(([k, v]) => (
+          <div key={k} className="node-row">
+            <span className="row-key">{k}</span>
+            <span className="row-val">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Execution progress overlay */}
+      {playhead !== null && progress > 0 && (
+        <div className="node-exec-overlay" style={{
+          width: `${progress * 100}%`,
+          background: execState === 'running' ? pipe.accent : '#ffffff',
+          opacity: execState === 'running' ? 0.09 : 0.04,
+        }} />
+      )}
+
+      {/* Duration heat bar */}
+      <div className="node-heat-bar" style={{
+        width: `${durFrac * 100}%`, background: heat, opacity: 0.85,
+      }} />
+
+    </div>
+  );
+}
+
+// ── GraphEdge (SVG) ────────────────────────────────────────────────────────
+function GraphEdge({ edge, selected, hovered, playhead }) {
+  const from = NODE_MAP[edge.from], to = NODE_MAP[edge.to];
+  if (!from || !to) return null;
+
+  const activeId = hovered || selected;
+  const isActive = activeId && (edge.from === activeId || edge.to === activeId);
+  const edgeDone = playhead !== null && playhead >= to.start;
+
+  const x1 = from.x + from.w, y1 = from.y + from.h / 2;
+  const x2 = to.x,            y2 = to.y   + to.h   / 2;
+  const dx = x2 - x1;
+  const cp = Math.max(Math.abs(dx) * 0.45, 40);
+  const fromPipe = PIPE[from.pipeline];
+
+  const waitTime = Math.max(0, to.start - (from.start + from.duration));
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+
+  return (
+    <g>
+      <path
+        d={`M${x1},${y1} C${x1+cp},${y1} ${x2-cp},${y2} ${x2},${y2}`}
+        fill="none"
+        stroke={isActive ? fromPipe.accent : edgeDone ? '#4A5568' : '#3D5070'}
+        strokeWidth={isActive ? 1.8 : 1}
+        opacity={activeId ? (isActive ? 1 : 0.08) : 0.72}
+        markerEnd={isActive ? "url(#arrow-active)" : "url(#arrow)"}
+        strokeDasharray={from.pipeline !== to.pipeline ? "5,3" : "none"}
+      />
+      {isActive && waitTime > 0.005 && (
+        <g>
+          <rect x={mx-19} y={my-8} width={38} height={14} rx={3}
+            fill="#0A0E18" stroke="#1E293B" strokeWidth={0.5} />
+          <text x={mx} y={my+0.5} fill="#F59E0B" fontSize={7}
+            fontFamily="'JetBrains Mono',monospace" textAnchor="middle" dominantBaseline="middle">
+            +{waitTime.toFixed(2)}ms
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+// ── DetailPanel ────────────────────────────────────────────────────────────
+function DetailPanel({ nodeId, onClose, onNavigate }) {
+  const node = nodeId ? NODE_MAP[nodeId] : null;
+  if (!node) return null;
+
+  const pipe    = PIPE[node.pipeline];
+  const unit    = UNIT[node.unit];
+  const endTime = node.start + node.duration;
+  const heat    = heatColor(node.duration / MAX_DUR);
+  const deps      = EDGES.filter(e => e.to   === node.id).map(e => NODE_MAP[e.from]).filter(Boolean);
+  const consumers = EDGES.filter(e => e.from === node.id).map(e => NODE_MAP[e.to]).filter(Boolean);
+
+  const execRows = [
+    ['Start',    `${node.start.toFixed(3)} ms`],
+    ['End',      `${endTime.toFixed(3)} ms`],
+    ['Duration', `${node.duration.toFixed(3)} ms`],
+    ['% Total',  `${((node.duration/TOTAL_TIME)*100).toFixed(1)}%`],
+    ['Core',     node.core],
+    ['Unit',     node.unit.toUpperCase()],
+    ...(node.tiles  ? [['Tiles', `×${node.tiles}`]] : []),
+    ...(node.memR>0 ? [['Mem R', `${node.memR} KB`]] : []),
+    ...(node.memW>0 ? [['Mem W', `${node.memW} KB`]] : []),
+  ];
+
+  return (
+    <>
+      <div className="detail-header">
+        <span className="detail-type-badge" style={{
+          background: pipe.dim, color: pipe.h,
+          border: `1px solid ${pipe.accent}28`,
+        }}>
+          {node.pipeline.toUpperCase()}
+        </span>
+        <span className="detail-name">{node.name}</span>
+        <button className="btn detail-close" onClick={onClose}>✕</button>
+      </div>
+
+      <div className="detail-body">
+
+        {/* Execution */}
+        <div className="detail-section">
+          <div className="detail-section-title">Execution</div>
+          {execRows.map(([k, v]) => (
+            <div key={k} className="detail-row">
+              <span className="detail-row-key">{k}</span>
+              <span className="detail-row-val">{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Timeline waterfall */}
+        <div className="detail-section">
+          <div className="detail-section-title">Timeline</div>
+          <div style={{ position: 'relative', height: 14, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', height: '100%', borderRadius: 2,
+              left: `${(node.start/TOTAL_TIME)*100}%`,
+              width: `${Math.max((node.duration/TOTAL_TIME)*100, 2)}%`,
+              background: `linear-gradient(90deg, ${pipe.accent}, ${heat})`,
+            }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9.5, color: 'var(--text-label)', fontFamily: 'var(--text-mono)' }}>
+            <span>0ms</span><span>{TOTAL_TIME.toFixed(2)}ms</span>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="detail-section">
+          <div className="detail-section-title">Description</div>
+          <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', lineHeight: 1.65, fontFamily: 'var(--text-mono)' }}>
+            {node.desc}
+          </div>
+        </div>
+
+        {/* Warning */}
+        {node.status === 'warning' && (
+          <div className="detail-section">
+            <div className="detail-section-title">Diagnostics</div>
+            <div style={{ padding: '6px 8px', borderRadius: 5, background: 'rgba(69,26,3,0.22)', border: '1px solid rgba(146,64,14,0.32)', color: '#FBBF24', fontSize: 10.5, lineHeight: 1.55, fontFamily: 'var(--text-mono)' }}>
+              ⚠ Duration anomaly — tiles T3, T7 are 18% slower. L2 bank conflict on AIC 3, 7.
+            </div>
+          </div>
+        )}
+
+        {/* Depends on */}
+        {deps.length > 0 && (
+          <div className="detail-section">
+            <div className="detail-section-title">Depends On ({deps.length})</div>
+            <div className="detail-connections">
+              {deps.map(d => {
+                const dp = PIPE[d.pipeline];
+                return (
+                  <span key={d.id} className="detail-conn-chip"
+                    style={{ borderColor: dp.accent + '45', color: dp.h }}
+                    onClick={() => onNavigate(d.id)}>
+                    {d.name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Feeds into */}
+        {consumers.length > 0 && (
+          <div className="detail-section">
+            <div className="detail-section-title">Feeds Into ({consumers.length})</div>
+            <div className="detail-connections">
+              {consumers.map(d => {
+                const dp = PIPE[d.pipeline];
+                return (
+                  <span key={d.id} className="detail-conn-chip"
+                    style={{ borderColor: dp.accent + '45', color: dp.h }}
+                    onClick={() => onNavigate(d.id)}>
+                    {d.name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+function App() {
+  const [selected,  setSelected]  = useState(null);
+  const [hovered,   setHovered]   = useState(null);
+  const [playhead,  setPlayhead]  = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [zoom,      setZoom]      = useState(0.68);
+  const [leftOpen,  setLeftOpen]  = useState(true);
+  const animRef   = useRef(null);
+  const startRef  = useRef(null);
+  const iframeRef = useRef(null);
+
+  const handleIframeLoad = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    const header = doc.querySelector('header.toolbar');
+    if (header) header.style.display = 'none';
+    const btnV32 = doc.getElementById('btn-v3_2');
+    if (btnV32) btnV32.click();
+  }, []);
+
+  // BFS: connected node set for dimming
+  const activeId = hovered || selected;
+  const connectedNodes = useMemo(() => {
+    if (!activeId) return new Set();
+    const s = new Set([activeId]);
+    const vU = new Set(), vD = new Set();
+    const up = id => { if (vU.has(id)) return; vU.add(id); s.add(id); EDGES.forEach(e => { if (e.to   === id) { s.add(e.from); up(e.from); } }); };
+    const dn = id => { if (vD.has(id)) return; vD.add(id); s.add(id); EDGES.forEach(e => { if (e.from === id) { s.add(e.to);   dn(e.to);   } }); };
+    up(activeId); dn(activeId);
+    return s;
+  }, [activeId]);
+
+  // Playback
+  useEffect(() => {
+    if (!isPlaying) { if (animRef.current) cancelAnimationFrame(animRef.current); return; }
+    startRef.current = performance.now() - ((playhead || 0) * 700);
+    const tick = ts => {
+      const e = (ts - startRef.current) / 700;
+      if (e >= TOTAL_TIME) { setPlayhead(TOTAL_TIME); setIsPlaying(false); return; }
+      setPlayhead(e);
+      animRef.current = requestAnimationFrame(tick);
+    };
+    animRef.current = requestAnimationFrame(tick);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [isPlaying]);
+
+  const handleWheel = useCallback(e => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      setZoom(z => Math.max(0.3, Math.min(2.5, z - e.deltaY * 0.002)));
+    }
+  }, []);
+
+  return (
+    <div className="eg-root pass-ir-page">
+      {/* ── Toolbar ── */}
+      <header className="toolbar eg-toolbar">
+        <div className="toolbar-l">
+          <a className="home-link" href="../launch.html" title="Back to Home" aria-label="Back to Home">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z"
+                stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+            </svg>
+          </a>
+          <div className="toolbar-sep" />
+          <svg width="18" height="18" viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+            <rect x="1" y="2" width="5" height="5" rx="1.5" fill={PIPE.query.accent}  opacity="0.85" />
+            <rect x="10" y="2" width="5" height="5" rx="1.5" fill={PIPE.key.accent}   opacity="0.80" />
+            <rect x="5.5" y="9" width="5" height="5" rx="1.5" fill={PIPE.weight.accent} opacity="0.80" />
+            <line x1="3.5" y1="7" x2="8" y2="9" stroke="#334155" strokeWidth="0.9" />
+            <line x1="12.5" y1="7" x2="8" y2="9" stroke="#334155" strokeWidth="0.9" />
+          </svg>
+          <span className="eg-title">IndexerPrologQuant</span>
+          <span className="eg-badge">Computation Graph · Execution</span>
+          <span className="eg-meta">Ascend 910B · {NODES.length} nodes · {TOTAL_TIME.toFixed(3)}ms</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Heat legend */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 7.5, color: '#475569', fontFamily: "'JetBrains Mono',monospace" }}>
+            <span>Fast</span>
+            <div style={{ width: 50, height: 5, borderRadius: 3, background: `linear-gradient(90deg, ${heatColor(0)}, ${heatColor(0.5)}, ${heatColor(1)})` }} />
+            <span>Slow</span>
+          </div>
+          <div style={{ width: 1, height: 16, background: '#1A2030' }} />
+          {/* Pipeline legend */}
+          <div style={{ display: 'flex', gap: 8, fontSize: 7.5, fontFamily: "'JetBrains Mono',monospace" }}>
+            {[['Query', PIPE.query.accent], ['Key', PIPE.key.accent], ['Weight', PIPE.weight.accent]].map(([l, c]) => (
+              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <div style={{ width: 8, height: 3, borderRadius: 1, background: c }} />
+                <span style={{ color: '#475569' }}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main area ── */}
+      <div className="eg-main">
+
+        {/* Left panel: model architecture iframe */}
+        <div className={`eg-left${leftOpen ? '' : ' collapsed'}`}>
+          <span className="eg-left-label">模型架构</span>
+          <iframe ref={iframeRef} src="../model-architecture/index.html?embed&model=v3_2" title="DeepSeek V3.2 模型架构" onLoad={handleIframeLoad} />
+          <button className="eg-left-toggle" onClick={() => setLeftOpen(o => !o)}>
+            {leftOpen ? '‹' : '›'}
+          </button>
+        </div>
+
+        {/* Canvas */}
+        <div className="eg-canvas" onWheel={handleWheel} onClick={() => setSelected(null)}>
+          <div className="eg-dot-grid" />
+
+          {/* Scaled container: sets scroll dimensions */}
+          <div style={{ position: 'relative', width: SVG_W * zoom, height: SVG_H * zoom }}>
+
+            {/* SVG layer: pipeline regions + edges */}
+            <svg
+              width={SVG_W * zoom} height={SVG_H * zoom}
+              viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 1 }}
+            >
+              <defs>
+                <marker id="arrow" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                  <path d="M0,0L6,2.5L0,5" fill="#2D3748" />
+                </marker>
+                <marker id="arrow-active" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+                  <path d="M0,0L7,2.5L0,5" fill="#94A3B8" />
+                </marker>
+              </defs>
+
+              {/* Pipeline region backgrounds */}
+              <rect x={190} y={10}  width={1580} height={420} rx={14}
+                fill={PIPE.query.accent + '18'} stroke={PIPE.query.accent + '40'} strokeWidth={1} strokeDasharray="6,4" />
+              <text x={206} y={28} fill={PIPE.query.accent + 'CC'} fontSize={10}
+                fontFamily="'JetBrains Mono',monospace" fontWeight="700" letterSpacing="0.06em">QUERY PIPELINE</text>
+
+              <rect x={190} y={550} width={1580} height={490} rx={14}
+                fill={PIPE.key.accent + '18'} stroke={PIPE.key.accent + '40'} strokeWidth={1} strokeDasharray="6,4" />
+              <text x={206} y={568} fill={PIPE.key.accent + 'CC'} fontSize={10}
+                fontFamily="'JetBrains Mono',monospace" fontWeight="700" letterSpacing="0.06em">KEY PIPELINE</text>
+
+              <rect x={385} y={940} width={580} height={200} rx={14}
+                fill={PIPE.weight.accent + '18'} stroke={PIPE.weight.accent + '40'} strokeWidth={1} strokeDasharray="6,4" />
+              <text x={401} y={958} fill={PIPE.weight.accent + 'CC'} fontSize={10}
+                fontFamily="'JetBrains Mono',monospace" fontWeight="700" letterSpacing="0.06em">WEIGHT PIPELINE</text>
+
+              {/* Edges */}
+              {EDGES.map((e, i) => (
+                <GraphEdge key={i} edge={e} selected={selected} hovered={hovered} playhead={playhead} />
+              ))}
+            </svg>
+
+            {/* HTML node layer */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0,
+              width: SVG_W, height: SVG_H,
+              transform: `scale(${zoom})`, transformOrigin: '0 0',
+              zIndex: 2,
+            }}>
+              {NODES.map(n => (
+                <NodeCard key={n.id} node={n}
+                  selected={selected} hovered={hovered}
+                  onSelect={setSelected} onHover={setHovered}
+                  playhead={playhead}
+                  dimmed={connectedNodes.size > 0 && !connectedNodes.has(n.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Detail panel — fixed overlay, slides in on select */}
+        <div className={`detail-panel${selected ? ' open' : ''}`}>
+          <DetailPanel
+            nodeId={selected}
+            onClose={() => setSelected(null)}
+            onNavigate={setSelected}
+          />
+        </div>
+      </div>
+
+      {/* ── Footer controls ── */}
+      <div className="eg-footer">
+        <button className="eg-ctrl" onClick={() => { setPlayhead(0); setIsPlaying(false); }}>⏮</button>
+        <button className="eg-ctrl"
+          onClick={() => setIsPlaying(p => !p)}
+          style={{ color: isPlaying ? '#EF4444' : '#34D399', borderColor: isPlaying ? '#7F1D1D' : '#064E3B' }}>
+          {isPlaying ? '⏸' : '▶'}
+        </button>
+        <div style={{ flex: 1, height: 4, background: '#1A2030', borderRadius: 2, cursor: 'pointer' }}
+          onClick={e => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setPlayhead(((e.clientX - r.left) / r.width) * TOTAL_TIME);
+          }}>
+          <div style={{
+            height: '100%', borderRadius: 2,
+            width: `${((playhead || 0) / TOTAL_TIME) * 100}%`,
+            background: `linear-gradient(90deg, ${PIPE.query.accent}, ${PIPE.key.accent}, ${PIPE.weight.accent})`,
+            transition: isPlaying ? 'none' : 'width .1s',
+          }} />
+        </div>
+        <span style={{ fontSize: 9, color: '#475569', minWidth: 90, textAlign: 'right', fontFamily: "'JetBrains Mono',monospace" }}>
+          {(playhead || 0).toFixed(3)} / {TOTAL_TIME.toFixed(3)} ms
+        </span>
+        <div style={{ width: 1, height: 14, background: '#1A2030' }} />
+        <button className="eg-ctrl" onClick={() => setZoom(z => Math.min(2.5, z + 0.12))}>+</button>
+        <span style={{ fontSize: 9, color: '#475569', minWidth: 32, textAlign: 'center', fontFamily: "'JetBrains Mono',monospace" }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button className="eg-ctrl" onClick={() => setZoom(z => Math.max(0.3, z - 0.12))}>−</button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
