@@ -494,9 +494,13 @@
   }
 
   async function loadFromQueryFile(file) {
-    const res = await fetch(file);
-    if (!res.ok) throw new Error(`Failed to fetch ${file}`);
-    const text = await res.text();
+    const text = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', file);
+      xhr.onload = () => resolve(xhr.responseText);
+      xhr.onerror = () => reject(new Error(`Failed to load ${file}`));
+      xhr.send();
+    });
     await loadFromText(text, file.split('/').pop() || 'merged_swimlane.json');
   }
 
