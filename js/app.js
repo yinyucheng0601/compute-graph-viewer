@@ -1560,13 +1560,22 @@
     dirInput.click();
   }
 
+  function xhrLoadJson(url) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.onload = () => { try { resolve(JSON.parse(xhr.responseText)); } catch (e) { reject(e); } };
+      xhr.onerror = () => reject(new Error('XHR error'));
+      xhr.send();
+    });
+  }
+
   // Wire sample chips (empty-state cards)
   document.querySelectorAll('.sample-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const url = chip.dataset.sample;
       const label = chip.dataset.label;
-      fetch(url)
-        .then(r => r.json())
+      xhrLoadJson(url)
         .then(data => loadGraphData(data, label))
         .catch(() => alert('Failed to load sample.\nTry serving the app via a local server (e.g. npx serve .)'));
     });
@@ -1584,8 +1593,7 @@
       graphMenu.classList.remove('open');
       const url = item.dataset.sample;
       const label = item.dataset.label;
-      fetch(url)
-        .then(r => r.json())
+      xhrLoadJson(url)
         .then(data => loadGraphData(data, label))
         .catch(() => alert('Failed to load sample.\nTry serving the app via a local server (e.g. npx serve .)'));
     });
@@ -1629,8 +1637,7 @@
   const urlToken = urlParams.get('token');
 
   if (urlFile) {
-    fetch(urlFile)
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    xhrLoadJson(urlFile)
       .then(data => loadGraphData(data, urlFile.split('/').pop()))
       .catch(err => { emptyState.classList.remove('hidden'); console.error('Failed to load', urlFile, err); });
   } else if (urlAction === 'consume-folder') {
@@ -2182,5 +2189,7 @@
   });
 
   initPanelCollapseState();
+
+  window.loadGraphData = loadGraphData;
 
 })();
