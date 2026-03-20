@@ -49,7 +49,7 @@ body {
 .card-grid {
   width: min(1280px, 100%);
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   justify-content: center;
   gap: 16px;
 }
@@ -177,6 +177,86 @@ body {
   background: rgba(17, 18, 24, 0.45);
 }
 
+.card--frame {
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  height: 400px;
+  min-height: 400px;
+}
+
+.card--frame:focus-visible {
+  outline: 2px solid rgba(127, 85, 212, 0.7);
+  outline-offset: 2px;
+}
+
+.card-frame-header {
+  padding: 18px 20px 12px;
+  flex-shrink: 0;
+}
+
+.card-frame-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: #0e0f14;
+}
+
+.card-frame-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  pointer-events: none;
+}
+
+.card-split-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0;
+  background: rgba(10, 10, 16, 0);
+  backdrop-filter: blur(0px);
+  transition: opacity 200ms ease, background 200ms ease, backdrop-filter 200ms ease;
+  pointer-events: none;
+}
+
+.card--split:hover .card-split-overlay {
+  opacity: 1;
+  background: rgba(10, 10, 16, 0.55);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.card-split-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 22px;
+  border-radius: 19px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #f6f4ff;
+  background: linear-gradient(90deg, var(--btn-primary-a), var(--btn-primary-b));
+  transition: filter 150ms ease, transform 150ms ease;
+}
+
+.card-split-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.card-split-btn--alt {
+  background: linear-gradient(90deg, var(--btn-primary-c), var(--btn-primary-d));
+}
+
 @media (max-width: 1200px) {
   .page {
     padding: 24px 16px;
@@ -232,40 +312,44 @@ body {
 <body>
 <main class="page">
   <section class="card-grid" aria-label="项目入口导航">
-    <article class="card">
-      <h2 class="card-title">模型算子层级架构图</h2>
-      <p class="card-desc">开发阶段：查看模型到算子之间的层级结构与融合后的 graph 形态。</p>
-      <div class="actions">
-        <a class="btn btn-primary" href="model-architecture/index.html">DEMO 1</a>
-        <a class="btn btn-secondary" href="graph-prototype-lab/index.html">DEMO 2</a>
+
+    <article class="card card--frame card--split" tabindex="0">
+      <div class="card-frame-header">
+        <h2 class="card-title">模型算子层级架构图</h2>
+      </div>
+      <div class="card-frame-body">
+        <iframe src="model-architecture/index.html?embed" scrolling="no" tabindex="-1" title="模型算子层级架构图预览"></iframe>
+        <div class="card-split-overlay">
+          <a class="card-split-btn" href="model-architecture/index.html">层级架构图</a>
+          <a class="card-split-btn card-split-btn--alt" href="graph-prototype-lab/index.html">图结构实验室</a>
+        </div>
       </div>
     </article>
 
-    <article class="card">
-      <h2 class="card-title">Pass IR计算图</h2>
-      <p class="card-desc">编译阶段：查看节点/连线/详情面板/Pass 导航条/节点聚类视图/锁定一条计算流</p>
-      <div class="actions">
-        <a class="btn btn-primary alt" href="pass-ir/index.html">查看sample</a>
-        <button class="btn btn-secondary" id="openProjectFolderBtn" type="button">选择文件夹</button>
-        <a class="btn btn-secondary" href="pass-ir/index.html?action=open-file">选择本地文件（.json）</a>
+    <article class="card card--frame" onclick="location.href='pass-ir/index.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter')location.href='pass-ir/index.html'">
+      <div class="card-frame-header">
+        <h2 class="card-title">Pass IR 计算图</h2>
+      </div>
+      <div class="card-frame-body">
+        <iframe src="pass-ir/index.html?preview=1" scrolling="no" tabindex="-1" title="Pass IR 计算图预览"></iframe>
       </div>
     </article>
 
-    <article class="card">
-      <h2 class="card-title">Swimlane 执行视图</h2>
-      <p class="card-desc">运行阶段：查看 merged_swimlane.json 的真实 AIC / AIV 执行泳道，支持内置文件与本地文件加载。</p>
-      <div class="actions">
-        <a class="btn btn-primary alt" href="swimlane/index.html">打开内置文件</a>
-        <button class="btn btn-secondary" id="openSwimFileBtn" type="button">选择本地文件（.json）</button>
-        <input type="file" id="swimFileInput" accept=".json,application/json" style="display:none;">
+    <article class="card card--frame" onclick="location.href='swimlane/index.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter')location.href='swimlane/index.html'">
+      <div class="card-frame-header">
+        <h2 class="card-title">Swimlane 执行视图</h2>
+      </div>
+      <div class="card-frame-body">
+        <iframe src="swimlane/index.html?preview=1" scrolling="no" tabindex="-1" title="Swimlane 执行视图预览"></iframe>
       </div>
     </article>
 
-    <article class="card">
-      <h2 class="card-title">图执行叠加原型</h2>
-      <p class="card-desc">研究模块：把 claude.txt 里的单文件 React 原型拆解成 PTO 页面，观察 DAG、执行信号和诊断侧栏如何叠加。</p>
-      <div class="actions">
-        <a class="btn btn-primary alt" href="indexer-exec/index.html">打开模块</a>
+    <article class="card card--frame" onclick="location.href='indexer-exec/index.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter')location.href='indexer-exec/index.html'">
+      <div class="card-frame-header">
+        <h2 class="card-title">图执行叠加原型</h2>
+      </div>
+      <div class="card-frame-body">
+        <iframe src="indexer-exec/index.html?preview=1" scrolling="no" tabindex="-1" title="图执行叠加原型预览"></iframe>
       </div>
     </article>
 
