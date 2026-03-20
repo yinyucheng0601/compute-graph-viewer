@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph + Execution Overlay 原型解读</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="eo-page">
+  <header class="toolbar">
+    <div class="toolbar-l">
+      <a class="home-link" href="../launch.html" title="Back To Home" aria-label="Back To Home">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <div class="toolbar-logo">Graph + Execution 原型</div>
+      <span class="graph-title">claude.txt 语义提炼版：IndexerPrologQuant on Ascend 910B</span>
+    </div>
+    <div class="toolbar-r">
+      <div class="graph-stats" id="eoHeaderStats"></div>
+      <div class="eo-filter-bar" id="eoFilterBar" role="tablist" aria-label="Pipeline Filter">
+        <button class="btn eo-filter-btn active" data-filter="all" type="button">全部</button>
+        <button class="btn eo-filter-btn" data-filter="query" type="button">Query</button>
+        <button class="btn eo-filter-btn" data-filter="key" type="button">Key</button>
+        <button class="btn eo-filter-btn" data-filter="weight" type="button">Weight</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="eo-shell">
+    <section class="eo-summary" id="eoSummary"></section>
+
+    <section class="eo-workbench">
+      <div class="viewport eo-viewport">
+        <div class="eo-legend">
+          <div class="eo-legend-group">
+            <span class="eo-legend-label">Pipeline</span>
+            <span class="eo-legend-chip query">Query</span>
+            <span class="eo-legend-chip key">Key</span>
+            <span class="eo-legend-chip weight">Weight</span>
+            <span class="eo-legend-chip shared">Shared</span>
+          </div>
+          <div class="eo-legend-group">
+            <span class="eo-legend-label">Heat</span>
+            <div class="eo-heat-bar" aria-hidden="true"></div>
+            <span class="eo-legend-text">短</span>
+            <span class="eo-legend-text">长</span>
+          </div>
+          <div class="eo-legend-group">
+            <span class="eo-legend-label">原型重点</span>
+            <span class="eo-legend-text">拓扑 + 执行 + 诊断叠加</span>
+          </div>
+        </div>
+
+        <div class="eo-canvas-wrap" id="eoCanvasWrap">
+          <div class="graph-root eo-canvas" id="eoCanvas">
+            <div class="eo-regions" id="eoRegions"></div>
+            <svg class="edges-svg eo-edges" id="eoEdges" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="eoArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                  <path d="M0,0 L0,7 L7,3.5 z" fill="rgba(255,255,255,0.28)"></path>
+                </marker>
+              </defs>
+            </svg>
+            <div class="nodes-layer eo-nodes" id="eoNodes"></div>
+          </div>
+        </div>
+
+        <div class="eo-footer">
+          <div class="eo-playback">
+            <button class="btn btn-icon" id="eoResetBtn" type="button" aria-label="Reset Playback">⏮</button>
+            <button class="btn btn-primary" id="eoPlayBtn" type="button">播放</button>
+            <div class="eo-progress" id="eoProgress" role="slider" aria-label="Playback Timeline" tabindex="0">
+              <div class="eo-progress-fill" id="eoProgressFill"></div>
+            </div>
+            <span class="eo-progress-label" id="eoProgressLabel">0.000 / 0.000 ms</span>
+          </div>
+          <div class="eo-zoom">
+            <button class="btn btn-icon" id="eoZoomOutBtn" type="button" aria-label="Zoom Out">−</button>
+            <span class="stat-chip" id="eoZoomLabel">100%</span>
+            <button class="btn btn-icon" id="eoZoomInBtn" type="button" aria-label="Zoom In">+</button>
+            <button class="btn" id="eoFitBtn" type="button">适配</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="eo-sidebar">
+        <section class="eo-panel">
+          <div class="detail-section-title">我对 claude.txt 的理解</div>
+          <div class="eo-copy">
+            <p>这不是运行数据，也不是 PTO 现有 viewer 的输入文件，而是一份单文件 React 原型。它想表达的是：把一个算子的 DAG 拓扑、执行时间、核分配、读写强度和诊断提示放进同一张图里。</p>
+            <p>换句话说，这份原型试图把 PTO 现有的“开发 / 编译 / 运行”三段视角，压缩成一个围绕单算子的解释界面。</p>
+          </div>
+        </section>
+
+        <section class="eo-panel">
+          <div class="detail-section-title">原型信号层</div>
+          <ul class="eo-list" id="eoSignalList"></ul>
+        </section>
+
+        <section class="eo-panel">
+          <div class="detail-section-title">节点详情</div>
+          <div class="eo-copy">
+            <p>点击画布中的任意节点，在右侧打开详情面板。</p>
+          </div>
+        </section>
+
+        <section class="eo-panel">
+          <div class="detail-section-title">映射到 PTO</div>
+          <ul class="eo-list">
+            <li><strong>开发</strong>：模型与算子层级结构由 `model-architecture` 承接。</li>
+            <li><strong>编译</strong>：lowering、Pass 演化和控制流由 `pass-ir` 承接。</li>
+            <li><strong>运行</strong>：真实 AIC / AIV 调度和任务分布由 `swimlane` 承接。</li>
+            <li><strong>这个新模块</strong>：补上“单算子解释层”，展示图和执行信号如何叠加。</li>
+          </ul>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <aside class="detail-panel" id="eoDetailPanel" aria-hidden="true">
+    <div class="detail-header">
+      <span class="detail-type-badge" id="eoDetailBadge">NODE</span>
+      <div class="detail-name" id="eoDetailName">点击节点查看详情</div>
+      <button class="btn detail-close" id="eoDetailClose" type="button" aria-label="Close Detail Panel">✕</button>
+    </div>
+    <div class="detail-body" id="eoNodeDetail"></div>
+  </aside>
+
+  <script src="../js/colormap.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

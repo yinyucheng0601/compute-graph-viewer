@@ -10,10 +10,10 @@
 
 | 入口 | 文件 | 功能 |
 |------|------|------|
-| Pass IR 计算图 | `pass-ir/index.html` | 精度调试：逐 Pass 追踪编译优化，节点聚类，锁定计算流 |
 | 大模型整网架构 | `model-architecture/index.html` | 架构洞察：DeepSeek V3 L1→L2→L3→L4 折叠展开 |
-| 源码计算流 `beta` | `source-flow/index.html` | 性能调优：算子 Python 源码 → 计算路径 + 数据依赖 |
+| Pass IR 计算图 | `pass-ir/index.html` | 精度调试：逐 Pass 追踪编译优化，节点聚类，锁定计算流 |
 | Swimlane 执行视图 | `swimlane/index.html` | 执行态观察：AIC / AIV 真实任务泳道，支持本地 `merged_swimlane.json` |
+| 图执行叠加原型 | `execution-overlay/index.html` | 研究视图：解析 `claude.txt` 原型，把 DAG、执行热度、核分配和诊断信息叠到一张图上 |
 
 ---
 
@@ -49,8 +49,10 @@ pto/
 ├── launch.html          # 启动页（四卡片导航）
 ├── pass-ir/
 │   └── index.html       # 精度调试
-├── source-flow/
-│   └── index.html       # 源码计算流（beta）
+├── execution-overlay/
+│   ├── index.html       # 图执行叠加原型解读
+│   ├── app.js           # 原型语义提炼版交互
+│   └── styles.css       # 原型模块样式
 ├── swimlane/
 │   ├── index.html       # Swimlane 执行视图
 │   ├── app.js           # Swimlane viewer 解析与渲染
@@ -72,6 +74,8 @@ pto/
 │   ├── app.js           # X6 封装（L1→L4）
 │   ├── data.js          # DeepSeek V3/V3.2 内置数据
 │   └── styles.css       # MVP 样式（与主站 Design Token 对齐）
+├── source-flow/
+│   └── index.html       # 源码计算流（保留在仓库，当前不在 Launcher 主入口）
 ├── graph-prototype-lab/ # 图原型实验室（辅助入口）
 └── 业务理解/            # PRD + 设计文档
     └── PROJECT_INDEX.md # 完整模块索引
