@@ -2,7 +2,7 @@ const swimlaneRoot = typeof window !== 'undefined' ? window : globalThis;
 
 (function registerBuiltinSwimlaneSamples(root) {
   const PID = 20260320;
-  const SPAN = 466.18;
+  const SPAN = 474.0;  // AIV 延伸到 ~474μs，晚于 AIC ~457μs
   const PROCESS_NAME = 'Machine View';
 
   const labelStem = {
@@ -26,40 +26,22 @@ const swimlaneRoot = typeof window !== 'undefined' ? window : globalThis;
     { value: 'Key-Rope2D', weight: 0.05 }
   ];
 
-  const aicHeavyLabels = [
-    { value: 'Prolog-Quant', weight: 0.48 },
-    { value: 'Weight-Linear', weight: 0.18 },
-    { value: 'Key-Linear', weight: 0.12 },
-    { value: 'Key-Hadamard', weight: 0.1 },
-    { value: 'Query-Linear', weight: 0.07 },
-    { value: 'Key-LayerNorm', weight: 0.05 }
+  // AIC 真实分布：Query-Linear 主力(~59%)，Query-Hadamard 次(~19%)，其余各~7%
+  const aicLabels = [
+    { value: 'Query-Linear',   weight: 0.59 },
+    { value: 'Query-Hadamard', weight: 0.19 },
+    { value: 'Key-Linear',     weight: 0.074 },
+    { value: 'Weight-Linear',  weight: 0.074 },
+    { value: 'Key-Hadamard',   weight: 0.072 }
   ];
 
-  const aicTailLabels = [
-    { value: 'Prolog-Quant', weight: 0.62 },
-    { value: 'Weight-Linear', weight: 0.16 },
-    { value: 'Key-Linear', weight: 0.1 },
-    { value: 'Key-Hadamard', weight: 0.07 },
-    { value: 'Query-Linear', weight: 0.05 }
-  ];
-
-  const aivPrimaryLabels = [
-    { value: 'Query-Dequant', weight: 0.26 },
-    { value: 'Key-LayerNorm', weight: 0.2 },
-    { value: 'Key-Rope2D', weight: 0.14 },
-    { value: 'Weight-Linear', weight: 0.14 },
-    { value: 'Query-Hadamard', weight: 0.12 },
-    { value: 'Query-Linear', weight: 0.08 },
-    { value: 'Key-Hadamard', weight: 0.06 }
-  ];
-
-  const aivLateLabels = [
-    { value: 'Prolog-Quant', weight: 0.56 },
-    { value: 'Query-Hadamard', weight: 0.14 },
-    { value: 'Query-Dequant', weight: 0.1 },
-    { value: 'Key-LayerNorm', weight: 0.1 },
-    { value: 'Weight-Linear', weight: 0.06 },
-    { value: 'Key-Rope2D', weight: 0.04 }
+  // AIV 真实分布：Prolog-Quant 主力(~65%)，Query-Dequant 次(~25%)
+  const aivLabels = [
+    { value: 'Prolog-Quant',  weight: 0.65 },
+    { value: 'Query-Dequant', weight: 0.25 },
+    { value: 'Key-LayerNorm', weight: 0.055 },
+    { value: 'Weight-Linear', weight: 0.03 },
+    { value: 'Key-Rope2D',    weight: 0.015 }
   ];
 
   function round(value) {
@@ -181,46 +163,28 @@ const swimlaneRoot = typeof window !== 'undefined' ? window : globalThis;
     fakeEmitter(286, 17, fakeLabels);
     fakeEmitter(388, 16, fakeLabels);
 
+    // AIC：从起点连续发射到 ~457μs，背靠背，小间隔，模拟真实密集形态
     for (let lane = 1; lane <= 24; lane += 1) {
       const laneName = `AIC_${lane}`;
       const laneRand = createRng(1100 + lane);
       addThread(traceEvents, lane, laneName);
       const emit = createLaneEmitter(traceEvents, lane, laneName, 'aic', 2100 + lane);
-
-      emit(16 + (lane % 4) * 2.3, intRange(laneRand, 6, 8), aicHeavyLabels, { durationScale: 0.9 });
-      emit(104 + (lane % 6) * 2.6, intRange(laneRand, 5, 7), aicHeavyLabels);
-      emit(188 + (lane % 5) * 3.1, intRange(laneRand, 4, 6), aicHeavyLabels, { durationScale: 0.88 });
-      emit(286 + (lane % 7) * 2.4, intRange(laneRand, 7, 9), aicTailLabels, { durationScale: 1.08 });
-      emit(392 + (lane % 6) * 2.1, intRange(laneRand, 6, 7), aicTailLabels, { durationScale: 0.94 });
+      const startOffset = (lane % 6) * 1.8;
+      emit(startOffset, intRange(laneRand, 30, 38), aicLabels, { gapScale: 0.6 });
     }
 
+    // AIV：稀疏散布，自然间隔大，整体跨度延伸到 ~474μs（晚于 AIC ~457μs）
     for (let lane = 25; lane <= 72; lane += 1) {
       const laneName = `AIV_${lane}`;
       const laneRand = createRng(3100 + lane);
       addThread(traceEvents, lane, laneName);
       const emit = createLaneEmitter(traceEvents, lane, laneName, 'aiv', 4100 + lane);
+      const startOffset = (lane % 8) * 3.2;
 
-      if (lane <= 32) {
-        emit(18 + (lane % 4) * 2.7, intRange(laneRand, 6, 8), aivPrimaryLabels);
-        emit(118 + (lane % 3) * 4.1, intRange(laneRand, 3, 5), aivPrimaryLabels, { durationScale: 0.92 });
-        emit(246 + (lane % 4) * 2.9, intRange(laneRand, 2, 3), aivPrimaryLabels, { durationScale: 0.86 });
-        if (lane % 2 === 0) {
-          emit(362 + (lane % 5) * 2.3, intRange(laneRand, 2, 3), aivLateLabels, { durationScale: 0.88 });
-        }
-        continue;
-      }
-
-      if (lane <= 48) {
-        emit(42 + (lane % 5) * 3.1, intRange(laneRand, 2, 4), aivPrimaryLabels, { durationScale: 0.9 });
-        emit(162 + (lane % 4) * 4.4, intRange(laneRand, 2, 4), aivPrimaryLabels, { durationScale: 0.92 });
-        emit(284 + (lane % 5) * 3.7, intRange(laneRand, 1, 3), aivLateLabels, { durationScale: 1.08 });
-        continue;
-      }
-
-      emit(24 + (lane % 4) * 2.8, intRange(laneRand, 2, 4), aivPrimaryLabels, { durationScale: 0.86 });
-      emit(124 + (lane % 6) * 3.2, intRange(laneRand, 2, 4), aivPrimaryLabels, { durationScale: 0.9 });
-      emit(302 + (lane % 6) * 2.8, intRange(laneRand, 4, 6), aivLateLabels, { durationScale: 1.18, gapScale: 0.82 });
-      emit(390 + (lane % 5) * 2.1, intRange(laneRand, 3, 5), aivLateLabels, { durationScale: 1.08, gapScale: 0.8 });
+      // 三段稀疏 cluster，间隔大，尾段延伸到 SPAN 以外 ~8μs
+      emit(startOffset, intRange(laneRand, 3, 5), aivLabels, { gapScale: 3.2 });
+      emit(160 + (lane % 5) * 6.1, intRange(laneRand, 2, 4), aivLabels, { gapScale: 3.6 });
+      emit(330 + (lane % 6) * 5.4, intRange(laneRand, 2, 4), aivLabels, { gapScale: 3.0 });
     }
 
     return traceEvents;

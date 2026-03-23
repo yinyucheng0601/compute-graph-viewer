@@ -3,6 +3,7 @@
   const STORAGE_TEXT_KEY = 'swimSelectedFileText';
 
   const searchInput = document.getElementById('swSearchInput');
+  const searchToggleBtn = document.getElementById('swSearchToggle');
   const searchPrevBtn = document.getElementById('swSearchPrev');
   const searchNextBtn = document.getElementById('swSearchNext');
   const searchCount = document.getElementById('swSearchCount');
@@ -339,7 +340,6 @@
     if (!stats) return;
 
     const chips = [
-      `文件：${fileName || '未命名'}`,
       `总泳道：${formatNumber(stats.totalLanes)}`,
       `Fake Core：${formatNumber(stats.fake)}`,
       `AIC：${formatNumber(stats.aic)}`,
@@ -489,20 +489,20 @@
       state.activeMatchIndex = 0;
       focusMatch(0);
     } else {
-      searchCount.textContent = '0 / 0';
+      if (searchCount) searchCount.textContent = '0 / 0';
     }
   }
 
   function focusMatch(index) {
     if (!state.matches.length) {
-      searchCount.textContent = '0 / 0';
+      if (searchCount) searchCount.textContent = '0 / 0';
       return;
     }
     state.matches.forEach((bar) => bar.classList.remove('is-active'));
     const target = state.matches[index];
     target.classList.add('is-active');
     state.activeMatchIndex = index;
-    searchCount.textContent = `${index + 1} / ${state.matches.length}`;
+    if (searchCount) searchCount.textContent = `${index + 1} / ${state.matches.length}`;
 
     const top = target.offsetTop;
     const left = target.offsetLeft;
@@ -521,6 +521,8 @@
 
   function updateMeta(fileName) {
     fileMeta.textContent = fileName;
+    const laneHeader = document.getElementById('swLaneHeader');
+    if (laneHeader) laneHeader.textContent = fileName;
   }
 
   function showViewer() {
@@ -607,6 +609,16 @@
 
   laneMainViewport?.addEventListener('scroll', syncOverlay);
   searchInput?.addEventListener('input', updateSearch);
+  searchToggleBtn?.addEventListener('click', () => {
+    const group = searchToggleBtn.closest('.sw-search-group');
+    const isOpen = group.classList.toggle('is-open');
+    if (isOpen) {
+      searchInput?.focus();
+    } else {
+      if (searchInput) searchInput.value = '';
+      updateSearch();
+    }
+  });
   searchPrevBtn?.addEventListener('click', () => goToNextMatch(-1));
   searchNextBtn?.addEventListener('click', () => goToNextMatch(1));
   zoomInBtn?.addEventListener('click', () => {
@@ -623,6 +635,12 @@
     fitZoom();
   });
 
+  const DEFAULT_SAMPLE = './samples/stitched_before.json';
+
+  async function loadDefaultSample() {
+    await loadFromQueryFile(DEFAULT_SAMPLE);
+  }
+
   (async function init() {
     showEmpty();
     const params = new URLSearchParams(location.search);
@@ -638,10 +656,12 @@
           console.error(error);
         }
         if (!loaded) {
-          loaded = await loadBuiltinSample();
-        }
-        if (!loaded) {
-          fileMeta.textContent = '没有找到来自 Launcher 的本地文件内容，请重新选择。';
+          try {
+            await loadDefaultSample();
+          } catch (error) {
+            console.error(error);
+            fileMeta.textContent = '没有找到来自 Launcher 的本地文件内容，请重新选择。';
+          }
         }
         return;
       }
@@ -650,17 +670,12 @@
           await loadFromQueryFile(file);
         } catch (error) {
           console.error(error);
-          const loaded = await loadBuiltinSample();
-          if (!loaded) throw error;
+          await loadDefaultSample();
         }
         return;
       }
 
-      const loaded = await loadBuiltinSample();
-      if (!loaded) {
-        fileMeta.textContent = '没有找到内置泳道样例，请选择本地文件。';
-        return;
-      }
+      await loadDefaultSample();
     } catch (error) {
       console.error(error);
       fileMeta.textContent = '泳道文件加载失败';
