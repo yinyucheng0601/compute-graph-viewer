@@ -635,10 +635,31 @@
     fitZoom();
   });
 
-  const DEFAULT_SAMPLE = './samples/stitched_before.json';
+  const SAMPLE_BEFORE = './samples/stitched_before.json';
+  const SAMPLE_AFTER  = './samples/stitched_after.json';
+  const DEFAULT_SAMPLE = SAMPLE_BEFORE;
+
+  const beforeBtn = document.getElementById('swBeforeBtn');
+  const afterBtn  = document.getElementById('swAfterBtn');
+
+  function setToggleActive(isBefore) {
+    beforeBtn?.classList.toggle('sw-toggle-active', isBefore);
+    afterBtn?.classList.toggle('sw-toggle-active', !isBefore);
+  }
+
+  beforeBtn?.addEventListener('click', async () => {
+    setToggleActive(true);
+    try { await loadFromQueryFile(SAMPLE_BEFORE); } catch (e) { console.error(e); }
+  });
+
+  afterBtn?.addEventListener('click', async () => {
+    setToggleActive(false);
+    try { await loadFromQueryFile(SAMPLE_AFTER); } catch (e) { console.error(e); }
+  });
 
   async function loadDefaultSample() {
     await loadFromQueryFile(DEFAULT_SAMPLE);
+    setToggleActive(true);
   }
 
   (async function init() {
