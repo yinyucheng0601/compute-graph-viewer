@@ -60,6 +60,7 @@
   const BRIDGE_STORE = 'pending-dir-handles';
   const LS_MINIMAP_COLLAPSED = 'pto_minimap_collapsed';
   const LS_COLOR_PANEL_COLLAPSED = 'pto_color_panel_collapsed';
+  const PASS_IR_COLOR_SYNC_EVENT = 'pto-pass-ir:set-color-mode';
 
   const SCALE_MIN = 0.06;
   const SCALE_MAX = 4;
@@ -1210,6 +1211,19 @@
     renderActiveGraph();
   }
 
+  function normalizeExternalColorMode(mode) {
+    if (mode === 'semantic' || mode === 'subgraph' || mode === 'latency' || mode === 'engineMemory') {
+      return mode;
+    }
+    return null;
+  }
+
+  function applyExternalColorMode(mode) {
+    const nextMode = normalizeExternalColorMode(mode);
+    if (!nextMode || nextMode === colorMode) return;
+    setColorMode(nextMode);
+  }
+
   function setViewMode(mode) {
     const nextMode = mode === 'grouped' && groupedGraph && groupedLayout ? 'grouped' : DEFAULT_VIEW_MODE;
     viewMode = nextMode;
@@ -1396,6 +1410,71 @@
 
   const LS_JSON = 'pto_last_json';
   const LS_NAME = 'pto_last_name';
+  const BRIDGE_SWIMLANE_META = 'ptoSwimlaneProgramMeta';
+  const BRIDGE_SWIMLANE_TEXT = 'ptoSwimlaneProgramText';
+  const BRIDGE_SWIMLANE_FOCUS = 'ptoSwimlanePassFocus';
+  let pendingExternalFocus = null;
+
+  function consumeSwimlaneBridgePayload() {
+    try {
+      const metaText = sessionStorage.getItem(BRIDGE_SWIMLANE_META);
+      const graphText = sessionStorage.getItem(BRIDGE_SWIMLANE_TEXT);
+      const focusText = sessionStorage.getItem(BRIDGE_SWIMLANE_FOCUS);
+      if (!graphText) return null;
+      const meta = metaText ? JSON.parse(metaText) : {};
+      const focus = focusText ? JSON.parse(focusText) : null;
+      sessionStorage.removeItem(BRIDGE_SWIMLANE_META);
+      sessionStorage.removeItem(BRIDGE_SWIMLANE_TEXT);
+      sessionStorage.removeItem(BRIDGE_SWIMLANE_FOCUS);
+      return {
+        data: JSON.parse(graphText),
+        name: meta?.name || 'program.json',
+        focus,
+      };
+    } catch (error) {
+      console.error('Failed to consume swimlane bridge payload:', error);
+      return null;
+    }
+  }
+
+  function normalizeOpaqueId(value) {
+    if (value == null || value === '') return null;
+    const text = String(value)
+      .trim()
+      .replace(/^[`'"]+|[`'"]+$/g, '')
+      .replace(/[;,\]}]+$/g, '')
+      .trim();
+    if (!text) return null;
+    return /^0x/i.test(text) ? text.toLowerCase() : text;
+  }
+
+  function findExternalFocusTarget(focus) {
+    if (!focus || !sourceGraph?.nodes?.length) return null;
+    const nodes = sourceGraph.nodes;
+    if (focus.callOpMagic != null) {
+      const magic = normalizeOpaqueId(focus.callOpMagic);
+      const byMagic = nodes.find(node => {
+        if (node.type !== 'op') return false;
+        return normalizeOpaqueId(node.data?.magic ?? node.data?.opmagic) === magic;
+      });
+      if (byMagic) return byMagic;
+    }
+    if (focus.semanticLabel) {
+      const bySemantic = nodes.find(node => node.type === 'op' && node.data?.semanticLabel === focus.semanticLabel);
+      if (bySemantic) return bySemantic;
+    }
+    return null;
+  }
+
+  function applyPendingExternalFocus() {
+    if (!pendingExternalFocus) return;
+    const focus = pendingExternalFocus;
+    pendingExternalFocus = null;
+    const target = findExternalFocusTarget(focus);
+    if (!target) return;
+    if (focus.semanticLabel && colorMode !== 'semantic') setColorMode('semantic');
+    centerOnActiveNode(target, { openDetailPanel: true });
+  }
 
   function loadGraphData(data, fileName) {
     sourceGraph = parseGraph(data);
@@ -1432,6 +1511,8 @@
       localStorage.setItem(LS_NAME, name);
       setRecentChip(name);
     } catch (_) {}
+
+    setTimeout(() => applyPendingExternalFocus(), 0);
   }
 
   function setRecentChip(name) {
@@ -1635,11 +1716,15 @@
   const urlFile = urlParams.get('file');
   const urlAction = urlParams.get('action');
   const urlToken = urlParams.get('token');
+  const bridgePayload = urlAction === 'open-file' ? consumeSwimlaneBridgePayload() : null;
 
   if (urlFile) {
     xhrLoadJson(urlFile)
       .then(data => loadGraphData(data, urlFile.split('/').pop()))
       .catch(err => { emptyState.classList.remove('hidden'); console.error('Failed to load', urlFile, err); });
+  } else if (bridgePayload?.data) {
+    pendingExternalFocus = bridgePayload.focus || null;
+    loadGraphData(bridgePayload.data, bridgePayload.name);
   } else if (urlAction === 'consume-folder') {
     // Folder handle selected on launch page; consume and auto-load here.
     setTimeout(() => {
@@ -2189,6 +2274,12 @@
   });
 
   initPanelCollapseState();
+
+  window.addEventListener('message', (event) => {
+    const payload = event?.data;
+    if (!payload || payload.type !== PASS_IR_COLOR_SYNC_EVENT) return;
+    applyExternalColorMode(payload.mode);
+  });
 
   window.loadGraphData = loadGraphData;
 

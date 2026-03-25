@@ -5,18 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Swimlane Viewer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121318'/%3E%3Crect x='12' y='18' width='40' height='8' rx='4' fill='%237b57bf'/%3E%3Crect x='12' y='30' width='28' height='8' rx='4' fill='%234d79d4'/%3E%3Crect x='12' y='42' width='34' height='8' rx='4' fill='%234da56d'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="../css/style.css">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="../css/style.css?v=2">
+  <link rel="stylesheet" href="./styles.css?v=2">
 <style>
 html.preview .toolbar,
 html.preview #swSummary,
 html.preview #swEmptyState,
+html.preview .sw-analysis-row,
+html.preview .sw-insight-grid,
+html.preview .sw-chart-controls,
+html.preview #swDiffSummary,
+html.preview .sw-chart-panel-head,
+html.preview #swComparePanel,
+html.preview #swDetailPanel,
+html.preview .sw-journey-panel,
+html.preview .sw-journey-toggle,
 html.preview .sw-lane-header,
 html.preview .sw-lane-label-viewport { display: none !important; }
 html.preview .sw-page { overflow: hidden; }
-html.preview #swViewer { padding: 0; flex: 1; }
+html.preview #swViewer { flex: 1; }
+html.preview .sw-chart-stack,
+html.preview .sw-chart-panel,
 html.preview .sw-grid {
   height: 100vh;
+  min-height: 100vh;
+}
+html.preview .sw-grid {
   grid-template-columns: 1fr !important;
   grid-template-rows: 46px 1fr !important;
 }
@@ -24,7 +38,7 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
 </style>
 <script>if(new URLSearchParams(location.search).get('preview')==='1')document.documentElement.classList.add('preview');</script>
 </head>
-<body>
+<body class="swimlane-page">
   <div class="sw-page">
     <header class="toolbar">
       <div class="toolbar-l">
@@ -34,7 +48,7 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
           </svg>
         </a>
         <span class="graph-title" id="swFileMeta">正在准备内置泳道样例</span>
-        <div id="swSummary" class="toolbar-chips"></div>
+        <div id="swSummary" class="graph-stats"></div>
       </div>
       <div class="toolbar-r">
         <div class="sw-search-group">
@@ -45,6 +59,9 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
             </svg>
           </button>
           <input id="swSearchInput" class="sw-search-input" type="search" placeholder="搜索 task / lane / label">
+          <button id="swSearchPrev" class="btn btn-icon sw-search-nav" type="button" aria-label="上一个匹配" title="上一个匹配">↑</button>
+          <button id="swSearchNext" class="btn btn-icon sw-search-nav" type="button" aria-label="下一个匹配" title="下一个匹配">↓</button>
+          <span id="swSearchCount" class="sw-search-count">0 / 0</span>
         </div>
         <div class="sw-action-group">
           <button id="swOpenLocalBtn" class="btn" type="button">
@@ -53,42 +70,173 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
             </svg>
             选择文件
           </button>
+          <button id="swOpenCompareBtn" class="btn" type="button">绑定对比</button>
+          <button id="swBindProgramBtn" class="btn" type="button">绑定 Program</button>
           <div class="sw-toggle-group">
             <button id="swBeforeBtn" class="btn sw-toggle-btn sw-toggle-active" type="button">Before</button>
             <button id="swAfterBtn"  class="btn sw-toggle-btn" type="button">After</button>
           </div>
+          <button id="swCompareModeBtn" class="btn" type="button">Diff</button>
           <button id="swZoomOutBtn" class="btn" type="button">缩小</button>
           <button id="swZoomInBtn"  class="btn" type="button">放大</button>
           <button id="swZoomFitBtn" class="btn" type="button">适配</button>
           <input id="swFileInput" type="file" accept=".json,application/json" hidden>
+          <input id="swCompareFileInput" type="file" accept=".json,application/json" hidden>
+          <input id="swProgramFileInput" type="file" accept=".json,application/json" hidden>
         </div>
       </div>
     </header>
 
-    <section id="swEmptyState" class="sw-empty-state">
-      <div class="sw-empty-card">
-        <h2>正在准备泳道视图</h2>
-        <p>页面默认会打开内置样例，也可从 Launcher 或当前页面选择本地 <code>merged_swimlane.json</code>。</p>
+    <section id="swEmptyState" class="empty-state">
+      <div class="empty-card">
+        <div class="empty-icon-wrap">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="5" width="22" height="4" rx="2" fill="rgba(123,87,191,0.9)"/>
+            <rect x="3" y="12" width="15" height="4" rx="2" fill="rgba(77,121,212,0.9)"/>
+            <rect x="3" y="19" width="18" height="4" rx="2" fill="rgba(77,165,109,0.9)"/>
+          </svg>
+        </div>
+        <h2 class="empty-title">Swimlane 执行视图</h2>
+        <p class="empty-sub">页面默认打开内置样例，也可加载本地 <code>merged_swimlane.json</code>，并绑定 <code>program.json</code> 做跨视图分析。</p>
       </div>
     </section>
 
     <section id="swViewer" class="sw-viewer" hidden>
-      <div class="sw-grid">
-        <div class="sw-lane-header" id="swLaneHeader"></div>
-        <div class="sw-timeline-viewport" id="swTimelineViewport">
-          <div class="sw-timeline-track" id="swTimelineTrack"></div>
+      <div class="sw-shell">
+        <div class="sw-analysis-row" aria-hidden="true"></div>
+
+        <div class="sw-chart-stack" id="swChartStack">
+          <section class="sw-chart-panel" id="swPrimaryPanel" data-chart-key="primary">
+            <div class="sw-chart-panel-head">
+              <div>
+                <div class="sw-chart-panel-title" id="swPrimaryPanelTitle">Primary</div>
+                <div class="sw-chart-panel-meta" id="swPrimaryPanelMeta"></div>
+              </div>
+              <div id="swBindingStatus" class="sw-card-meta"></div>
+            </div>
+            <div class="sw-chart-controls">
+              <span class="sw-filter-label">Lane</span>
+              <div id="swLaneKindFilters" class="sw-chip-row"></div>
+              <span class="sw-filter-label">Stitch</span>
+              <div id="swSeqFilters" class="sw-chip-row"></div>
+              <select id="swColorMode" class="sw-select">
+                <option value="semantic">语义标签</option>
+                <option value="engine">执行单元 / Lane</option>
+                <option value="stitch">Stitch（仅泳道）</option>
+                <option value="subgraph">子图 / Leaf</option>
+              </select>
+              <select id="swSortMode" class="sw-select">
+                <option value="default">默认顺序</option>
+                <option value="gap">按最大气泡</option>
+                <option value="util">按利用率</option>
+                <option value="taskCount">按任务数</option>
+                <option value="duration">按工作时长</option>
+              </select>
+              <button id="swToggleBubbles" class="btn" type="button">Bubbles</button>
+              <button id="swMeasureModeBtn" class="btn" type="button">Measure</button>
+              <button id="swClearRangeBtn" class="btn" type="button">清除区间</button>
+            </div>
+            <section id="swDiffSummary" class="sw-diff-inline" hidden>
+              <div class="sw-card-head">
+                <h2 class="sw-card-title">Diff</h2>
+                <div id="swCompareStatus" class="sw-card-meta"></div>
+              </div>
+              <div id="swDiffMetrics" class="sw-diff-metrics"></div>
+              <div id="swDiffTopLanes" class="sw-diff-list"></div>
+            </section>
+            <div class="sw-grid">
+              <div class="sw-lane-header" id="swPrimaryLaneHeader"></div>
+              <div class="sw-timeline-viewport" id="swPrimaryTimelineViewport">
+                <div class="sw-timeline-track" id="swPrimaryTimelineTrack"></div>
+              </div>
+              <div class="sw-lane-label-viewport" id="swPrimaryLaneLabelViewport">
+                <div class="sw-lane-label-track" id="swPrimaryLaneLabelTrack"></div>
+              </div>
+              <div class="sw-lane-main-viewport" id="swPrimaryLaneMainViewport">
+                <svg id="swDepOverlay" class="sw-dep-overlay" aria-hidden="true"></svg>
+                <div class="sw-lane-main-track" id="swPrimaryLaneMainTrack"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="sw-chart-panel" id="swComparePanel" data-chart-key="compare" hidden>
+            <div class="sw-chart-panel-head">
+              <div>
+                <div class="sw-chart-panel-title" id="swComparePanelTitle">Reference</div>
+                <div class="sw-chart-panel-meta" id="swComparePanelMeta"></div>
+              </div>
+            </div>
+            <div class="sw-grid">
+              <div class="sw-lane-header" id="swCompareLaneHeader"></div>
+              <div class="sw-timeline-viewport" id="swCompareTimelineViewport">
+                <div class="sw-timeline-track" id="swCompareTimelineTrack"></div>
+              </div>
+              <div class="sw-lane-label-viewport" id="swCompareLaneLabelViewport">
+                <div class="sw-lane-label-track" id="swCompareLaneLabelTrack"></div>
+              </div>
+              <div class="sw-lane-main-viewport" id="swCompareLaneMainViewport">
+                <div class="sw-lane-main-track" id="swCompareLaneMainTrack"></div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div class="sw-lane-label-viewport">
-          <div class="sw-lane-label-track" id="swLaneLabelTrack"></div>
-        </div>
-        <div class="sw-lane-main-viewport" id="swLaneMainViewport">
-          <div class="sw-lane-main-track" id="swLaneMainTrack"></div>
+
+        <!-- Ghost elements: hidden from layout but kept for JS data binding -->
+        <div class="sw-insight-grid" aria-hidden="true">
+          <div id="swRangeSummary" hidden></div>
+          <div id="swLaneInsights" hidden></div>
+          <div id="swLabelInsights" hidden></div>
+          <div id="swExplanation" hidden></div>
         </div>
       </div>
     </section>
   </div>
 
-  <script src="./data.js"></script>
-  <script src="./app.js"></script>
+  <!-- Split View Container -->
+  <div id="swSplitContainer" class="sw-split-container" hidden>
+    <div class="sw-split-top" id="swSplitTop">
+      <div class="sw-split-top-bar">
+        <span class="sw-split-top-label" id="swSplitLabel">Pass IR</span>
+        <button id="swSplitClose" class="sw-split-close-btn btn" type="button">关闭分屏 ×</button>
+      </div>
+      <iframe id="swGraphIframe" class="sw-split-iframe" src="" allow="same-origin" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+    </div>
+    <div class="sw-split-divider" id="swSplitDivider" title="拖动调整分屏比例"></div>
+    <div class="sw-split-bottom" id="swSplitBottom">
+      <!-- Swimlane chart will be moved here when split is active -->
+    </div>
+  </div>
+
+  <aside class="detail-panel sw-detail-panel" id="swDetailPanel">
+    <div class="detail-header">
+      <div class="detail-type-badge" id="swDetailBadge">TASK</div>
+      <span class="detail-name" id="swDetailName">Task detail</span>
+      <button class="btn btn-icon detail-close" id="swDetailClose" type="button" aria-label="关闭">×</button>
+    </div>
+    <div class="sw-detail-subhead" id="swDetailDataset"></div>
+    <div class="detail-body" id="swDetailBody"></div>
+  </aside>
+
+  <!-- Journey Panel -->
+  <aside id="swJourneyPanel" class="sw-journey-panel sw-journey-panel--hidden">
+    <div class="sw-journey-header">
+      <span class="sw-journey-title">分析旅程</span>
+      <button id="swJourneyClose" class="sw-journey-close" type="button" title="收起">×</button>
+    </div>
+    <div id="swJourneyCards" class="sw-journey-cards"></div>
+  </aside>
+  <button id="swJourneyToggle" class="sw-journey-toggle" type="button" title="分析旅程">⊞</button>
+
+  <div id="swTaskPopup" class="sw-task-popup" hidden>
+    <div class="sw-task-popup-header">
+      <span class="sw-task-popup-badge" id="swPopupBadge">AIC</span>
+      <span class="sw-task-popup-name" id="swPopupName"></span>
+      <button class="sw-task-popup-close" id="swPopupClose" type="button">×</button>
+    </div>
+    <div class="sw-task-popup-body" id="swPopupBody"></div>
+  </div>
+
+  <script src="./data.js?v=2"></script>
+  <script src="./app.js?v=2"></script>
 </body>
 </html>
