@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Viewer — Ascend 910B</title>
+<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+
+<!-- ============================================================
+     Header — reuses global .toolbar
+     ============================================================ -->
+<header class="toolbar">
+  <div class="toolbar-l">
+    <a class="home-link" href="../" title="Back To Home" aria-label="Back To Home">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <span class="toolbar-sep"></span>
+    <span class="toolbar-logo">Memory Viewer</span>
+    <span class="mv-badge">Ascend 910B</span>
+    <span class="mv-badge mv-badge-green">IndexerPrologQuant · PATH0_leaf293</span>
+  </div>
+  <div class="toolbar-r">
+    <div id="step-indicator">
+      Step <strong id="si-step">0</strong> / <strong id="si-total">128</strong>
+      &mdash; <span class="opname" id="si-opname">—</span>
+      <span class="opmagic" id="si-opmagic"></span>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     Main Content — top/bottom split
+     ============================================================ -->
+<div id="main">
+
+  <!-- ── Top: Compute Graph (pass-ir rendering stack) ── -->
+  <div id="top-panel">
+    <div id="graph-toolbar">
+      <span class="toolbar-label">Compute Graph</span>
+      <div class="graph-toolbar-sep"></div>
+      <button class="btn" id="fit-btn" title="Fit graph to viewport">Fit</button>
+      <button class="btn" id="zoom-in-btn" title="Zoom in">+</button>
+      <button class="btn" id="zoom-out-btn" title="Zoom out">−</button>
+      <span id="zoom-display" class="zoom-display">100%</span>
+      <div class="graph-toolbar-sep"></div>
+      <div class="detail-row" id="detail-row">
+        <span class="detail-key">Op:</span>
+        <span class="detail-val" id="det-name">—</span>
+        <span class="detail-val" id="det-magic" style="color:var(--text-dim);font-size:9px;"></span>
+        <span class="detail-key" style="margin-left:10px;">Inputs:</span>
+        <span class="detail-val" id="det-inputs">—</span>
+        <span class="detail-key" style="margin-left:10px;">Outputs:</span>
+        <span class="detail-val" id="det-outputs">—</span>
+        <span class="detail-key" style="margin-left:10px;">Tiers:</span>
+        <span class="detail-val" id="det-tiers">—</span>
+      </div>
+    </div>
+
+    <div id="graph-viewport">
+      <div id="graph-transform"></div>
+      <div id="svg-placeholder">
+        <div class="spin"></div>
+        <div>Loading graph…</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">data/sample-graph.json</div>
+      </div>
+      <aside id="mv-color-panel" aria-label="Color Mode Panel">
+        <div class="mv-cp-head">Color Mode</div>
+        <div class="mv-cp-buttons">
+          <button class="mv-cp-btn active" data-mode="semantic">Semantic</button>
+          <button class="mv-cp-btn" data-mode="subgraph">Subgraph</button>
+          <button class="mv-cp-btn" data-mode="latency">Latency</button>
+          <button class="mv-cp-btn" data-mode="engineMemory">Engine / Memory</button>
+          <button class="mv-cp-btn" data-mode="none">None</button>
+        </div>
+        <div id="mv-color-legend"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ── Bottom: Ascend 910B Architecture Diagram ── -->
+  <div id="bottom-panel">
+    <div id="arch-diagram">
+
+      <!-- AIC Section -->
+      <div class="arch-section aic">
+        <span class="arch-section-label">AIC</span>
+
+        <div class="gm-strip">
+          <span class="gm-label">GM</span>
+          <span class="mte-arrow">MTE2</span>
+        </div>
+
+        <div class="arch-inner">
+          <div class="aic-main-row">
+            <!-- L1 Buffer -->
+            <div class="buf-box buf-l1">
+              <div class="buf-label">L1 Buffer</div>
+              <div class="buf-cap">1024 KB</div>
+              <div class="tensor-chips" id="tensors-L1">
+                <div class="tier-empty">empty</div>
+              </div>
+            </div>
+
+            <!-- L0A + L0B -->
+            <div class="l0ab-col">
+              <div class="buf-box buf-l0a">
+                <div class="buf-label">L0A</div>
+                <div class="buf-cap">64 KB</div>
+                <div class="tensor-chips" id="tensors-L0A">
+                  <div class="tier-empty">empty</div>
+                </div>
+              </div>
+              <div class="buf-box buf-l0b">
+                <div class="buf-label">L0B</div>
+                <div class="buf-cap">64 KB</div>
+                <div class="tensor-chips" id="tensors-L0B">
+                  <div class="tier-empty">empty</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cube MMA -->
+            <div class="cube-box">
+              <span>Cube</span>
+              <span class="cube-sub">MMA</span>
+            </div>
+
+            <!-- L0C Buffer -->
+            <div class="buf-box buf-l0c">
+              <div class="buf-label">L0C</div>
+              <div class="buf-cap">256 KB</div>
+              <div class="tensor-chips" id="tensors-L0C">
+                <div class="tier-empty">empty</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="fixpipe-bar">FixPipe</div>
+
+          <div class="unit-row">
+            <div class="unit-box">Scalar</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Separator -->
+      <div class="arch-sep">1 : N &thinsp; (AIV)</div>
+
+      <!-- AIV Section (no UB in this subgraph — shown dimmed) -->
+      <div class="arch-section aiv aiv-dim">
+        <span class="arch-section-label">AIV</span>
+        <div class="arch-inner">
+          <div class="buf-box buf-ub">
+            <div class="buf-label">Unified Buffer (UB)</div>
+            <div class="buf-cap">256 KB</div>
+            <div class="tensor-chips">
+              <div class="tier-empty">—</div>
+            </div>
+          </div>
+          <div class="unit-row">
+            <div class="unit-box">Scalar</div>
+            <div class="unit-box vector">Vector</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- #arch-diagram -->
+  </div>
+
+</div><!-- #main -->
+
+<!-- ============================================================
+     Floating playback toolbar — liquid glass, centered
+     ============================================================ -->
+<div id="floating-bar">
+  <div id="floating-shell">
+    <div id="controls-row">
+      <button class="mv-btn mv-btn-primary" id="play-btn">&#9654; Play</button>
+      <button class="mv-btn" id="step-back-btn" title="Previous step">&#9664;</button>
+      <button class="mv-btn" id="step-fwd-btn" title="Next step">&#9654;</button>
+      <div class="mv-sep"></div>
+      <label class="scrubber-label">Step</label>
+      <input type="range" id="scrubber" min="0" max="127" value="0" step="1">
+      <label id="scrubber-label">0 / 127</label>
+      <div class="mv-sep"></div>
+      <span class="speed-label">Speed</span>
+      <button class="mv-speed-btn mv-btn" data-speed="0.5">0.5×</button>
+      <button class="mv-speed-btn mv-btn active" data-speed="1">1×</button>
+      <button class="mv-speed-btn mv-btn" data-speed="2">2×</button>
+      <button class="mv-speed-btn mv-btn" data-speed="4">4×</button>
+      <div class="mv-sep"></div>
+      <div id="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(53,119,246,0.8);"></div>COPY</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(168,85,247,0.8);"></div>L1→L0A</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(124,58,237,0.8);"></div>L1→L0B</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.8);"></div>MMA</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#22c55e;border-radius:50%;"></div>Done</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#E8B300;border-radius:50%;"></div>Active</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- pass-ir rendering stack (global functions) -->
+<script src="../js/colormap.js"></script>
+<script src="../js/parser.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/renderer.js"></script>
+
+<script type="module" src="./js/playback.js"></script>
+</body>
+</html>
