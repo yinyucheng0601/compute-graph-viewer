@@ -545,6 +545,370 @@ body {
 }
 
 /* ============================================================
+   Right Panel — Section Labels
+   ============================================================ */
+.rp-sec-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 6px 10px 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.rp-sec-title::before {
+  content: '';
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--rp-accent, #3b82f6);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Runtime Status Panel
+   ============================================================ */
+#runtime-status {
+  padding: 0 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.rs-progress-wrap {
+  margin: 1px 0 3px;
+}
+.rs-progress-bar {
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.rs-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+.rs-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.rs-counts {
+  display: flex;
+  gap: 6px;
+  margin: 1px 0;
+}
+.rs-count {
+  font-size: 9px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rs-count.done    { background: rgba(16,185,129,0.12); color: #059669; border: 1px solid rgba(16,185,129,0.30); }
+.rs-count.running { background: rgba(245,158,11,0.12); color: #c05600; border: 1px solid rgba(245,158,11,0.40); }
+.rs-count.pending { background: rgba(0,0,0,0.04); color: var(--text-dim); border: 1px solid var(--border-color); }
+.rs-cur-op {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0 1px;
+}
+.rs-cur-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: rsDotPulse 1.4s ease-in-out infinite;
+}
+@keyframes rsDotPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.rs-cur-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rs-cur-magic {
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.rs-pipe-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   Buffer Pixel Grid — Dark LCD Style
+   ============================================================ */
+.buf-hdr {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 3px;
+  margin-bottom: 1px;
+}
+.buf-stat-pct {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.buf-stat-used {
+  font-size: 7px;
+  opacity: 0.6;
+  white-space: nowrap;
+  margin-top: 2px;
+  display: block;
+}
+.buf-sub-info {
+  font-size: 7.5px;
+  opacity: 0.5;
+  margin: 1px 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The dark pixel grid */
+.bpg-grid {
+  display: grid;
+  gap: 1px;
+  background: #101829;
+  border-radius: 4px;
+  padding: 3px;
+  border: 1px solid rgba(0,0,0,0.18);
+  box-shadow: inset 0 1px 4px rgba(0,0,0,0.2);
+}
+.bpg-cell {
+  border-radius: 1.5px;
+  cursor: crosshair;
+  transition: transform 0.08s, filter 0.08s;
+  border: 1px solid transparent;
+  position: relative;
+}
+.bpg-cell:hover {
+  transform: scaleY(1.5) scaleX(1.1);
+  filter: brightness(1.5);
+  z-index: 5;
+  border-color: rgba(255,255,255,0.45) !important;
+}
+.bpg-cell.bpg-empty {
+  background: #1c2a3e;
+}
+.bpg-cell.bpg-active {
+  animation: bpgPulse 0.9s ease-in-out infinite;
+}
+@keyframes bpgPulse {
+  0%,100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+.bpg-cell.bpg-read  { border-color: #3b82f6 !important; }
+.bpg-cell.bpg-write { border-color: #10b981 !important; }
+
+.bpg-free-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #101829;
+  border-radius: 0 0 3px 3px;
+  border: 1px solid rgba(0,0,0,0.18);
+  border-top: none;
+  padding: 1px 0;
+  margin-top: -2px;
+}
+.bpg-free-row span {
+  font-size: 7px;
+  color: #2a3a5a;
+  letter-spacing: 0.8px;
+  font-family: monospace;
+}
+.bpg-addr-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 7px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  opacity: 0.65;
+}
+#bpg-float-tip {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  background: #0f1829;
+  border-radius: 7px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #a0aec0;
+  line-height: 1.4;
+  border: 1px solid rgba(59,130,246,0.35);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04);
+  min-width: 140px;
+  max-width: 220px;
+  animation: ftip-in 0.1s ease;
+}
+@keyframes ftip-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#bpg-float-tip.visible { display: flex; }
+#bpg-float-tip .bt-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#bpg-float-tip .bt-k { color: #4b5a70; font-size: 10px; white-space: nowrap; }
+#bpg-float-tip .bt-v { font-weight: 600; color: #93c5fd; text-align: right; }
+#bpg-float-tip .bt-v.rw-r { color: #60a5fa; }
+#bpg-float-tip .bt-v.rw-w { color: #34d399; }
+#bpg-float-tip .bt-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 2px 0; }
+
+.bpg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-top: 4px;
+}
+.bpg-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.bpg-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+  flex-shrink: 0;
+}
+
+/* Per-tier cell heights */
+.buf-l1  .bpg-cell { height: 8px; }
+.buf-l0a .bpg-cell { height: 11px; }
+.buf-l0b .bpg-cell { height: 11px; }
+.buf-l0c .bpg-cell { height: 13px; }
+.buf-ub  .bpg-cell { height: 13px; }
+
+/* ============================================================
+   Selected Op Detail Panel
+   ============================================================ */
+#op-detail-panel {
+  flex-shrink: 0;
+  border-top: 2px solid var(--border-color);
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+}
+#op-detail-panel::-webkit-scrollbar { width: 4px; }
+#op-detail-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 2px; }
+#op-detail-body {
+  padding: 4px 10px 10px;
+}
+.od-placeholder {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 6px 0;
+}
+.od-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.od-color-bar {
+  width: 4px;
+  border-radius: 2px;
+  min-height: 28px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+.od-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  flex: 1;
+}
+.od-pipe-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.od-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-secondary);
+  padding: 1.5px 0;
+  line-height: 1.5;
+  gap: 8px;
+}
+.od-row .od-val {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+}
+.od-sep { border-top: 1px solid var(--border-color); margin: 5px 0; }
+.od-mem-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin: 4px 0 2px;
+}
+.od-tensor-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.od-tensor-row:last-child { border-bottom: none; }
+.od-dir {
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.od-dir.in  { background: rgba(59,130,246,0.12); color: #2563eb; border: 1px solid rgba(59,130,246,0.25); }
+.od-dir.out { background: rgba(16,185,129,0.12); color: #059669; border: 1px solid rgba(16,185,129,0.25); }
+.od-tier-chip {
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: #fff;
+}
+.od-t-magic {
+  color: var(--text-dim);
+  flex: 1;
+}
+
+/* ============================================================
    Bottom — Timeline / Controls
    ============================================================ */
 #bottom-panel {
@@ -816,12 +1180,38 @@ rect.sprotty-node.output { fill: rgba(14,99,156,0.10) !important; }
     </div>
   </div>
 
-  <!-- Right: Ascend 910B Architecture Diagram -->
+  <!-- Right: Ascend 910B Architecture + Info Panels -->
   <div id="right-panel">
+
+    <!-- ── 运行状态 ── -->
+    <div class="rp-sec-title" style="--rp-accent:#3b82f6">运行状态</div>
+    <div id="runtime-status">
+      <div class="rs-progress-wrap">
+        <div class="rs-progress-bar"><div class="rs-progress-fill" id="rs-prog-fill" style="width:0%"></div></div>
+        <div class="rs-progress-label">
+          <span id="rs-step-lbl">Step 0 / 0</span>
+          <span id="rs-pct-lbl">0%</span>
+        </div>
+      </div>
+      <div class="rs-counts">
+        <span class="rs-count done"  id="rs-done">✓ 0 done</span>
+        <span class="rs-count running" id="rs-run">▶ — running</span>
+        <span class="rs-count pending" id="rs-pend">◌ 0 pending</span>
+      </div>
+      <div class="rs-cur-op" id="rs-cur-op">
+        <div class="rs-cur-dot" id="rs-cur-dot" style="background:#6b7280"></div>
+        <span class="rs-cur-name" id="rs-cur-name">—</span>
+        <span class="rs-cur-magic" id="rs-cur-magic"></span>
+        <span class="rs-pipe-badge" id="rs-pipe-badge"></span>
+      </div>
+    </div>
+
+    <!-- ── DaVinci 内存层级 ── -->
+    <div class="rp-sec-title" style="--rp-accent:#8b5cf6">DaVinci 内存层级</div>
     <div id="arch-diagram">
 
       <!-- ── AIC Section ─────────────────────────────────── -->
-      <div class="arch-section aic">
+      <div class="arch-section aic" id="arch-aic">
         <span class="arch-section-label">AIC</span>
 
         <!-- GM strip -->
@@ -835,54 +1225,78 @@ rect.sprotty-node.output { fill: rgba(14,99,156,0.10) !important; }
           <!-- Main row: L1 | L0A+L0B | Cube | L0C -->
           <div class="aic-main-row">
             <!-- L1 Buffer -->
-            <div class="buf-box buf-l1">
-              <div class="buf-label">L1 Buffer</div>
-              <div class="buf-cap">1024 KB</div>
-              <div class="tensor-chips" id="tensors-L1">
-                <div class="tier-empty">empty</div>
+            <div class="buf-box buf-l1" id="bufbox-L1">
+              <div class="buf-hdr">
+                <span class="buf-label">L1</span>
+                <div style="text-align:right">
+                  <span class="buf-stat-pct" id="pct-L1" style="color:#3b82f6">0%</span>
+                  <span class="buf-stat-used" id="used-L1">0 B / 1024 KB</span>
+                </div>
               </div>
+              <div class="buf-sub-info">1024 KB · ~20cy · row-major</div>
+              <div class="bpg-grid" id="grid-L1" style="grid-template-columns:repeat(8,1fr)"></div>
+              <div class="bpg-free-row"><span id="free-L1">··· 1024 KB FREE ···</span></div>
+              <div class="bpg-addr-row">
+                <span>0x000000</span><span>0x0FFFFF</span>
+              </div>
+              <div class="bpg-legend" id="legend-L1"></div>
             </div>
 
             <!-- L0A + L0B stacked -->
             <div class="l0ab-col">
-              <div class="buf-box buf-l0a" style="flex:1;">
-                <div class="buf-label">L0A</div>
-                <div class="buf-cap">64 KB</div>
-                <div class="tensor-chips" id="tensors-L0A">
-                  <div class="tier-empty">empty</div>
+              <div class="buf-box buf-l0a" id="bufbox-L0A" style="flex:1;">
+                <div class="buf-hdr">
+                  <span class="buf-label">L0A</span>
+                  <span class="buf-stat-pct" id="pct-L0A" style="color:#a78bfa">0%</span>
                 </div>
+                <div class="buf-sub-info">64 KB · 16×16 tile · Cube A</div>
+                <div class="bpg-grid" id="grid-L0A" style="grid-template-columns:repeat(4,1fr)"></div>
+                <div class="bpg-free-row"><span id="free-L0A">64 KB FREE</span></div>
+                <div class="bpg-addr-row"><span>0x0000</span><span>0xFFFF</span></div>
+                <div class="bpg-legend" id="legend-L0A"></div>
               </div>
-              <div class="buf-box buf-l0b" style="flex:1;">
-                <div class="buf-label">L0B</div>
-                <div class="buf-cap">64 KB</div>
-                <div class="tensor-chips" id="tensors-L0B">
-                  <div class="tier-empty">empty</div>
+              <div class="buf-box buf-l0b" id="bufbox-L0B" style="flex:1;">
+                <div class="buf-hdr">
+                  <span class="buf-label">L0B</span>
+                  <span class="buf-stat-pct" id="pct-L0B" style="color:#7c3aed">0%</span>
                 </div>
+                <div class="buf-sub-info">64 KB · 16×16 tile · Cube B</div>
+                <div class="bpg-grid" id="grid-L0B" style="grid-template-columns:repeat(4,1fr)"></div>
+                <div class="bpg-free-row"><span id="free-L0B">64 KB FREE</span></div>
+                <div class="bpg-addr-row"><span>0x0000</span><span>0xFFFF</span></div>
+                <div class="bpg-legend" id="legend-L0B"></div>
               </div>
             </div>
 
             <!-- Cube MMA -->
-            <div class="cube-box">
+            <div class="cube-box" id="cube-unit">
               <span>Cube</span>
               <span class="cube-sub">(MMA)</span>
             </div>
 
             <!-- L0C Buffer -->
-            <div class="buf-box buf-l0c" style="flex:1;">
-              <div class="buf-label">L0C</div>
-              <div class="buf-cap">256 KB</div>
-              <div class="tensor-chips" id="tensors-L0C">
-                <div class="tier-empty">empty</div>
+            <div class="buf-box buf-l0c" id="bufbox-L0C" style="flex:1;">
+              <div class="buf-hdr">
+                <span class="buf-label">L0C</span>
+                <div style="text-align:right">
+                  <span class="buf-stat-pct" id="pct-L0C" style="color:#f97316">0%</span>
+                  <span class="buf-stat-used" id="used-L0C">0 B / 256 KB</span>
+                </div>
               </div>
+              <div class="buf-sub-info">256 KB · Cube output · ACC</div>
+              <div class="bpg-grid" id="grid-L0C" style="grid-template-columns:repeat(8,1fr)"></div>
+              <div class="bpg-free-row"><span id="free-L0C">··· 256 KB FREE ···</span></div>
+              <div class="bpg-addr-row"><span>0x000000</span><span>0x03FFFF</span></div>
+              <div class="bpg-legend" id="legend-L0C"></div>
             </div>
           </div>
 
           <!-- FixPipe bar -->
-          <div class="fixpipe-bar">FixPipe</div>
+          <div class="fixpipe-bar" id="fixpipe-unit">FixPipe</div>
 
           <!-- Scalar unit -->
           <div class="unit-row">
-            <div class="unit-box">Scalar</div>
+            <div class="unit-box" id="scalar-aic-unit">Scalar</div>
           </div>
         </div>
       </div>
@@ -891,7 +1305,7 @@ rect.sprotty-node.output { fill: rgba(14,99,156,0.10) !important; }
       <div class="arch-sep">1 : N &nbsp;(AIV)</div>
 
       <!-- ── AIV Section ─────────────────────────────────── -->
-      <div class="arch-section aiv">
+      <div class="arch-section aiv" id="arch-aiv">
         <span class="arch-section-label">AIV</span>
 
         <!-- GM strip -->
@@ -904,23 +1318,39 @@ rect.sprotty-node.output { fill: rgba(14,99,156,0.10) !important; }
         <!-- AIV inner content -->
         <div class="arch-inner">
           <!-- UB (Unified Buffer) -->
-          <div class="buf-box buf-ub">
-            <div class="buf-label">Unified Buffer (UB)</div>
-            <div class="buf-cap">256 KB</div>
-            <div class="tensor-chips" id="tensors-UB">
-              <div class="tier-empty">empty</div>
+          <div class="buf-box buf-ub" id="bufbox-UB">
+          <div class="buf-hdr">
+            <span class="buf-label">UB</span>
+            <div style="text-align:right">
+              <span class="buf-stat-pct" id="pct-UB" style="color:#10b981">0%</span>
+              <span class="buf-stat-used" id="used-UB">0 B / 256 KB</span>
             </div>
+          </div>
+          <div class="buf-sub-info">256 KB · Vec/Scalar shared · ~5cy</div>
+          <div class="bpg-grid" id="grid-UB" style="grid-template-columns:repeat(8,1fr)"></div>
+          <div class="bpg-free-row"><span id="free-UB">··· 256 KB FREE ···</span></div>
+          <div class="bpg-addr-row"><span>0x000000</span><span>0x03FFFF</span></div>
+          <div class="bpg-legend" id="legend-UB"></div>
           </div>
 
           <!-- Scalar + Vector units -->
           <div class="unit-row">
-            <div class="unit-box">Scalar</div>
-            <div class="unit-box vector">Vector</div>
+            <div class="unit-box" id="scalar-aiv-unit">Scalar</div>
+            <div class="unit-box vector" id="vector-unit">Vector</div>
           </div>
         </div>
       </div>
 
     </div><!-- #arch-diagram -->
+
+    <!-- ── 选中算子详情 ── -->
+    <div class="rp-sec-title" style="--rp-accent:#f97316">选中算子详情</div>
+    <div id="op-detail-panel">
+      <div id="op-detail-body">
+        <div class="od-placeholder">点击计算图中的算子节点查看详情</div>
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -965,7 +1395,7 @@ rect.sprotty-node.output { fill: rgba(14,99,156,0.10) !important; }
         <div class="legend-dot" style="background:#22c55e;border-radius:50%;border:1px solid #22c55e;"></div> Done
       </div>
       <div class="legend-item">
-        <div class="legend-dot" style="background:#E8B300;border-radius:50%;border:1px solid #E8B300;"></div> Executing
+        <div class="legend-dot" style="background:#f59e0b;border-radius:50%;border:1px solid #f59e0b;"></div> Executing
       </div>
       <div class="legend-item">
         <div class="legend-dot" style="background:rgba(255,255,255,0.15);border-radius:50%;border:1px solid rgba(255,255,255,0.3);"></div> Pending
@@ -1158,8 +1588,186 @@ const OP_DATA = [
    ============================================================ */
 const DDR_TENSORS = new Set([17, 19, 21, 23, 25, 27, 30, 33, 36]);
 
+/* ── Tensor metadata: magic → {sh:shape, dt:dtype, b:bytes, s:symbol} ── */
+const TENSOR_META = {
+  17: {sh:[1024,64],dt:"BF16",b:131072,s:"kRope"},
+  19: {sh:[1024,512],dt:"BF16",b:1048576,s:"kNopeCache"},
+  21: {sh:[128,64],dt:"BF16",b:16384,s:"qRope"},
+  23: {sh:[128,512],dt:"BF16",b:131072,s:"qNope"},
+  25: {sh:[1024,512],dt:"BF16",b:1048576,s:"vNopeCache"},
+  27: {sh:[32,1],dt:"UINT32",b:128,s:"miUpdate"},
+  30: {sh:[32,1],dt:"UINT32",b:128,s:"liUpdate"},
+  33: {sh:[32,512],dt:"UINT32",b:65536,s:"oiUpdate"},
+  36: {sh:[128,512],dt:"UINT32",b:262144,s:"paOut"},
+  46: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  47: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  48: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  49: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  55: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  56: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  57: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  58: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  64: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  65: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  66: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  67: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  73: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  74: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  75: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  76: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  82: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  83: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  84: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  85: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  91: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  92: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  93: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  94: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  100: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  101: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  102: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  103: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  109: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  110: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  111: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  112: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  118: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  119: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  120: {sh:[32,64],dt:"BF16",b:4096,s:"View_qi"},
+  121: {sh:[128,64],dt:"BF16",b:16384,s:"View_kj"},
+  124: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  126: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  127: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  128: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  129: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  130: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  131: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  132: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  133: {sh:[32,128],dt:"UINT32",b:16384,s:"sij"},
+  135: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  136: {sh:[32,64],dt:"UINT32",b:8192,s:"View_sij"},
+  138: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  139: {sh:[32,64],dt:"UINT32",b:8192,s:"View_sij"},
+  141: {sh:[32,8],dt:"UINT32",b:1024,s:"OUTCAST_LOCAL_BUF0"},
+  148: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  151: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  153: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  155: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  159: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  162: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  164: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  166: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  168: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  170: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  172: {sh:[32,8],dt:"UINT32",b:1024,s:"OUTCAST_LOCAL_BUF1"},
+  179: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  182: {sh:[1,8],dt:"UINT32",b:32,s:""},
+  189: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  190: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  191: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  197: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  198: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  199: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  206: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  207: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  208: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  214: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  215: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  216: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  223: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  224: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  225: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  231: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  232: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  233: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  240: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  241: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  242: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  248: {sh:[32,64],dt:"BF16",b:4096,s:"a_l0"},
+  249: {sh:[64,128],dt:"BF16",b:16384,s:"b_l0"},
+  250: {sh:[64,128],dt:"BF16",b:16384,s:"View_vNopeCache"},
+  253: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  255: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  257: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  259: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  261: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  263: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  265: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  267: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  269: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  271: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  273: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  275: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  277: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  279: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  281: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  283: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  287: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  288: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  291: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  292: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  295: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  296: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  299: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  300: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  303: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  304: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  307: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  308: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  311: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  312: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  315: {sh:[32,64],dt:"UINT32",b:8192,s:"OUTCAST_LOCAL_BUF2"},
+  316: {sh:[32,64],dt:"UINT32",b:8192,s:"View_"},
+  662: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  663: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  664: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  665: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  666: {sh:[32,64],dt:"BF16",b:4096,s:""},
+  667: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  668: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  669: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  670: {sh:[32,128],dt:"UINT32",b:16384,s:""},
+  671: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  672: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  673: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  674: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  675: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  676: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  677: {sh:[32,1],dt:"UINT32",b:128,s:""},
+  678: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  679: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  680: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  681: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  682: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  683: {sh:[32,64],dt:"UINT32",b:8192,s:""},
+  684: {sh:[32,1],dt:"UINT32",b:128,s:""},
+  685: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  686: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  687: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  688: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  689: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  690: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  691: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+  692: {sh:[32,8],dt:"UINT32",b:1024,s:""},
+};
+
+/* helper: get display name for a tensor magic */
+function getTensorName(magic) {
+  const m = TENSOR_META[magic];
+  if (!m) return `T${magic}`;
+  return m.s ? m.s : `T${magic}`;
+}
+/* helper: format bytes */
+function fmtBytes(b) {
+  if (b >= 1048576) return (b/1048576).toFixed(2)+' MB';
+  if (b >= 1024)    return (b/1024).toFixed(1)+' KB';
+  return b+' B';
+}
+
 const TIERS = ['UB', 'L1', 'L0A', 'L0B', 'L0C'];
 const TIER_CAPACITY = { UB: 256, L1: 1024, L0A: 64, L0B: 64, L0C: 256 };
+/* Actual byte capacities */
+const TIER_CAP_BYTES = { UB: 262144, L1: 1048576, L0A: 65536, L0B: 65536, L0C: 262144 };
 const TIER_COLORS = {
   UB:  '#10b981',
   L1:  '#3b82f6',
@@ -2474,8 +3082,15 @@ function goToStep(step) {
     detTiers.textContent = '—';
   }
 
-  // Render memory panel
+  // Render memory panel (tensor chips + buffer stats)
   renderMemoryPanel(step);
+  renderBufferStats(step);
+
+  // Render runtime status panel
+  renderRuntimeStatus(step);
+
+  // Render selected op detail (re-renders to reflect updated status)
+  if (selectedOpMagic !== null) renderOpDetail(selectedOpMagic);
 
   // Apply SVG coloring
   if (svgLoaded) applyStepToSVG(step);
@@ -2686,9 +3301,401 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* ============================================================
+   Runtime Status Panel
+   ============================================================ */
+const OP_PIPE_COLOR = {
+  'TILE_COPY_IN':    '#3b82f6',
+  'TILE_COPY_OUT':   '#3b82f6',
+  'TILE_L1_TO_L0A':  '#a78bfa',
+  'TILE_L1_TO_L0B':  '#7c3aed',
+  'TILE_A_MUL_B':    '#f97316',
+  'TILE_A_MULACC_B': '#f97316',
+};
+function getOpColor(opName) {
+  if (OP_PIPE_COLOR[opName]) return OP_PIPE_COLOR[opName];
+  if (UB_VEC_OPS.has(opName)) return '#10b981';
+  return '#6b7280';
+}
+function getOpCategory(opName) {
+  if (opName === 'TILE_COPY_IN' || opName === 'TILE_COPY_OUT') return 'MTE';
+  if (opName === 'TILE_L1_TO_L0A') return 'L1→L0A';
+  if (opName === 'TILE_L1_TO_L0B') return 'L1→L0B';
+  if (opName === 'TILE_A_MUL_B' || opName === 'TILE_A_MULACC_B') return 'Cube';
+  if (UB_VEC_OPS.has(opName)) return 'Vector';
+  return 'Scalar';
+}
+
+function renderRuntimeStatus(step) {
+  const total = totalSteps;
+  const done = step;                    // ops at index < step have completed
+  const pending = total - step - 1;     // ops after current
+  const pct = total > 0 ? ((step / (total - 1)) * 100).toFixed(1) : '0.0';
+
+  document.getElementById('rs-prog-fill').style.width = pct + '%';
+  document.getElementById('rs-step-lbl').textContent = `Step ${step + 1} / ${total}`;
+  document.getElementById('rs-pct-lbl').textContent = pct + '%';
+  document.getElementById('rs-done').textContent = `✓ ${done} done`;
+  document.getElementById('rs-run').textContent = `▶ 1 running`;
+  document.getElementById('rs-pend').textContent = `◌ ${pending} pending`;
+
+  const op = opByMagic.get(SCHEDULE[step]);
+  if (op) {
+    const c = getOpColor(op.n);
+    const cat = getOpCategory(op.n);
+    document.getElementById('rs-cur-dot').style.background = c;
+    document.getElementById('rs-cur-name').textContent = op.n;
+    document.getElementById('rs-cur-magic').textContent = `#${op.m}`;
+    const badge = document.getElementById('rs-pipe-badge');
+    badge.textContent = cat;
+    badge.style.cssText = `background:${c}22;color:${c};border:1px solid ${c}55;font-size:8px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0;`;
+  } else {
+    document.getElementById('rs-cur-dot').style.background = '#6b7280';
+    document.getElementById('rs-cur-name').textContent = '—';
+    document.getElementById('rs-cur-magic').textContent = '';
+    document.getElementById('rs-pipe-badge').textContent = '';
+    document.getElementById('rs-pipe-badge').style.cssText = '';
+  }
+}
+
+/* ============================================================
+   Buffer Grid & Stats Rendering
+   ============================================================ */
+const TIER_CAPACITY_KB = { UB: 256*1024, L1: 1024*1024, L0A: 64*1024, L0B: 64*1024, L0C: 256*1024 };
+const GRID_CELLS = { UB: 32, L1: 32, L0A: 16, L0B: 16, L0C: 24 };
+
+/* Tensor color palette — deterministic per magic */
+const TENSOR_PALETTE = [
+  '#1D4ED8','#0284C7','#0891B2','#059669','#D97706',
+  '#7C3AED','#DC2626','#9333EA','#D97706','#0D9488',
+  '#6D28D9','#BE185D','#1E40AF','#065F46','#92400E',
+];
+
+/* Grid configs: rows×cols × bytesPerCell = bufferCapacity */
+const BPG_CONFIG = {
+  L1:  { rows: 8, cols: 8,  bpc: 16384  }, // 64 cells × 16KB = 1024KB
+  L0A: { rows: 4, cols: 4,  bpc: 4096   }, // 16 cells × 4KB  = 64KB
+  L0B: { rows: 4, cols: 4,  bpc: 4096   }, // 16 cells × 4KB  = 64KB
+  L0C: { rows: 8, cols: 8,  bpc: 4096   }, // 64 cells × 4KB  = 256KB
+  UB:  { rows: 8, cols: 8,  bpc: 4096   }, // 64 cells × 4KB  = 256KB
+};
+
+/* Build & render one buffer's pixel grid */
+function buildAndRenderBpg(tier, tensors, activeTensors, inputSet, outputSet) {
+  const capBytes = TIER_CAP_BYTES[tier];
+  const cfg = BPG_CONFIG[tier];
+  if (!cfg) return;
+  const totalCells = cfg.rows * cfg.cols;
+  const bpc = cfg.bpc; // bytes per cell
+
+  // Assign a palette color per tensor (sorted by magic for stability)
+  const sorted = [...tensors].sort((a, b) => a - b);
+  const tColor = new Map();
+  sorted.forEach((t, i) => tColor.set(t, TENSOR_PALETTE[i % TENSOR_PALETTE.length]));
+
+  // Build cell occupancy: lay tensors sequentially in address space
+  const cellMeta = new Array(totalCells).fill(null);
+  let cursor = 0;
+  for (const t of tensors) {
+    const meta = TENSOR_META[t];
+    const bytes = meta?.b ?? 0;
+    if (!bytes || cursor >= capBytes) continue;
+    const startCell = Math.floor(cursor / bpc);
+    const endCell   = Math.min(totalCells - 1, Math.ceil((cursor + bytes) / bpc) - 1);
+    const isAct = activeTensors.has(t);
+    const isIn  = inputSet.has(t);
+    const isOut = outputSet.has(t);
+    for (let c = startCell; c <= endCell; c++) {
+      if (!cellMeta[c]) {
+        cellMeta[c] = { color: tColor.get(t), isActive: isAct, isRead: isIn, isWrite: isOut, magic: t, addr: cursor };
+      }
+    }
+    cursor += bytes;
+  }
+
+  // Usage
+  const usedBytes = Math.min(tensors.reduce((s, t) => s + (TENSOR_META[t]?.b ?? 0), 0), capBytes);
+  const freeBytes = capBytes - usedBytes;
+  const fillPct = usedBytes / capBytes * 100;
+
+  // Grid HTML
+  let html = '';
+  for (let i = 0; i < totalCells; i++) {
+    const m = cellMeta[i];
+    const addrHex = '0x' + (i * bpc).toString(16).toUpperCase().padStart(6, '0');
+    if (!m) {
+      html += `<div class="bpg-cell bpg-empty" data-tier="${tier}" data-ci="${i}" data-addr="${addrHex}"></div>`;
+    } else {
+      const meta = TENSOR_META[m.magic];
+      const name  = meta?.s || `T${m.magic}`;
+      const shStr = meta?.sh ? JSON.stringify(meta.sh) : '?';
+      const dtStr = meta?.dt || '';
+      const szStr = meta?.b ? fmtBytes(meta.b) : '';
+      const cls = ['bpg-cell', m.isActive ? 'bpg-active' : '', m.isRead ? 'bpg-read' : m.isWrite ? 'bpg-write' : ''].filter(Boolean).join(' ');
+      const op = m.isActive ? '1' : '0.75';
+      html += `<div class="${cls}"
+        style="background:${m.color};opacity:${op}"
+        data-tier="${tier}" data-ci="${i}" data-addr="${addrHex}"
+        data-name="${name}" data-dt="${dtStr}" data-sh="${shStr}"
+        data-sz="${szStr}" data-rw="${m.isRead?'read':m.isWrite?'write':''}"
+        data-magic="${m.magic}" data-color="${m.color}"></div>`;
+    }
+  }
+
+  // Update grid
+  const gridEl = document.getElementById(`grid-${tier}`);
+  if (gridEl) gridEl.innerHTML = html;
+
+  // Update pct / used
+  const pctEl  = document.getElementById(`pct-${tier}`);
+  const usedEl = document.getElementById(`used-${tier}`);
+  const freeEl = document.getElementById(`free-${tier}`);
+  if (pctEl)  { pctEl.textContent = fillPct.toFixed(1) + '%'; pctEl.style.color = fillPct > 85 ? '#ef4444' : fillPct > 65 ? '#f97316' : ''; }
+  if (usedEl) usedEl.textContent = `${fmtBytes(usedBytes)} / ${fmtBytes(capBytes)}`;
+  if (freeEl) freeEl.textContent = freeBytes > 0 ? `··· ${fmtBytes(freeBytes)} FREE ···` : '··· FULL ···';
+
+  // Legend
+  const legendEl = document.getElementById(`legend-${tier}`);
+  if (legendEl) {
+    let leg = '';
+    for (const t of sorted.slice(0, 5)) {
+      const meta = TENSOR_META[t];
+      const nm = meta?.s || `T${t}`;
+      const sh = meta?.sh ? '[' + meta.sh.join('×') + ']' : '';
+      const sz = meta?.b ? fmtBytes(meta.b) : '';
+      leg += `<span class="bpg-legend-item" title="T${t} ${sh} ${meta?.dt||''} ${sz}">
+        <span class="bpg-legend-dot" style="background:${tColor.get(t)}"></span>${nm}
+      </span>`;
+    }
+    if (sorted.length > 5) leg += `<span class="bpg-legend-item" style="color:var(--text-dim)">+${sorted.length - 5}…</span>`;
+    legendEl.innerHTML = leg;
+  }
+}
+
+function renderBufferStats(step) {
+  const liveByTier   = getLiveTensorsAtStep(step);
+  const activeTensors = getActiveTensors(step);
+  const op      = opByMagic.get(SCHEDULE[step]);
+  const inputSet  = op ? new Set(op.i) : new Set();
+  const outputSet = op ? new Set(op.o) : new Set();
+
+  for (const tier of ARCH_TIERS) {
+    const tensors = liveByTier[tier] || [];
+    buildAndRenderBpg(tier, tensors, activeTensors, inputSet, outputSet);
+  }
+
+  // Compute unit highlights (unchanged)
+  const cubeActive = op && (op.n === 'TILE_A_MUL_B' || op.n === 'TILE_A_MULACC_B');
+  const vecActive  = op && UB_VEC_OPS.has(op.n);
+
+  const cubeEl = document.getElementById('cube-unit');
+  if (cubeEl) cubeEl.style.cssText = cubeActive
+    ? 'background:#f97316;color:#fff;box-shadow:0 0 10px rgba(249,115,22,0.55);transform:scale(1.04);transition:all .15s;'
+    : 'transition:all .15s;';
+  const vecEl = document.getElementById('vector-unit');
+  if (vecEl) vecEl.style.cssText = vecActive
+    ? 'background:#10b981;color:#fff;box-shadow:0 0 8px rgba(16,185,129,0.5);transition:all .15s;'
+    : 'transition:all .15s;';
+  const fixEl = document.getElementById('fixpipe-unit');
+  if (fixEl) fixEl.style.cssText = cubeActive
+    ? 'background:#fef3c7;border-color:#f59e0b;color:#b45309;font-weight:700;transition:all .15s;'
+    : 'transition:all .15s;';
+
+  const liveByTierLocal = liveByTier;
+  const anyAIC = ['L1','L0A','L0B','L0C'].some(t => (liveByTierLocal[t]||[]).length > 0);
+  const anyAIV = (liveByTierLocal['UB']||[]).length > 0;
+  const aicEl = document.getElementById('arch-aic');
+  const aivEl = document.getElementById('arch-aiv');
+  if (aicEl) aicEl.style.background = anyAIC ? '#e8f0ff' : '';
+  if (aivEl) aivEl.style.background = anyAIV ? '#e8fff4' : '';
+}
+
+/* ============================================================
+   Selected Op Detail Panel
+   ============================================================ */
+let selectedOpMagic = null;
+
+function selectOp(magic) {
+  selectedOpMagic = (selectedOpMagic === magic) ? null : magic;
+  renderOpDetail(selectedOpMagic);
+}
+
+function renderOpDetail(magic) {
+  const body = document.getElementById('op-detail-body');
+  if (!magic) {
+    body.innerHTML = '<div class="od-placeholder">点击计算图中的算子节点查看详情</div>';
+    return;
+  }
+  const op = opByMagic.get(magic);
+  if (!op) {
+    body.innerHTML = '<div class="od-placeholder">未找到算子信息</div>';
+    return;
+  }
+
+  const c = getOpColor(op.n);
+  const cat = getOpCategory(op.n);
+
+  // Schedule index for this op
+  const stepIdx = scheduleIndexOf.get(magic) ?? -1;
+  const status = stepIdx < currentStep ? 'done' :
+                 stepIdx === currentStep ? 'executing' : 'pending';
+  const statusLabel = { done: '✓ 已完成', executing: '▶ 执行中', pending: '◌ 待执行' }[status];
+  const statusColor = { done: '#059669', executing: '#c05600', pending: '#9ca3af' }[status];
+
+  // Determine which tensors are inputs vs outputs
+  const inputTensors  = op.i || [];
+  const outputTensors = op.o || [];
+
+  let html = `
+    <div class="od-header">
+      <div class="od-color-bar" style="background:${c}"></div>
+      <div style="flex:1;">
+        <div class="od-name">${op.n}</div>
+        <span class="od-pipe-badge" style="background:${c}18;color:${c};border:1px solid ${c}44">${cat}</span>
+      </div>
+    </div>
+    <div class="od-row"><span>Magic ID</span><span class="od-val" style="font-family:monospace">#${op.m}</span></div>
+    <div class="od-row"><span>执行顺序</span><span class="od-val">Step ${stepIdx + 1} / ${totalSteps}</span></div>
+    <div class="od-row"><span>状态</span><span class="od-val" style="color:${statusColor}">${statusLabel}</span></div>
+  `;
+
+  // Memory operations section
+  if (inputTensors.length > 0 || outputTensors.length > 0) {
+    html += '<div class="od-sep"></div>';
+    html += '<div class="od-mem-label">内存操作</div>';
+
+    const renderTensorRow = (t, dirLabel, dirClass) => {
+      const tier = getTensorTier(t);
+      const tc   = TIER_COLORS[tier] || '#6b7280';
+      const meta = TENSOR_META[t];
+      const name = meta?.s ? meta.s : `T${t}`;
+      const shStr = meta?.sh ? '[' + meta.sh.join('×') + ']' : '';
+      const dtStr = meta?.dt ?? '';
+      const szStr = meta?.b ? fmtBytes(meta.b) : '';
+      return `<div class="od-tensor-row">
+        <span class="od-dir ${dirClass}">${dirLabel}</span>
+        <span class="od-tier-chip" style="background:${tc}">${tier}</span>
+        <span class="od-t-magic" title="T${t}">${name}</span>
+        <span style="font-size:8.5px;color:var(--text-dim);white-space:nowrap">${shStr}&nbsp;${dtStr}</span>
+        <span style="font-size:8.5px;color:var(--text-secondary);font-weight:600;white-space:nowrap;margin-left:2px">${szStr}</span>
+      </div>`;
+    };
+
+    for (const t of inputTensors)  html += renderTensorRow(t, '读', 'in');
+    for (const t of outputTensors) html += renderTensorRow(t, '写', 'out');
+  }
+
+  body.innerHTML = html;
+}
+
+/* ============================================================
+   SVG Click Handler — Op Selection
+   ============================================================ */
+function attachSVGClickHandler() {
+  if (!svgEl) return;
+  svgEl.addEventListener('click', (e) => {
+    // Walk up from click target to find an element with id matching op pattern
+    let el = e.target;
+    while (el && el !== svgEl) {
+      const id = el.id || '';
+      const m = id.match(/^sprotty_operation-magic-(\d+)/);
+      if (m) {
+        selectOp(parseInt(m[1], 10));
+        return;
+      }
+      el = el.parentElement;
+    }
+  });
+}
+
+/* ============================================================
+   Pixel Grid Hover — floating tip
+   ============================================================ */
+(function() {
+  const TIP_OFFSET_X = 14;
+  const TIP_OFFSET_Y = 12;
+
+  // Create the single global floating tooltip
+  const ftip = document.createElement('div');
+  ftip.id = 'bpg-float-tip';
+  document.body.appendChild(ftip);
+
+  let lastCell = null;
+
+  function row(k, v, cls) {
+    return `<div class="bt-row"><span class="bt-k">${k}</span><span class="bt-v${cls ? ' ' + cls : ''}">${v}</span></div>`;
+  }
+
+  function showTip(cell, mouseX, mouseY) {
+    if (cell.classList.contains('bpg-empty')) { hideTip(); return; }
+
+    const tier  = cell.dataset.tier  || '';
+    const name  = cell.dataset.name  || `T${cell.dataset.magic}`;
+    const sh    = cell.dataset.sh    || '';
+    const dt    = cell.dataset.dt    || '';
+    const sz    = cell.dataset.sz    || '';
+    const addr  = cell.dataset.addr  || '';
+    const rw    = cell.dataset.rw    || '';
+    const color = cell.dataset.color || '#3b82f6';
+    const rwCls = rw === 'read' ? 'rw-r' : rw === 'write' ? 'rw-w' : '';
+
+    ftip.innerHTML =
+      `<div style="font-size:10px;font-weight:700;color:${color};margin-bottom:2px;letter-spacing:.03em">${tier} · Tensor</div>` +
+      `<div class="bt-divider"></div>` +
+      row('Name',  name) +
+      row('Shape', sh) +
+      row('Type',  dt) +
+      row('Size',  sz) +
+      row('Addr',  addr) +
+      (rw ? row('Access', rw, rwCls) : '');
+
+    ftip.style.borderColor = rw === 'read'  ? 'rgba(59,130,246,0.55)'
+                           : rw === 'write' ? 'rgba(16,185,129,0.55)'
+                           : color + '66';
+
+    positionTip(mouseX, mouseY);
+    ftip.classList.add('visible');
+    lastCell = cell;
+  }
+
+  function positionTip(mx, my) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = mx + TIP_OFFSET_X;
+    let y = my + TIP_OFFSET_Y;
+    // Flip left if would overflow right edge
+    if (x + 230 > vw) x = mx - 230 - TIP_OFFSET_X;
+    // Flip up if would overflow bottom
+    if (y + 160 > vh) y = my - 160 - TIP_OFFSET_Y;
+    ftip.style.left = x + 'px';
+    ftip.style.top  = y + 'px';
+  }
+
+  function hideTip() {
+    ftip.classList.remove('visible');
+    lastCell = null;
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    if (lastCell) positionTip(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('mouseover', (e) => {
+    const cell = e.target.closest('.bpg-cell');
+    if (cell) showTip(cell, e.clientX, e.clientY);
+    else hideTip();
+  });
+
+  document.addEventListener('mouseleave', hideTip);
+})();
+
+/* ============================================================
    Initialize
    ============================================================ */
-loadSVG();
+loadSVG().then(() => {
+  attachSVGClickHandler();
+}).catch(() => {
+  // SVG load failed, attach handler is skipped — that's OK
+});
 goToStep(0);
 </script>
 </body>
