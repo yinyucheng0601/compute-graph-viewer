@@ -66,7 +66,7 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
           <span id="swSearchCount" class="sw-search-count">0 / 0</span>
         </div>
         <div class="sw-action-group">
-          <button id="swResourceToggleBtn" class="btn" type="button">资源</button>
+          <button id="swResourceToggleBtn" class="btn sw-resource-cta" type="button">加载本地资源</button>
         </div>
         <input id="swFolderInput" type="file" webkitdirectory directory multiple accept=".json,.py,application/json,text/x-python" hidden>
         <input id="swFileInput" type="file" accept=".json,application/json" hidden>
@@ -140,25 +140,23 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
                 <div class="sw-chart-panel-meta" id="swPrimaryPanelMeta"></div>
               </div>
             </div>
-            <div class="sw-data-mode-bar">
-              <div class="sw-data-mode-group">
-                <span class="sw-data-mode-label">内置样例</span>
-                <div class="sw-toggle-group">
-                  <button id="swBeforeBtn" class="btn sw-toggle-btn sw-toggle-active" type="button">Before</button>
-                  <button id="swAfterBtn"  class="btn sw-toggle-btn" type="button">After</button>
-                </div>
-              </div>
-              <div class="sw-data-mode-group">
-                <span class="sw-data-mode-label">数据视角</span>
-                <div class="sw-view-mode-group">
-                  <button id="swSingleViewBtn" class="btn sw-view-mode-btn" type="button">单视图</button>
-                  <button id="swCompareViewBtn" class="btn sw-view-mode-btn" type="button">对比</button>
-                  <button id="swDiffViewBtn" class="btn sw-view-mode-btn" type="button">Diff</button>
-                </div>
-              </div>
-              <div id="swBindingStatus" class="sw-status-pill-row"></div>
-            </div>
             <div class="sw-chart-controls">
+              <div class="sw-chart-controls-section sw-chart-controls-section--mode">
+                <span class="sw-controls-section-label">模式</span>
+                <div class="sw-chart-controls-row">
+                  <span class="sw-filter-label">样例</span>
+                  <div class="sw-toggle-group">
+                    <button id="swBeforeBtn" class="btn sw-toggle-btn sw-toggle-active" type="button">Before</button>
+                    <button id="swAfterBtn"  class="btn sw-toggle-btn" type="button">After</button>
+                  </div>
+                  <span class="sw-filter-label">视图</span>
+                  <div class="sw-view-mode-group">
+                    <button id="swSingleViewBtn" class="btn sw-view-mode-btn" type="button">单视图</button>
+                    <button id="swCompareViewBtn" class="btn sw-view-mode-btn" type="button">对比</button>
+                    <button id="swDiffViewBtn" class="btn sw-view-mode-btn" type="button">Diff</button>
+                  </div>
+                </div>
+              </div>
               <div class="sw-chart-controls-section">
                 <span class="sw-controls-section-label">筛选</span>
                 <div class="sw-chart-controls-row">
@@ -170,36 +168,49 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
                   <div id="swSeqFilters" class="sw-chip-row"></div>
                 </div>
               </div>
-              <div class="sw-chart-controls-section sw-chart-controls-section--display">
-                <span class="sw-controls-section-label">显示</span>
-                <div class="sw-chart-controls-row">
-                  <span class="sw-filter-label">Color</span>
-                  <select id="swColorMode" class="sw-select">
-                    <option value="semantic">语义标签</option>
-                    <option value="engine">执行单元 / Lane</option>
-                    <option value="stitch">Stitch（仅泳道）</option>
-                    <option value="subgraph">子图 / Leaf</option>
-                  </select>
-                  <span class="sw-filter-label">Sort</span>
-                  <select id="swSortMode" class="sw-select">
-                    <option value="default">默认顺序</option>
-                    <option value="gap">按最大气泡</option>
-                    <option value="util">按利用率</option>
-                    <option value="taskCount">按任务数</option>
-                    <option value="duration">按工作时长</option>
-                  </select>
+              <div class="sw-chart-controls-section sw-chart-controls-section--quick">
+                <div class="sw-zoom-group">
+                  <button id="swZoomOutBtn" class="btn" type="button">缩小</button>
+                  <button id="swZoomInBtn"  class="btn" type="button">放大</button>
+                  <button id="swZoomFitBtn" class="btn" type="button">适配</button>
                 </div>
-                <div class="sw-chart-controls-row">
-                  <button id="swToggleBubbles" class="btn" type="button">Bubbles</button>
-                  <button id="swMeasureModeBtn" class="btn" type="button">Measure</button>
-                  <button id="swClearRangeBtn" class="btn" type="button">清除区间</button>
-                  <div class="sw-zoom-group">
-                    <button id="swZoomOutBtn" class="btn" type="button">缩小</button>
-                    <button id="swZoomInBtn"  class="btn" type="button">放大</button>
-                    <button id="swZoomFitBtn" class="btn" type="button">适配</button>
+                <div class="sw-more-menu-wrap">
+                  <button id="swMoreControlsBtn" class="btn sw-more-menu-btn" type="button" aria-expanded="false">更多</button>
+                  <div id="swMoreControlsMenu" class="sw-more-menu" hidden>
+                    <div class="sw-more-menu-section">
+                      <div class="sw-more-menu-title">显示</div>
+                      <div class="sw-chart-controls-row">
+                        <span class="sw-filter-label">Color</span>
+                        <select id="swColorMode" class="sw-select">
+                          <option value="semantic">语义标签</option>
+                          <option value="engine">执行单元 / Lane</option>
+                          <option value="stitch">Stitch（仅泳道）</option>
+                          <option value="subgraph">子图 / Leaf</option>
+                        </select>
+                      </div>
+                      <div class="sw-chart-controls-row">
+                        <span class="sw-filter-label">Sort</span>
+                        <select id="swSortMode" class="sw-select">
+                          <option value="default">默认顺序</option>
+                          <option value="gap">按最大气泡</option>
+                          <option value="util">按利用率</option>
+                          <option value="taskCount">按任务数</option>
+                          <option value="duration">按工作时长</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="sw-more-menu-section">
+                      <div class="sw-more-menu-title">分析</div>
+                      <div class="sw-chart-controls-row">
+                        <button id="swToggleBubbles" class="btn" type="button">Bubbles</button>
+                        <button id="swMeasureModeBtn" class="btn" type="button">Measure</button>
+                        <button id="swClearRangeBtn" class="btn" type="button">清除区间</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+              <div id="swBindingStatus" class="sw-status-pill-row"></div>
             </div>
             <section id="swDiffSummary" class="sw-diff-inline" hidden>
               <div class="sw-card-head">

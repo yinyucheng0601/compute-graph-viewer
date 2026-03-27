@@ -32,6 +32,8 @@
     zoomInBtn: document.getElementById('swZoomInBtn'),
     zoomOutBtn: document.getElementById('swZoomOutBtn'),
     zoomFitBtn: document.getElementById('swZoomFitBtn'),
+    moreControlsBtn: document.getElementById('swMoreControlsBtn'),
+    moreControlsMenu: document.getElementById('swMoreControlsMenu'),
     beforeBtn: document.getElementById('swBeforeBtn'),
     afterBtn: document.getElementById('swAfterBtn'),
     singleViewBtn: document.getElementById('swSingleViewBtn'),
@@ -854,13 +856,11 @@
   function renderBindingStatus() {
     const primary = state.datasets.primary;
     const compare = state.datasets.compare;
-    const sourceName = state.bindings.moduleDir?.sourceName || '未绑定';
-    const pills = [
-      statusPillHtml('主泳道', primary ? primary.name : '未载入', primary ? 'is-bound' : 'is-muted'),
-      statusPillHtml('参考泳道', compare ? compare.name : '未绑定', compare ? 'is-compare' : 'is-muted'),
-      statusPillHtml('Program', state.bindings.program ? state.bindings.program.name : '未绑定', state.bindings.program ? 'is-program' : 'is-muted'),
-      statusPillHtml('源码', sourceName, state.bindings.moduleDir?.sourceName ? 'is-source' : 'is-muted'),
-    ];
+    const pills = [];
+    if (primary) pills.push(statusPillHtml('主', primary.name, 'is-bound'));
+    if (compare) pills.push(statusPillHtml('参', compare.name, 'is-compare'));
+    if (state.bindings.program) pills.push(statusPillHtml('Program', state.bindings.program.name, 'is-program'));
+    if (state.bindings.moduleDir?.sourceName) pills.push(statusPillHtml('码', state.bindings.moduleDir.sourceName, 'is-source'));
     if (dom.bindingStatus) dom.bindingStatus.innerHTML = pills.join('');
     renderResourcePanel();
   }
@@ -2129,9 +2129,9 @@
   }
 
   function renderControlState() {
-    dom.singleViewBtn.classList.toggle('btn-primary', !state.compareMode);
-    dom.compareViewBtn.classList.toggle('btn-primary', state.compareMode && state.comparePresentation === 'compare');
-    dom.diffViewBtn.classList.toggle('btn-primary', state.compareMode && state.comparePresentation === 'diff');
+    dom.singleViewBtn.classList.toggle('is-active', !state.compareMode);
+    dom.compareViewBtn.classList.toggle('is-active', state.compareMode && state.comparePresentation === 'compare');
+    dom.diffViewBtn.classList.toggle('is-active', state.compareMode && state.comparePresentation === 'diff');
     dom.measureModeBtn.classList.toggle('btn-primary', state.measureMode);
     dom.toggleBubblesBtn.classList.toggle('btn-primary', state.showBubbles);
   }
@@ -2325,6 +2325,24 @@
     dom.resourceToggleBtn?.setAttribute('aria-expanded', 'false');
   }
 
+  function closeMoreControlsMenu() {
+    if (!dom.moreControlsMenu || dom.moreControlsMenu.hidden) return;
+    dom.moreControlsMenu.hidden = true;
+    dom.moreControlsBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  function openMoreControlsMenu() {
+    if (!dom.moreControlsMenu) return;
+    dom.moreControlsMenu.hidden = false;
+    dom.moreControlsBtn?.setAttribute('aria-expanded', 'true');
+  }
+
+  function toggleMoreControlsMenu() {
+    if (!dom.moreControlsMenu) return;
+    if (dom.moreControlsMenu.hidden) openMoreControlsMenu();
+    else closeMoreControlsMenu();
+  }
+
   function openResourcePanel() {
     if (!dom.resourcePanel) return;
     renderResourcePanel();
@@ -2495,11 +2513,22 @@
   dom.resourcePanel?.addEventListener('click', (event) => {
     event.stopPropagation();
   });
+  dom.moreControlsBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleMoreControlsMenu();
+  });
+  dom.moreControlsMenu?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
   document.addEventListener('click', () => {
     closeResourcePanel();
+    closeMoreControlsMenu();
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeResourcePanel();
+    if (event.key === 'Escape') {
+      closeResourcePanel();
+      closeMoreControlsMenu();
+    }
   });
   dom.searchPrevBtn?.addEventListener('click', () => goToNextMatch(-1));
   dom.searchNextBtn?.addEventListener('click', () => goToNextMatch(1));
@@ -2709,23 +2738,19 @@
   function buildDeepDiveCardHtml() {
     const selected = getSelectedTaskState();
     const moduleDir = state.bindings.moduleDir;
-    const resourceActionLabel = moduleDir || state.bindings.program ? '管理资源' : '补齐模块资源';
+    const resourceActionLabel = moduleDir || state.bindings.program ? '加载本地资源' : '加载本地资源';
     const moduleSection = moduleDir
       ? `<div class="sw-journey-program-bound is-folder">
            <span class="sw-journey-bound-check">✓</span>
            <span>${escapeHtml(moduleDir.name)} · ${escapeHtml(String(moduleDir.entryCount || 0))} 文件</span>
          </div>`
-      : `<div class="sw-journey-program-bound is-empty">
-           <span>模块目录未绑定</span>
-         </div>`;
+      : '';
     const programSection = state.bindings.program
       ? `<div class="sw-journey-program-bound">
            <span class="sw-journey-bound-check">✓</span>
            <span>${escapeHtml(state.bindings.program.name || 'program.json')}</span>
          </div>`
-      : `<div class="sw-journey-program-bound is-empty">
-           <span>Program 未绑定</span>
-         </div>`;
+      : '';
     const selectedTaskHtml = selected.task
       ? `
           <div class="sw-journey-stat">
@@ -2749,7 +2774,7 @@
           <div class="sw-journey-stat-label" style="margin-bottom:4px">模块资源</div>
           ${moduleSection}
           ${programSection}
-          <button class="sw-journey-program-btn" id="swJourneyBtnResources" type="button">${escapeHtml(resourceActionLabel)}</button>
+          <button class="sw-journey-btn" id="swJourneyBtnResources" type="button">${escapeHtml(resourceActionLabel)}</button>
           <div class="sw-journey-card-divider"></div>
           <div class="sw-detail-note">旅程入口保留，但会统一打开顶部“资源”面板。</div>
           <div class="sw-detail-note">${escapeHtml(selected.depReason)}</div>
@@ -2757,9 +2782,9 @@
           <div class="sw-detail-note">${escapeHtml(selected.sourceFlowReason)}</div>
         </div>
         <div class="sw-journey-card-actions">
-          <button class="sw-journey-btn${selected.canShowDeps ? '' : ' is-disabled'}" id="swJourneyBtnDeps" type="button"${selected.canShowDeps ? '' : ' disabled'}>显示前后依赖连线</button>
-          <button class="sw-journey-btn${selected.canOpenPassIr ? '' : ' is-disabled'}" id="swJourneyBtnPassIr" type="button"${selected.canOpenPassIr ? '' : ' disabled'}>${escapeHtml(selected.passIrActionLabel)}</button>
-          <button class="sw-journey-btn${selected.canOpenSourceFlow ? '' : ' is-disabled'}" id="swJourneyBtnSourceFlow" type="button"${selected.canOpenSourceFlow ? '' : ' disabled'}>${escapeHtml(selected.sourceFlowActionLabel)}</button>
+          <button class="sw-journey-btn" id="swJourneyBtnDeps" type="button">显示前后依赖连线</button>
+          <button class="sw-journey-btn" id="swJourneyBtnPassIr" type="button">${escapeHtml(selected.passIrActionLabel)}</button>
+          <button class="sw-journey-btn" id="swJourneyBtnSourceFlow" type="button">${escapeHtml(selected.sourceFlowActionLabel)}</button>
         </div>
       </div>`;
   }
@@ -2797,6 +2822,11 @@
     const depsBtn = document.getElementById('swJourneyBtnDeps');
     if (depsBtn) {
       depsBtn.addEventListener('click', () => {
+        const selected = getSelectedTaskState();
+        if (!selected.canShowDeps) {
+          openResourcePanel();
+          return;
+        }
         focusDependencyChainFromSelectedTask();
       });
     }
@@ -2805,7 +2835,10 @@
     if (passIrBtn) {
       passIrBtn.addEventListener('click', () => {
         const selected = getSelectedTaskState();
-        if (!selected.canOpenPassIr) return;
+        if (!selected.canOpenPassIr) {
+          openResourcePanel();
+          return;
+        }
         hideTaskPopup();
         openSplitView(canTaskOpenPassIr(selected.task) ? selected.task : null, 'pass-ir');
       });
@@ -2815,7 +2848,10 @@
     if (sourceFlowBtn) {
       sourceFlowBtn.addEventListener('click', () => {
         const selected = getSelectedTaskState();
-        if (!selected.canOpenSourceFlow) return;
+        if (!selected.canOpenSourceFlow) {
+          openResourcePanel();
+          return;
+        }
         hideTaskPopup();
         openSplitView(canTaskOpenSourceFlow(selected.task) ? selected.task : null, 'source-flow');
       });
