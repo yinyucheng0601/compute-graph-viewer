@@ -1,4 +1,5 @@
 import { OP_DATA, TENSOR_TOBE } from '../data/ops.js';
+export { TENSOR_META } from '../data/ops.js';
 
 /* ============================================================
    Constants
@@ -9,13 +10,34 @@ const TOBE_TO_TIER = { 1: 'L1', 2: 'L0A', 3: 'L0B', 4: 'L0C', 15: 'DDR' };
 
 const TIERS = ['L1', 'L0A', 'L0B', 'L0C'];  // on-chip tiers shown in arch diagram
 const TIER_CAPACITY = { L1: 1024, L0A: 64, L0B: 64, L0C: 256 };
+const TIER_CAP_BYTES = { L1: 1048576, L0A: 65536, L0B: 65536, L0C: 262144, UB: 262144 };
 const TIER_COLORS = {
   L1:  '#3b82f6',
   L0A: '#a78bfa',
   L0B: '#7c3aed',
   L0C: '#f97316',
+  UB:  '#10b981',
   DDR: '#6b7280',
 };
+
+// Pixel grid config: rows × cols × bytes-per-cell
+const BPG_CONFIG = {
+  L1:  { rows: 8, cols: 8, bpc: 16384 },
+  L0A: { rows: 4, cols: 4, bpc: 4096  },
+  L0B: { rows: 4, cols: 4, bpc: 4096  },
+  L0C: { rows: 8, cols: 8, bpc: 4096  },
+  UB:  { rows: 8, cols: 8, bpc: 4096  },
+};
+
+// Tensor color palette (15 colors, assigned by sorted magic index)
+const TENSOR_PALETTE = [
+  '#1D4ED8', '#0284C7', '#0891B2', '#059669', '#D97706',
+  '#7C3AED', '#DC2626', '#9333EA', '#D97706', '#0D9488',
+  '#6D28D9', '#BE185D', '#1E40AF', '#065F46', '#92400E',
+];
+
+// UB vector ops (none in this graph, but defined for completeness)
+const UB_VEC_OPS = new Set([]);
 
 const OP_CATEGORY_COLOR = {
   'COPY_IN':    '#3577F6',
@@ -69,9 +91,25 @@ function getOpColor(opName) {
   return OP_CATEGORY_COLOR[opName] ?? '#6b7280';
 }
 
+function getOpCategory(opName) {
+  if (opName === 'COPY_IN' || opName === 'COPY_OUT') return 'DMA';
+  if (opName === 'L1_TO_L0A') return 'L1→L0A';
+  if (opName === 'L1_TO_L0B') return 'L1→L0B';
+  if (opName === 'A_MUL_B' || opName === 'A_MULACC_B') return 'Cube MMA';
+  if (UB_VEC_OPS.has(opName)) return 'Vector UB';
+  return 'Other';
+}
+
+function fmtBytes(b) {
+  if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+  if (b >= 1024)    return (b / 1024).toFixed(1) + ' KB';
+  return b + ' B';
+}
+
 export {
-  TOBE_TO_TIER, TIERS, TIER_CAPACITY, TIER_COLORS,
+  TOBE_TO_TIER, TIERS, TIER_CAPACITY, TIER_CAP_BYTES, TIER_COLORS,
+  BPG_CONFIG, TENSOR_PALETTE, UB_VEC_OPS,
   OP_CATEGORY_COLOR, CUBE_OPS, ALLOC_OPS,
   opByMagic, tensorProducer,
-  getTensorTier, getOpColor,
+  getTensorTier, getOpColor, getOpCategory, fmtBytes,
 };
