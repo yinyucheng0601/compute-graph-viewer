@@ -1,4 +1,5 @@
 import { opByMagic } from './constants.js';
+import { selectOp } from './op-detail.js';
 import { SCHEDULE, tensorBorn, tensorDies } from './schedule.js';
 
 /* ============================================================
@@ -12,6 +13,7 @@ const graphViewport  = document.getElementById('graph-viewport');
 const graphPlaceholder = document.getElementById('svg-placeholder');
 const zoomDisplay    = document.getElementById('zoom-display');
 const colorLegend = document.getElementById('mv-color-legend');
+const stepIndicator = document.getElementById('step-indicator');
 const INITIAL_SCALE = 0.5;
 const DEFAULT_COLOR_MODE = 'semantic';
 const SUPPORTED_COLOR_MODES = new Set(['none', 'semantic', 'subgraph', 'latency', 'engineMemory']);
@@ -33,6 +35,46 @@ let dragStartX = 0, dragStartY = 0, dragStartPanX = 0, dragStartPanY = 0;
 
 // Smooth-pan animation
 let _animRafId = null, _animTarget = null;
+let autoFollowEnabled = true;
+
+function ensureStepIndicatorMounted() {
+  if (!stepIndicator || !graphViewport) return;
+  if (stepIndicator.parentElement !== graphViewport) {
+    graphViewport.appendChild(stepIndicator);
+  }
+}
+
+function emitAutoFollowChange() {
+  window.dispatchEvent(new CustomEvent('mv:auto-follow-change', { detail: { enabled: autoFollowEnabled } }));
+}
+
+function positionStepIndicator() {
+  if (!stepIndicator || !graphViewport || !nodesLayer) return;
+  const magic = SCHEDULE[lastStep];
+  if (magic == null) {
+    stepIndicator.classList.remove('visible');
+    return;
+  }
+
+  const nodeEl = nodesLayer.querySelector(`[data-node-id="op_${magic}"]`);
+  if (!nodeEl) {
+    stepIndicator.classList.remove('visible');
+    return;
+  }
+
+  const viewportRect = graphViewport.getBoundingClientRect();
+  const nodeRect = nodeEl.getBoundingClientRect();
+  const bubbleRect = stepIndicator.getBoundingClientRect();
+  const margin = 10;
+  const desiredLeft = nodeRect.left - viewportRect.left;
+  const desiredTop = nodeRect.top - viewportRect.top - 8;
+  const maxLeft = Math.max(margin, viewportRect.width - (bubbleRect.width || 180) - margin);
+  const minTop = margin + (bubbleRect.height || 28);
+
+  stepIndicator.style.left = `${Math.max(margin, Math.min(maxLeft, desiredLeft))}px`;
+  stepIndicator.style.top = `${Math.max(minTop, desiredTop)}px`;
+  stepIndicator.classList.add('visible');
+}
 
 function titleCaseToken(token) {
   if (!token) return '';
@@ -259,7 +301,17 @@ function renderGraphForCurrentMode() {
     layoutData,
     nodesLayer,
     edgesSvg,
-    (_node, _el) => {},
+    (node, el) => {
+      if (!node || node.type !== 'op') return;
+      const rect = el?.getBoundingClientRect?.();
+      const anchor = rect
+        ? { x: rect.right - 8, y: rect.top + Math.min(rect.height / 2, 36) }
+        : { x: graphViewport.clientWidth / 2, y: graphViewport.clientHeight / 2 };
+      const magic = Number(node.data?.magic);
+      if (Number.isFinite(magic)) {
+        selectOp(magic, anchor);
+      }
+    },
     colorMap,
     colorMode,
     { compact: true, direction: 'LR' }
@@ -267,6 +319,7 @@ function renderGraphForCurrentMode() {
   applyStepToGraph(lastStep);
   syncColorModeButtons();
   updateColorLegend();
+  requestAnimationFrame(positionStepIndicator);
 }
 
 function setColorMode(nextMode) {
@@ -329,6 +382,7 @@ async function loadGraph() {
       colorMode = modeEnabled.semantic ? 'semantic' : 'none';
     }
     graphLoaded = true;
+    ensureStepIndicatorMounted();
     renderGraphForCurrentMode();
     fitGraph();
     applyInitialScale();
@@ -378,6 +432,7 @@ function applyInitialScale() {
 function _applyTransform() {
   graphTransform.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
   if (zoomDisplay) zoomDisplay.textContent = Math.round(scale * 100) + '%';
+  requestAnimationFrame(positionStepIndicator);
 }
 
 // Wheel zoom
@@ -391,6 +446,8 @@ graphViewport.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   _cancelAnim();
   isDragging = true;
+  autoFollowEnabled = false;
+  emitAutoFollowChange();
   dragStartX = e.clientX; dragStartY = e.clientY;
   dragStartPanX = panX; dragStartPanY = panY;
   e.preventDefault();
@@ -472,6 +529,8 @@ function applyStepToGraph(step) {
       if (tEl) { tEl.classList.remove('mv-tensor-dim'); tEl.classList.add('mv-tensor-output'); }
     }
   }
+
+  requestAnimationFrame(positionStepIndicator);
 }
 
 /* ============================================================
@@ -524,4 +583,13 @@ function centerOnExecuting(op, immediate) {
 }
 
 export function isSvgLoaded() { return graphLoaded; }
+export function setAutoFollowEnabled(enabled) {
+  autoFollowEnabled = !!enabled;
+  emitAutoFollowChange();
+}
+export function isAutoFollowEnabled() { return autoFollowEnabled; }
 export { loadGraph, fitGraph, applyStepToGraph, centerOnExecuting, setColorMode };
+
+window.addEventListener('resize', () => {
+  requestAnimationFrame(positionStepIndicator);
+});

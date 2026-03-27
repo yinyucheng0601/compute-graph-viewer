@@ -82,12 +82,36 @@
     </div>
   </div>
 
+  <div id="panel-resizer" role="separator" aria-orientation="horizontal" aria-label="Resize graph and memory panels">
+    <div class="panel-resizer-grip"></div>
+  </div>
+
   <!-- ── Bottom: Ascend 910B Architecture Diagram ── -->
   <div id="bottom-panel">
+
+    <!-- Run Status Panel -->
+    <div id="runtime-status">
+      <div class="rs-top-row">
+        <div class="rs-counts">
+          <span class="rs-count rs-done" id="rs-done">✓ 0 done</span>
+          <span class="rs-count rs-run"  id="rs-run">▶ —</span>
+          <span class="rs-count rs-pend" id="rs-pend">◌ 0 pending</span>
+        </div>
+        <div id="runtime-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(53,119,246,0.8);"></div>COPY</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(168,85,247,0.8);"></div>L1→L0A</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(124,58,237,0.8);"></div>L1→L0B</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.8);"></div>MMA</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#22c55e;border-radius:50%;"></div>Done</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#E8B300;border-radius:50%;"></div>Active</div>
+        </div>
+      </div>
+    </div>
+
     <div id="arch-diagram">
 
       <!-- AIC Section -->
-      <div class="arch-section aic">
+      <div class="arch-section aic" id="arch-aic">
         <span class="arch-section-label">AIC</span>
 
         <div class="gm-strip">
@@ -99,48 +123,76 @@
           <div class="aic-main-row">
             <!-- L1 Buffer -->
             <div class="buf-box buf-l1">
-              <div class="buf-label">L1 Buffer</div>
-              <div class="buf-cap">1024 KB</div>
-              <div class="tensor-chips" id="tensors-L1">
-                <div class="tier-empty">empty</div>
+              <div class="buf-hdr">
+                <span class="buf-label">L1 Buffer</span>
+                <div class="buf-hdr-right">
+                  <span class="buf-stat-pct" id="pct-L1">0%</span>
+                  <span class="buf-stat-used" id="used-L1">0 B / 1024 KB</span>
+                </div>
               </div>
+              <div class="buf-sub-info">1024 KB · ~20cy · row-major</div>
+              <div class="bpg-grid" id="grid-L1" style="--bpg-cols:8"></div>
+              <div class="bpg-free-row"><span id="free-L1">··· 1024 KB FREE ···</span></div>
+              <div class="bpg-addr-row"><span>0x000000</span><span>0x0FFFFF</span></div>
+              <div class="bpg-legend" id="legend-L1"></div>
             </div>
 
             <!-- L0A + L0B -->
             <div class="l0ab-col">
               <div class="buf-box buf-l0a">
-                <div class="buf-label">L0A</div>
-                <div class="buf-cap">64 KB</div>
-                <div class="tensor-chips" id="tensors-L0A">
-                  <div class="tier-empty">empty</div>
+                <div class="buf-hdr">
+                  <span class="buf-label">L0A</span>
+                  <div class="buf-hdr-right">
+                    <span class="buf-stat-pct" id="pct-L0A">0%</span>
+                    <span class="buf-stat-used" id="used-L0A">0 B / 64 KB</span>
+                  </div>
                 </div>
+                <div class="buf-sub-info">64 KB · ~5cy · fracZ</div>
+                <div class="bpg-grid" id="grid-L0A" style="--bpg-cols:4"></div>
+                <div class="bpg-free-row"><span id="free-L0A">··· 64 KB FREE ···</span></div>
+                <div class="bpg-addr-row"><span>0x00000</span><span>0x0FFFF</span></div>
+                <div class="bpg-legend" id="legend-L0A"></div>
               </div>
               <div class="buf-box buf-l0b">
-                <div class="buf-label">L0B</div>
-                <div class="buf-cap">64 KB</div>
-                <div class="tensor-chips" id="tensors-L0B">
-                  <div class="tier-empty">empty</div>
+                <div class="buf-hdr">
+                  <span class="buf-label">L0B</span>
+                  <div class="buf-hdr-right">
+                    <span class="buf-stat-pct" id="pct-L0B">0%</span>
+                    <span class="buf-stat-used" id="used-L0B">0 B / 64 KB</span>
+                  </div>
                 </div>
+                <div class="buf-sub-info">64 KB · ~5cy · fracZ</div>
+                <div class="bpg-grid" id="grid-L0B" style="--bpg-cols:4"></div>
+                <div class="bpg-free-row"><span id="free-L0B">··· 64 KB FREE ···</span></div>
+                <div class="bpg-addr-row"><span>0x00000</span><span>0x0FFFF</span></div>
+                <div class="bpg-legend" id="legend-L0B"></div>
               </div>
             </div>
 
             <!-- Cube MMA -->
-            <div class="cube-box">
+            <div class="cube-box" id="cube-unit">
               <span>Cube</span>
               <span class="cube-sub">MMA</span>
             </div>
 
             <!-- L0C Buffer -->
             <div class="buf-box buf-l0c">
-              <div class="buf-label">L0C</div>
-              <div class="buf-cap">256 KB</div>
-              <div class="tensor-chips" id="tensors-L0C">
-                <div class="tier-empty">empty</div>
+              <div class="buf-hdr">
+                <span class="buf-label">L0C</span>
+                <div class="buf-hdr-right">
+                  <span class="buf-stat-pct" id="pct-L0C">0%</span>
+                  <span class="buf-stat-used" id="used-L0C">0 B / 256 KB</span>
+                </div>
               </div>
+              <div class="buf-sub-info">256 KB · ~5cy · nZ</div>
+              <div class="bpg-grid" id="grid-L0C" style="--bpg-cols:8"></div>
+              <div class="bpg-free-row"><span id="free-L0C">··· 256 KB FREE ···</span></div>
+              <div class="bpg-addr-row"><span>0x00000</span><span>0x3FFFF</span></div>
+              <div class="bpg-legend" id="legend-L0C"></div>
             </div>
           </div>
 
-          <div class="fixpipe-bar">FixPipe</div>
+          <div class="fixpipe-bar" id="fixpipe-unit">FixPipe</div>
 
           <div class="unit-row">
             <div class="unit-box">Scalar</div>
@@ -151,56 +203,80 @@
       <!-- Separator -->
       <div class="arch-sep">1 : N &thinsp; (AIV)</div>
 
-      <!-- AIV Section (no UB in this subgraph — shown dimmed) -->
-      <div class="arch-section aiv aiv-dim">
+      <!-- AIV Section -->
+      <div class="arch-section aiv" id="arch-aiv">
         <span class="arch-section-label">AIV</span>
+        <div class="gm-strip gm-strip-placeholder" aria-hidden="true">
+          <span class="gm-label">GM</span>
+          <span class="mte-arrow">MTE2</span>
+        </div>
         <div class="arch-inner">
           <div class="buf-box buf-ub">
-            <div class="buf-label">Unified Buffer (UB)</div>
-            <div class="buf-cap">256 KB</div>
-            <div class="tensor-chips">
-              <div class="tier-empty">—</div>
+            <div class="buf-hdr">
+              <span class="buf-label">UB</span>
+              <div class="buf-hdr-right">
+                <span class="buf-stat-pct" id="pct-UB">0%</span>
+                <span class="buf-stat-used" id="used-UB">0 B / 256 KB</span>
+              </div>
             </div>
+            <div class="buf-sub-info">256 KB · ~10cy · row-major</div>
+            <div class="bpg-grid" id="grid-UB" style="--bpg-cols:8"></div>
+            <div class="bpg-free-row"><span id="free-UB">··· 256 KB FREE ···</span></div>
+            <div class="bpg-addr-row"><span>0x00000</span><span>0x3FFFF</span></div>
+            <div class="bpg-legend" id="legend-UB"></div>
           </div>
           <div class="unit-row">
             <div class="unit-box">Scalar</div>
-            <div class="unit-box vector">Vector</div>
+            <div class="unit-box vector" id="vector-unit">Vector</div>
           </div>
         </div>
       </div>
 
     </div><!-- #arch-diagram -->
+
   </div>
 
 </div><!-- #main -->
+
+<div id="op-detail-float" aria-hidden="true">
+  <div class="odf-header">
+    <div class="rp-sec-title">Selected Op Detail</div>
+    <button id="op-detail-close" class="odf-close" type="button" aria-label="Close detail panel">&times;</button>
+  </div>
+  <div id="op-detail-body">
+    <div class="od-placeholder">点击计算图中的算子节点查看详情</div>
+  </div>
+</div>
 
 <!-- ============================================================
      Floating playback toolbar — liquid glass, centered
      ============================================================ -->
 <div id="floating-bar">
-  <div id="floating-shell">
+  <div id="floating-shell" class="is-expanded">
+    <button id="floating-toggle" type="button" aria-label="Collapse playback toolbar" aria-expanded="true">
+      <span class="floating-toggle-icon">⌄</span>
+    </button>
+    <button id="floating-collapsed-btn" type="button" aria-label="Expand playback toolbar">
+      <span id="floating-collapsed-icon">&#9654;</span>
+    </button>
     <div id="controls-row">
-      <button class="mv-btn mv-btn-primary" id="play-btn">&#9654; Play</button>
-      <button class="mv-btn" id="step-back-btn" title="Previous step">&#9664;</button>
-      <button class="mv-btn" id="step-fwd-btn" title="Next step">&#9654;</button>
+      <div class="controls-group controls-group-playback">
+        <button class="mv-btn" id="step-back-btn" title="Previous step">&#9664;</button>
+        <button class="mv-btn mv-btn-primary" id="play-btn">&#9654; Play</button>
+        <button class="mv-btn" id="step-fwd-btn" title="Next step">&#9654;</button>
+        <button class="mv-btn" id="replay-btn" title="Replay from step 0">↺ Replay</button>
+      </div>
       <div class="mv-sep"></div>
-      <label class="scrubber-label">Step</label>
-      <input type="range" id="scrubber" min="0" max="127" value="0" step="1">
-      <label id="scrubber-label">0 / 127</label>
-      <div class="mv-sep"></div>
-      <span class="speed-label">Speed</span>
-      <button class="mv-speed-btn mv-btn" data-speed="0.5">0.5×</button>
-      <button class="mv-speed-btn mv-btn active" data-speed="1">1×</button>
-      <button class="mv-speed-btn mv-btn" data-speed="2">2×</button>
-      <button class="mv-speed-btn mv-btn" data-speed="4">4×</button>
-      <div class="mv-sep"></div>
-      <div id="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:rgba(53,119,246,0.8);"></div>COPY</div>
-        <div class="legend-item"><div class="legend-dot" style="background:rgba(168,85,247,0.8);"></div>L1→L0A</div>
-        <div class="legend-item"><div class="legend-dot" style="background:rgba(124,58,237,0.8);"></div>L1→L0B</div>
-        <div class="legend-item"><div class="legend-dot" style="background:rgba(249,115,22,0.8);"></div>MMA</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#22c55e;border-radius:50%;"></div>Done</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#E8B300;border-radius:50%;"></div>Active</div>
+      <div class="controls-group controls-group-timeline">
+        <div class="timeline-meta">
+          <label class="scrubber-label">Timeline</label>
+          <label id="scrubber-label">0 / 127</label>
+          <span id="scrubber-opname">—</span>
+        </div>
+        <div class="scrubber-wrap">
+          <input type="range" id="scrubber" min="0" max="127" value="0" step="1">
+          <div id="scrubber-hover" aria-hidden="true"></div>
+        </div>
       </div>
     </div>
 
