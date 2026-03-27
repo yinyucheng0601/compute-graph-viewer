@@ -372,6 +372,9 @@ function buildTensorCard(node) {
 function buildCompactOpCard(node) {
   const d = node.data;
   const latLabel = d.latency != null ? `lat·${d.latency}` : '';
+  const fromStr = (d.ioperands || []).map(id => `T${id}`).join(', ') || '—';
+  const toStr = (d.ooperands || []).map(id => `T${id}`).join(', ') || '—';
+  const dtypeStr = d.dtype || '—';
   return `
     <div class="op-pill">
       <div class="op-pill-icon">
@@ -379,6 +382,20 @@ function buildCompactOpCard(node) {
       </div>
       <span class="op-pill-name">${escHtml(stageLabel(d))}</span>
       ${latLabel ? `<span class="op-pill-latency">${escHtml(latLabel)}</span>` : ''}
+    </div>
+    <div class="node-rows">
+      <div class="node-row">
+        <span class="row-key">dtype</span>
+        <span class="row-val">${escHtml(dtypeStr)}</span>
+      </div>
+      <div class="node-row">
+        <span class="row-key">from</span>
+        <span class="row-val row-val-dim">${escHtml(fromStr)}</span>
+      </div>
+      <div class="node-row">
+        <span class="row-key">to</span>
+        <span class="row-val row-val-dim">${escHtml(toStr)}</span>
+      </div>
     </div>`;
 }
 
