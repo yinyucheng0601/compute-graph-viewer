@@ -37,6 +37,22 @@ let dragStartX = 0, dragStartY = 0, dragStartPanX = 0, dragStartPanY = 0;
 let _animRafId = null, _animTarget = null;
 let autoFollowEnabled = true;
 
+function pruneIsolatedOps(graph) {
+  const degree = new Map(graph.nodes.map(node => [node.id, 0]));
+  for (const edge of graph.edges) {
+    degree.set(edge.source, (degree.get(edge.source) || 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) || 0) + 1);
+  }
+
+  const keptNodes = graph.nodes.filter(node => {
+    if (node.type !== 'op') return true;
+    return (degree.get(node.id) || 0) > 0;
+  });
+  const keptNodeIds = new Set(keptNodes.map(node => node.id));
+  const keptEdges = graph.edges.filter(edge => keptNodeIds.has(edge.source) && keptNodeIds.has(edge.target));
+  return { ...graph, nodes: keptNodes, edges: keptEdges };
+}
+
 function ensureStepIndicatorMounted() {
   if (!stepIndicator || !graphViewport) return;
   if (stepIndicator.parentElement !== graphViewport) {
@@ -344,8 +360,19 @@ async function loadGraph() {
     const json = await resp.json();
 
     // Use global functions from pass-ir script tags
-    graphData  = parseGraph(json);
-    layoutData = computeLayout(graphData, { compact: true, direction: 'LR' });
+    graphData  = pruneIsolatedOps(parseGraph(json));
+    layoutData = computeLayout(graphData, {
+      compact: true,
+      direction: 'LR',
+      nodeWidth: 225,
+      nodeHeightsCompact: {
+        incast: 98,
+        outcast: 98,
+        op: 124,
+        tensor: 98,
+        group: 98,
+      },
+    });
 
     // Build DOM structure
     const container = document.createElement('div');

@@ -9,7 +9,7 @@
  * Output: Map<nodeId, {x, y, w, h}>
  */
 
-const NODE_W = 150;   // default node width
+const NODE_W = 225;   // compact node width tuned to 1.5x for readable labels
 const H_GAP = 180;    // default horizontal gap between layers
 const H_STEP = NODE_W + H_GAP;   // horizontal step: column width + gap
 const V_GAP = 20;     // dynamic gap between nodes when using per-node heights
@@ -29,7 +29,7 @@ const NODE_HEIGHTS_COMPACT = {
   // otherwise layout underestimates vertical space and cards overlap/clipped.
   incast: 98,
   outcast: 98,
-  op: 64,
+  op: 124,
   tensor: 98,
   group: 98,
 };
@@ -69,9 +69,10 @@ function estimateGroupHeight(node) {
   return Math.max(148, Math.min(320, Math.round(estimated)));
 }
 
-function getNodeHeight(nodeOrType, compact) {
+function getNodeHeight(nodeOrType, compact, options = {}) {
   const type = typeof nodeOrType === 'string' ? nodeOrType : nodeOrType?.type;
-  if (compact) return NODE_HEIGHTS_COMPACT[type] ?? 44;
+  const compactHeights = options.nodeHeightsCompact || NODE_HEIGHTS_COMPACT;
+  if (compact) return compactHeights[type] ?? 44;
   if (type === 'group') return estimateGroupHeight(nodeOrType);
   return NODE_HEIGHTS[type] ?? 124;
 }
@@ -79,8 +80,8 @@ function getNodeHeight(nodeOrType, compact) {
 function computeLayout(graph, options = {}) {
   const { nodes, edges } = graph;
   const compact = !!options.compact;
-  const nodeWidth = compact ? NODE_W : (options.nodeWidth || NODE_W);
-  const hStep = compact ? 200 : (options.hStep || (nodeWidth + H_GAP));
+  const nodeWidth = compact ? (options.nodeWidth || NODE_W) : (options.nodeWidth || NODE_W);
+  const hStep = compact ? (nodeWidth + 50) : (options.hStep || (nodeWidth + H_GAP));
   const vGap = compact ? V_GAP_COMPACT : V_GAP;
   if (nodes.length === 0) return { positions: new Map(), layerNodes: [], maxLayer: 0 };
 
@@ -225,7 +226,7 @@ function computeLayout(graph, options = {}) {
     for (let l = 0; l <= maxLayer; l++) {
       for (const id of layerNodes[l]) {
         const node = nodeMap.get(id);
-        const h = getNodeHeight(node, compact);
+        const h = getNodeHeight(node, compact, options);
         positions.set(id, { x: nodeX.get(id) ?? PAD, y: layerY[l], w: nodeWidth, h });
       }
     }
@@ -250,7 +251,7 @@ function computeLayout(graph, options = {}) {
         ? placedPreds.reduce((s, p) => s + nodeY.get(p), 0) / placedPreds.length
         : null;
       const node = nodeMap.get(id);
-      const nodeH = getNodeHeight(node, compact);
+      const nodeH = getNodeHeight(node, compact, options);
       const y = ideal !== null ? Math.max(cursor, ideal) : cursor;
       nodeY.set(id, y);
       cursor = y + nodeH + vGap;
@@ -263,7 +264,7 @@ function computeLayout(graph, options = {}) {
     for (let i = ids.length - 1; i >= 0; i--) {
       const id = ids[i];
       const node = nodeMap.get(id);
-      const nodeH = getNodeHeight(node, compact);
+      const nodeH = getNodeHeight(node, compact, options);
       const placedSuccs = (succ.get(id) || []).filter(s => nodeY.has(s));
       if (placedSuccs.length > 0) {
         const ideal = placedSuccs.reduce((s, p) => s + nodeY.get(p), 0) / placedSuccs.length;
@@ -282,7 +283,7 @@ function computeLayout(graph, options = {}) {
   for (let l = 0; l <= maxLayer; l++) {
     for (const id of layerNodes[l]) {
       const node = nodeMap.get(id);
-      const h = getNodeHeight(node, compact);
+      const h = getNodeHeight(node, compact, options);
       positions.set(id, { x: layerX[l], y: nodeY.get(id) ?? PAD, w: nodeWidth, h });
     }
   }
