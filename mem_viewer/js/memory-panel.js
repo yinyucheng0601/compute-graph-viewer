@@ -1,4 +1,5 @@
-import { getLiveTensorsAtStep, getActiveTensors } from './schedule.js';
+import { getLiveTensorsAtStep, getActiveTensors, SCHEDULE } from './schedule.js';
+import { opByMagic, UB_VEC_OPS } from './constants.js';
 
 /* ============================================================
    Memory Panel Rendering — dark mode
@@ -57,4 +58,52 @@ function renderMemoryPanel(step) {
   }
 }
 
-export { hexToRgba, renderMemoryPanel };
+/* ============================================================
+   DaVinci Architecture Dynamic Highlights
+   ============================================================ */
+function renderDaVinciHighlights(step) {
+  const liveByTier = getLiveTensorsAtStep(step);
+  const op = opByMagic.get(SCHEDULE[step]);
+  const opName = op?.n ?? '';
+
+  const cubeActive = opName === 'A_MUL_B' || opName === 'A_MULACC_B';
+  const vecActive  = UB_VEC_OPS.has(opName);
+  const anyAIC = ['L1', 'L0A', 'L0B', 'L0C'].some(t => (liveByTier[t] ?? []).length > 0);
+  const anyAIV = (liveByTier['UB'] ?? []).length > 0;
+
+  // Cube MMA
+  const cubeEl = document.getElementById('cube-unit');
+  if (cubeEl) {
+    cubeEl.style.background    = cubeActive ? 'rgba(249,115,22,0.25)' : '';
+    cubeEl.style.borderColor   = cubeActive ? '#f97316' : '';
+    cubeEl.style.boxShadow     = cubeActive ? '0 0 12px rgba(249,115,22,0.5)' : '';
+    cubeEl.style.transform     = cubeActive ? 'scale(1.03)' : '';
+    cubeEl.style.transition    = 'all 0.25s ease';
+  }
+
+  // FixPipe
+  const fixEl = document.getElementById('fixpipe-unit');
+  if (fixEl) {
+    fixEl.style.color      = cubeActive ? '#fbbf24' : '';
+    fixEl.style.borderBottom = cubeActive ? '1px solid rgba(251,191,36,0.4)' : '';
+    fixEl.style.transition = 'all 0.25s ease';
+  }
+
+  // Vector
+  const vecEl = document.getElementById('vector-unit');
+  if (vecEl) {
+    vecEl.style.background  = vecActive ? 'rgba(16,185,129,0.20)' : '';
+    vecEl.style.borderColor = vecActive ? '#10b981' : '';
+    vecEl.style.boxShadow   = vecActive ? '0 0 10px rgba(16,185,129,0.45)' : '';
+    vecEl.style.transition  = 'all 0.25s ease';
+  }
+
+  // AIC / AIV region backgrounds
+  const aicEl = document.getElementById('arch-aic');
+  if (aicEl) aicEl.style.background = anyAIC ? 'rgba(59,130,246,0.05)' : '';
+
+  const aivEl = document.getElementById('arch-aiv');
+  if (aivEl) aivEl.style.background = anyAIV ? 'rgba(16,185,129,0.05)' : '';
+}
+
+export { hexToRgba, renderMemoryPanel, renderDaVinciHighlights };

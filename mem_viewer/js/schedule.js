@@ -46,7 +46,7 @@ for (const [t, born] of tensorBorn) {
    Query functions
    ============================================================ */
 function getLiveTensorsAtStep(step) {
-  const tiers = { L1: [], L0A: [], L0B: [], L0C: [], DDR: [] };
+  const tiers = { L1: [], L0A: [], L0B: [], L0C: [], UB: [], DDR: [] };
 
   for (const [t, born] of tensorBorn) {
     const dies = tensorDies.get(t) ?? born;
