@@ -5,6 +5,8 @@
   const PASS_IR_TEXT_KEY = 'ptoSwimlaneProgramText';
   const PASS_IR_FOCUS_KEY = 'ptoSwimlanePassFocus';
   const SOURCE_FLOW_FOCUS_KEY = 'ptoSwimlaneSourceFocus';
+  const SOURCE_FLOW_META_KEY = 'vtSelectedFile';
+  const SOURCE_FLOW_TEXT_KEY = 'vtSelectedFileText';
   const PASS_IR_COLOR_SYNC_EVENT = 'pto-pass-ir:set-color-mode';
   const ENABLE_SPLIT_VIEW = true;
 
@@ -14,9 +16,16 @@
     searchPrevBtn: document.getElementById('swSearchPrev'),
     searchNextBtn: document.getElementById('swSearchNext'),
     searchCount: document.getElementById('swSearchCount'),
+    resourceToggleBtn: document.getElementById('swResourceToggleBtn'),
+    resourcePanel: document.getElementById('swResourcePanel'),
+    resourceCloseBtn: document.getElementById('swResourceCloseBtn'),
+    resourceFolderStatus: document.getElementById('swResourceFolderStatus'),
+    resourceFilesStatus: document.getElementById('swResourceFilesStatus'),
+    openFolderBtn: document.getElementById('swOpenFolderBtn'),
     openLocalBtn: document.getElementById('swOpenLocalBtn'),
     openCompareBtn: document.getElementById('swOpenCompareBtn'),
     bindProgramBtn: document.getElementById('swBindProgramBtn'),
+    folderInput: document.getElementById('swFolderInput'),
     fileInput: document.getElementById('swFileInput'),
     compareFileInput: document.getElementById('swCompareFileInput'),
     programFileInput: document.getElementById('swProgramFileInput'),
@@ -25,7 +34,9 @@
     zoomFitBtn: document.getElementById('swZoomFitBtn'),
     beforeBtn: document.getElementById('swBeforeBtn'),
     afterBtn: document.getElementById('swAfterBtn'),
-    compareModeBtn: document.getElementById('swCompareModeBtn'),
+    singleViewBtn: document.getElementById('swSingleViewBtn'),
+    compareViewBtn: document.getElementById('swCompareViewBtn'),
+    diffViewBtn: document.getElementById('swDiffViewBtn'),
     fileMeta: document.getElementById('swFileMeta'),
     summary: document.getElementById('swSummary'),
     emptyState: document.getElementById('swEmptyState'),
@@ -71,7 +82,7 @@
     },
     compareSource: null,
     fileName: '',
-    pxPerUnit: 2.8,
+    pxPerUnit: 8,
     matches: [],
     activeMatchIndex: -1,
     selectedTaskRef: null,
@@ -86,6 +97,7 @@
     },
     scrollSyncLock: false,
     compareMode: false,
+    comparePresentation: 'diff', // 'compare' | 'diff'
     showBubbles: false,
     measureMode: false,
     filters: {
@@ -97,6 +109,7 @@
     },
     bindings: {
       program: null,
+      moduleDir: null,
     },
     builtinSelection: 'before',
     uiMode: 'default', // 'default' | 'task-popup' | 'split'
@@ -127,7 +140,7 @@
   };
   const GAP_EMPHASIS_US = 24;
   const STRONG_GAP_US = 80;
-  const MIN_BAR_LABEL_PX = 58;
+  const MIN_BAR_SEGMENT_COUNTS_PX = 96;
   let overlayRenderFrame = 0;
 
   function buildChartRefs(prefix) {
@@ -175,6 +188,84 @@
     }) || null;
   }
 
+  function normalizeRelativePath(value) {
+    return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  }
+
+  function baseName(value) {
+    const normalized = normalizeRelativePath(value);
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || '';
+  }
+
+  async function collectHandleEntries(handle, prefix = '') {
+    const out = [];
+    for await (const [name, child] of handle.entries()) {
+      const rel = prefix ? `${prefix}/${name}` : name;
+      if (child.kind === 'directory') {
+        const sub = await collectHandleEntries(child, rel);
+        out.push(...sub);
+      } else if (/\.(json|py)$/i.test(name)) {
+        const file = await child.getFile();
+        out.push({ relativePath: rel, file });
+      }
+    }
+    return out;
+  }
+
+  function collectInputEntries(fileList) {
+    const files = Array.from(fileList || []);
+    const entries = files
+      .filter((file) => file && /\.(json|py)$/i.test(file.name))
+      .map((file) => ({
+        relativePath: normalizeRelativePath(file.webkitRelativePath || file.name),
+        file,
+      }));
+    const folderName = entries.length
+      ? entries[0].relativePath.split('/')[0]
+      : '';
+    return { entries, folderName: folderName || 'local-folder' };
+  }
+
+  function detectFolderResources(entries) {
+    const normalizedEntries = entries.map((entry) => ({
+      ...entry,
+      relativePath: normalizeRelativePath(entry.relativePath || entry.file?.name),
+      baseName: baseName(entry.relativePath || entry.file?.name).toLowerCase(),
+    }));
+    const pick = (matcher) => normalizedEntries.find((entry) => matcher(entry));
+    const program = pick((entry) => entry.baseName === 'program.json');
+    const merged = pick((entry) => entry.baseName === 'merged_swimlane.json');
+    const before = pick((entry) => entry.baseName === 'stitched_before.json');
+    const after = pick((entry) => entry.baseName === 'stitched_after.json');
+    const source = pick((entry) => entry.baseName === 'lightning_indexer_prolog_quant.py')
+      || pick((entry) => entry.baseName.endsWith('.py'));
+
+    let primary = merged || null;
+    let compare = null;
+
+    if (!primary) {
+      if (state.builtinSelection === 'after' && after) {
+        primary = after;
+        compare = before || null;
+      } else if (before) {
+        primary = before;
+        compare = after || null;
+      } else if (after) {
+        primary = after;
+      }
+    }
+
+    return {
+      entryCount: normalizedEntries.length,
+      program,
+      primary,
+      compare,
+      source,
+      hasBeforeAfterPair: !!(before && after),
+    };
+  }
+
   function laneRank(name) {
     if (/Fake Core/i.test(name)) return 0;
     if (/AIC_/i.test(name)) return 1;
@@ -198,28 +289,28 @@
 
   function laneMetrics(kind, lineCount) {
     if (kind === 'fake') {
-      const barHeight = 6;
-      const lineGap = 2;
-      const topPad = 5;
-      const bottomPad = 5;
+      const barHeight = 5;
+      const lineGap = 1;
+      const topPad = 2;
+      const bottomPad = 2;
       return {
         barHeight,
         lineGap,
         topPad,
         bottomPad,
-        laneHeight: Math.max(38, topPad + lineCount * barHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad),
+        laneHeight: Math.max(18, topPad + lineCount * barHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad),
       };
     }
-    const barHeight = 14;
-    const lineGap = 2;
-    const topPad = 4;
-    const bottomPad = 4;
+    const barHeight = 11;
+    const lineGap = 0;
+    const topPad = 2;
+    const bottomPad = 2;
     return {
       barHeight,
       lineGap,
       topPad,
       bottomPad,
-      laneHeight: Math.max(36, topPad + lineCount * barHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad),
+      laneHeight: Math.max(16, topPad + lineCount * barHeight + Math.max(0, lineCount - 1) * lineGap + bottomPad),
     };
   }
 
@@ -269,6 +360,30 @@
     if (value >= 100) return `${Math.round(value)}μs`;
     if (value >= 10) return `${value.toFixed(1)}μs`;
     return `${value.toFixed(2)}μs`;
+  }
+
+  function buildTaskSegmentSpec(task, widthPx) {
+    const semantic = String(task?.label || task?.displayName || task?.rawName || 'compute');
+    const inputCount = Array.isArray(task?.inputRawMagic) ? task.inputRawMagic.length : 0;
+    const outputCount = Array.isArray(task?.outputRawMagic) ? task.outputRawMagic.length : 0;
+    const showCounts = widthPx >= MIN_BAR_SEGMENT_COUNTS_PX;
+    return [
+      {
+        key: 'in',
+        className: 'sw-bar-segment sw-bar-segment-in',
+        text: showCounts ? `IN ${inputCount}` : 'IN',
+      },
+      {
+        key: 'compute',
+        className: 'sw-bar-segment sw-bar-segment-compute',
+        text: semantic,
+      },
+      {
+        key: 'out',
+        className: 'sw-bar-segment sw-bar-segment-out',
+        text: showCounts ? `OUT ${outputCount}` : 'OUT',
+      },
+    ];
   }
 
   function formatDelta(value, invertedGood) {
@@ -704,6 +819,20 @@
     return `<span class="stat-chip">${escapeHtml(text)}</span>`;
   }
 
+  function statusPillHtml(label, value, tone = 'is-muted') {
+    return `<span class="sw-status-pill ${tone}">
+      <span class="sw-status-pill-label">${escapeHtml(label)}</span>
+      <span class="sw-status-pill-value">${escapeHtml(value)}</span>
+    </span>`;
+  }
+
+  function resourceRowHtml(label, value, tone = 'is-muted') {
+    return `<div class="sw-resource-status-row ${tone}">
+      <span class="sw-resource-status-label">${escapeHtml(label)}</span>
+      <span class="sw-resource-status-value">${escapeHtml(value)}</span>
+    </div>`;
+  }
+
   function renderSummary() {
     const dataset = state.datasets.primary;
     if (!dataset) {
@@ -723,18 +852,41 @@
   }
 
   function renderBindingStatus() {
-    const bits = [];
-    if (state.bindings.program) {
-      bits.push(`Program 已绑定 · ${state.bindings.program.name}`);
-    } else {
-      bits.push('Program 未绑定');
+    const primary = state.datasets.primary;
+    const compare = state.datasets.compare;
+    const sourceName = state.bindings.moduleDir?.sourceName || '未绑定';
+    const pills = [
+      statusPillHtml('主泳道', primary ? primary.name : '未载入', primary ? 'is-bound' : 'is-muted'),
+      statusPillHtml('参考泳道', compare ? compare.name : '未绑定', compare ? 'is-compare' : 'is-muted'),
+      statusPillHtml('Program', state.bindings.program ? state.bindings.program.name : '未绑定', state.bindings.program ? 'is-program' : 'is-muted'),
+      statusPillHtml('源码', sourceName, state.bindings.moduleDir?.sourceName ? 'is-source' : 'is-muted'),
+    ];
+    if (dom.bindingStatus) dom.bindingStatus.innerHTML = pills.join('');
+    renderResourcePanel();
+  }
+
+  function renderResourcePanel() {
+    if (dom.resourceFolderStatus) {
+      if (state.bindings.moduleDir) {
+        dom.resourceFolderStatus.innerHTML = [
+          resourceRowHtml('目录', state.bindings.moduleDir.name, 'is-bound'),
+          resourceRowHtml('主泳道', state.bindings.moduleDir.primaryName || '未识别', state.bindings.moduleDir.primaryName ? 'is-bound' : 'is-muted'),
+          resourceRowHtml('参考泳道', state.bindings.moduleDir.compareName || '未识别', state.bindings.moduleDir.compareName ? 'is-compare' : 'is-muted'),
+          resourceRowHtml('Program', state.bindings.moduleDir.programName || '未识别', state.bindings.moduleDir.programName ? 'is-program' : 'is-muted'),
+          resourceRowHtml('源码', state.bindings.moduleDir.sourceName || '未识别', state.bindings.moduleDir.sourceName ? 'is-source' : 'is-muted'),
+        ].join('');
+      } else {
+        dom.resourceFolderStatus.innerHTML = resourceRowHtml('目录', '未绑定模块目录', 'is-muted');
+      }
     }
-    if (state.datasets.compare) {
-      bits.push(`Compare · ${state.datasets.compare.name}`);
-    } else {
-      bits.push('Compare 未绑定');
+
+    if (dom.resourceFilesStatus) {
+      dom.resourceFilesStatus.innerHTML = [
+        resourceRowHtml('主泳道', state.datasets.primary ? state.datasets.primary.name : '未载入', state.datasets.primary ? 'is-bound' : 'is-muted'),
+        resourceRowHtml('参考泳道', state.datasets.compare ? state.datasets.compare.name : '未绑定', state.datasets.compare ? 'is-compare' : 'is-muted'),
+        resourceRowHtml('Program', state.bindings.program ? state.bindings.program.name : '未绑定', state.bindings.program ? 'is-program' : 'is-muted'),
+      ].join('');
     }
-    dom.bindingStatus.textContent = bits.join(' | ');
   }
 
   function laneKindsPresent() {
@@ -1100,11 +1252,12 @@
 
       entry.visibleTasks.forEach((task) => {
         const bar = document.createElement('button');
+        const widthPx = Math.max(3, Math.round(task.dur * state.pxPerUnit));
         bar.type = 'button';
         bar.className = 'sw-bar';
         bar.style.left = `${16 + Math.round(task.relTs * state.pxPerUnit)}px`;
         bar.style.top = `${lane._top + metrics.topPad + task.line * (metrics.barHeight + metrics.lineGap)}px`;
-        bar.style.width = `${Math.max(3, Math.round(task.dur * state.pxPerUnit))}px`;
+        bar.style.width = `${widthPx}px`;
         bar.style.height = `${metrics.barHeight}px`;
         bar.style.background = colorForTask(task, state.filters.colorMode);
         bar.dataset.taskId = task.id;
@@ -1116,12 +1269,15 @@
           showTaskPopup(task, lane, chartKey, bar);
         });
 
-        if (Math.round(task.dur * state.pxPerUnit) >= MIN_BAR_LABEL_PX) {
+        const segmentWrap = document.createElement('span');
+        segmentWrap.className = 'sw-bar-segments';
+        buildTaskSegmentSpec(task, widthPx).forEach((segment) => {
           const label = document.createElement('span');
-          label.className = 'sw-bar-label';
-          label.textContent = task.label;
-          bar.appendChild(label);
-        }
+          label.className = segment.className;
+          label.textContent = segment.text;
+          segmentWrap.appendChild(label);
+        });
+        bar.appendChild(segmentWrap);
         refs.laneMainTrack.appendChild(bar);
         refs.barElements.set(task.id, bar);
       });
@@ -1309,16 +1465,15 @@
   }
 
   function buildDetailHtml(task, lane, compareTask) {
-    const actionDisabled = !(state.bindings.program && (task.callOpMagic != null || task.label));
+    const actionDisabled = !canTaskOpenPassIr(task);
     const actionRow = `
       <div class="detail-section">
         <div class="detail-section-title">Actions</div>
         <div class="sw-detail-actions">
           <button class="sw-detail-btn" data-detail-action="open-pass-ir"${actionDisabled ? ' disabled' : ''}>Open Pass IR</button>
-          <button class="sw-detail-btn" data-detail-action="bind-program">Bind Program</button>
           ${task.label ? '<button class="sw-detail-btn" data-detail-action="open-source-flow">Open Source Flow</button>' : ''}
         </div>
-        <div class="sw-detail-note">${state.bindings.program ? `当前 Program: ${escapeHtml(state.bindings.program.name)}` : '绑定 program.json 后，可按 callOpMagic 或 semantic label 跳到 Pass IR。'}</div>
+        <div class="sw-detail-note">${state.bindings.program ? `当前 Program: ${escapeHtml(state.bindings.program.name)}` : 'Program 入口已收口到顶部“资源”面板。'}</div>
       </div>`;
 
     const timingRows = [
@@ -1400,12 +1555,106 @@
     return otherDataset.taskKeyMap.get(composite) || null;
   }
 
+  function canTaskOpenPassIr(task) {
+    return !!(task && state.bindings.program && (task.callOpMagic != null || task.label));
+  }
+
+  function canOpenPassIrView() {
+    return !!state.bindings.program;
+  }
+
+  function canTaskOpenSourceFlow(task) {
+    return !!(task && task.label);
+  }
+
+  function canOpenSourceFlowView() {
+    return !!(state.bindings.moduleDir?.sourceText || state.bindings.moduleDir?.sourceName);
+  }
+
+  function getSelectedTaskState() {
+    const ref = state.selectedTaskRef;
+    if (!ref) {
+      return {
+        ref: null,
+        task: null,
+        dependencyTask: null,
+        canShowDeps: false,
+        canOpenPassIr: ENABLE_SPLIT_VIEW && canOpenPassIrView(),
+        canOpenSourceFlow: ENABLE_SPLIT_VIEW && canOpenSourceFlowView(),
+        passIrActionLabel: canOpenPassIrView() ? '打开 Pass IR' : 'Pass IR 分屏联动',
+        sourceFlowActionLabel: canOpenSourceFlowView() ? '打开 Source Flow' : 'Source Flow 分屏联动',
+        depReason: '先点击一个 task，再做深入联动。',
+        passIrReason: state.bindings.program ? '未选中 task 时会先打开整体 Pass IR 视图。' : '先绑定 program.json 或整个模块目录。',
+        sourceFlowReason: canOpenSourceFlowView() ? '未选中 task 时会先打开整体 Source Flow 视图。' : '先选择模块目录中的源码文件。',
+      };
+    }
+
+    const dataset = state.datasets[ref.chartKey];
+    const task = dataset?.taskMap.get(ref.taskId) || null;
+    const dependencyTask = ref.chartKey === 'primary'
+      ? task
+      : (task ? findCompareTask(task, ref.chartKey) : null);
+
+    const canShowDeps = !!dependencyTask;
+    const taskCanOpenPassIr = canTaskOpenPassIr(task);
+    const taskCanOpenSourceFlow = canTaskOpenSourceFlow(task);
+    const canOpenPassIr = ENABLE_SPLIT_VIEW && (taskCanOpenPassIr || canOpenPassIrView());
+    const canOpenSourceFlow = ENABLE_SPLIT_VIEW && (taskCanOpenSourceFlow || canOpenSourceFlowView());
+
+    return {
+      ref,
+      task,
+      dependencyTask,
+      canShowDeps,
+      canOpenPassIr,
+      canOpenSourceFlow,
+      passIrActionLabel: taskCanOpenPassIr ? 'Pass IR 分屏联动' : '打开 Pass IR',
+      sourceFlowActionLabel: taskCanOpenSourceFlow ? 'Source Flow 分屏联动' : '打开 Source Flow',
+      depReason: canShowDeps
+        ? (ref.chartKey === 'primary' ? '主图会高亮当前任务的前后依赖。' : '将切回主图并高亮对应任务的前后依赖。')
+        : (task ? '当前对比任务在主图里没有找到可映射的依赖视角。' : '先点击一个 task，再做深入联动。'),
+      passIrReason: taskCanOpenPassIr
+        ? '将带着当前任务焦点打开可交互 Pass IR 分屏。'
+        : (!state.bindings.program
+          ? '先绑定 program.json 或整个模块目录。'
+          : '当前任务缺少定位锚点，将先打开整体 Pass IR 视图。'),
+      sourceFlowReason: taskCanOpenSourceFlow
+        ? '将按 semantic label 打开 Source Flow 分屏。'
+        : (canOpenSourceFlowView()
+          ? '当前任务缺少 semantic label，将先打开整体 Source Flow 视图。'
+          : '先选择模块目录中的源码文件。'),
+    };
+  }
+
+  function revealTaskInChart(chartKey, task) {
+    const refs = chartRefs[chartKey];
+    const bar = refs?.barElements.get(task?.id);
+    if (!refs || !bar) return;
+    const left = bar.offsetLeft + bar.offsetWidth / 2 - refs.laneMainViewport.clientWidth / 2;
+    const top = bar.offsetTop + bar.offsetHeight / 2 - refs.laneMainViewport.clientHeight / 2;
+    refs.laneMainViewport.scrollTo({
+      left: Math.max(0, left),
+      top: Math.max(0, top),
+      behavior: 'smooth',
+    });
+  }
+
+  function focusDependencyChainFromSelectedTask() {
+    const selected = getSelectedTaskState();
+    if (!selected.canShowDeps || !selected.dependencyTask) return;
+    hideTaskPopup();
+    if (selected.ref?.chartKey !== 'primary') clearDepLines();
+    selectTask('primary', selected.dependencyTask.id);
+    revealTaskInChart('primary', selected.dependencyTask);
+    setUiMode(state.splitSource ? 'split' : 'default');
+    renderDepLines(selected.dependencyTask);
+  }
+
   function wireDetailButtons(task) {
     dom.detailBody.querySelectorAll('[data-detail-action]').forEach((button) => {
       button.addEventListener('click', () => {
         const action = button.dataset.detailAction;
         if (action === 'open-pass-ir') openPassIrForTask(task);
-        if (action === 'bind-program') dom.programFileInput.click();
         if (action === 'open-source-flow') openSourceFlowForTask(task);
       });
     });
@@ -1432,11 +1681,22 @@
 
   function openSourceFlowForTask(task) {
     try {
-      sessionStorage.setItem(SOURCE_FLOW_FOCUS_KEY, JSON.stringify({
-        semanticLabel: task.label || null,
-        source: 'swimlane',
-      }));
-      window.open('../source-flow/index.html', '_blank');
+      if (state.bindings.moduleDir?.sourceText && state.bindings.moduleDir?.sourceName) {
+        sessionStorage.setItem(SOURCE_FLOW_META_KEY, JSON.stringify({ name: state.bindings.moduleDir.sourceName }));
+        sessionStorage.setItem(SOURCE_FLOW_TEXT_KEY, state.bindings.moduleDir.sourceText);
+      }
+      if (task?.label) {
+        sessionStorage.setItem(SOURCE_FLOW_FOCUS_KEY, JSON.stringify({
+          semanticLabel: task.label || null,
+          source: 'swimlane',
+        }));
+      } else {
+        sessionStorage.removeItem(SOURCE_FLOW_FOCUS_KEY);
+      }
+      const sourceUrl = state.bindings.moduleDir?.sourceText && state.bindings.moduleDir?.sourceName
+        ? '../source-flow/index.html?action=open-py-file'
+        : '../source-flow/index.html';
+      window.open(sourceUrl, '_blank');
     } catch (error) {
       console.error(error);
       alert('Failed to prepare Source Flow bridge.');
@@ -1786,7 +2046,7 @@
   function renderDiffSummary() {
     const primary = state.datasets.primary;
     const compare = state.datasets.compare;
-    const visible = !!(primary && compare && state.compareMode);
+    const visible = !!(primary && compare && state.compareMode && state.comparePresentation === 'diff');
     dom.diffSummary.hidden = !visible;
     if (!visible) return;
 
@@ -1869,10 +2129,11 @@
   }
 
   function renderControlState() {
-    dom.compareModeBtn.classList.toggle('btn-primary', state.compareMode);
+    dom.singleViewBtn.classList.toggle('btn-primary', !state.compareMode);
+    dom.compareViewBtn.classList.toggle('btn-primary', state.compareMode && state.comparePresentation === 'compare');
+    dom.diffViewBtn.classList.toggle('btn-primary', state.compareMode && state.comparePresentation === 'diff');
     dom.measureModeBtn.classList.toggle('btn-primary', state.measureMode);
     dom.toggleBubblesBtn.classList.toggle('btn-primary', state.showBubbles);
-    dom.compareModeBtn.textContent = state.compareMode ? 'Diff On' : 'Diff';
   }
 
   function updateMeta() {
@@ -1885,7 +2146,7 @@
   function fitZoom() {
     const primaryViewport = chartRefs.primary.laneMainViewport;
     const width = Math.max(primaryViewport.clientWidth - 40, 640);
-    state.pxPerUnit = Math.max(1.2, width / getSharedSpan());
+    state.pxPerUnit = Math.max(8, width / getSharedSpan());
     renderChartsOnly();
   }
 
@@ -1998,6 +2259,102 @@
     }
   }
 
+  async function loadFolderResources(entries, folderName) {
+    const resources = detectFolderResources(entries);
+    if (!resources.primary) {
+      throw new Error('所选文件夹里没有识别到 merged_swimlane.json / stitched_before.json / stitched_after.json。');
+    }
+
+    const primaryText = await resources.primary.file.text();
+    const compareText = resources.compare ? await resources.compare.file.text() : null;
+    const programText = resources.program ? await resources.program.file.text() : null;
+
+    state.bindings.moduleDir = {
+      name: folderName || 'local-folder',
+      entryCount: resources.entryCount,
+      hasBeforeAfterPair: resources.hasBeforeAfterPair,
+      primaryName: baseName(resources.primary.relativePath),
+      compareName: resources.compare ? baseName(resources.compare.relativePath) : null,
+      programName: resources.program ? baseName(resources.program.relativePath) : null,
+      sourceName: resources.source ? baseName(resources.source.relativePath) : null,
+      sourceText: resources.source ? await resources.source.file.text() : null,
+    };
+    state.bindings.program = null;
+    state.datasets.compare = null;
+    state.compareSource = null;
+    state.compareMode = false;
+    state.comparePresentation = 'diff';
+
+    await loadFromText(primaryText, baseName(resources.primary.relativePath), 'primary');
+
+    if (compareText) {
+      await loadFromText(compareText, baseName(resources.compare.relativePath), 'compare');
+      state.compareSource = 'folder-auto';
+      state.compareMode = true;
+      state.comparePresentation = 'diff';
+    }
+
+    if (programText) {
+      await bindProgramText(programText, baseName(resources.program.relativePath));
+    } else {
+      renderBindingStatus();
+      renderLaneInsightCards();
+    }
+
+    renderAll();
+  }
+
+  async function openLocalFolder() {
+    if (window.showDirectoryPicker) {
+      try {
+        const dirHandle = await window.showDirectoryPicker({ id: 'pto-swimlane-folder' });
+        const entries = await collectHandleEntries(dirHandle);
+        await loadFolderResources(entries, dirHandle.name || 'local-folder');
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+        throw error;
+      }
+      return;
+    }
+    dom.folderInput?.click();
+  }
+
+  function closeResourcePanel() {
+    if (!dom.resourcePanel || dom.resourcePanel.hidden) return;
+    dom.resourcePanel.hidden = true;
+    dom.resourceToggleBtn?.setAttribute('aria-expanded', 'false');
+  }
+
+  function openResourcePanel() {
+    if (!dom.resourcePanel) return;
+    renderResourcePanel();
+    dom.resourcePanel.hidden = false;
+    dom.resourceToggleBtn?.setAttribute('aria-expanded', 'true');
+  }
+
+  function toggleResourcePanel() {
+    if (!dom.resourcePanel) return;
+    if (dom.resourcePanel.hidden) openResourcePanel();
+    else closeResourcePanel();
+  }
+
+  async function setCompareView(view) {
+    if (view === 'single') {
+      state.compareMode = false;
+      renderAll();
+      return true;
+    }
+    const ok = await ensureCompareDataset();
+    if (!ok) {
+      alert('请先绑定参考泳道，或切回内置 Before/After 样例。');
+      return false;
+    }
+    state.compareMode = true;
+    state.comparePresentation = view === 'compare' ? 'compare' : 'diff';
+    renderAll();
+    return true;
+  }
+
   async function ensureCompareDataset() {
     if (state.datasets.compare) return true;
     if (state.builtinSelection === 'before') {
@@ -2021,28 +2378,72 @@
 
   async function loadBuiltinSelection(selection) {
     state.builtinSelection = selection;
+    state.bindings.moduleDir = null;
+    state.bindings.program = null;
     setToggleActive(selection === 'before');
     const target = selection === 'before' ? './samples/stitched_before.json' : './samples/stitched_after.json';
     await loadFromQueryFile(target, 'primary');
-    if (state.compareMode && state.compareSource === 'auto-builtin') {
+    state.datasets.compare = null;
+    state.compareSource = null;
+    if (state.compareMode) {
       const compareTarget = selection === 'before' ? './samples/stitched_after.json' : './samples/stitched_before.json';
       await loadFromQueryFile(compareTarget, 'compare');
+      state.compareSource = 'auto-builtin';
     }
   }
 
-  dom.openLocalBtn?.addEventListener('click', () => dom.fileInput.click());
-  dom.openCompareBtn?.addEventListener('click', () => dom.compareFileInput.click());
-  dom.bindProgramBtn?.addEventListener('click', () => dom.programFileInput.click());
+  dom.resourceToggleBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toggleResourcePanel();
+  });
+  dom.resourceCloseBtn?.addEventListener('click', closeResourcePanel);
+  dom.openFolderBtn?.addEventListener('click', () => {
+    closeResourcePanel();
+    openLocalFolder().catch((error) => {
+      console.error(error);
+      alert(error?.message || 'Failed to read local folder.');
+    });
+  });
+  dom.openLocalBtn?.addEventListener('click', () => {
+    closeResourcePanel();
+    dom.fileInput.click();
+  });
+  dom.openCompareBtn?.addEventListener('click', () => {
+    closeResourcePanel();
+    dom.compareFileInput.click();
+  });
+  dom.bindProgramBtn?.addEventListener('click', () => {
+    closeResourcePanel();
+    dom.programFileInput.click();
+  });
+  dom.folderInput?.addEventListener('change', async (event) => {
+    const { entries, folderName } = collectInputEntries(event.target.files);
+    if (!entries.length) {
+      dom.folderInput.value = '';
+      return;
+    }
+    try {
+      await loadFolderResources(entries, folderName);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Failed to parse folder JSON files.');
+    } finally {
+      dom.folderInput.value = '';
+    }
+  });
   dom.fileInput?.addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      state.bindings.moduleDir = null;
+      state.bindings.program = null;
       await handleLocalFile(file, 'primary');
       if (state.compareSource === 'auto-builtin') {
         state.datasets.compare = null;
         state.compareMode = false;
       }
       state.compareSource = null;
+      state.comparePresentation = 'diff';
       renderAll();
     } catch (error) {
       console.error(error);
@@ -2059,6 +2460,7 @@
       await handleLocalFile(file, 'compare');
       state.compareSource = 'user-file';
       state.compareMode = true;
+      state.comparePresentation = 'diff';
       renderAll();
     } catch (error) {
       console.error(error);
@@ -2090,6 +2492,15 @@
       updateSearch();
     }
   });
+  dom.resourcePanel?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+  document.addEventListener('click', () => {
+    closeResourcePanel();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeResourcePanel();
+  });
   dom.searchPrevBtn?.addEventListener('click', () => goToNextMatch(-1));
   dom.searchNextBtn?.addEventListener('click', () => goToNextMatch(1));
   dom.zoomInBtn?.addEventListener('click', () => {
@@ -2102,27 +2513,36 @@
   });
   dom.zoomFitBtn?.addEventListener('click', fitZoom);
   dom.beforeBtn?.addEventListener('click', () => {
+    closeResourcePanel();
     loadBuiltinSelection('before').catch((error) => {
       console.error(error);
       alert('Failed to load built-in Before sample.');
     });
   });
   dom.afterBtn?.addEventListener('click', () => {
+    closeResourcePanel();
     loadBuiltinSelection('after').catch((error) => {
       console.error(error);
       alert('Failed to load built-in After sample.');
     });
   });
-  dom.compareModeBtn?.addEventListener('click', async () => {
-    if (!state.compareMode) {
-      const ok = await ensureCompareDataset();
-      if (!ok) {
-        alert('Bind a compare JSON first, or switch to the built-in Before/After samples.');
-        return;
-      }
-    }
-    state.compareMode = !state.compareMode;
-    renderAll();
+  dom.singleViewBtn?.addEventListener('click', () => {
+    setCompareView('single').catch((error) => {
+      console.error(error);
+      alert('Failed to switch view mode.');
+    });
+  });
+  dom.compareViewBtn?.addEventListener('click', () => {
+    setCompareView('compare').catch((error) => {
+      console.error(error);
+      alert('Failed to switch view mode.');
+    });
+  });
+  dom.diffViewBtn?.addEventListener('click', () => {
+    setCompareView('diff').catch((error) => {
+      console.error(error);
+      alert('Failed to switch view mode.');
+    });
   });
   dom.toggleBubblesBtn?.addEventListener('click', () => {
     state.showBubbles = !state.showBubbles;
@@ -2287,15 +2707,36 @@
   }
 
   function buildDeepDiveCardHtml() {
-    const program = state.bindings.program;
-    const programSection = program
+    const selected = getSelectedTaskState();
+    const moduleDir = state.bindings.moduleDir;
+    const resourceActionLabel = moduleDir || state.bindings.program ? '管理资源' : '补齐模块资源';
+    const moduleSection = moduleDir
+      ? `<div class="sw-journey-program-bound is-folder">
+           <span class="sw-journey-bound-check">✓</span>
+           <span>${escapeHtml(moduleDir.name)} · ${escapeHtml(String(moduleDir.entryCount || 0))} 文件</span>
+         </div>`
+      : `<div class="sw-journey-program-bound is-empty">
+           <span>模块目录未绑定</span>
+         </div>`;
+    const programSection = state.bindings.program
       ? `<div class="sw-journey-program-bound">
            <span class="sw-journey-bound-check">✓</span>
-           <span>${escapeHtml(program.name || 'program.json')}</span>
+           <span>${escapeHtml(state.bindings.program.name || 'program.json')}</span>
          </div>`
-      : `<button class="sw-journey-program-btn" id="swJourneyProgramBtn" type="button">
-           📂 选择 program.json
-         </button>`;
+      : `<div class="sw-journey-program-bound is-empty">
+           <span>Program 未绑定</span>
+         </div>`;
+    const selectedTaskHtml = selected.task
+      ? `
+          <div class="sw-journey-stat">
+            <span class="sw-journey-stat-label">当前任务</span>
+            <span class="sw-journey-stat-value">${escapeHtml(selected.task.label || selected.task.displayName || selected.task.rawName)}</span>
+          </div>
+          <div class="sw-journey-stat">
+            <span class="sw-journey-stat-label">来源</span>
+            <span class="sw-journey-stat-value">${escapeHtml(selected.ref?.chartKey === 'compare' ? 'Reference' : 'Primary')}</span>
+          </div>`
+      : '<div class="sw-journey-empty-hint">先点击一个 task，再打开依赖或分屏联动。</div>';
 
     return `
       <div class="sw-journey-card">
@@ -2303,13 +2744,22 @@
           <span class="sw-journey-step-num">3</span>深入任务
         </div>
         <div class="sw-journey-card-body">
-          <div class="sw-journey-stat-label" style="margin-bottom:4px">计算图联动需要 program.json</div>
-          ${programSection}
+          ${selectedTaskHtml}
           <div class="sw-journey-card-divider"></div>
+          <div class="sw-journey-stat-label" style="margin-bottom:4px">模块资源</div>
+          ${moduleSection}
+          ${programSection}
+          <button class="sw-journey-program-btn" id="swJourneyBtnResources" type="button">${escapeHtml(resourceActionLabel)}</button>
+          <div class="sw-journey-card-divider"></div>
+          <div class="sw-detail-note">旅程入口保留，但会统一打开顶部“资源”面板。</div>
+          <div class="sw-detail-note">${escapeHtml(selected.depReason)}</div>
+          <div class="sw-detail-note">${escapeHtml(selected.passIrReason)}</div>
+          <div class="sw-detail-note">${escapeHtml(selected.sourceFlowReason)}</div>
         </div>
         <div class="sw-journey-card-actions">
-          <button class="sw-journey-btn is-stub" type="button" title="即将支持">显示前后依赖连线</button>
-          <button class="sw-journey-btn is-stub" type="button" title="即将支持">在计算图中分屏联动</button>
+          <button class="sw-journey-btn${selected.canShowDeps ? '' : ' is-disabled'}" id="swJourneyBtnDeps" type="button"${selected.canShowDeps ? '' : ' disabled'}>显示前后依赖连线</button>
+          <button class="sw-journey-btn${selected.canOpenPassIr ? '' : ' is-disabled'}" id="swJourneyBtnPassIr" type="button"${selected.canOpenPassIr ? '' : ' disabled'}>${escapeHtml(selected.passIrActionLabel)}</button>
+          <button class="sw-journey-btn${selected.canOpenSourceFlow ? '' : ' is-disabled'}" id="swJourneyBtnSourceFlow" type="button"${selected.canOpenSourceFlow ? '' : ' disabled'}>${escapeHtml(selected.sourceFlowActionLabel)}</button>
         </div>
       </div>`;
   }
@@ -2337,11 +2787,37 @@
       });
     }
 
-    // Wire Step 3 program.json button
-    const programBtn = document.getElementById('swJourneyProgramBtn');
-    if (programBtn) {
-      programBtn.addEventListener('click', () => {
-        dom.programFileInput.click();
+    const resourceBtn = document.getElementById('swJourneyBtnResources');
+    if (resourceBtn) {
+      resourceBtn.addEventListener('click', () => {
+        openResourcePanel();
+      });
+    }
+
+    const depsBtn = document.getElementById('swJourneyBtnDeps');
+    if (depsBtn) {
+      depsBtn.addEventListener('click', () => {
+        focusDependencyChainFromSelectedTask();
+      });
+    }
+
+    const passIrBtn = document.getElementById('swJourneyBtnPassIr');
+    if (passIrBtn) {
+      passIrBtn.addEventListener('click', () => {
+        const selected = getSelectedTaskState();
+        if (!selected.canOpenPassIr) return;
+        hideTaskPopup();
+        openSplitView(canTaskOpenPassIr(selected.task) ? selected.task : null, 'pass-ir');
+      });
+    }
+
+    const sourceFlowBtn = document.getElementById('swJourneyBtnSourceFlow');
+    if (sourceFlowBtn) {
+      sourceFlowBtn.addEventListener('click', () => {
+        const selected = getSelectedTaskState();
+        if (!selected.canOpenSourceFlow) return;
+        hideTaskPopup();
+        openSplitView(canTaskOpenSourceFlow(selected.task) ? selected.task : null, 'source-flow');
       });
     }
   }
@@ -2424,6 +2900,7 @@
     const sections = [];
 
     const facts = [
+      ['semantic', task.label || '—'],
       ['duration', formatTick(task.dur)],
       ['start', formatTick(task.relTs)],
       ['gap before', formatTick(task.gapBefore || 0)],
@@ -2447,16 +2924,19 @@
     </div>`);
     }
 
-    const hasProg = !!state.bindings.program;
-    const hasOpMagic = task.callOpMagic != null;
+    sections.push(`<div class="sw-popup-section">
+      <div class="sw-popup-section-title">I/O</div>
+      <div class="sw-popup-row"><span class="sw-popup-row-key">in</span><span class="sw-popup-row-val">${escapeHtml(task.inputRawMagic.length ? task.inputRawMagic.join(', ') : '—')}</span></div>
+      <div class="sw-popup-row"><span class="sw-popup-row-key">out</span><span class="sw-popup-row-val">${escapeHtml(task.outputRawMagic.length ? task.outputRawMagic.join(', ') : '—')}</span></div>
+    </div>`);
+
     const splitDisabled = !ENABLE_SPLIT_VIEW;
-    const passIrDisabled = splitDisabled || !(hasProg && hasOpMagic);
-    const sourceFlowDisabled = splitDisabled || !task.label;
+    const passIrDisabled = splitDisabled || !canTaskOpenPassIr(task);
+    const sourceFlowDisabled = splitDisabled || !canTaskOpenSourceFlow(task);
     sections.push(`<div class="sw-popup-actions">
     ${chartKey === 'primary' ? '<div class="sw-detail-note">主图依赖连线已自动显示，点击节点可快速定位。</div>' : ''}
     <button class="sw-popup-action-btn" data-popup-action="open-split-pass-ir"${passIrDisabled ? ' disabled' : ''}>Pass IR 分屏联动</button>
     ${task.label ? `<button class="sw-popup-action-btn" data-popup-action="open-split-source-flow"${sourceFlowDisabled ? ' disabled' : ''}>Source Flow 分屏联动</button>` : ''}
-    ${!hasProg ? '<button class="sw-popup-action-btn" data-popup-action="bind-program">📂 绑定 program.json</button>' : ''}
   </div>`);
 
     return sections.join('');
@@ -2472,8 +2952,6 @@
           openSplitView(task, 'pass-ir');
         } else if (action === 'open-split-source-flow') {
           openSplitView(task, 'source-flow');
-        } else if (action === 'bind-program') {
-          dom.programFileInput.click();
         }
       });
     });
@@ -2483,6 +2961,8 @@
 
   function openSplitView(task, source) {
     if (!ENABLE_SPLIT_VIEW) return;
+    if (source === 'pass-ir' && !canOpenPassIrView()) return;
+    if (source === 'source-flow' && !canOpenSourceFlowView() && !canTaskOpenSourceFlow(task)) return;
     state.splitSource = source;
 
     const container = document.getElementById('swSplitContainer');
@@ -2506,24 +2986,38 @@
       try {
         sessionStorage.setItem(PASS_IR_META_KEY, JSON.stringify({ name: state.bindings.program?.name || '' }));
         sessionStorage.setItem(PASS_IR_TEXT_KEY, state.bindings.program?.text || '');
-        sessionStorage.setItem(PASS_IR_FOCUS_KEY, JSON.stringify({
-          semanticLabel: task.label || null,
-          callOpMagic: task.callOpMagic != null ? task.callOpMagic : null,
-          laneName: task.threadName,
-          seqNo: task.seqNo,
-          source: 'swimlane',
-        }));
+        if (task) {
+          sessionStorage.setItem(PASS_IR_FOCUS_KEY, JSON.stringify({
+            semanticLabel: task.label || null,
+            callOpMagic: task.callOpMagic != null ? task.callOpMagic : null,
+            laneName: task.threadName,
+            seqNo: task.seqNo,
+            source: 'swimlane',
+          }));
+        } else {
+          sessionStorage.removeItem(PASS_IR_FOCUS_KEY);
+        }
       } catch(e) { console.error(e); }
       iframe.src = `../pass-ir/index.html?action=open-file&embed=1`;
     } else if (source === 'source-flow') {
       label.textContent = 'Source Flow';
       try {
-        sessionStorage.setItem(SOURCE_FLOW_FOCUS_KEY, JSON.stringify({
-          semanticLabel: task.label || null,
-          source: 'swimlane',
-        }));
+        if (state.bindings.moduleDir?.sourceText && state.bindings.moduleDir?.sourceName) {
+          sessionStorage.setItem(SOURCE_FLOW_META_KEY, JSON.stringify({ name: state.bindings.moduleDir.sourceName }));
+          sessionStorage.setItem(SOURCE_FLOW_TEXT_KEY, state.bindings.moduleDir.sourceText);
+        }
+        if (task?.label) {
+          sessionStorage.setItem(SOURCE_FLOW_FOCUS_KEY, JSON.stringify({
+            semanticLabel: task.label || null,
+            source: 'swimlane',
+          }));
+        } else {
+          sessionStorage.removeItem(SOURCE_FLOW_FOCUS_KEY);
+        }
       } catch(e) { console.error(e); }
-      iframe.src = '../source-flow/index.html';
+      iframe.src = state.bindings.moduleDir?.sourceText && state.bindings.moduleDir?.sourceName
+        ? '../source-flow/index.html?action=open-py-file'
+        : '../source-flow/index.html';
     }
 
     iframe.onload = () => {
