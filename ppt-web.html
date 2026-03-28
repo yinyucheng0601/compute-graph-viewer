@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PTO Web Deck</title>
+  <style>
+    :root {
+      --page-bg: #131313;
+      --deck-bg: #000000;
+      --text: #f5f7fb;
+      --muted: rgba(255, 255, 255, 0.68);
+      --soft: rgba(255, 255, 255, 0.12);
+      --panel: rgba(10, 12, 18, 0.82);
+      --panel-soft: rgba(255, 255, 255, 0.05);
+      --accent: #77a8ff;
+      --deck-w: min(96vw, calc(94vh * 16 / 9));
+      --deck-h: min(94vh, calc(96vw * 9 / 16));
+      --ui-font: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --mono-font: "JetBrains Mono", "SFMono-Regular", "Menlo", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 16% 10%, rgba(119, 168, 255, 0.06), transparent 18%),
+        linear-gradient(180deg, #191919 0%, var(--page-bg) 100%);
+      color: var(--text);
+      font-family: var(--ui-font);
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .deck-shell {
+      width: var(--deck-w);
+      height: var(--deck-h);
+      position: relative;
+      border-radius: 28px;
+      overflow: hidden;
+      background: var(--deck-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+    }
+
+    .deck-dots-overlay {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      z-index: 5;
+    }
+
+    .slides {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: scale(1.015);
+      transition: opacity 280ms ease, transform 280ms ease;
+      pointer-events: none;
+      background: var(--deck-bg);
+      overflow: hidden;
+    }
+
+    .slide.is-active {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+      z-index: 2;
+    }
+
+    .slide iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #111;
+    }
+
+    .slide-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .fade-top {
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 240px;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.62) 32%, rgba(0, 0, 0, 0.18) 72%, rgba(0, 0, 0, 0) 100%);
+    }
+
+    .cover-surface,
+    .index-surface {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(119, 168, 255, 0.16), transparent 20%),
+        radial-gradient(circle at 82% 18%, rgba(119, 168, 255, 0.08), transparent 18%),
+        linear-gradient(180deg, #020202 0%, #000000 100%);
+    }
+
+    .cover-grid {
+      position: absolute;
+      inset: 0;
+      padding: 44px 52px 48px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 16px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .cover-title {
+      margin: 0;
+      font-size: clamp(72px, 6.4vw, 120px);
+      line-height: 0.92;
+      letter-spacing: -0.05em;
+      font-weight: 700;
+      max-width: 1180px;
+    }
+
+    .cover-subtitle {
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 38px;
+      line-height: 1.2;
+    }
+
+    .cover-meta {
+      color: rgba(255, 255, 255, 0.44);
+      font-size: 14px;
+    }
+
+    .index-layout {
+      position: absolute;
+      inset: 0;
+      padding: 44px 52px 48px;
+    }
+
+    .index-center-layout {
+      position: absolute;
+      inset: 0;
+      padding: 44px 52px 48px;
+      display: grid;
+      grid-template-columns: minmax(520px, 1fr) minmax(420px, 620px);
+      align-items: center;
+      gap: 48px;
+    }
+
+    .index-copy {
+      display: grid;
+      gap: 18px;
+      align-content: center;
+      min-height: 420px;
+    }
+
+    .index-title {
+      margin: 0;
+      font-size: 92px;
+      line-height: 0.94;
+      letter-spacing: -0.05em;
+    }
+
+    .index-subtitle {
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 28px;
+    }
+
+    .module-panel {
+      width: min(36vw, 620px);
+      padding: 24px;
+      border-radius: 24px;
+      background: var(--panel);
+      border: 1px solid var(--soft);
+      backdrop-filter: blur(14px);
+    }
+
+    .module-panel-title {
+      margin: 0 0 16px;
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .module-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .module-card {
+      padding: 16px 16px 18px;
+      border-radius: 18px;
+      background: var(--panel-soft);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .module-card-name {
+      margin: 0 0 8px;
+      font-size: 21px;
+      line-height: 1.2;
+    }
+
+    .module-card-desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.46;
+    }
+
+    .split-iframe-pane {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 50%;
+      height: 100%;
+      background: #5c5c5c;
+    }
+
+    .split-iframe-pane iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .split-copy {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 50%;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    .split-copy .eyebrow {
+      position: absolute;
+      top: 44px;
+      left: 39px;
+    }
+
+    .split-title {
+      position: absolute;
+      top: 377px;
+      left: 39px;
+      margin: 0;
+      width: 666px;
+      font-size: 60px;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .split-desc {
+      position: absolute;
+      left: 39px;
+      top: 573px;
+      width: 834px;
+      margin: 0;
+      color: #ffffffbf;
+      font-size: 24px;
+      line-height: 1.45;
+    }
+
+    .notes-box {
+      position: absolute;
+      left: 39px;
+      bottom: 34px;
+      width: 460px;
+      padding: 18px 22px 20px;
+      border-radius: 20px;
+      background: var(--panel);
+      border: 1px solid var(--soft);
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+    }
+
+    .notes-list {
+      margin: 0;
+      padding-left: 22px;
+      display: grid;
+      gap: 10px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .full-iframe-copy-top {
+      position: absolute;
+      top: 24px;
+      left: 39px;
+      right: 39px;
+      pointer-events: none;
+    }
+
+    .zoom-tools {
+      position: absolute;
+      top: 24px;
+      right: 39px;
+      display: flex;
+      gap: 8px;
+      z-index: 6;
+    }
+
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      background: rgba(10, 12, 18, 0.82);
+      color: rgba(255, 255, 255, 0.92);
+      font: 600 15px/1 var(--mono-font);
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    .zoom-btn.is-active {
+      border-color: rgba(119, 168, 255, 0.5);
+      color: var(--accent);
+    }
+
+    .full-iframe-title {
+      margin: 8px 0 0;
+      width: 1300px;
+      font-size: 60px;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .full-iframe-desc {
+      position: absolute;
+      left: 39px;
+      bottom: 120px;
+      width: 834px;
+      margin: 0;
+      color: #ffffffbf;
+      font-size: 24px;
+      line-height: 1.42;
+      pointer-events: none;
+    }
+
+    .zoom-stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .zoom-target {
+      position: absolute;
+      inset: 0;
+      transform-origin: center center;
+      transition: transform 180ms ease;
+    }
+
+    .zoom-target iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .deck-ui {
+      width: var(--deck-w);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .deck-status,
+    .deck-dots {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(7, 9, 14, 0.76);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .deck-status {
+      color: var(--muted);
+      font: 500 12px/1.2 var(--mono-font);
+    }
+
+    .deck-dots {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      padding: 0;
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .dot.is-active {
+      background: var(--accent);
+      transform: scale(1.22);
+    }
+
+    .hint {
+      color: rgba(255, 255, 255, 0.62);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+
+    @media (max-width: 1100px) {
+      :root {
+        --deck-w: 100vw;
+        --deck-h: 100vh;
+      }
+
+      body {
+        padding: 0;
+        gap: 0;
+      }
+
+      .deck-shell {
+        border-radius: 0;
+      }
+
+      .module-panel,
+      .notes-box {
+        left: 26px;
+        right: 26px;
+        width: auto;
+      }
+
+      .index-center-layout {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        align-items: start;
+        padding: 28px 26px 90px;
+      }
+
+      .split-iframe-pane,
+      .split-copy {
+        width: 100%;
+      }
+
+      .split-copy {
+        padding: 28px 26px 90px;
+      }
+
+      .split-title,
+      .split-desc,
+      .full-iframe-title,
+      .full-iframe-desc {
+        width: auto;
+      }
+
+      .split-desc,
+      .full-iframe-desc {
+        left: 26px;
+        right: 26px;
+      }
+
+      .split-copy .eyebrow,
+      .split-title,
+      .split-desc {
+        position: static;
+      }
+
+      .split-copy .eyebrow {
+        margin-bottom: 10px;
+      }
+
+      .zoom-tools {
+        top: 18px;
+        right: 18px;
+      }
+
+      .deck-ui {
+        width: 100%;
+        padding: 14px;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .deck-dots-overlay {
+        bottom: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck-shell">
+    <div class="slides" id="slides"></div>
+    <div class="deck-dots deck-dots-overlay" id="deckDots" aria-label="Slide navigation"></div>
+  </div>
+
+  <div class="deck-ui">
+    <div class="deck-status" id="deckStatus">01 / 04 · 封面</div>
+  </div>
+  <div class="hint">支持键盘左右上下翻页；底部导航点保留在 PPT 画布内</div>
+
+  <script>
+    const slideData = [
+      {
+        id: "cover",
+        title: "封面",
+        template: "cover",
+        eyebrow: "PTO Demo",
+        headline: "2026PyPTO创新体验",
+        subhead: "汇报人",
+        meta: "Cover"
+      },
+      {
+        id: "index",
+        title: "目录",
+        template: "index-center",
+        eyebrow: "Index",
+        headline: "Index",
+        subhead: "当前版本可直接串讲的核心模块。",
+        panelTitle: "真实模块目录",
+        modules: [
+          {
+            name: "模型算子层级架构图",
+            desc: "DeepSeek V3 / V3.2 的层级结构视图，支持 L1 到 L4 展开和并行视图切换。"
+          },
+          {
+            name: "Pass IR 计算图",
+            desc: "从图编译视角展示算子与连接关系，适合讲计算图结构和节点定位。"
+          },
+          {
+            name: "Memory Viewer",
+            desc: "以显存块与时间片方式展示资源占用，适合讲内存热点与分配情况。"
+          },
+          {
+            name: "Swimlane 执行视图",
+            desc: "用泳道方式看执行顺序、阶段切换与任务并发关系。"
+          },
+          {
+            name: "图执行叠加原型",
+            desc: "把图结构和执行信息叠加到同一视图，强调分析与定位效率。"
+          }
+        ]
+      },
+      {
+        id: "model-architecture",
+        title: "模型架构图",
+        template: "split-iframe",
+        eyebrow: "Module 01",
+        headline: "模型架构图",
+        desc: "iframe 直接填充右半边灰色区域，不叠黑色蒙层。这样演示时模块本身更清楚，也不会和 PPT 视觉层互相打架。",
+        iframe: "./model-architecture/index.html?embed&model=v3_2",
+        notes: [
+          "L1 到 L4 的层级展开路径",
+          "结构视图和并行视图切换",
+          "V3 与 V3.2 的对照讲法"
+        ]
+      },
+      {
+        id: "pass-ir",
+        title: "Pass IR",
+        template: "full-iframe-top-title",
+        eyebrow: "Module 02",
+        headline: "Pass IR 计算图",
+        desc: "",
+        iframe: "./pass-ir/index.html?embed=1",
+        notes: [
+          "计算图的 colormap 取色",
+          "group 模式",
+          "多种染色机制"
+        ]
+      }
+    ];
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;");
+    }
+
+    function renderCover(slide) {
+      return `
+        <div class="cover-surface"></div>
+        <div class="cover-grid">
+          <div class="eyebrow">${escapeHtml(slide.eyebrow)}</div>
+          <div>
+            <h1 class="cover-title">${escapeHtml(slide.headline)}</h1>
+            <p class="cover-subtitle">${escapeHtml(slide.subhead)}</p>
+          </div>
+          <div class="cover-meta">${escapeHtml(slide.meta || "")}</div>
+        </div>
+      `;
+    }
+
+    function renderIndex(slide) {
+      return `
+        <div class="index-surface"></div>
+        <div class="index-layout">
+          <div class="eyebrow">${escapeHtml(slide.eyebrow)}</div>
+          <h2 class="index-title">${escapeHtml(slide.headline)}</h2>
+          <p class="index-subtitle">${escapeHtml(slide.subhead)}</p>
+          <aside class="module-panel">
+            <h3 class="module-panel-title">${escapeHtml(slide.panelTitle)}</h3>
+            <div class="module-list">
+              ${slide.modules.map((item) => `
+                <article class="module-card">
+                  <h4 class="module-card-name">${escapeHtml(item.name)}</h4>
+                  <p class="module-card-desc">${escapeHtml(item.desc)}</p>
+                </article>
+              `).join("")}
+            </div>
+          </aside>
+        </div>
+      `;
+    }
+
+    function renderIndexCenter(slide) {
+      return `
+        <div class="index-surface"></div>
+        <div class="index-center-layout">
+          <div class="index-copy">
+            <div class="eyebrow">${escapeHtml(slide.eyebrow)}</div>
+            <h2 class="index-title">${escapeHtml(slide.headline)}</h2>
+            <p class="index-subtitle">${escapeHtml(slide.subhead)}</p>
+          </div>
+          <aside class="module-panel">
+            <h3 class="module-panel-title">${escapeHtml(slide.panelTitle)}</h3>
+            <div class="module-list">
+              ${slide.modules.map((item) => `
+                <article class="module-card">
+                  <h4 class="module-card-name">${escapeHtml(item.name)}</h4>
+                  <p class="module-card-desc">${escapeHtml(item.desc)}</p>
+                </article>
+              `).join("")}
+            </div>
+          </aside>
+        </div>
+      `;
+    }
+
+    function renderSplitIframe(slide) {
+      return `
+        <div class="split-copy">
+          <div class="eyebrow">${escapeHtml(slide.eyebrow)}</div>
+          <h2 class="split-title">${escapeHtml(slide.headline)}</h2>
+          <p class="split-desc">${escapeHtml(slide.desc)}</p>
+        </div>
+        <div class="split-iframe-pane">
+          <iframe title="${escapeHtml(slide.title)}" data-src="${escapeHtml(slide.iframe)}"></iframe>
+        </div>
+        <aside class="notes-box">
+          <ul class="notes-list">
+            ${slide.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </aside>
+      `;
+    }
+
+    function renderFullIframeTopTitle(slide) {
+      return `
+        <div class="zoom-stage">
+          <div class="zoom-target" data-zoom="1">
+            <iframe title="${escapeHtml(slide.title)}" data-src="${escapeHtml(slide.iframe)}"></iframe>
+          </div>
+        </div>
+        <div class="slide-layer">
+          <div class="fade-top"></div>
+          <div class="full-iframe-copy-top">
+            <div class="eyebrow">${escapeHtml(slide.eyebrow)}</div>
+            <h2 class="full-iframe-title">${escapeHtml(slide.headline)}</h2>
+          </div>
+          <div class="zoom-tools">
+            <button class="zoom-btn" type="button" data-zoom-action="in" aria-label="Zoom in">+</button>
+            <button class="zoom-btn is-active" type="button" data-zoom-action="reset" aria-label="Reset zoom">1</button>
+          </div>
+          <p class="full-iframe-desc">${escapeHtml(slide.desc)}</p>
+          <aside class="notes-box">
+            <ul class="notes-list">
+              ${slide.notes.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          </aside>
+        </div>
+      `;
+    }
+
+    function renderSlide(slide) {
+      const section = document.createElement("section");
+      section.className = "slide";
+      section.dataset.id = slide.id;
+      section.dataset.title = slide.title;
+
+      if (slide.template === "cover") section.innerHTML = renderCover(slide);
+      if (slide.template === "index") section.innerHTML = renderIndex(slide);
+      if (slide.template === "index-center") section.innerHTML = renderIndexCenter(slide);
+      if (slide.template === "split-iframe") section.innerHTML = renderSplitIframe(slide);
+      if (slide.template === "full-iframe-top-title") section.innerHTML = renderFullIframeTopTitle(slide);
+
+      return section;
+    }
+
+    const slidesRoot = document.getElementById("slides");
+    const deckStatus = document.getElementById("deckStatus");
+    const deckDots = document.getElementById("deckDots");
+
+    const slideNodes = slideData.map(renderSlide);
+    slideNodes.forEach((node) => slidesRoot.appendChild(node));
+
+    let activeIndex = 0;
+
+    function ensureIframe(index) {
+      const node = slideNodes[index];
+      if (!node) return;
+      const iframe = node.querySelector("iframe[data-src]");
+      if (iframe && !iframe.src) {
+        iframe.src = iframe.dataset.src;
+        if (node.dataset.id === "pass-ir") {
+          iframe.addEventListener("load", () => bindPassIrIframe(node, iframe), { once: true });
+        }
+      }
+    }
+
+    function bindPassIrIframe(node, iframe) {
+      const zoomTarget = node.querySelector(".zoom-target");
+      const buttons = Array.from(node.querySelectorAll(".zoom-btn"));
+      const zoomSteps = [0.9, 1, 1.1];
+      let currentZoom = 1;
+
+      function applyZoom(nextZoom) {
+        currentZoom = nextZoom;
+        zoomTarget.style.transform = `scale(${currentZoom})`;
+        buttons.forEach((btn) => {
+          btn.classList.toggle("is-active", btn.dataset.zoomAction === "reset" && currentZoom === 1);
+        });
+      }
+
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn.dataset.zoomAction === "reset") applyZoom(1);
+          if (btn.dataset.zoomAction === "in") {
+            const next = zoomSteps.find((value) => value > currentZoom) ?? zoomSteps[zoomSteps.length - 1];
+            applyZoom(next);
+          }
+        });
+      });
+
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        doc.addEventListener("wheel", (event) => {
+          event.preventDefault();
+        }, { passive: false, capture: true });
+      } catch (error) {
+        console.warn("Pass IR wheel mute skipped:", error);
+      }
+    }
+
+    function updateDeck(nextIndex) {
+      activeIndex = Math.max(0, Math.min(slideNodes.length - 1, nextIndex));
+      slideNodes.forEach((node, index) => {
+        node.classList.toggle("is-active", index === activeIndex);
+      });
+
+      ensureIframe(activeIndex);
+      ensureIframe(activeIndex - 1);
+      ensureIframe(activeIndex + 1);
+
+      const current = slideData[activeIndex];
+      deckStatus.textContent = `${String(activeIndex + 1).padStart(2, "0")} / ${String(slideData.length).padStart(2, "0")} · ${current.title}`;
+      Array.from(deckDots.children).forEach((dot, index) => {
+        dot.classList.toggle("is-active", index === activeIndex);
+      });
+    }
+
+    function move(delta) {
+      updateDeck(activeIndex + delta);
+    }
+
+    function indexFromHash() {
+      const id = window.location.hash.replace(/^#/, "");
+      if (!id) return 0;
+      const found = slideData.findIndex((slide) => slide.id === id);
+      return found >= 0 ? found : 0;
+    }
+
+    slideData.forEach((slide, index) => {
+      const dot = document.createElement("button");
+      dot.className = "dot";
+      dot.type = "button";
+      dot.title = slide.title;
+      dot.setAttribute("aria-label", slide.title);
+      dot.addEventListener("click", () => updateDeck(index));
+      deckDots.appendChild(dot);
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (["ArrowRight", "ArrowDown", "PageDown", " ", "j", "J"].includes(event.key)) {
+        event.preventDefault();
+        move(1);
+      }
+      if (["ArrowLeft", "ArrowUp", "PageUp", "k", "K"].includes(event.key)) {
+        event.preventDefault();
+        move(-1);
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        updateDeck(0);
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        updateDeck(slideData.length - 1);
+      }
+    });
+
+    window.addEventListener("hashchange", () => {
+      updateDeck(indexFromHash());
+    });
+
+    updateDeck(indexFromHash());
+  </script>
+</body>
+</html>
