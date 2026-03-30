@@ -1,0 +1,55 @@
+<div
+  class="devui-gantt-scale {{ unit }}"
+  *ngFor="let data of viewSCaleData; trackBy: trackByFn; let first = first; let last = last"
+  [ngClass]="{ today: data.today, milestone: data.milestone }"
+  [style.left]="scaleWidth[unit] * data.index + 'px'"
+  [style.width]="scaleWidth[unit] + 'px'"
+  dGanttMarker
+  [monthMark]="data.monthStart"
+  [weekend]="data.weekend"
+  [milestone]="data.milestone"
+  [today]="data.today"
+  [index]="data.index"
+  [showDaySplitLine]="showDaySplitLine"
+  [date]="data.date"
+  [unit]="unit"
+  [last]="last"
+  [ganttScaleContainerOffsetLeft]="ganttScaleContainerOffsetLeft"
+  [ganttBarContainerElement]="ganttBarContainerElement"
+>
+  <div class="devui-scale-start" [ngClass]="{ milestone: data.milestone }" [title]="data.milestone || ''">
+    <ng-container *ngIf="data.milestone && unit === 'day'">
+      {{ data.milestone }}
+    </ng-container>
+    <ng-container *ngIf="!data.milestone || unit !== 'day'">
+      {{
+        data.scaleStartVisable && (first || data.monthStart)
+          ? unit === 'month'
+            ? i18nText?.yearDisplay(data.yearLabel)
+            : i18nText?.yearAndMonthDisplay(data.yearLabel, data.monthLabel)
+          : ''
+      }}
+    </ng-container>
+  </div>
+  <div class="devui-scale-unit">
+    <div *ngIf="highlight && data.highlightStart" class="scale-highlight" [style.minWidth]="highlightMinWidth + 'px'">
+      <div style="float: left">{{ highlightStartText }}</div>
+      <div style="float: right">{{ highlightEndText }}</div>
+      <div style="clear: both"></div>
+    </div>
+    <ng-container *ngIf="!highlight || !data.highlight">
+      <div *ngIf="unit === 'day'" class="border-left" [ngClass]="{ today: data.today }">
+        {{ data.today ? i18nText?.today : data.dayOfMonthLabel }}
+      </div>
+      <div *ngIf="unit === 'week'" [ngClass]="{ 'border-left': first || data.weekend }">
+        {{ first || data.weekend ? data.dayOfMonthLabel : '' }}
+      </div>
+      <div *ngIf="unit === 'month'" [ngClass]="{ 'border-left': first || data.monthStart }">
+        {{ first || data.monthStart ? i18nText?.monthDisplay(data.monthLabel) : '' }}
+      </div>
+    </ng-container>
+  </div>
+  <div class="milestone-new {{ unit }}" [title]="i18nText?.milestone" (click)="addMilestone(data)">
+    <div class="icon-add"></div>
+  </div>
+</div>

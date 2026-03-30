@@ -517,6 +517,21 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
     }
   </style>
+  <style>
+    html.preview .vt-header,
+    html.preview .vt-compiler-bar,
+    html.preview .vt-info-bar,
+    html.preview .vt-zoom-controls,
+    html.preview #vtLegend,
+    html.preview #vtSourcePanel { display: none !important; }
+    html.preview body { overflow: hidden; }
+    html.preview #vtCanvasArea {
+      flex: 1;
+      height: 100vh;
+    }
+    html.preview * { pointer-events: none !important; cursor: default !important; }
+  </style>
+  <script>if(new URLSearchParams(location.search).get('preview')==='1')document.documentElement.classList.add('preview');</script>
 </head>
 
 <body style="display:flex;flex-direction:column;height:100vh;overflow:hidden;">
@@ -770,6 +785,7 @@
       };
       const urlParams = new URLSearchParams(window.location.search);
       const urlAction = urlParams.get('action');
+      const SWIMLANE_SOURCE_FOCUS_KEY = 'ptoSwimlaneSourceFocus';
 
       const COMPACT_OPTS = { compact: true };
       const pipelineRenderTokens = new Map();
@@ -805,6 +821,7 @@
       let currentSourceInfo = DEFAULT_INFO.source;
       let currentLegendItems = DEFAULT_LEGEND_ITEMS;
       let currentSourceDefaultLayout = 'horizontal';
+      let pendingExternalSourceFocus = null;
 
       function safeParseJSON(raw) {
         if (!raw) return null;
@@ -842,6 +859,8 @@
       }
 
       function resolveSourceContext() {
+        pendingExternalSourceFocus = safeParseJSON(sessionStorage.getItem(SWIMLANE_SOURCE_FOCUS_KEY));
+        if (pendingExternalSourceFocus) sessionStorage.removeItem(SWIMLANE_SOURCE_FOCUS_KEY);
         const storedMeta = safeParseJSON(sessionStorage.getItem('vtSelectedFile'));
         const storedText = sessionStorage.getItem('vtSelectedFileText');
         if (urlAction === 'open-py-file' && storedMeta?.name) {
@@ -1213,6 +1232,17 @@
             }
           }
         }
+      }
+
+      function applyPendingExternalSourceFocus() {
+        if (!pendingExternalSourceFocus || !sourceGraph?.nodes?.length) return;
+        const focus = pendingExternalSourceFocus;
+        pendingExternalSourceFocus = null;
+        if (!focus.semanticLabel) return;
+        const target = sourceGraph.nodes.find(node => node.type === 'op' && node.data?.semanticLabel === focus.semanticLabel);
+        if (!target) return;
+        const nodeEl = document.querySelector(`[data-node-id="${target.id}"]`);
+        handleNodeClick(target, nodeEl || null);
       }
 
       // ── Semantic color map ────────────────────────────────────────
@@ -2168,6 +2198,7 @@
           } else {
             fitView(sourceLayout);
           }
+          applyPendingExternalSourceFocus();
         })
         .catch(err => {
           loading.innerHTML = `<span style="color:#e05a5a">Failed to load graph: ${err.message}</span>`;

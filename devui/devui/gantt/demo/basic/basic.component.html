@@ -1,0 +1,61 @@
+<d-fullscreen [zIndex]="1080" (fullscreenLaunch)="launchFullscreen($event)">
+  <div #ganttContainer class="gantt-container" fullscreen-target>
+    <div class="header" [style.width]="ganttScaleWidth">
+      <d-gantt-scale [ganttBarContainerElement]="ganttBody" [scrollElement]="ganttContainer" [showDaySplitLine]="true"></d-gantt-scale>
+    </div>
+    <d-gantt-tools
+      [currentUnit]="unit"
+      [isFullScreen]="isFullScreen"
+      (goToday)="goToday()"
+      (increaseUnit)="onIncreaseUnit()"
+      (reduceUnit)="onReduceUnit()"
+      (switchView)="onSwitchView($event)"
+    >
+      <d-button bsStyle="text" fullscreen-launch class="tool">
+        <i class="icon" [ngClass]="{ 'icon-frame-contract': isFullScreen, 'icon-frame-expand': !isFullScreen }"></i>
+      </d-button>
+    </d-gantt-tools>
+    <div #ganttBody class="body" [style.width]="ganttScaleWidth">
+      <div class="item" *ngFor="let item of list">
+        <d-gantt-bar
+          [startDate]="item?.startDate"
+          [endDate]="item?.endDate"
+          [tipTemplateRef]="tipTemplate"
+          [titleTemplateRef]="titleTemplate"
+          [id]="item?.id"
+          [title]="item?.title"
+          [progressRate]="item?.progressRate"
+          [scrollElement]="ganttContainer"
+          [status]="item?.status"
+          [data]="item"
+          [showTitle]="true"
+          (barMoveStartEvent)="onGanttBarMoveStart()"
+          (barMovingEvent)="onGanttBarMoving($event)"
+          (barResizeStartEvent)="onGanttBarResizeStart()"
+          (barResizingEvent)="onGanttBarResizing($event)"
+          (barMoveEndEvent)="onGanttBarMoveEnd($event)"
+          (barResizeEndEvent)="onGanttBarResize($event)"
+          (barProgressEvent)="onBarProgressEvent($event)"
+        ></d-gantt-bar>
+      </div>
+    </div>
+  </div>
+  <ng-template #tipTemplate let-ganttInstance="ganttInstance" let-data="data">
+    <div class="title">{{ data?.title }}</div>
+    <div class="content">
+      <div>Duration: {{ ganttInstance?.duration }}</div>
+      <div>ProgressRate: {{ (ganttInstance?.progressRate || 0) + '%' }}</div>
+      <div>startDate: {{ ganttInstance?.startDate | i18nDate: 'short' }}</div>
+      <div>endDate: {{ ganttInstance?.endDate | i18nDate: 'short' }}</div>
+    </div>
+  </ng-template>
+  <ng-template #titleTemplate let-data="data">
+    <d-tag
+      *ngIf="data?.overdueTime > 0 && data?.status !== 'done'"
+      class="delay-tag"
+      [tag]="'overdue ' + data?.overdueTime + ' days'"
+      [labelStyle]="'pink-w98'"
+    >
+    </d-tag>
+  </ng-template>
+</d-fullscreen>

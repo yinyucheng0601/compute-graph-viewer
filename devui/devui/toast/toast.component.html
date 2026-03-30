@@ -1,0 +1,138 @@
+<div #container [ngClass]="'devui-toast'" [style.zIndex]="zIndex" [ngStyle]="style" [class]="styleClass">
+  <div
+    #msgItem
+    *ngFor="let msg of value; let i = index"
+    class="devui-toast-item-container"
+    aria-live="polite"
+    [ngClass]="{
+      'devui-toast-message-info': msg.severity == 'info',
+      'devui-toast-message-warn': msg.severity == 'warn',
+      'devui-toast-message-error': msg.severity == 'error',
+      'devui-toast-message-success': msg.severity == 'success',
+      'devui-toast-message-common': msg.severity == 'common'
+    }"
+    (mouseenter)="interrupt(i, msgItem)"
+    (mouseleave)="removeReset(i, msgItem, msg)"
+  >
+    <div class="devui-toast-item" [ngSwitch]="msg.severity">
+      <div *ngIf="!(!msg.summary && life)" class="devui-toast-icon-close" (click)="removeThrottle(i, msgItem)">
+        <svg
+          width="16px"
+          height="16px"
+          viewBox="0 0 14 14"
+          version="1.1"
+          xmlns="http://www.w3.org/2000/svg"
+          xmlns:xlink="http://www.w3.org/1999/xlink"
+        >
+          <polygon
+            class="devui-toast-close-icon"
+            points="8.07106781 6.65685425 10.8994949 3.82842712 12.3137085 5.24264069 9.48528137 8.07106781 12.3137085 10.8994949 10.8994949 12.3137085 8.07106781 9.48528137 5.24264069 12.3137085 3.82842712 10.8994949 6.65685425 8.07106781 3.82842712 5.24264069 5.24264069 3.82842712"
+          ></polygon>
+        </svg>
+      </div>
+      <span
+        class="devui-toast-image"
+        [ngClass]="{
+          'devui-toast-image-info': msg.severity === 'info',
+          'devui-toast-image-warning': msg.severity === 'warn',
+          'devui-toast-image-error': msg.severity === 'error',
+          'devui-toast-image-success': msg.severity === 'success'
+        }"
+        *ngIf="msg.severity !== 'common'"
+      >
+        <ng-container *ngSwitchCase="'info'">
+          <svg
+            width="16px"
+            height="16px"
+            viewBox="0 0 16 16"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+          >
+            <g id="info" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <path class="devui-toast-image-info-path" d="M7,13 L7,6 L9,6 L9,13 L7,13 Z M7,5 L7,3 L9,3 L9,5 L7,5 Z" id="info"></path>
+            </g>
+          </svg>
+        </ng-container>
+        <ng-container *ngSwitchCase="'warn'">
+          <svg
+            width="16px"
+            height="16px"
+            viewBox="0 0 16 16"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+          >
+            <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <path
+                class="devui-icon-warning-outer"
+                d="M8.96244623,0.57254229 L15.8714442,13.4101975 C16.1549662,13.9370117 15.9538562,14.5918482 15.4222523,14.8728158 C15.2642579,14.9563203 15.0879506,15 14.9088903,15 L1.09089441,15 C0.488410063,15 0,14.5159904 0,13.9189343 C0,13.7414873 0.0440768395,13.5667684 0.128340519,13.4101975 L7.03733844,0.57254229 C7.32086049,0.0457280838 7.98165058,-0.153569987 8.51325441,0.127397589 C8.70423071,0.228333932 8.8605922,0.383286648 8.96244623,0.57254229 Z"
+              ></path>
+              <path
+                class="devui-icon-warning-inner"
+                stroke-width="0.3"
+                fill-rule="nonzero"
+                d="M8.87894737,13 L7.08947368,13 L7.08947368,11.2105263 L8.87894737,11.2105263 L8.87894737,13 Z M8.62102372,9.86842105 L7.32800539,9.86842105 L7,4.5 L8.96842105,4.5 L8.62102372,9.86842105 Z"
+              ></path>
+            </g>
+          </svg>
+        </ng-container>
+        <ng-container *ngSwitchCase="'error'">
+          <svg
+            width="16px"
+            height="16px"
+            viewBox="0 0 16 16"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+          >
+            <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <circle cx="8" cy="8" r="8"></circle>
+              <path
+                class="devui-toast-image-error-path"
+                d="M11.5355339,4.46446609 C11.9260582,4.85499039 11.9260582,5.48815536 11.5355339,5.87867966 L9.41421356,8 L11.5355339,10.1213203 C11.9260582,10.5118446 11.9260582,11.1450096 11.5355339,11.5355339 C11.1450096,11.9260582 10.5118446,11.9260582 10.1213203,11.5355339 L8,9.41421356 L5.87867966,11.5355339 C5.48815536,11.9260582 4.85499039,11.9260582 4.46446609,11.5355339 C4.0739418,11.1450096 4.0739418,10.5118446 4.46446609,10.1213203 L6.58578644,8 L4.46446609,5.87867966 C4.0739418,5.48815536 4.0739418,4.85499039 4.46446609,4.46446609 C4.85499039,4.0739418 5.48815536,4.0739418 5.87867966,4.46446609 L8,6.58578644 L10.1213203,4.46446609 C10.5118446,4.0739418 11.1450096,4.0739418 11.5355339,4.46446609 Z"
+              ></path>
+            </g>
+          </svg>
+        </ng-container>
+        <ng-container *ngSwitchCase="'success'">
+          <svg
+            width="16px"
+            height="16px"
+            viewBox="0 0 16 16"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+          >
+            <defs>
+              <polygon
+                id="path-s"
+                points="6.53553391 9.77817459 12.1923882 4.12132034 13.6066017 5.53553391 6.53553391 12.6066017 3 9.07106781 4.41421356 7.65685425 6.53553391 9.77817459"
+              ></polygon>
+            </defs>
+            <g id="correct" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <mask id="mask-2" fill="white">
+                <use xlink:href="#path-s"></use>
+              </mask>
+              <use id="Mask" class="devui-toast-image-success-path" xlink:href="#path-s"></use>
+            </g>
+          </svg>
+        </ng-container>
+      </span>
+      <div class="devui-toast-message">
+        <span *ngIf="!!msg.summary" class="devui-toast-title">{{ msg.summary }}</span>
+        <ng-template
+          *ngIf="msg.content; else detailTemplate"
+          [ngTemplateOutlet]="msg.content | dIsTemplatePipe : plainText"
+          [ngTemplateOutletContext]="{ msg: msg }"
+        ></ng-template>
+        <ng-template #plainText>
+          <p [style.marginTop]="msg.summary ? '4px' : '0'">{{ msg.content }}</p>
+        </ng-template>
+        <ng-template #detailTemplate>
+          <p *ngIf="msg.detail" [style.marginTop]="msg.summary ? '4px' : '0'" [innerHTML]="msg.detail | safe : 'html'"></p>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</div>

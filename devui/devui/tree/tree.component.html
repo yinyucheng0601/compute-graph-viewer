@@ -1,0 +1,211 @@
+<cdk-virtual-scroll-viewport
+  *ngIf="virtualScroll"
+  class="devui-scrollbar devui-scroll-overlay"
+  [itemSize]="itemSize"
+  [minBufferPx]="minBufferPx"
+  [maxBufferPx]="maxBufferPx"
+  [style.height]="virtualScrollHeight"
+>
+  <d-tree-nodes
+    [virtualScroll]="true"
+    [treeList]="treeNodes"
+    [treeNodesRef]="treeNodesRef ? treeNodesRef : virtualScrollRef"
+    [treeFactory]="treeFactory"
+  >
+  </d-tree-nodes>
+</cdk-virtual-scroll-viewport>
+
+<d-tree-nodes
+  *ngIf="!virtualScroll"
+  [treeList]="treeFactory.treeRoot"
+  [treeNodesRef]="treeNodesRef ? treeNodesRef : default"
+  [treeFactory]="treeFactory"
+>
+</d-tree-nodes>
+<!-- TODO: 虚拟滚动支持动效 -->
+<ng-template #virtualScrollRef let-treeNode="treeNode" let-treeFactory="treeFactory">
+  <div
+    class="devui-tree-node"
+    [style.paddingLeft.px]="treeNode.data.depth * 24"
+    [ngClass]="{
+      'devui-tree-node__open': treeNode.data.isOpen,
+      'devui-tree-node__customIcon': iconParentClose
+    }"
+    #treeNodeContent
+  >
+    <div
+      class="devui-tree-vertical-line"
+      *ngFor="let item of treeNode.data.depth | transferToArrayPipe; let i = index"
+      [style.marginLeft.px]="i === 0 ? -16 : -16 - 24 * i"
+      [ngStyle]="{ height: i === 0 && treeNode.data.isLast && !treeNode.data.isOpen ? '15px' : '30px' }"
+    ></div>
+    <div
+      *ngIf="treeNode.data.depth"
+      [ngStyle]="{ width: treeNode.data.isParent ? '8px' : '16px' }"
+      class="devui-tree-horizontal-line"
+    ></div>
+    <div
+      class="devui-tree-node__content"
+      [class.active]="treeNode.data.isActive"
+      [class.devui-tree-node--parent]="(treeNode.data.children || []).length > 0"
+      (click)="selectNode($event, treeNode)"
+    >
+      <div class="devui-tree-node__content--value-wrapper" [class.isMatch]="treeNode.data.isMatch">
+        <span
+          (click)="toggleNode($event, treeNode)"
+          *ngIf="(treeNode.data.children || []).length > 0 || treeNode.data.isParent"
+          class="devui-tree-node__folder"
+          [class.toggle-disabled]="treeNode.data.disableToggle"
+        >
+          <span class="devui-tree-node__folder--icon" *ngIf="iconParentClose && !treeNode.data.isOpen" [innerHTML]="iconParentClose"></span>
+          <span class="devui-tree-node__folder--icon" *ngIf="iconParentOpen && treeNode.data.isOpen" [innerHTML]="iconParentOpen"></span>
+          <span class="devui-tree-node__folder--icon" *ngIf="!iconParentClose && !treeNode.data.isOpen">
+            <svg
+              width="16px"
+              height="16px"
+              viewBox="0 0 16 16"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              class="svg-icon"
+            >
+              <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <rect x="0.5" y="0.5" width="15" height="15" rx="2"></rect>
+                <path
+                  d="M8.75,4 L8.75,7.25 L12,7.25 L12,8.75 L8.749,8.75 L8.75,12 L7.25,12 L7.249,8.75 L4,8.75 L4,7.25 L7.25,7.25 L7.25,4 L8.75,4 Z"
+                ></path>
+              </g>
+            </svg>
+          </span>
+          <span class="devui-tree-node__folder--icon" *ngIf="!iconParentOpen && treeNode.data.isOpen">
+            <svg
+              width="16px"
+              height="16px"
+              viewBox="0 0 16 16"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              class="svg-icon svg-icon-close"
+            >
+              <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <rect x="0.5" y="0.5" width="15" height="15" rx="2"></rect>
+                <rect x="4" y="7" width="8" height="2"></rect>
+              </g>
+            </svg>
+          </span>
+        </span>
+        <span class="devui-tree-node__leaf" *ngIf="(treeNode.data.children || []).length === 0 && !treeNode.data.isParent">
+          <span *ngIf="!iconLeaf" class="devui-leaf-icon-none" [ngStyle]="{ width: indent }"></span>
+          <span *ngIf="iconLeaf" [innerHTML]="iconLeaf"></span>
+        </span>
+        <span
+          (dblclick)="nodeDblClick($event, treeNode)"
+          (contextmenu)="contextmenuEvent($event, treeNode)"
+          class="devui-tree-node__title"
+          [class.select-disabled]="treeNode.data.disableSelect"
+          title="{{ treeNode.data.title }}"
+          >{{ treeNode.data.title }}</span
+        >
+        <span
+          dLoading
+          [showLoading]="treeNode.data.loading"
+          [loadingTemplateRef]="loadingTemplateRef ? loadingTemplateRef : defaultLoadingTmpl"
+        >
+        </span>
+      </div>
+    </div>
+  </div>
+</ng-template>
+<ng-template #default let-treeNode="treeNode" let-treeFactory="treeFactory">
+  <div
+    class="devui-tree-node devui-tree-without-virtual-scroll"
+    [ngClass]="{
+      'devui-tree-node__open': treeNode.data.isOpen,
+      'devui-tree-node__customIcon': iconParentClose
+    }"
+    #treeNodeContent
+  >
+    <div
+      class="devui-tree-node__content"
+      [class.active]="treeNode.data.isActive"
+      [class.devui-tree-node--parent]="(treeNode.data.children || []).length > 0"
+      (click)="selectNode($event, treeNode)"
+    >
+      <div class="devui-tree-node__content--value-wrapper" [class.isMatch]="treeNode.data.isMatch">
+        <span
+          (click)="toggleNode($event, treeNode)"
+          *ngIf="(treeNode.data.children || []).length > 0 || treeNode.data.isParent"
+          class="devui-tree-node__folder"
+          [class.toggle-disabled]="treeNode.data.disableToggle"
+        >
+          <span class="devui-tree-node__folder--icon" *ngIf="iconParentClose && !treeNode.data.isOpen" [innerHTML]="iconParentClose"></span>
+          <span class="devui-tree-node__folder--icon" *ngIf="iconParentOpen && treeNode.data.isOpen" [innerHTML]="iconParentOpen"></span>
+          <span class="devui-tree-node__folder--icon" *ngIf="!iconParentClose && !treeNode.data.isOpen">
+            <svg
+              width="16px"
+              height="16px"
+              viewBox="0 0 16 16"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              class="svg-icon"
+            >
+              <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <rect x="0.5" y="0.5" width="15" height="15" rx="2"></rect>
+                <path
+                  d="M8.75,4 L8.75,7.25 L12,7.25 L12,8.75 L8.749,8.75 L8.75,12 L7.25,12 L7.249,8.75 L4,8.75 L4,7.25 L7.25,7.25 L7.25,4 L8.75,4 Z"
+                ></path>
+              </g>
+            </svg>
+          </span>
+          <span class="devui-tree-node__folder--icon" *ngIf="!iconParentOpen && treeNode.data.isOpen">
+            <svg
+              width="16px"
+              height="16px"
+              viewBox="0 0 16 16"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              class="svg-icon svg-icon-close"
+            >
+              <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <rect x="0.5" y="0.5" width="15" height="15" rx="2"></rect>
+                <rect x="4" y="7" width="8" height="2"></rect>
+              </g>
+            </svg>
+          </span>
+        </span>
+        <span class="devui-tree-node__leaf" *ngIf="(treeNode.data.children || []).length === 0 && !treeNode.data.isParent">
+          <span *ngIf="!iconLeaf" class="devui-leaf-icon-none" [ngStyle]="{ width: indent }"></span>
+          <span *ngIf="iconLeaf" [innerHTML]="iconLeaf"></span>
+        </span>
+        <span
+          (dblclick)="nodeDblClick($event, treeNode)"
+          (contextmenu)="contextmenuEvent($event, treeNode)"
+          class="devui-tree-node__title"
+          [class.select-disabled]="treeNode.data.disableSelect"
+          title="{{ treeNode.data.title }}"
+          >{{ treeNode.data.title }}</span
+        >
+        <span
+          dLoading
+          [showLoading]="treeNode.data.loading"
+          [loadingTemplateRef]="loadingTemplateRef ? loadingTemplateRef : defaultLoadingTmpl"
+        >
+        </span>
+      </div>
+    </div>
+    <div
+      *ngIf="treeNode.data.isOpen"
+      class="devui-tree-node__children"
+      @collapseForDomDestroy
+      [@.disabled]="afterInitAnimate || !showAnimation"
+    >
+      <d-tree-nodes [treeList]="treeNode.data.children || []" [treeNodesRef]="default" [treeFactory]="treeFactory"> </d-tree-nodes>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #defaultLoadingTmpl>
+  <span class="devui-loading-children">{{ i18nCommonText?.loading }}</span>
+</ng-template>

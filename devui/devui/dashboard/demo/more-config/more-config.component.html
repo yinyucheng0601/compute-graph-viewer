@@ -1,0 +1,106 @@
+<div class="layout">
+  <div class="side">
+    <div
+      class="add-zone"
+      dDashboardLibraryPanel
+      (widgetDragStart)="log('Dashboard Library Panel: widget drag start')"
+      (widgetDragStop)="log('Dashboard Library Panel: widget drag stop')"
+    >
+      <div
+        class="new-widget"
+        dDashboardLibraryWidget
+        [targetDashboard]="dashboard"
+        [dragCopyStyle]="true"
+        [dragMode]="'copy'"
+        [widgetData]="{ msg: 'Aha!' }"
+      >
+        <span class="icon icon-add"></span>
+        <div class="info">Drag this card to the right to add</div>
+      </div>
+    </div>
+    <div class="trash-zone" dDashboardLibraryTrash [trashData]="{ data: 'foo' }" [targetDashboard]="dashboard">
+      <div class="icon icon-delete"></div>
+      <div class="info">Drag the dashboard card here to delete it</div>
+    </div>
+  </div>
+  <div class="main-content">
+    <d-dashboard
+      #dashboard="dDashboard"
+      [static]="static"
+      [float]="float"
+      [animate]="animate"
+      [widgetMoveable]="widgetMoveable"
+      [widgetResizable]="widgetResizable"
+      [showGridBlock]="showGridBlock"
+      [column]="column"
+      [cellHeight]="cellHeight"
+      [margin]="margin"
+      [maxRow]="maxRow"
+      [minRow]="minRow"
+      (widgetAdded)="log('add', $event); addWidget($event, 'drag')"
+      (widgetChanged)="log('change', $event)"
+      (widgetRemoved)="log('remove', $event); deleteWidget($event)"
+    >
+      <d-dashboard-widget
+        *ngFor="let widget of widgets; let index = index"
+        [(x)]="widget.x"
+        [(y)]="widget.y"
+        [(width)]="widget.width"
+        [(height)]="widget.height"
+      >
+        <div style="padding: 12px">Source: {{ widget.from === 'data' ? 'Data' : 'Drag' }}</div>
+      </d-dashboard-widget>
+    </d-dashboard>
+  </div>
+</div>
+<hr />
+<div class="layout">
+  <div class="setting">
+    <div class="title">Layout</div>
+    <form dForm [layout]="layoutDirection" [labelSize]="'sm'">
+      <d-form-item>
+        <d-form-label>Columns</d-form-label>
+        <d-form-control [extraInfo]="'Numeral, ranges from 1 to 12. For more than 12 columns, see the API configuration.'">
+          <input dTextInput name="column" [(ngModel)]="column" [ngModelOptions]="{ updateOn: 'blur' }" />
+        </d-form-control>
+      </d-form-item>
+      <d-form-item>
+        <d-form-label>Row height</d-form-label>
+        <d-form-control [extraInfo]="'Numeral or character string. The unit is px.'">
+          <input dTextInput name="cellHeight" [(ngModel)]="cellHeight" [ngModelOptions]="{ updateOn: 'blur' }" />
+        </d-form-control>
+      </d-form-item>
+      <d-form-item>
+        <d-form-label>Margins</d-form-label>
+        <d-form-control [extraInfo]="'Numeral or character string. The unit is px.'">
+          <input dTextInput name="margin" [(ngModel)]="margin" [ngModelOptions]="{ updateOn: 'blur' }" />
+        </d-form-control>
+      </d-form-item>
+      <d-form-item>
+        <d-form-label>Minimum row height</d-form-label>
+        <d-form-control [extraInfo]="'Number. The value 0 indicates no restriction.'">
+          <input dTextInput name="minRow" [(ngModel)]="minRow" [ngModelOptions]="{ updateOn: 'blur' }" />
+        </d-form-control>
+      </d-form-item>
+      <d-form-item>
+        <d-form-label>Maximum row height</d-form-label>
+        <d-form-control [extraInfo]="'Number. The value 0 indicates no restriction.'">
+          <input dTextInput name="maxRow" [(ngModel)]="maxRow" [ngModelOptions]="{ updateOn: 'blur' }" />
+        </d-form-control>
+      </d-form-item>
+    </form>
+  </div>
+  <div class="config">
+    <div class="title">Configuration</div>
+    <div><d-toggle [(ngModel)]="static"></d-toggle>Static</div>
+    <div><d-toggle [(ngModel)]="float"></d-toggle>Permitted overhead</div>
+    <div><d-toggle [(ngModel)]="animate"></d-toggle>Animation</div>
+    <div><d-toggle [(ngModel)]="widgetMoveable"></d-toggle>Disable moving</div>
+    <div><d-toggle [(ngModel)]="widgetResizable"></d-toggle>Disable resizing</div>
+    <div><d-toggle [(ngModel)]="showGridBlock"></d-toggle>Show grid</div>
+  </div>
+  <div class="operation">
+    <div class="title">Operation</div>
+    <d-button [bsStyle]="'common'" (btnClick)="dashboard.compact()">Automatic continuous compact arrangement</d-button>
+  </div>
+</div>
