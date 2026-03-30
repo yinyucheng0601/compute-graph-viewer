@@ -1,0 +1,79 @@
+<div class="handle-group">
+  Style：<d-tabs type="options" [(activeTab)]="activeBorderTab" [showContent]="false">
+    <d-tab *ngFor="let item of borderItems" [id]="item.id">
+      <ng-template dTabTitle>
+        {{ item.title }}
+      </ng-template>
+    </d-tab>
+  </d-tabs>
+</div>
+<div class="handle-group">
+  Size：<d-tabs type="options" [(activeTab)]="activeSizeTab" [showContent]="false">
+    <d-tab *ngFor="let item of sizeItems" [id]="item.id">
+      <ng-template dTabTitle>
+        {{ item.title }}
+      </ng-template>
+    </d-tab>
+  </d-tabs>
+</div>
+<div class="handle-group">
+  Table Layout：<d-tabs type="options" [(activeTab)]="activeLayoutTab" [showContent]="false" (activeTabChange)="layoutChange($event)">
+    <d-tab *ngFor="let item of layoutItems" [id]="item.id">
+      <ng-template dTabTitle>
+        {{ item.title }}
+      </ng-template>
+    </d-tab>
+  </d-tabs>
+</div>
+<div class="handle-group">
+  Shadow Type：<d-tabs type="options" [(activeTab)]="activeShadowType" [showContent]="false" (activeTabChange)="layoutChange($event)">
+    <d-tab *ngFor="let item of TypeItems" [id]="item.id">
+      <ng-template dTabTitle>
+        {{ item.title }}
+      </ng-template>
+    </d-tab>
+  </d-tabs>
+</div>
+<div class="handle-group">Header background：<d-toggle [(ngModel)]="headerBk"></d-toggle></div>
+<div class="handle-group">Stripes：<d-toggle [(ngModel)]="striped"></d-toggle></div>
+<d-data-table
+  [dataSource]="basicDataSource"
+  [scrollable]="true"
+  [tableWidthConfig]="tableWidthConfig"
+  [borderType]="activeBorderTab"
+  [headerBg]="headerBk"
+  [striped]="striped"
+  [size]="activeSizeTab"
+  [tableLayout]="activeLayoutTab"
+  [shadowType]="activeShadowType"
+  [tableOverflowType]="'overlay'"
+>
+  <thead dTableHead [checkable]="true">
+    <tr dTableRow>
+      <th dHeadCell>#</th>
+      <th dHeadCell *ngFor="let colOption of dataTableOptions.columns">{{ colOption.header }}</th>
+    </tr>
+  </thead>
+  <tbody dTableBody>
+    <ng-template let-rowItem="rowItem" let-rowIndex="rowIndex">
+      <tr dTableRow>
+        <td dTableCell class="devui-checkable-cell">
+          <d-checkbox
+            [ngModelOptions]="{ standalone: true }"
+            [ngModel]="rowItem.$checked"
+            [halfchecked]="rowItem.$halfChecked"
+            [disabled]="rowItem.$checkDisabled"
+            dTooltip
+            [content]="rowItem.$checkBoxTips"
+            [position]="['top', 'right', 'bottom', 'left']"
+          >
+          </d-checkbox>
+        </td>
+        <td dTableCell>{{ rowIndex + 1 }}</td>
+        <td dTableCell *ngFor="let colOption of dataTableOptions.columns">
+          {{ colOption.fieldType === 'date' ? (rowItem[colOption.field] | i18nDate : 'short' : false) : rowItem[colOption.field] }}
+        </td>
+      </tr>
+    </ng-template>
+  </tbody>
+</d-data-table>

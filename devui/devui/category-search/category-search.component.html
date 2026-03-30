@@ -1,0 +1,571 @@
+<div
+  #PrimeContainer
+  class="devui-category-search-container devui-category-search-id-{{ id }}"
+  [ngClass]="{
+    'container-hover': isHover && !isFocus,
+    'container-active': inputDropdown.isOpen,
+    'devui-gray-style': styleType === 'gray',
+    disabled: disabled
+  }"
+  (mouseenter)="isHover = true"
+  (mouseleave)="isHover = false"
+>
+  <div class="devui-category-search-icon" (click)="searchInputValue()">
+    <svg
+      class="svg-icon-search"
+      width="16px"
+      height="16px"
+      viewBox="0 0 16 16"
+      version="1.1"
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+    >
+      <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path
+          d="M7.71295742,1.53283795 C11.0266659,1.53283795 13.7129574,4.21912945 13.7129574,7.53283795 C13.7129574,9.0690006 13.1356609,10.4703284 12.1861834,11.5317059 L14.5333041,13.8784875 C14.7285663,14.0737497 14.7285663,14.3903321 14.5333041,14.5855943 C14.3597378,14.7591606 14.0903134,14.7784458 13.8954453,14.6434497 L13.8261974,14.5855943 L11.4604434,12.2188804 C10.4336319,13.0411023 9.13072017,13.5328379 7.71295742,13.5328379 C4.39924893,13.5328379 1.71295742,10.8465464 1.71295742,7.53283795 C1.71295742,4.21912945 4.39924893,1.53283795 7.71295742,1.53283795 Z M7.71295742,2.53283795 C4.95153368,2.53283795 2.71295742,4.7714142 2.71295742,7.53283795 C2.71295742,10.2942617 4.95153368,12.5328379 7.71295742,12.5328379 C10.4743812,12.5328379 12.7129574,10.2942617 12.7129574,7.53283795 C12.7129574,4.7714142 10.4743812,2.53283795 7.71295742,2.53283795 Z"
+          fill-rule="nonzero"
+        ></path>
+      </g>
+    </svg>
+  </div>
+  <div #ScrollBarContainer class="devui-category-search-line-container">
+    <ul class="devui-category-search-line">
+      <li
+        class="devui-tag-item"
+        *ngFor="let item of selectedTags"
+        #selectedDropdown="d-dropdown"
+        #selectedDropdownMenu="d-dropdown-append-to-body"
+        dDropDown
+        appendToBody
+        dDropDownToggle
+        [appendToBodyDirections]="['rightDown', 'rightUp', 'leftDown', 'leftUp']"
+        [closeScope]="checkType(item)"
+        (toggleEvent)="resetContent(selectedDropdown, item, selectedDropdownMenu)"
+      >
+        <ng-template
+          [ngTemplateOutlet]="joinLabelTypesTemplate"
+          [ngTemplateOutletContext]="{ item: item, isJoinLabelType: joinLabelTypes.includes(item.type) }"
+        ></ng-template>
+        <div dDropDownMenu class="devui-dropdown-menu devui-dropdown-menu-fix" [ngClass]="{ 'max-height': item.type !== 'treeSelect' }">
+          <ng-template
+            [ngTemplateOutlet]="item.customTemplate || templates[item.type]"
+            [ngTemplateOutletContext]="{ tagOption: item, dropdown: selectedDropdown, isSelected: true }"
+          ></ng-template>
+        </div>
+      </li>
+      <div class="devui-category-search-input">
+        <div
+          class="devui-input-container"
+          #inputDropdown="d-dropdown"
+          dDropDown
+          appendToBody
+          [appendToBodyDirections]="['rightDown', 'rightUp', 'leftDown', 'leftUp']"
+          [autofocusToggleElement]="inputAutofocus"
+          [closeScope]="checkType(currentSelectTag)"
+          [trigger]="'manually'"
+          (toggleEvent)="resetContent(inputDropdown)"
+        >
+          <div class="devui-input-box">
+            <input
+              class="devui-category-search-toggle"
+              autocomplete="off"
+              #InputEle
+              dDropDownToggle
+              [readOnly]="inputReadOnly"
+              [placeholder]="disabled ? '' : placeholderText || i18nCategorySearchText?.searchPlaceholder || ''"
+              [maxlength]="showSearchConfig.searchInputMaxLength"
+              [disabled]="disabled"
+              [ngModel]="searchKey"
+              (ngModelChange)="searchKeyChangeEvent($event)"
+              (click)="openMenu(inputDropdown, $event)"
+              (keyup)="checkInputSearching(); openMenu(inputDropdown, $event)"
+              (keydown.backspace)="backspaceEvent(inputDropdown)"
+              (keydown.enter)="searchInputValue($event); closeMenu(inputDropdown)"
+              (focus)="isHover = false; isFocus = true"
+              (blur)="isFocus = false; blurInput($event)"
+            />
+          </div>
+          <div
+            *ngIf="!enterSearch || (enterSearch && showSearchCategory)"
+            dDropDownMenu
+            class="devui-dropdown-menu devui-dropdown-menu-fix devui-scrollbar devui-category-dropdown-menu-{{ id }}"
+            [ngClass]="{ 'max-height': currentSelectTag?.type !== 'treeSelect' }"
+          >
+            <ul *ngIf="!currentSelectTag" class="devui-dropdown-menu-template devui-scrollbar">
+              <ng-container *ngIf="!enterSearch && !currentSelectTag">
+                <ng-container *ngFor="let item of categoryDisplay">
+                  <li *ngIf="item.groupLength" class="devui-dropdown-item devui-category-search-group">
+                    <ng-template
+                      [ngTemplateOutlet]="customGroupNameTemplate || defaultGroupNameTemplate"
+                      [ngTemplateOutletContext]="{ tag: item }"
+                    ></ng-template>
+                  </li>
+                  <li
+                    *ngIf="item.groupLength === undefined && !item.isSelected"
+                    class="devui-dropdown-item"
+                    (click)="chooseCategory(item, inputDropdown); closeMenu(inputDropdown)"
+                  >
+                    <ng-template
+                      [ngTemplateOutlet]="customCategoryNameTemplate || defaultCategoryNameTemplate"
+                      [ngTemplateOutletContext]="{ tag: item }"
+                    ></ng-template>
+                  </li>
+                </ng-container>
+                <div class="devui-no-data-text" *ngIf="showNoDataTips">
+                  {{ textConfig.noCategoriesAvailable || i18nCategorySearchText?.noFilterConditions }}
+                </div>
+              </ng-container>
+              <ng-container *ngIf="enterSearch">
+                <li
+                  *ngIf="showSearchConfig.keyword"
+                  class="devui-dropdown-item devui-search-description"
+                  (click)="searchInputValue($event); closeMenu(inputDropdown)"
+                >
+                  <span class="icon-search"></span>{{ showSearchConfig.keywordDescription(searchKey) }}
+                </li>
+                <ng-container *ngIf="showSearchConfig.field">
+                  <li *ngFor="let item of searchField" (click)="searchCategory(item); closeMenu(inputDropdown)" class="devui-dropdown-item">
+                    <span class="icon-search"></span>{{ showSearchConfig.fieldDescription(item?.label) }}
+                  </li>
+                </ng-container>
+                <div
+                  *ngIf="(showSearchConfig.keyword || showSearchConfig.field) && showSearchConfig.category && currentSearchCategory?.length"
+                  class="devui-dividing-line"
+                ></div>
+                <ng-container *ngIf="showSearchConfig.category && currentSearchCategory?.length">
+                  <div class="devui-dropdown-menu-tip" [style.paddingBottom]="currentSearchCategory.length ? '0' : '12px'">
+                    {{ showSearchConfig.categoryDescription }}
+                  </div>
+                  <ul class="devui-category-search-keyword-in-category devui-dropdown-menu-template devui-scrollbar">
+                    <li
+                      *ngFor="let item of currentSearchCategory"
+                      (click)="showCurrentSearchCategory(item, inputDropdown)"
+                      class="devui-dropdown-item"
+                    >
+                      <span>{{ item?.label }}</span>
+                    </li>
+                  </ul>
+                </ng-container>
+              </ng-container>
+            </ul>
+            <ng-container *ngIf="!enterSearch && currentSelectTag">
+              <ng-template
+                [ngTemplateOutlet]="currentSelectTag.customTemplate || templates[currentSelectTag.type]"
+                [ngTemplateOutletContext]="{ tagOption: currentSelectTag, dropdown: inputDropdown }"
+              ></ng-template>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </ul>
+  </div>
+  <div class="devui-category-search-extended-container" *ngIf="showExtendedConfig">
+    <ng-template *ngIf="operationConfig.clear.show" [ngTemplateOutlet]="operationConfig.clear.template || clearTpl"></ng-template>
+    <ng-template *ngIf="operationConfig.save.show" [ngTemplateOutlet]="operationConfig.save.template || saveTpl"></ng-template>
+    <ng-template *ngIf="operationConfig.more.show" [ngTemplateOutlet]="operationConfig.more.template || moreTpl"></ng-template>
+    <ng-template *ngIf="operationConfig.customTemplate" [ngTemplateOutlet]="operationConfig.customTemplate"></ng-template>
+  </div>
+</div>
+
+<ng-template #defaultGroupNameTemplate let-item="tag">
+  <strong>{{ item?.groupName }}</strong>
+</ng-template>
+
+<ng-template #defaultCategoryNameTemplate let-item="tag">
+  <span title="{{ item?.label }}">{{ item?.label }}</span>
+</ng-template>
+
+<ng-template #noData>
+  <div class="devui-no-data-tip">{{ i18nCommonText?.noData }}</div>
+</ng-template>
+
+<ng-template #clearTpl>
+  <div
+    class="devui-category-search-icon"
+    [class.disabled]="operationConfig.clear.disabled"
+    (click)="!operationConfig.clear.disabled && clearFilter($event)"
+  >
+    <svg
+      width="16px"
+      height="16px"
+      viewBox="0 0 16 16"
+      version="1.1"
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+    >
+      <title>{{ i18nCategorySearchText?.clearFilterCondition }}</title>
+      <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g transform="translate(3.000000, 3.000000)" fill-rule="nonzero">
+          <path
+            d="M-0.353553391,-0.353553391 C-0.179987039,-0.527119742 0.0894373624,-0.546404893 0.284305503,-0.411408841 L0.353553391,-0.353553391 L10.3535534,9.64644661 C10.5488155,9.84170876 10.5488155,10.1582912 10.3535534,10.3535534 C10.179987,10.5271197 9.91056264,10.5464049 9.7156945,10.4114088 L9.64644661,10.3535534 L-0.353553391,0.353553391 C-0.548815536,0.158291245 -0.548815536,-0.158291245 -0.353553391,-0.353553391 Z"
+          ></path>
+          <path
+            d="M9.64644661,-0.353553391 C9.84170876,-0.548815536 10.1582912,-0.548815536 10.3535534,-0.353553391 C10.5271197,-0.179987039 10.5464049,0.0894373624 10.4114088,0.284305503 L10.3535534,0.353553391 L0.353553391,10.3535534 C0.158291245,10.5488155 -0.158291245,10.5488155 -0.353553391,10.3535534 C-0.527119742,10.179987 -0.546404893,9.91056264 -0.411408841,9.7156945 L-0.353553391,9.64644661 L9.64644661,-0.353553391 Z"
+          ></path>
+        </g>
+      </g>
+    </svg>
+  </div>
+</ng-template>
+
+<ng-template #saveTpl>
+  <div
+    class="devui-category-search-icon"
+    #saveDropdown="d-dropdown"
+    dDropDown
+    appendToBody
+    [appendToBodyDirections]="['rightDown', 'rightUp', 'leftDown', 'leftUp']"
+    [class.disabled]="operationConfig.save.disabled"
+    [closeScope]="'blank'"
+    [disabled]="operationConfig.save.disabled"
+    (toggleEvent)="createFilterInputAutoFocus(saveDropdown, createFilterInput, filterNameForm)"
+  >
+    <svg
+      dDropDownToggle
+      width="16px"
+      height="16px"
+      viewBox="0 0 16 16"
+      version="1.1"
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+    >
+      <title>{{ textConfig.createFilter }}</title>
+      <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path
+          d="M13,1.5 C13.8284379,1.5 14.5,2.17156982 14.5,3 L14.5,3 L14.5,13 C14.5,13.8284424 13.8284424,14.5 13,14.5 L13,14.5 L3,14.5 C2.17156982,14.5 1.5,13.8284379 1.5,13 L1.5,13 L1.5,3 C1.5,2.17157429 2.17157429,1.5 3,1.5 L3,1.5 Z M4.833,2.5 L3,2.5 C2.72385904,2.5 2.5,2.72385904 2.5,3 L2.5,3 L2.5,13 C2.5,13.2761506 2.723852,13.5 3,13.5 L3,13.5 L13,13.5 C13.2761576,13.5 13.5,13.2761576 13.5,13 L13.5,13 L13.5,3 C13.5,2.723852 13.2761506,2.5 13,2.5 L13,2.5 L11.166,2.5 L11.1666667,5.33333333 C11.1666667,5.57879322 10.9897915,5.7829417 10.7565423,5.82527766 L10.6666667,5.83333333 L5.33333333,5.83333333 C5.05719096,5.83333333 4.83333333,5.60947571 4.83333333,5.33333333 L4.83333333,5.33333333 L4.833,2.5 Z M10.3333333,11.5 C10.6094757,11.5 10.8333333,11.7238576 10.8333333,12 C10.8333333,12.2454599 10.6564582,12.4496084 10.423209,12.4919443 L10.3333333,12.5 L5.66666667,12.5 C5.39052429,12.5 5.16666667,12.2761424 5.16666667,12 C5.16666667,11.7545401 5.34354183,11.5503916 5.57679103,11.5080557 L5.66666667,11.5 L10.3333333,11.5 Z M10.166,2.5 L5.833,2.5 L5.833,4.833 L10.166,4.833 L10.166,2.5 Z"
+          fill-rule="nonzero"
+        ></path>
+      </g>
+    </svg>
+    <div dDropDownMenu class="devui-save-panel">
+      <div class="devui-save-panel-title">
+        <span>{{ textConfig.createFilter }}</span>
+      </div>
+      <div class="devui-save-filter-name">
+        <span>{{ textConfig.filterTitle }}</span>
+        <form #filterNameForm="ngForm">
+          <input
+            name="filter-name"
+            class="devui-category-search-toggle"
+            autocomplete="off"
+            #createFilterInput
+            dTextInput
+            [(ngModel)]="filterName"
+            [placeholder]="i18nCategorySearchText?.placeholder || ''"
+            [dValidateRules]="filterNameRules"
+          />
+          <svg
+            *ngIf="showFilterNameClear"
+            (click)="$event.preventDefault(); $event.stopPropagation(); filterNameForm.form.reset()"
+            width="16px"
+            height="16px"
+            viewBox="0 0 16 16"
+          >
+            <title>{{ i18nCategorySearchText?.clearFilterCondition }}</title>
+            <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+              <path
+                d="M8,1 C11.8659932,1 15,4.13400675 15,8 C15,11.8659932 11.8659932,15 8,15 C4.13400675,15 1,11.8659932 1,8 C1,4.13400675 4.13400675,1 8,1 Z M5.87867966,5.17157288 C5.68341751,4.97631073 5.36683502,4.97631073 5.17157288,5.17157288 C4.99800652,5.34513923 4.97872137,5.61456363 5.11371742,5.80943177 L5.17157288,5.87867966 L7.29218611,7.99929289 L5.17157288,10.1213203 C4.97631073,10.3165825 4.97631073,10.633165 5.17157288,10.8284271 C5.34513923,11.0019935 5.61456363,11.0212786 5.80943177,10.8862826 L5.87867966,10.8284271 L7.99929289,8.70639967 L10.1213203,10.8284271 C10.3165825,11.0236893 10.633165,11.0236893 10.8284271,10.8284271 C11.0019935,10.6548608 11.0212786,10.3854364 10.8862826,10.1905682 L10.8284271,10.1213203 L8.70710678,8 L10.8284271,5.87867966 C11.0236893,5.68341751 11.0236893,5.36683502 10.8284271,5.17157288 C10.6548608,4.99800652 10.3854364,4.97872137 10.1905682,5.11371742 L10.1213203,5.17157288 L8,7.29289322 L5.87867966,5.17157288 Z"
+                fill-rule="nonzero"
+              ></path>
+            </g>
+          </svg>
+        </form>
+      </div>
+      <div class="devui-save-panel-operation-area">
+        <d-button [disabled]="filterNameForm.invalid" (btnClick)="createFilterFn(); saveDropdown.toggle()">{{
+          i18nCategorySearchText?.confirm
+        }}</d-button>
+        <d-button bsStyle="common" (btnClick)="saveDropdown.toggle()">{{ i18nCategorySearchText?.cancel }}</d-button>
+      </div>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #moreTpl>
+  <div
+    class="devui-category-search-icon"
+    #seeMoreDropdown="d-dropdown"
+    dDropDown
+    appendToBody
+    [alignOrigin]="primeContainer"
+    [appendToBodyDirections]="['rightDown', 'rightUp', 'leftDown', 'leftUp']"
+    [class.disabled]="operationConfig.more.disabled"
+  >
+    <svg
+      dDropDownToggle
+      width="14px"
+      height="14px"
+      viewBox="0 0 16 16"
+      version="1.1"
+      xmlns="http://www.w3.org/2000/svg"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+    >
+      <title>{{ i18nCategorySearchText?.seeMore }}</title>
+      <g id="edit-icon/unordered-list" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path
+          d="M5,1 L16,1 L16,2.5 L5,2.5 L5,1 Z M2,4 C0.8954305,4 0,3.1045695 0,2 C0,0.8954305 0.8954305,0 2,0 C3.1045695,0 4,0.8954305 4,2 C4,3.1045695 3.1045695,4 2,4 Z M2,3 C2.55228475,3 3,2.55228475 3,2 C3,1.44771525 2.55228475,1 2,1 C1.44771525,1 1,1.44771525 1,2 C1,2.55228475 1.44771525,3 2,3 Z M2,10 C0.8954305,10 0,9.1045695 0,8 C0,6.8954305 0.8954305,6 2,6 C3.1045695,6 4,6.8954305 4,8 C4,9.1045695 3.1045695,10 2,10 Z M2,9 C2.55228475,9 3,8.55228475 3,8 C3,7.44771525 2.55228475,7 2,7 C1.44771525,7 1,7.44771525 1,8 C1,8.55228475 1.44771525,9 2,9 Z M2,16 C0.8954305,16 0,15.1045695 0,14 C0,12.8954305 0.8954305,12 2,12 C3.1045695,12 4,12.8954305 4,14 C4,15.1045695 3.1045695,16 2,16 Z M2,15 C2.55228475,15 3,14.5522847 3,14 C3,13.4477153 2.55228475,13 2,13 C1.44771525,13 1,13.4477153 1,14 C1,14.5522847 1.44771525,15 2,15 Z M5,7 L16,7 L16,8.5 L5,8.5 L5,7 Z M5,13 L16,13 L16,14.5 L5,14.5 L5,13 Z"
+        ></path>
+      </g>
+    </svg>
+    <div dDropDownMenu class="devui-selected-tags-list">
+      <ul [ngStyle]="{ width: PrimeContainer?.clientWidth + 'px' }">
+        <li class="devui-tag-item" *ngFor="let item of selectedTags; let i = index" (click)="scrollToTag(i, $event)">
+          <ng-template
+            [ngTemplateOutlet]="joinLabelTypesTemplate"
+            [ngTemplateOutletContext]="{ item: item, isJoinLabelType: joinLabelTypes.includes(item.type) }"
+          ></ng-template>
+        </li>
+      </ul>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #joinLabelTypesTemplate let-item="item" let-isJoinLabelType="isJoinLabelType">
+  <div class="devui-tag-container">
+    <d-tag
+      [tag]="item"
+      [mode]="disabled || item.deletable === false ? 'default' : 'closeable'"
+      [titleContent]="item.title"
+      [customViewTemplate]="item.tagCustomTemplate || (isJoinLabelType ? defaultJoinLabelTypeTemplate : defaultTagTemplate)"
+      (tagDelete)="removeTag(item, $event.event)"
+    ></d-tag>
+  </div>
+</ng-template>
+
+<ng-template #defaultTagTemplate let-tag="tag">
+  <span [style.maxWidth]="tagMaxWidth + 'px'">{{ tag.label + ': ' + (tag.value[tag.filterKey || 'label'] || '') }}</span>
+</ng-template>
+
+<ng-template #defaultJoinLabelTypeTemplate let-tag="tag" let-colorKey="tag.colorKey || 'color'">
+  <span>{{ tag.label }}: </span>
+  <span class="devui-category-search-multi-tag" [style.max-width]="tagMaxWidth + 'px'">
+    <ng-container *ngFor="let val of tag.value.cache; let i = index">
+      <span *ngIf="i > 0" class="devui-color-block-split-line">{{ textConfig.labelConnector || '|' }}</span>
+      <span *ngIf="tag.type === 'label'" class="devui-color-block-sm" [style.background]="val[colorKey]"></span>
+      <span [style.color]="val[colorKey]" [style.max-width]="tagMaxWidth + 'px'">{{ val[tag.filterKey || 'label'] || '' }}</span>
+    </ng-container>
+  </span>
+</ng-template>
+
+<ng-template [dType]="'radio'" let-tagOption="tagOption" let-key="tagOption.filterKey || 'label'">
+  <div *ngIf="!tagOption.options?.length">
+    <ng-container *ngTemplateOutlet="noData"></ng-container>
+  </div>
+  <ul *ngIf="tagOption.options?.length" class="devui-dropdown-menu-template devui-scrollbar">
+    <li
+      *ngFor="let item of tagOption.options"
+      title="{{ item[key] }}"
+      class="devui-dropdown-item"
+      [class.active]="tagOption?.value[key] === item[key]"
+      (click)="chooseItem(tagOption, item)"
+    >
+      <span>{{ item[key] }}</span>
+    </li>
+  </ul>
+</ng-template>
+
+<ng-template [dType]="'dateRange'" let-tagOption="tagOption" let-dropdown="dropdown">
+  <d-datepicker-calendar
+    #datepickerCalendarItem
+    *ngIf="dropdown.isOpen"
+    id="{{ tagOption.field }}"
+    style="overflow-x: hidden"
+    #dDatepickerPro
+    [isRangeType]="true"
+    [showTime]="tagOption.showTime"
+    [activeRangeType]="tagOption.activeRangeType || 'start'"
+    [(ngModel)]="tagOption.value.value"
+    (input)="dateChange(datepickerCalendarItem, tagOption)"
+  >
+    <ng-template #footerTemplate>
+      <div class="devui-datepicker-footer">
+        <d-button
+          style="margin-right: 8px"
+          bsStyle="primary"
+          (btnClick)="confirmDate(datepickerCalendarItem, tagOption, dropdown)"
+          [disabled]="
+            tagOption.showTime ? false : !tagOption.value.value || tagOption.value.value.length < 2 || tagOption.value.value.includes(null)
+          "
+        >
+          {{ i18nCategorySearchText?.confirm }}
+        </d-button>
+        <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+      </div>
+    </ng-template>
+  </d-datepicker-calendar>
+</ng-template>
+
+<ng-template #selectAllTemplate let-tagOption="tagOption">
+  <div class="devui-category-search-select-all" (click)="selectAll(tagOption)">
+    <d-checkbox
+      [label]="i18nCommonText.checkAll"
+      [isShowTitle]="false"
+      [halfchecked]="tagOption.halfChecked"
+      [(ngModel)]="tagOption.allChecked"
+    ></d-checkbox>
+  </div>
+</ng-template>
+
+<ng-template [dType]="'checkbox'" let-tagOption="tagOption" let-dropdown="dropdown">
+  <ng-container *ngIf="tagOption.options?.length; else noData">
+    <ng-template
+      *ngIf="tagOption.showSelectAll"
+      [ngTemplateOutlet]="selectAllTemplate"
+      [ngTemplateOutletContext]="{ tagOption: tagOption }"
+    ></ng-template>
+    <div *ngIf="tagOption.options?.length" class="devui-dropdown-menu-template devui-scrollbar">
+      <d-checkbox-group
+        [options]="tagOption.options"
+        [filterKey]="tagOption.filterKey || 'label'"
+        [isShowTitle]="true"
+        [(ngModel)]="tagOption.value.value"
+        (ngModelChange)="isSelectAll(tagOption)"
+      >
+      </d-checkbox-group>
+    </div>
+  </ng-container>
+  <div class="devui-dropdown-operation-area">
+    <d-button (btnClick)="chooseItems(tagOption); closeMenu(dropdown)">{{ i18nCategorySearchText?.confirm }}</d-button>
+    <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+  </div>
+</ng-template>
+
+<ng-template [dType]="'label'" let-tagOption="tagOption" let-dropdown="dropdown">
+  <ng-container *ngIf="tagOption.options?.length; else noData">
+    <ng-template
+      *ngIf="tagOption.showSelectAll"
+      [ngTemplateOutlet]="selectAllTemplate"
+      [ngTemplateOutletContext]="{ tagOption: tagOption }"
+    ></ng-template>
+    <div class="devui-dropdown-menu-template devui-scrollbar">
+      <d-checkbox-group
+        [(ngModel)]="tagOption.value.value"
+        [options]="tagOption.options"
+        [filterKey]="'$label'"
+        [labelTemplate]="labelContent"
+        [isShowTitle]="true"
+      >
+        <ng-template #labelContent let-label="label">
+          <span class="devui-color-block" [style.background]="splitLabel('color', label)" title="{{ splitLabel('label', label) }}"></span>
+          <span title="{{ splitLabel('label', label) }}">{{ splitLabel('label', label) }}</span>
+        </ng-template>
+      </d-checkbox-group>
+    </div>
+  </ng-container>
+  <div class="devui-dropdown-operation-area">
+    <d-button (btnClick)="chooseItems(tagOption); closeMenu(dropdown)">{{ i18nCategorySearchText?.confirm }}</d-button>
+    <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+  </div>
+</ng-template>
+
+<ng-template [dType]="'textInput'" let-tagOption="tagOption" let-dropdown="dropdown">
+  <form #textInputForm="ngForm">
+    <input
+      name="text-input"
+      class="devui-category-search-type-text-input"
+      autocomplete="off"
+      dTextInput
+      [(ngModel)]="tagOption.value.value"
+      [maxlength]="tagOption.maxLength"
+      [placeholder]="tagOption.placeholder || ''"
+      [dValidateRules]="tagOption.validateRules"
+    />
+  </form>
+  <div class="devui-dropdown-operation-area">
+    <d-button [disabled]="textInputForm.invalid" (btnClick)="getTextInputValue(tagOption); closeMenu(dropdown)">{{
+      i18nCategorySearchText?.confirm
+    }}</d-button>
+    <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+  </div>
+</ng-template>
+
+<ng-template [dType]="'numberRange'" let-tagOption="tagOption" let-dropdown="dropdown">
+  <div class="devui-input-number-operation-area">
+    <d-input-number
+      size="sm"
+      [min]="tagOption.min?.left"
+      [max]="tagOption.max?.left"
+      [maxLength]="tagOption.maxLength?.left"
+      [decimalLimit]="tagOption.decimalLimit?.left"
+      [step]="tagOption.step?.left || 1"
+      [reg]="tagOption.reg?.left"
+      [placeholder]="tagOption.placeholder?.left || ''"
+      [(ngModel)]="tagOption.value.value[0]"
+    >
+    </d-input-number>
+    <span> - </span>
+    <d-input-number
+      size="sm"
+      [min]="tagOption.min?.right"
+      [max]="tagOption.max?.right"
+      [maxLength]="tagOption.maxLength?.right"
+      [decimalLimit]="tagOption.decimalLimit?.right"
+      [step]="tagOption.step?.right || 1"
+      [reg]="tagOption.reg?.right"
+      [placeholder]="tagOption.placeholder?.right || ''"
+      [(ngModel)]="tagOption.value.value[1]"
+    >
+    </d-input-number>
+  </div>
+  <div class="devui-dropdown-operation-area">
+    <d-button (btnClick)="getNumberRangeValue(tagOption, dropdown); !tagOption.validateFunc && closeMenu(dropdown)">{{
+      i18nCategorySearchText?.confirm
+    }}</d-button>
+    <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+  </div>
+</ng-template>
+
+<ng-template [dType]="'treeSelect'" let-tagOption="tagOption" let-dropdown="dropdown" let-isSelected="isSelected">
+  <div *ngIf="tagOption.multiple && tagOption.options?.length && tagOption.value.value?.length">
+    <ul class="devui-select-list">
+      <span>{{ i18nCategorySearchText?.selected }}</span>
+      <li class="devui-select-item devui-no-label-item" *ngFor="let item of tagOption.value.value; last as isLast">
+        {{ item[tagOption.filterKey || tagOption.treeNodeTitleKey || 'title'] }}
+        <span *ngIf="!isLast">, </span>
+      </li>
+    </ul>
+  </div>
+  <div *ngIf="tagOption.searchable" class="devui-search-container">
+    <d-search
+      [placeholder]="tagOption.searchPlaceholder"
+      [ngModel]="treeSearchKey"
+      (ngModelChange)="treeSearch($event, tagOption.searchFn)"
+    ></d-search>
+  </div>
+  <div
+    #treeSelectBox
+    class="devui-category-search-tree-container"
+    [style.display]="tagOption.options?.length && !treeNoRecord ? 'block' : 'none'"
+  >
+    <d-operable-tree
+      #OperableTree
+      *ngIf="dropdown.isOpen"
+      class="devui-tree"
+      [tree]="isSelected && treeFactories[tagOption.field] ? [] : tagOption.options"
+      [treeNodeIdKey]="tagOption.treeNodeIdKey || 'id'"
+      [treeNodeChildrenKey]="tagOption.treeNodeChildrenKey || 'children'"
+      [treeNodeTitleKey]="tagOption.filterKey || tagOption.treeNodeTitleKey || 'title'"
+      [checkboxDisabledKey]="tagOption.disabledKey || 'disabled'"
+      [checkable]="tagOption.multiple"
+      [checkableRelation]="tagOption.checkableRelation"
+      [canActivateNode]="!tagOption.multiple"
+      [canActivateParentNode]="!tagOption.leafOnly"
+      [iconParentOpen]="tagOption.iconParentOpen || icons.iconParentOpen"
+      [iconParentClose]="tagOption.iconParentClose || icons.iconParentClose"
+      [iconLeaf]="tagOption.iconLeaf || icons.iconLeaf"
+      (nodeChecked)="onOperableNodeChecked($event, tagOption)"
+      (nodeSelected)="onOperableNodeSelected($event, tagOption); closeMenu(dropdown)"
+    >
+    </d-operable-tree>
+  </div>
+  <div *ngIf="!tagOption.options?.length">
+    <ng-container *ngTemplateOutlet="noData"></ng-container>
+  </div>
+  <div *ngIf="treeNoRecord" class="devui-no-data-tip">{{ i18nCommonText?.noRecordsFound }}</div>
+  <div *ngIf="tagOption.multiple" class="devui-dropdown-operation-area">
+    <d-button [disabled]="!tagOption.value.value?.length" (btnClick)="getTreeValue(tagOption); closeMenu(dropdown)">{{
+      i18nCategorySearchText?.confirm
+    }}</d-button>
+    <d-button bsStyle="common" (btnClick)="closeMenu(dropdown)">{{ i18nCategorySearchText?.cancel }}</d-button>
+  </div>
+</ng-template>

@@ -5,6 +5,121 @@
 
 ---
 
+## v1.1 — 2026-03-26
+
+**主题：Memory Viewer 全面重构 — 真实 tile graph + 暗色模式 + liquid glass 工具栏**
+
+### `mem_viewer/index.html`
+
+- 布局从左右分屏改为**上下分屏**：上 58% 为计算图，下 42% 为内存架构图
+- Header 复用全局 `.toolbar` 样式，badge 更新为新图名 `IndexerPrologQuant · PATH0_leaf293`
+- 引入 pass-ir 渲染栈脚本（`colormap.js` / `parser.js` / `layout.js` / `renderer.js`），通过 `<script>` 全局加载
+- 底部操作栏改为**居中悬浮工具栏**，不再铺满宽度
+- AIV 区块因本 subgraph 无 UB 操作，标记为半透明 dim 状态
+- 补充 `det-magic` span 用于显示当前执行 op 的 magic ID
+
+### `mem_viewer/styles/main.css`（完全重写）
+
+- 全局暗色模式对齐 PTO 设计系统，使用 `--canvas-bg: #1a1a1a` 等全局 token
+- 架构图 buffer 盒子全面切换为暗色调色：L1/L0A/L0B/L0C 使用 `rgba` 半透明着色，保持视觉层次
+- 悬浮工具栏实现 **liquid glass** 效果：`blur(32px) saturate(180%)` + 顶部内高光 + 多层阴影
+- 工具栏居中定位（`left:50%; transform:translateX(-50%)`），宽度自适应内容，风格对齐 pass-ir nav pill
+- 计算图节点状态 CSS：`.mv-op-executing`（amber glow）/ `.mv-op-done`（50% opacity）/ `.mv-op-pending`（25% opacity）
+- tensor 高亮：input 蓝边 glow / output 绿边 glow / live 正常 / dim 淡出
+
+### `mem_viewer/data/sample-graph.json`（新增）
+
+- 从 `output_deepseek/Pass_33_RemoveAlloc/` 选取真实 tile graph subgraph
+- 图名：`TENSOR_IndexerPrologQuantQuantLoop_Unroll1_PATH0_leaf293_319`
+- 128 个 op，涵盖 `COPY_IN / L1_TO_L0A / L1_TO_L0B / A_MULACC_B / COPY_OUT` 等完整 tile 流水线
+
+### `mem_viewer/data/ops.js`（重新生成）
+
+- 从 `sample-graph.json` 自动生成，格式维持 `{m, n, i, o}`
+- 新增 `TENSOR_TOBE` Map，直接从 JSON `mem_type.tobe` 字段获取 tensor 所在内存层（1=L1, 2=L0A, 3=L0B, 4=L0C, 15=DDR）
+
+### `mem_viewer/js/graph-viewer.js`（新增，替换 svg-viewer.js）
+
+- 加载 `sample-graph.json`，调用全局 `parseGraph()` / `computeLayout()` / `renderGraph()` 渲染计算图
+- compact LR 布局，复用 pass-ir 渲染器的节点卡片样式
+- 通过 `data-node-id` 属性（`op_<magic>` / `t_<magic>`）驱动逐步高亮
+- 保留完整 fit/zoom/pan/平滑动画功能，`centerOnExecuting` 基于 layout positions 直接计算
+
+### `mem_viewer/js/constants.js`
+
+- 移除旧的硬编码 `DDR_TENSORS` Set，改用 `TENSOR_TOBE` 查表实现 `getTensorTier()`
+- op 名称映射更新为无 `TILE_` 前缀版本（`COPY_IN` / `L1_TO_L0A` / `A_MULACC_B` 等）
+
+### `mem_viewer/js/schedule.js`
+
+- 移除 topo sort，直接使用 JSON 中 ops 的自然顺序作为执行调度（本 subgraph ops 已按执行序排列）
+- 移除 `PRE_EXISTING` 硬编码集合，liveness 完全由 producer/consumer 关系推导
+
+### `mem_viewer/js/memory-panel.js`
+
+- 架构图 tensor chip 配色全面切换为暗色 `rgba` 调色板，与新 CSS 一致
+- 移除不再使用的 `darkenColor` 工具函数
+
+### `mem_viewer/js/playback.js`
+
+- import 从 `svg-viewer.js` 切换为 `graph-viewer.js`，函数名对应更新（`loadSVG` → `loadGraph`，`applyStepToSVG` → `applyStepToGraph`）
+
+---
+
+## v1.0 — 2026-03-25
+
+**主题：Swimlane 顶部信息架构重组**
+
+### `swimlane/index.html`
+
+- 顶部工具栏收口为“搜索 + 资源”两类全局入口，移除直接暴露的文件绑定、对比绑定、Program 绑定和缩放按钮
+- 新增 `资源管理` 面板，统一承载模块目录导入与手动覆盖入口
+- 在主图上方新增 `数据模式条`，集中放置 `Before / After` 与 `单视图 / 对比 / Diff`
+- 将图表控制重新分成 `筛选` 和 `显示` 两组，缩放也并入图表控制层
+
+### `swimlane/app.js`
+
+- 新增资源面板开关、状态刷新和外部点击收起逻辑，资源绑定不再散落在顶部 / Journey / popup / detail 多处
+- 新增 `单视图 / 对比 / Diff` 三态切换：`Diff` 只负责差异摘要，`对比` 负责双图对照，`单视图` 收起参考泳道
+- 数据模式条中的状态展示改为结构化 pill，统一显示主泳道、参考泳道、Program、源码绑定状态
+- 切回内置 `Before / After` 样例时，会同步清理旧的本地 compare 上下文，避免视图状态和数据来源错位
+- Journey 第 3 步保留资源快捷入口，但统一跳到顶部资源面板；task popup、detail panel 中移除了重复的 Program 绑定入口
+
+### `swimlane/styles.css`
+
+- 新增资源面板、状态 pill、数据模式条与分组后的图表控制条样式
+- 为资源状态增加按类型区分的视觉层级：主泳道 / 参考泳道 / Program / 源码不再混成同一类按钮
+- Journey 中未绑定资源改为只读状态块，不再伪装成第二套资源导入按钮
+
+## v0.9 — 2026-03-25
+
+**主题：Swimlane 模块目录导入 + 深入任务卡片联动**
+
+### `swimlane/index.html`
+
+- 顶部工具栏新增「选择文件夹」入口，支持直接导入整个 `output_deepseek` 模块目录
+- 新增隐藏目录 input（`webkitdirectory` / `directory`）作为 `showDirectoryPicker` 的 fallback
+- 空态文案改为强调可直接识别 `merged_swimlane.json` 与 `program.json`
+
+### `swimlane/app.js`
+
+- 新增目录扫描与资源识别逻辑：遍历本地目录 JSON，自动识别 `merged_swimlane.json`、`stitched_before.json`、`stitched_after.json`、`program.json`
+- 目录扫描扩展到模块源码：识别 `lightning_indexer_prolog_quant.py` 等 `.py` 文件，供 Source Flow 直接打开本地源码
+- 目录导入后自动装配主泳道 / 对比泳道 / Program 绑定；若目录内同时存在 before / after，则默认一起挂上 compare
+- `bindingStatus` 增加目录绑定态展示，避免只显示 Program / Compare 而看不出当前模块上下文
+- “深入任务”卡片从 stub 改为真实状态机：根据当前选中 task、Program 绑定、task 的 `callOpMagic` / `semanticLabel` 动态启用
+- 新增卡片动作：`显示前后依赖连线`、`Pass IR 分屏联动`、`Source Flow 分屏联动`
+- 目录绑定后，即使还没选 task，也可以先打开整体 `Pass IR` / `Source Flow` 视图；只有“依赖连线”仍要求先选 task
+- compare 视图选中 task 时，依赖连线动作会尽量回落到主图对应 task，并滚动定位后显示依赖 overlay
+- 内置样例与单文件导入时会清掉旧目录 / Program 绑定，避免沿用过期模块上下文
+
+### `swimlane/styles.css`
+
+- 为“深入任务”卡片新增真实 disabled 态样式，不再使用误导性的灰色 stub 按钮
+- 为目录绑定态新增蓝色信息条样式，与 Program 绿色已绑定态区分
+
+---
+
 ## v0.8 — 2026-03-13
 
 **主题：V3.2 Attention 集群重构为五个官方 PyPTO 算子**

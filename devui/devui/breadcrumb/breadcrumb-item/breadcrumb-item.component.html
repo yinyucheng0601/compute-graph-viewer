@@ -1,0 +1,83 @@
+<ng-container *ngIf="showMenu; else breadcrumbContentTpl">
+  <span
+    class="devui-breadcrumb-item-with-menu devui-dropdown-no-border devui-dropdown-origin devui-breadcrumb-dropdown-origin"
+    dDropDown
+    dDropDownToggle
+    appendToBody
+    trigger="hover"
+    (toggleEvent)="onToggle($event)"
+    [ngClass]="{ 'devui-breadcrumb-item-active': isOpen }"
+  >
+    <ng-template [ngTemplateOutlet]="breadcrumbContentTpl"></ng-template>
+    <i class="devui-breadcrumb-down-icon">
+      <svg
+        width="16px"
+        height="16px"
+        viewBox="0 0 16 16"
+        version="1.1"
+        xmlns="http://www.w3.org/2000/svg"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+      >
+        <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+          <path
+            d="M3.64644661,5.64644661 C3.82001296,5.47288026 4.08943736,5.45359511 4.2843055,5.58859116 L4.35355339,5.64644661 L8,9.293 L11.6464466,5.64644661 C11.820013,5.47288026 12.0894374,5.45359511 12.2843055,5.58859116 L12.3535534,5.64644661 C12.5271197,5.82001296 12.5464049,6.08943736 12.4114088,6.2843055 L12.3535534,6.35355339 L8.35355339,10.3535534 C8.17998704,10.5271197 7.91056264,10.5464049 7.7156945,10.4114088 L7.64644661,10.3535534 L3.64644661,6.35355339 C3.45118446,6.15829124 3.45118446,5.84170876 3.64644661,5.64644661 Z"
+          ></path>
+        </g>
+      </svg>
+    </i>
+    <div dDropDownMenu class="devui-dropdown-menu">
+      <ng-template
+        [ngTemplateOutlet]="customMenuTemplate ? customMenuTemplate : dropDownMenuTpl"
+        [ngTemplateOutletContext]="{
+          $implicit: this
+        }"
+      >
+      </ng-template>
+    </div>
+  </span>
+</ng-container>
+
+<ng-template #breadcrumbContentTpl>
+  <span class="devui-breadcrumb-item">
+    <ng-content></ng-content>
+  </span>
+</ng-template>
+
+<ng-template #dropDownMenuTpl>
+  <div *ngIf="isSearch" class="devui-search-container">
+    <d-search [size]="'sm'" (searchFn)="searchEvent($event)" [cssClass]="'devui-search-in-dropdown'"></d-search>
+  </div>
+  <ul class="devui-breadcrumb-dropdown-menu">
+    <li *ngFor="let item of menuListDisplay" title="{{ item.name }}">
+      <a
+        *ngIf="!item.linkType || item.linkType === 'hrefLink'"
+        [href]="item.link"
+        rel="noopener"
+        [target]="item.target ? item.target : '_self'"
+        >{{ item.name }}</a
+      >
+      <a
+        *ngIf="item.linkType === 'routerLink'"
+        rel="noopener"
+        [target]="item.target"
+        [href]="item.link"
+        (click)="navigateTo($event, item)"
+        >{{ item.name }}</a
+      >
+    </li>
+  </ul>
+</ng-template>
+
+<span class="devui-breadcrumb-separator">
+  <ng-template
+    [ngTemplateOutlet]="breadCrumbComponent.separatorIcon ? breadCrumbComponent.separatorIcon : defaultSeparator"
+    [ngTemplateOutletContext]="{
+      $implicit: this
+    }"
+  >
+  </ng-template>
+</span>
+
+<ng-template #defaultSeparator>
+  <span class="devui-breadcrumb-separator">/</span>
+</ng-template>

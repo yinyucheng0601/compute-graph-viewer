@@ -1,0 +1,108 @@
+<div class="form-group multi-auto-complete">
+  <label
+    for="multiple-label-auto-complete-{{ id }}"
+    class="multiple-label-auto-complete multiple-label-auto-complete-{{ multipleLabelClassNameSuffix }}"
+    [ngClass]="{ 'multiple-label-auto-complete-disabled': disabled }"
+  >
+    <ul *ngIf="overview !== 'single'" class="devui-dropdown-origin" #multiAutoCompleteWrapper>
+      <li *ngFor="let item of multiItems">
+        <ng-template
+          [ngTemplateOutlet]="disabled || (overview === 'none' && !inputEdit) ? transparentTemplate : defaultTemplate"
+          [ngTemplateOutletContext]="{
+            item: item,
+            formatter: formatter,
+            parent: multiItems
+          }"
+        ></ng-template>
+      </li>
+      <li *ngIf="!disabled">
+        <input
+          #multiAutoCompleteInput
+          id="multiple-label-auto-complete-{{ id }}"
+          type="text"
+          name="autoCompleteControl"
+          class="auto-complete-control"
+          [placeholder]="placeholderView"
+          [tipsText]="tipsText"
+          [latestSource]="latestSource"
+          (selectValue)="onMultipleSearch($event)"
+          (transInputFocusEmit)="getInputFocusFlag($event)"
+          (keydown.backspace)="onBackspaceKeyUp($event, inputValue)"
+          [formatter]="formatter"
+          [valueParser]="valueParser"
+          [itemTemplate]="itemTemplate"
+          [noResultItemTemplate]="noResultItemTemplate"
+          [cssClass]="cssClass"
+          [overview]="overview"
+          [disabled]="disabled"
+          [(ngModel)]="inputValue"
+          [delay]="delay"
+          [dAutoCompleteWidth]="width"
+          dAutoComplete
+          [retainInputValue]="retainInputValue"
+          [showAnimation]="showAnimation"
+          [searchFn]="searchFn"
+          [appendToBody]="appendToBody"
+          [appendToBodyDirections]="appendToBodyDirections"
+          [cdkOverlayOffsetY]="3"
+          [disabledKey]="disabledKey"
+          (blur)="inputBlur()"
+          (changeDropDownStatus)="changePopUp($event)"
+        />
+      </li>
+    </ul>
+
+    <!--单选模板-->
+    <ul *ngIf="overview === 'single'" title="{{ formatter(multiItems[0]) }}" (click)="singleClick($event)">
+      <li *ngFor="let item of multiItems">
+        <ng-template
+          [ngTemplateOutlet]="transparentTemplate"
+          [ngTemplateOutletContext]="{
+            item: item,
+            formatter: formatter,
+            parent: multiItems
+          }"
+        ></ng-template>
+      </li>
+      <li *ngIf="!disabled && inputEdit">
+        <input
+          #multiAutoCompleteInput
+          id="multiple-label-auto-complete-{{ id }}"
+          type="text"
+          name="autoCompleteControl"
+          class="auto-complete-control"
+          [placeholder]="placeholder"
+          [tipsText]="tipsText"
+          [latestSource]="latestSource"
+          (selectValue)="onMultipleSearch($event)"
+          (transInputFocusEmit)="getInputFocusFlag($event)"
+          (keydown.backspace)="onBackspaceKeyUp($event, inputValue)"
+          [formatter]="formatter"
+          [valueParser]="valueParser"
+          [itemTemplate]="itemTemplate"
+          [noResultItemTemplate]="noResultItemTemplate"
+          [cssClass]="cssClass"
+          [overview]="overview"
+          [disabled]="disabled"
+          [(ngModel)]="inputValue"
+          [delay]="delay"
+          [dAutoCompleteWidth]="width"
+          dAutoComplete
+          [searchFn]="searchFn"
+          (blur)="inputBlur()"
+          (changeDropDownStatus)="changePopUp($event)"
+        />
+      </li>
+    </ul>
+  </label>
+</div>
+
+<!--黄底模板-->
+<ng-template #defaultTemplate let-item="item" let-formatter="formatter">
+  <d-tag [deletable]="true" [tag]="formatter(item)" (tagDelete)="removeLabel(item)"></d-tag>
+</ng-template>
+
+<!--无底色模板-->
+<ng-template #transparentTemplate let-item="item" let-formatter="formatter" let-parent="parent">
+  <d-tag [tag]="formatter(item)"></d-tag>
+</ng-template>

@@ -1,15 +1,10 @@
-# Graph Prototype Lab
+# DeepSeek Source Graph Viewer
 
-Independent prototype for exploring:
-
-- automatic DAG layout via `elkjs`
-- compound groups deeper than 4 levels
-- free `TB` / `LR` direction switching
-- TensorBoard-like tensor presentation in vertical layouts
+Interactive DAG viewer for the DeepSeek model's annotated source graph — showing ops, tensors, boundary nodes, and group hierarchies.
 
 ## Run
 
-Serve the repository root so the prototype can fetch shared sample data:
+Serve the repository root so the viewer can fetch `data/source-graph.json`:
 
 ```bash
 cd /Users/yin/pto
@@ -22,18 +17,12 @@ Then open:
 http://localhost:8000/graph-prototype-lab/
 ```
 
-## Samples
+## Features
 
-- `MVP Layer 3 · Deep Groups`: synthetic deep hierarchy extracted from `model-architecture/data.js`
-- `MVP Layer 0 · Deep Groups`: dense-layer variant
-- `Ascend Pass Graph`: real compiler pass JSON
-- `Source Graph`: `data/source-graph.json`
-
-## Current scope
-
-- neutral grayscale rendering only
-- no build tool, no framework
-- no minimap / diff / controlflow integration yet
-- TensorBoard-style tensor handling is approximated as:
-  - internal tensors -> edge payload
-  - input/output tensors -> side annotations
+- Auto-loads `data/source-graph.json` on startup
+- `TB` / `LR` layout direction switching
+- Tensor mode toggle (Auto / Nodes / Edge Data)
+- Fit view (`Fit` button or `F` key)
+- Node / edge inspector panel with source code references
+- Group expand / collapse
+- Preview mode (`?preview=1`) hides UI chrome

@@ -1,0 +1,109 @@
+<section class="demo-section" style="width: 400px">
+  <div>
+    <form
+      dForm
+      ngForm
+      [dValidateRules]="{ message: 'The form verification failed, please check.' }"
+      [layout]="layoutDirection"
+      #planForm="dValidateRules"
+      (dSubmit)="submitPlanForm($event)"
+    >
+      <div [ngModelGroup]="'textGroup'">
+        <d-form-item>
+          <d-form-label [required]="true" [hasHelp]="true" [helpTips]="'This is the plan name.'">Name</d-form-label>
+          <d-form-control>
+            <input
+              dTextInput
+              autocomplete="off"
+              name="planName"
+              placeholder="Name"
+              [(ngModel)]="planFormData.planName"
+              [dValidateRules]="{
+                validators: [{ required: true }],
+                asyncValidators: [{ nameCheck: this.checkName.bind(this), message: temp }]
+              }"
+              [dValidatePopConfig]="{
+                popMaxWidth: 400
+              }"
+            />
+          </d-form-control>
+        </d-form-item>
+        <d-form-item>
+          <d-form-label>Description</d-form-label>
+          <d-form-control>
+            <textarea
+              dTextarea
+              autocomplete="off"
+              name="planDescription"
+              placeholder="Description"
+              [(ngModel)]="planFormData.planDescription"
+              [dValidateRules]="[{ maxlength: 256 }]"
+              style="height: 80px"
+            ></textarea>
+          </d-form-control>
+        </d-form-item>
+      </div>
+      <d-form-item>
+        <d-form-label [required]="true" [hasHelp]="true" [helpTips]="'Reviewer of each task execution.'">Reviewer</d-form-label>
+        <d-form-control>
+          <d-select
+            [options]="verifierOptions"
+            [(ngModel)]="planFormData.planVerifier"
+            [name]="'planVerifier'"
+            [placeholder]="'Select Verifier'"
+            [filterKey]="'name'"
+            [allowClear]="true"
+            [dValidateRules]="[{ required: true }]"
+          ></d-select>
+        </d-form-control>
+      </d-form-item>
+      <d-form-item [dHasFeedback]="true">
+        <d-form-label [required]="true">Execution day</d-form-label>
+        <d-form-control [extraInfo]="customTemplate">
+          <d-checkbox-group
+            [options]="checkboxOptions"
+            [(ngModel)]="planFormData.planExerciseDate"
+            [name]="'planExerciseDate'"
+            [direction]="'row'"
+            [filterKey]="'label'"
+            [isShowTitle]="true"
+            [dValidateRules]="{
+              validators: [{ required: true }],
+              asyncValidators: [{ canChoose: validateDate }]
+            }"
+          ></d-checkbox-group>
+        </d-form-control>
+      </d-form-item>
+      <d-form-operation>
+        <d-button
+          class="mr-element-spacing"
+          [title]="planForm.errorMessage || ''"
+          circled="true"
+          style="margin-right: 8px"
+          [showLoading]="planForm.pending"
+          dFormSubmit
+          [dFormSubmitData]="'submit-button'"
+          >Submit</d-button
+        >
+      </d-form-operation>
+    </form>
+  </div>
+  <ng-template #customTemplate>
+    <span>Choose your execution cycle, it is recommended to choose Monday, Wednesday, Friday.</span>
+  </ng-template>
+</section>
+
+<ng-template #temp>
+  <div class="custom-tip">
+    <p class="tip-item" [ngClass]="{ 'is-error': !nameValid.same }">
+      <i class="icon-error" *ngIf="!nameValid.same"></i>
+      <i class="icon-right" *ngIf="nameValid.same"></i>
+      <span> No duplicate Name </span>
+    </p>
+    <p class="tip-item" [ngClass]="{ 'is-error': !nameValid.length }">
+      <i class="icon-error" *ngIf="!nameValid.length"></i>
+      <i class="icon-right" *ngIf="nameValid.length"></i>
+      <span> Name should has 4-9 characters </span>
+    </p>
+  </div>
+</ng-template>

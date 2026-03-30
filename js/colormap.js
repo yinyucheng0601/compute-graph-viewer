@@ -54,22 +54,21 @@ function hexToHsl(hex) { return rgbToHsl(hexToRgb(hex)); }
 // ── Base palette (design colors + RGB×0.8 dark overlay) ───────────────────
 
 const CORE = [
-  '#0015CC', // blue   H=234°
-  '#1E8DB7', // sky    H=196°
-  '#36B29F', // teal   H=171°
-  '#57AA01', // lime   H=89°
-  '#7246C8', // violet H=260°
-  '#859100', // olive  H=65°
-  '#B32E77', // pink   H=327°
-  '#C69101', // amber  H=44°
-  '#C85001', // orange H=24°
+  '#34D399', // emerald-400  H=160°
+  '#14B8A6', // teal-500     H=173°
+  '#06B6D4', // cyan-500     H=188°
+  '#0EA5E9', // sky-500      H=201°
+  '#3B82F6', // blue-500     H=218°
+  '#6366F1', // indigo-500   H=239°
+  '#8B5CF6', // violet-500   H=258°
+  '#A855F7', // purple-500   H=266°
+  '#1E40AF', // blue-800     H=226°
 ];
 
 // ── Forbidden hue zones (avoid semantic red and green) ─────────────────────
 
 const FORBIDDEN = [
-  { from: 340 / 360, to: 20 / 360, wraps: true }, // 正红 340°–20°
-  { from: 108 / 360, to: 148 / 360, wraps: false }, // 正绿 108°–148°
+  { from: 300 / 360, to: 150 / 360, wraps: true }, // 限定在蓝绿–紫弧段 150°–300°
 ];
 
 function isHueForbidden(h) {
@@ -310,17 +309,17 @@ function buildEngineMemoryNodeColorMap(nodes) {
 // ── Pipeline semantic coloring ─────────────────────────────────────────────
 
 const PIPELINE_HUES = {
-  Query: { h: 215 / 360, s: 0.72 },
-  Key: { h: 265 / 360, s: 0.68 },
-  Weight: { h: 145 / 360, s: 0.65 },
-  Prolog: { h: 40 / 360, s: 0.45 },  // shared utility, desaturated
-  Embed: { h: 176 / 360, s: 0.62 },
-  Norm: { h: 34 / 360, s: 0.68 },
-  Attn: { h: 213 / 360, s: 0.7 },
-  Residual: { h: 18 / 360, s: 0.72 },
-  FFN: { h: 142 / 360, s: 0.6 },
-  MoE: { h: 302 / 360, s: 0.55 },
-  Output: { h: 346 / 360, s: 0.62 },
+  FFN:      { h: 163 / 360, s: 0.62 }, // teal-green
+  Embed:    { h: 176 / 360, s: 0.62 }, // teal
+  Weight:   { h: 183 / 360, s: 0.65 }, // teal-cyan
+  Prolog:   { h: 197 / 360, s: 0.45 }, // sky (desaturated = shared utility)
+  Query:    { h: 210 / 360, s: 0.72 }, // sky-blue
+  Attn:     { h: 222 / 360, s: 0.70 }, // blue
+  Output:   { h: 233 / 360, s: 0.68 }, // cobalt
+  Norm:     { h: 247 / 360, s: 0.65 }, // indigo
+  Residual: { h: 260 / 360, s: 0.70 }, // blue-violet
+  Key:      { h: 265 / 360, s: 0.68 }, // violet
+  MoE:      { h: 280 / 360, s: 0.58 }, // purple
 };
 
 function parsePipelineLabel(semKey) {

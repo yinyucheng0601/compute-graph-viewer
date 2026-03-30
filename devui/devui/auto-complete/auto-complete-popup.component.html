@@ -1,0 +1,95 @@
+<ng-container *ngIf="appendToBody">
+  <ng-template
+    cdk-connected-overlay
+    [cdkConnectedOverlayOrigin]="origin"
+    [cdkConnectedOverlayWidth]="width"
+    [cdkConnectedOverlayOpen]="isOpen && !disabled"
+    [cdkConnectedOverlayOffsetY]="cdkOverlayOffsetY"
+    [cdkConnectedOverlayPositions]="overlayPositions"
+    [cdkConnectedOverlayScrollStrategy]="scrollStrategy"
+    (positionChange)="onPositionChange($event)"
+    (detach)="isOpen && hidePopup()"
+  >
+    <ng-template [ngTemplateOutlet]="popTpl"> </ng-template>
+  </ng-template>
+</ng-container>
+
+<ng-container *ngIf="!appendToBody">
+  <ng-template [ngTemplateOutlet]="popTpl"> </ng-template>
+</ng-container>
+
+<ng-template #popTpl>
+  <div
+    class="devui-dropdown-menu"
+    [ngClass]="{
+      'devui-dropdown-menu-cdk': appendToBody,
+      'devui-custom-right': customViewTemplate && customViewDirection === 'right',
+      'devui-custom-left': customViewTemplate && customViewDirection === 'left',
+      'devui-custom-top': customViewTemplate && customViewDirection === 'top'
+    }"
+    [style.display]="isOpen && (source?.length || noResultItemTemplate) && !disabled ? 'inline-block' : 'none'"
+    [style.top]="overview === 'multiline' ? (position?.top < labelMinHeight ? '50%' : '100%') : '100%'"
+    [style.left]="overview === 'multiline' ? position?.left + 'px' : '0'"
+    [@fadeInOut]="isOpen && !disabled ? (appendToBody ? popPosition : 'bottom') : 'void'"
+    (@fadeInOut.done)="animationEnd($event)"
+    [@.disabled]="!showAnimation"
+    #selectMenuElement
+    dLoading
+    [showLoading]="showLoading"
+    [backdrop]="true"
+  >
+    <ul
+      class="devui-list-unstyled devui-scrollbar scroll-height devui-dropdown-menu-wrap devui-auto-complete-list"
+      [style.maxHeight]="maxHeight + 'px'"
+      dLazyLoad
+      [enableLazyLoad]="enableLazyLoad"
+      (loadMore)="loadMoreEvent($event)"
+      #dropdownUl
+    >
+      <ng-container *ngIf="!isSearching || !searchingTemplate">
+        <li *ngIf="popTipsText && popTipsText.length > 0" class="devui-popup-tips">
+          {{ popTipsText }}
+        </li>
+        <li
+          *ngFor="let item of source; let $index = index; trackBy: trackByFn"
+          class="devui-dropdown-item"
+          [title]="formatter(item)"
+          [ngClass]="{
+            selected: $index == activeIndex,
+            'devui-dropdown-bg': $index == hoverIndex,
+            disabled: disabledKey && item[disabledKey]
+          }"
+          (click)="onSelect($event, item)"
+          (mouseover)="onMouseOver($event, item)"
+        >
+          <ng-template
+            [ngTemplateOutlet]="itemTemplate || defaultItemTemplate"
+            [ngTemplateOutletContext]="{
+              formatter: formatter,
+              term: term,
+              source: source,
+              item: item,
+              $index: $index
+            }"
+          >
+          </ng-template>
+        </li>
+        <div class="devui-no-data-tip" *ngIf="!source?.length && noResultItemTemplate">
+          <ng-template [ngTemplateOutlet]="noResultItemTemplate" [ngTemplateOutletContext]="{ term: term, source: source }"> </ng-template>
+        </div>
+      </ng-container>
+      <div class="devui-no-data-tip" *ngIf="isSearching && searchingTemplate">
+        <ng-template [ngTemplateOutlet]="searchingTemplate" [ngTemplateOutletContext]="{ term: term }"> </ng-template>
+      </div>
+    </ul>
+    <ng-container *ngIf="customViewTemplate">
+      <div class="devui-select-custom-area">
+        <ng-template [ngTemplateOutlet]="customViewTemplate" [ngTemplateOutletContext]="{ $implicit: this }"></ng-template>
+      </div>
+    </ng-container>
+  </div>
+</ng-template>
+
+<ng-template #defaultItemTemplate let-item="item" let-term="term">
+  <d-highlight [value]="formatter(item)" [term]="term"></d-highlight>
+</ng-template>

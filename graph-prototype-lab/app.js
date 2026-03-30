@@ -3,16 +3,8 @@ import {createInitialState, materializeVisibleGraph} from "./graph-ir.js?v=20260
 import {computeLayout} from "./layout-engine.js?v=20260317c";
 import {GraphRenderer} from "./renderer.js?v=20260317c";
 
-const SAMPLE_CATALOG = dataAdapters.SAMPLE_CATALOG || [];
-const REAL_PASS_00_FILES = dataAdapters.REAL_PASS_00_FILES || [];
-const DEFAULT_REAL_PASS_00_FILE =
-  dataAdapters.DEFAULT_REAL_PASS_00_FILE ||
-  "After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json";
 const loadGraphSample = dataAdapters.loadGraphSample;
 
-const sampleSelect = document.getElementById("sampleSelect");
-const realPassField = document.getElementById("realPassField");
-const realPassSelect = document.getElementById("realPassSelect");
 const tensorModeSelect = document.getElementById("tensorModeSelect");
 const fitBtn = document.getElementById("fitBtn");
 const reloadBtn = document.getElementById("reloadBtn");
@@ -38,49 +30,17 @@ const state = {
   ui: null,
   materialized: null,
   layout: null,
-  selectedSample: "source-graph",
-  selectedRealPassFile: DEFAULT_REAL_PASS_00_FILE,
   loadingToken: 0,
 };
 
 bootstrap();
 
 async function bootstrap() {
-  populateSampleOptions();
-  populateRealPassOptions();
   bindControls();
   await loadSelectedSample({fit: true});
 }
 
-function populateSampleOptions() {
-  sampleSelect.innerHTML = SAMPLE_CATALOG.map((sample) => (
-    `<option value="${sample.key}">${sample.label}</option>`
-  )).join("");
-  sampleSelect.value = state.selectedSample;
-}
-
-function populateRealPassOptions() {
-  realPassSelect.innerHTML = REAL_PASS_00_FILES.map((fileName) => (
-    `<option value="${fileName}">${shortPassLabel(fileName)}</option>`
-  )).join("");
-  realPassSelect.value = state.selectedRealPassFile;
-  syncRealPassVisibility();
-}
-
 function bindControls() {
-  sampleSelect.addEventListener("change", async () => {
-    state.selectedSample = sampleSelect.value;
-    syncRealPassVisibility();
-    await loadSelectedSample({fit: true});
-  });
-
-  realPassSelect.addEventListener("change", async () => {
-    state.selectedRealPassFile = realPassSelect.value;
-    if (state.selectedSample === "pass-graph") {
-      await loadSelectedSample({fit: true});
-    }
-  });
-
   tensorModeSelect.addEventListener("change", async () => {
     if (!state.ui) {
       return;
@@ -114,15 +74,12 @@ function bindControls() {
 
 async function loadSelectedSample(options = {}) {
   const token = ++state.loadingToken;
-  const sample = SAMPLE_CATALOG.find((entry) => entry.key === state.selectedSample) || SAMPLE_CATALOG[0];
-  setStatus(`Loading ${sample.label}…`, "");
+  setStatus("Loading…", "");
   clearInspector();
   emptyState.hidden = true;
 
   try {
-    const graph = await loadGraphSample(sample.key, {
-      realPassFile: state.selectedRealPassFile,
-    });
+    const graph = await loadGraphSample("source-graph");
     if (token !== state.loadingToken) {
       return;
     }
@@ -136,9 +93,9 @@ async function loadSelectedSample(options = {}) {
       return;
     }
     emptyState.hidden = false;
-    setStatus(`Failed to load ${sample.label}`, error.message || String(error));
+    setStatus("Failed to load source graph", error.message || String(error));
     detailKind.textContent = "error";
-    detailSummary.textContent = "Sample loading failed.";
+    detailSummary.textContent = "Source graph loading failed.";
     detailBody.innerHTML = `<pre class="insp-code">${escHtml(String(error.stack || error.message || error))}</pre>`;
   }
 }
@@ -187,11 +144,6 @@ function syncDirectionButtons() {
   document.querySelectorAll("[data-direction]").forEach((button) => {
     button.classList.toggle("active", button.dataset.direction === state.ui?.direction);
   });
-}
-
-function syncRealPassVisibility() {
-  const active = state.selectedSample === "pass-graph";
-  realPassField.hidden = !active;
 }
 
 function handleToggleGroup(groupId) {
@@ -468,14 +420,4 @@ function clearInspector() {
   detailKind.textContent = "-";
   detailSummary.textContent = "Select a node or edge label.";
   detailBody.innerHTML = "";
-}
-
-function shortPassLabel(fileName) {
-  return String(fileName)
-    .replace(/\.json$/i, "")
-    .replace(/^After_000_RemoveRedundantReshape_/, "After · ")
-    .replace(/^Before_000_RemoveRedundantReshape_/, "Before · ")
-    .replace(/_Unroll1_/g, " · ")
-    .replace(/_PATH0_/g, " · PATH0/")
-    .replace(/_/g, " ");
 }
