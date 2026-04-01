@@ -464,7 +464,7 @@
 
   function semanticColorForKey(key, pipelineColorMap) {
     if (!key) return '#666666';
-    if (key === 'tensor') return '#606060';
+    if (key === 'tensor') return '#727272';
     if (key === 'boundary:incast') return BOUNDARY_COLORS.incast;
     if (key === 'boundary:outcast') return BOUNDARY_COLORS.outcast;
     if (pipelineColorMap?.has(key)) return pipelineColorMap.get(key) || '#666666';
@@ -1033,11 +1033,11 @@
           else if (member.subgraphId != null) key = 'sg_' + member.subgraphId;
           nextColor = subgraphPalette.get(key) || '#666666';
         } else if (mode === 'latency') {
-          nextColor = member.latency != null ? latencyToColor(member.latency) : '#606060';
+          nextColor = member.latency != null ? latencyToColor(member.latency) : '#727272';
         } else if (mode === 'engineMemory') {
           nextColor = engineMemoryColorForKey(member.engineMemoryKey) || '#6B7280';
         }
-        member.color = nextColor || (member.type === 'tensor' ? '#606060' : '#666666');
+        member.color = nextColor || (member.type === 'tensor' ? '#727272' : '#666666');
       });
     });
   }
@@ -1073,7 +1073,7 @@
         let color = null;
         const latency = latencyValueForNode(n);
         if (latency != null) color = latencyToColor(latency);
-        else if (n.type === 'tensor' || n.type === 'group') color = '#606060';
+        else if (n.type === 'tensor' || n.type === 'group') color = '#727272';
         nodeIdMap.set(n.id, color);
       });
     } else if (mode === 'engineMemory') {

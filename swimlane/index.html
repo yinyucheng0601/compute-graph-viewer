@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Swimlane Viewer</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121318'/%3E%3Crect x='12' y='18' width='40' height='8' rx='4' fill='%237b57bf'/%3E%3Crect x='12' y='30' width='28' height='8' rx='4' fill='%234d79d4'/%3E%3Crect x='12' y='42' width='34' height='8' rx='4' fill='%234da56d'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
   <link rel="stylesheet" href="../css/style.css?v=2">
   <link rel="stylesheet" href="./styles.css?v=2">
 <style>
@@ -312,6 +314,69 @@ html.preview * { pointer-events: none !important; cursor: default !important; }
     <div class="sw-task-popup-body" id="swPopupBody"></div>
   </div>
 
+  <script>
+  (function() {
+    const STITCH_COLORS = ['#7b57bf', '#4d79d4', '#4da56d', '#d98f55', '#45b5c4', '#c86aa0', '#00a6fb', '#eab308'];
+
+    const LABEL_COLORS = {
+      'Prolog-Quant': '#9b6bde',
+      'Query-Linear': '#7b57bf',
+      'Query-Dequant': '#4d79d4',
+      'Query-Hadamard': '#6f63c5',
+      'Weight-Linear': '#4da56d',
+      'Key-Linear': '#d98f55',
+      'Key-Hadamard': '#e39b63',
+      'Key-LayerNorm': '#c86aa0',
+      'Key-Rope2D': '#45b5c4',
+      fake: '#6f6a64',
+      unknown: '#6f6a64',
+    };
+
+    const LANE_KIND_COLORS = {
+      fake: '#6f6a64',
+      aic: '#7b57bf',
+      aiv: '#4d79d4',
+      aicpu: '#4da56d',
+      other: '#8c847c',
+    };
+
+    function stableHash(input) {
+      let hash = 2166136261;
+      const value = String(input || '');
+      for (let i = 0; i < value.length; i += 1) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function hueColor(input, saturation, lightness) {
+      const hash = stableHash(input);
+      const hue = hash % 360;
+      return `hsl(${hue} ${saturation}% ${lightness}%)`;
+    }
+
+    window.PTO_COLORMAP = {
+      colorForLaneKind(kind) {
+        return LANE_KIND_COLORS[kind] || LANE_KIND_COLORS.other;
+      },
+      colorForTask(task, mode = 'semantic') {
+        if (mode === 'stitch') {
+          const index = Math.abs(task?.seqNo || 0) % STITCH_COLORS.length;
+          return STITCH_COLORS[index];
+        }
+        if (mode === 'engine') {
+          return this.colorForLaneKind(task?.laneKind);
+        }
+        if (mode === 'subgraph') {
+          const key = task?.subgraphKey || task?.subGraphId || task?.leafHash || task?.label;
+          return hueColor(key, 58, 56);
+        }
+        return LABEL_COLORS[task?.label] || hueColor(task?.label, 54, 54);
+      },
+    };
+  })();
+  </script>
   <script src="./data.js?v=2"></script>
   <script src="./app.js?v=2"></script>
 </body>
