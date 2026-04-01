@@ -1,6 +1,6 @@
-@import './tokens/foundation.css';
-@import './tokens/semantic.css';
-@import './tokens/components.css';
+@import '../tokens/foundation.css';
+@import '../tokens/semantic.css';
+@import '../tokens/components.css';
 
 /* ──── Design Tokens ──── */
 :root {
@@ -52,6 +52,19 @@
   /* Group card */
   --group-count-color: var(--accent);
   --group-tab-border: var(--border-default);
+
+  /* Alias tokens (consumed by pypto and other modules) */
+  --severity-critical: var(--danger);
+  --severity-warning: var(--warning);
+  --severity-info: var(--primary);
+  --accent-blue: var(--primary);
+  --accent-yellow: var(--warning);
+  --accent-green: var(--success);
+
+  /* Pass-IR elevated node surface (intentionally lighter than canvas) */
+  --node-bg-elevated: #3b3b3b;
+  --node-bg-elevated-hover: #3c3c3c;
+  --node-bg-elevated-selected: #3e3e3e;
 }
 
 /* ──── Reset & Base ──── */
@@ -422,19 +435,20 @@ input[type="file"] { display: none; }
 
 /* Pass IR page only: use a distinct card language from source-logic view */
 .pass-ir-page .node-card {
-  border: 1px solid rgba(148, 163, 184, 0.20);
-  background: #3B3B3B;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--border-default);
+  background: var(--node-bg-elevated);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-xl);
 }
 
 .pass-ir-page .node-card:hover {
-  border-color: rgba(148, 163, 184, 0.34);
-  background: #3C3C3C;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.38);
+  border-color: var(--border-strong);
+  background: var(--node-bg-elevated-hover);
+  box-shadow: var(--shadow-lg);
 }
 
 .pass-ir-page .node-card.selected {
-  background: #3E3E3E;
+  background: var(--node-bg-elevated-selected);
 }
 
 .huge-graph-mode .node-card {
@@ -460,11 +474,50 @@ input[type="file"] { display: none; }
 
 .pass-ir-page .op-pill {
   border-radius: 40px;
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 20px color-mix(in srgb, var(--node-accent, #3577F6) 30%, transparent),
+    0 2px 8px rgba(0,0,0,0.45);
 }
 
 .pass-ir-page .tensor-rect {
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.10);
+  height: auto;
+  padding: 13px 16px;
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 20px color-mix(in srgb, var(--node-accent, #F97316) 50%, transparent),
+    0 2px 8px rgba(0,0,0,0.45);
+}
+
+.pass-ir-page .op-pill-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pass-ir-page .tensor-rect-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* compact mode: strip colored glow, keep inset highlight */
+.pass-ir-page[data-compact] .op-pill,
+.pass-ir-page [data-compact] .op-pill,
+.pass-ir-page[data-compact] .tensor-rect,
+.pass-ir-page [data-compact] .tensor-rect {
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 2px 6px rgba(0,0,0,0.35);
+}
+
+/* huge-graph mode: remove all shadows for perf */
+.huge-graph-mode .pass-ir-page .op-pill,
+.huge-graph-mode .pass-ir-page .tensor-rect {
+  box-shadow: none !important;
 }
 
 /* Group card – keeps base node width, increases height via layout */
@@ -498,7 +551,7 @@ input[type="file"] { display: none; }
 }
 
 .node-card-group .group-shell-fill {
-  fill: #3B3B3B;
+  fill: var(--node-bg-elevated);
 }
 
 .node-card-group .group-content {
@@ -643,7 +696,7 @@ input[type="file"] { display: none; }
   padding: 9px 10px; /* 增加2px上下padding，总共增加4px高度 */
   border-radius: 40px;
   background: linear-gradient(180deg, var(--node-accent, #3577F6) 0%, color-mix(in srgb, var(--node-accent, #2459CC) 75%, #000) 100%);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 3px 8px rgba(0,0,0,0.35);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.1) inset, 0 2px 5px rgba(0,0,0,0.18);
   min-height: 44px; /* 确保最小高度，文字垂直居中 */
   justify-content: center; /* 水平居中 */
 }
@@ -698,7 +751,7 @@ input[type="file"] { display: none; }
 }
 .tensor-rect-shape {
   font-size: 12px;
-  color: rgba(255,255,255,0.55);
+  color: rgba(255,255,255,0.7);
   font-family: var(--text-mono);
   overflow: hidden;
   text-overflow: ellipsis;

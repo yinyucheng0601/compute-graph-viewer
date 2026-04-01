@@ -21,7 +21,10 @@ class App {
 
   _initElements() {
     this.fileInput = document.getElementById('fileInput');
-    this.loadBtn = document.getElementById('loadBtn');
+    this.fileDropdownBtn = document.getElementById('fileDropdownBtn');
+    this.fileDropdownMenu = document.getElementById('fileDropdownMenu');
+    this.loadSampleBtn = document.getElementById('loadSampleBtn');
+    this.loadLocalBtn = document.getElementById('loadLocalBtn');
     this.fitBtn = document.getElementById('fitBtn');
     this.exportBtn = document.getElementById('exportBtn');
     this.zoomInBtn = document.getElementById('zoomInBtn');
@@ -145,8 +148,22 @@ class App {
   }
 
   _bindEvents() {
-    // 文件加载
-    this.loadBtn.addEventListener('click', () => this.fileInput.click());
+    // 文件下拉菜单
+    this.fileDropdownBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.fileDropdownMenu?.classList.toggle('open');
+    });
+    document.addEventListener('click', () => {
+      this.fileDropdownMenu?.classList.remove('open');
+    });
+    this.loadSampleBtn?.addEventListener('click', () => {
+      this.fileDropdownMenu?.classList.remove('open');
+      this._loadDefaultSample();
+    });
+    this.loadLocalBtn?.addEventListener('click', () => {
+      this.fileDropdownMenu?.classList.remove('open');
+      this.fileInput.click();
+    });
     this.fileInput.addEventListener('change', (e) => this._onFileSelected(e));
 
     // 拖放加载
@@ -251,8 +268,8 @@ class App {
 
   _updateFileMeta(displayName) {
     document.getElementById('fileName').textContent = displayName;
-    document.getElementById('eventCount').textContent = `${this.parsedData.totalEventCount.toLocaleString()} 个事件`;
-    document.getElementById('coreCount').textContent = `${this.parsedData.coreCount} 个核心`;
+    document.getElementById('eventCount').textContent = `Events: ${this.parsedData.totalEventCount.toLocaleString()}`;
+    document.getElementById('coreCount').textContent = `Cores: ${this.parsedData.coreCount}`;
   }
 
   async _loadDefaultSample() {
@@ -260,14 +277,20 @@ class App {
     this.isLoading = true;
     this._showLoading('正在加载内置样例...');
     try {
-      const response = await fetch('./samples/stitched_before.json');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await response.text();
+      let text;
+      if (window.PYPTO_SAMPLE_DATA) {
+        text = JSON.stringify(window.PYPTO_SAMPLE_DATA);
+      } else {
+        const response = await fetch('./samples/stitched_before.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        text = await response.text();
+      }
       await this._loadJSONText(text, '内置样例 · stitched_before.json');
     } catch (err) {
       console.error('加载默认样例失败:', err);
-      this._showWelcome();
-      this._showError(`内置样例加载失败: ${err.message}`);
+      if (this.loadingOverlay) this.loadingOverlay.style.display = 'none';
+      if (this.mainContent) this.mainContent.style.display = 'flex';
+      this._showError(`内置样例加载失败，请通过下拉菜单打开本地 JSON`);
     } finally {
       this.isLoading = false;
     }
@@ -551,29 +574,27 @@ class App {
   }
 
   _onCoreClick(coreName) {
-    // 在分析面板中显示该核心的详细信息
     const metrics = this.analysisResult?.coreMetrics.get(coreName);
     if (!metrics) return;
 
     const panel = document.getElementById('coreDetailPanel');
     if (panel) {
-      panel.style.display = 'block';
       panel.innerHTML = this._buildCoreDetailHTML(metrics);
+      panel.classList.add('is-open');
     }
   }
 
   _onEventClick(event, relatedEvents) {
+    const panel = document.getElementById('coreDetailPanel');
     if (!event) {
-      const panel = document.getElementById('coreDetailPanel');
-      if (panel) panel.style.display = 'none';
+      if (panel) panel.classList.remove('is-open');
       return;
     }
 
     this._currentDetailEvent = event;
-    const panel = document.getElementById('coreDetailPanel');
     if (panel) {
-      panel.style.display = 'block';
       panel.innerHTML = this._buildEventDetailHTML(event, relatedEvents);
+      panel.classList.add('is-open');
     }
   }
 
@@ -589,7 +610,7 @@ class App {
           <strong>${e.name || op}</strong>
           <span class="task-id-badge">Task ID: ${taskId}</span>
           <button class="tt-cg-btn" style="margin-left:auto;margin-right:8px;width:auto;display:inline-flex;align-items:center;gap:4px;" onclick="app._openComputeGraphFromDetail()">⊞ 查看计算图</button>
-          <button class="close-btn" onclick="document.getElementById('coreDetailPanel').style.display='none'">✕</button>
+          <button class="close-btn" onclick="document.getElementById('coreDetailPanel').classList.remove('is-open')">✕</button>
         </div>
         <div class="cd-metrics">
           <div class="cd-metric">
@@ -658,7 +679,7 @@ class App {
         <div class="cd-header">
           <span class="core-type-badge type-${m.coreType}">${m.coreType}</span>
           <strong>${m.coreName}</strong>
-          <button class="close-btn" onclick="document.getElementById('coreDetailPanel').style.display='none'">✕</button>
+          <button class="close-btn" onclick="document.getElementById('coreDetailPanel').classList.remove('is-open')">✕</button>
         </div>
         <div class="cd-metrics">
           <div class="cd-metric">

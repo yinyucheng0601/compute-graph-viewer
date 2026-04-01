@@ -83,12 +83,63 @@ pto/
 
 ---
 
+## 设计系统
+
+PTO 使用四层 Design Token 架构，所有颜色、排版、间距通过 CSS 变量统一管理。
+
+### Token 层级
+
+```
+tokens/foundation.css   # 原始值：色盘、字号、间距、圆角、阴影、动效
+tokens/semantic.css     # 语义映射：background / foreground / border / surface / 交互状态
+css/style.css           # 场景 Token + Alias Token（模块消费层）
+```
+
+### Token 概览
+
+**foundation.css**
+- Neutral 灰阶：`--ark-neutral-0 ~ 4`（纯中性，无蓝色偏移）
+- Accent：blue-500 / blue-600 / domain-aux / green-500 / orange-500 / red-500
+- 排版：6 个字号档（11px ~ 28px）、font-weight（500 / 600 / 700）
+- 间距：`--space-1 ~ 6`（4px ~ 24px）
+- 圆角：`--radius-sm / md / lg / xl / pill`
+- 阴影：`--shadow-sm / md / lg`
+- 动效：`--duration-fast / base / slow` + `--easing-default / out`
+
+**semantic.css（深色主题 :root）**
+- Background：`--background`、`--background-elevated`
+- Surface：`--surface-1 ~ 3`（纯中性灰）
+- Foreground：`--foreground` / `secondary` / `muted` / `disabled`
+- Border：`--border-subtle / default / strong`（白色 alpha，纯中性）
+- 语义色：`--primary` / `accent` / `success` / `warning` / `danger`
+- 交互状态叠加：`--state-hover / press / selected / focus`
+
+**css/style.css（场景 Token）**
+- Pass-IR 节点面：`--node-bg-elevated / hover / selected`（比画布略亮）
+- Severity alias：`--severity-critical / warning / info`
+- Accent alias：`--accent-blue / yellow / green`
+
+### 模块接入状态
+
+| 模块 | 接入 | 说明 |
+|------|------|------|
+| pass-ir | ✅ | 节点卡片全部 token 化，边框去蓝偏 |
+| swimlane | ✅ | |
+| execution-overlay | ✅ | |
+| model-architecture | ✅ | |
+| source-flow | ✅ | |
+| pypto-swimlane-perf-tool | ✅ | 含本地扩展 token（tone-* 系列） |
+| mem_viewer / op-ide-assistant / indexer-exec | ✅ | |
+| graph-prototype-lab | ⚪ | 独立实验，未接入 |
+
+---
+
 ## 技术架构
 
 - **前端**：纯 HTML + CSS + Vanilla JS，无构建依赖
 - **布局算法**：自研 Sugiyama 分层布局（`js/layout.js`）
 - **MVP 图库**：AntV X6（仅 `model-architecture/` 使用，bundle 隔离）
-- **主题**：深色系，Design Token 集中于 `css/style.css`
+- **主题**：深色系，四层 Design Token 架构（见上方「设计系统」章节）
 
 ---
 
