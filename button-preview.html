@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Target UI System Preview</title>
+  <link rel="stylesheet" href="./tokens/foundation.css">
+  <link rel="stylesheet" href="./tokens/semantic.css">
+  <link rel="stylesheet" href="./tokens/components.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <link rel="stylesheet" href="./swimlane/styles.css">
+  <style>
+    body {
+      min-height: 100vh;
+      overflow: auto;
+      background: var(--background);
+    }
+
+    .preview-shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .preview-nav {
+      position: sticky;
+      top: 24px;
+      background: color-mix(in srgb, var(--background-elevated) 76%, transparent);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .preview-nav-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--foreground-muted);
+    }
+
+    .preview-nav-link {
+      color: var(--foreground-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .preview-nav-link:hover {
+      color: var(--foreground);
+    }
+
+    .preview-main {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .preview-head {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .preview-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .preview-control-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--background-elevated) 72%, transparent);
+    }
+
+    .preview-control-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--foreground-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0 4px;
+    }
+
+    .theme-switch-btn {
+      min-width: 72px;
+      height: 32px;
+      padding: 0 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .theme-switch-btn.is-active {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--foreground);
+    }
+
+    .accent-input {
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+      color: var(--foreground);
+      padding: 0 10px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      width: 112px;
+    }
+
+    .accent-picker {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    :root[data-preview-mode='light'] {
+      --background: #f6f7fb;
+      --background-elevated: #ffffff;
+      --surface-1: #ffffff;
+      --surface-2: #f5f6fa;
+      --surface-3: #eceef5;
+      --surface-4: #e3e7f0;
+      --foreground: rgba(17, 24, 39, 0.94);
+      --foreground-secondary: rgba(17, 24, 39, 0.68);
+      --foreground-muted: rgba(17, 24, 39, 0.48);
+      --foreground-disabled: rgba(17, 24, 39, 0.28);
+      --border-subtle: rgba(17, 24, 39, 0.08);
+      --border-default: rgba(17, 24, 39, 0.12);
+      --border-strong: rgba(17, 24, 39, 0.18);
+      --surface-disabled: rgba(17, 24, 39, 0.04);
+      --border-disabled: rgba(17, 24, 39, 0.08);
+      --state-hover: rgba(17, 24, 39, 0.05);
+      --state-press: rgba(17, 24, 39, 0.08);
+    }
+
+    :root[data-preview-mode='light'] .token-badge {
+      background: #e8ebf1;
+      color: #1f2937;
+      box-shadow: none;
+    }
+
+    :root[data-preview-mode='light'] .card-demo,
+    :root[data-preview-mode='light'] .pattern-node,
+    :root[data-preview-mode='light'] .layout-header,
+    :root[data-preview-mode='light'] .layout-sidepanel,
+    :root[data-preview-mode='light'] .layout-page,
+    :root[data-preview-mode='light'] .toggle-outline,
+    :root[data-preview-mode='light'] .toggle-outline[aria-pressed="true"],
+    :root[data-preview-mode='light'] .layout-minimap,
+    :root[data-preview-mode='light'] .layout-minimap-viewport,
+    :root[data-preview-mode='light'] .layout-page-canvas {
+      box-shadow: none;
+    }
+
+    .preview-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .preview-sub {
+      max-width: 860px;
+      color: var(--foreground-secondary);
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .preview-section {
+      background: color-mix(in srgb, var(--background-elevated) 68%, transparent);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .preview-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+    }
+
+    .preview-card {
+      background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .preview-card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .preview-card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .preview-card-class {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--foreground-muted);
+    }
+
+    .preview-stage {
+      min-height: 74px;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--background) 54%, transparent);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .preview-stage * {
+      box-shadow: none !important;
+      filter: none !important;
+    }
+
+    .preview-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .token-badge,
+    .state-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 6px;
+      font-size: 10px;
+    }
+
+    .token-badge {
+      border: none;
+      background: rgba(0, 0, 0, 0.82);
+      color: rgba(255, 255, 255, 0.88);
+      font-family: var(--font-mono);
+    }
+
+    .state-badge {
+      font-family: var(--font-sans);
+      border: none;
+      background: color-mix(in srgb, var(--surface-disabled) 72%, transparent);
+      color: var(--foreground-secondary);
+    }
+
+    .preview-note {
+      color: var(--foreground-muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .preview-fullpage {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    .layout-page-frame {
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .preview-fullpage-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .preview-caption {
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .preview-swatch {
+      width: 52px;
+      height: 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+    }
+
+    .preview-panel {
+      width: min(100%, 280px);
+      min-height: 92px;
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .preview-panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--foreground);
+    }
+
+    .preview-panel-sub {
+      font-size: 11px;
+      color: var(--foreground-secondary);
+    }
+
+    .card-demo {
+      width: min(100%, 360px);
+      border-radius: 12px;
+      border: 1px solid var(--border-default);
+      background: var(--background-elevated);
+      color: var(--foreground);
+      overflow: hidden;
+    }
+
+    .card-demo-header,
+    .card-demo-content,
+    .card-demo-footer {
+      padding: 16px;
+    }
+
+    .card-demo-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card-demo-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .card-demo-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .card-demo-description {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--foreground-secondary);
+    }
+
+    .card-demo-content {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-top: 1px solid color-mix(in srgb, var(--border-default) 56%, transparent);
+    }
+
+    .card-demo-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card-demo-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--foreground-secondary);
+    }
+
+    .card-demo-input {
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+      background: var(--surface-1);
+      color: var(--foreground-muted);
+      display: inline-flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 13px;
+    }
+
+    .card-demo-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-top: 1px solid color-mix(in srgb, var(--border-default) 56%, transparent);
+    }
+
+    .action-row-selected {
+      background: var(--state-hover) !important;
+      border-color: var(--border-default) !important;
+      color: var(--foreground) !important;
+    }
+
+    .action-row-selected .cp-btn-icon {
+      background: color-mix(in srgb, var(--surface-3) 92%, transparent) !important;
+      color: var(--foreground) !important;
+    }
+
+    .pattern-event {
+      width: min(100%, 320px);
+      border-radius: 10px;
+      background: rgba(143, 190, 255, 0.18);
+      overflow: hidden;
+    }
+
+    .pattern-event-segments {
+      display: grid;
+      grid-template-columns: 18% 1fr 14%;
+      min-height: 28px;
+    }
+
+    .pattern-event-segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.82);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .pattern-event-segment:last-child {
+      border-right: none;
+    }
+
+    .pattern-event-segment-in,
+    .pattern-event-segment-out {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .pattern-event-segment-compute {
+      background: transparent;
+      justify-content: flex-start;
+      padding-left: 10px;
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .pattern-node {
+      min-width: 160px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--background-elevated);
+      overflow: hidden;
+    }
+
+    .pattern-node-compact {
+      min-width: 124px;
+      border-radius: 10px;
+    }
+
+    .pattern-node-top {
+      min-height: 24px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      background: rgba(96, 165, 250, 0.24);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .pattern-node-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--foreground-secondary);
+    }
+
+    .pattern-node-body strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+
+    .layout-header {
+      min-height: 44px;
+      background: var(--toolbar-bg);
+      border-bottom: 1px solid var(--toolbar-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 12px;
+    }
+
+    .layout-header-left,
+    .layout-header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .layout-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--foreground);
+      font-size: 13px;
+      font-weight: 600;
+      margin-right: 4px;
+      padding-right: 12px;
+      border-right: 1px solid var(--toolbar-border);
+    }
+
+    .layout-header-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--foreground);
+      opacity: 0.88;
+    }
+
+    .layout-sidepanel {
+      width: min(100%, 320px);
+      min-height: 320px;
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--background-elevated) 94%, transparent);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .layout-sidepanel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .layout-sidepanel-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--foreground);
+    }
+
+    .layout-sidepanel-sub {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--foreground-secondary);
+    }
+
+    .layout-minimap {
+      width: min(100%, 240px);
+      height: 170px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .layout-minimap-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.45;
+    }
+
+    .layout-minimap-frame {
+      position: absolute;
+      inset: 34px 48px 42px 36px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .layout-minimap-viewport {
+      position: absolute;
+      left: 92px;
+      top: 58px;
+      width: 86px;
+      height: 42px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.09);
+    }
+
+    .layout-page {
+      width: 1440px;
+      height: 1080px;
+      flex: 0 0 auto;
+      border: 10px solid rgba(255, 255, 255, 0.3);
+      border-radius: 30px;
+      background: color-mix(in srgb, var(--background) 86%, transparent);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      grid-template-rows: 44px minmax(0, 1fr);
+      gap: 0;
+      transform-origin: top left;
+      overflow: hidden;
+    }
+
+    .layout-page-topbar {
+      grid-column: 1 / span 2;
+    }
+
+    .layout-page-canvas {
+      margin: 12px 0 0 12px;
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .layout-page > .layout-sidepanel {
+      margin: 12px 12px 12px 12px;
+    }
+
+    .layout-page-canvas::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.5;
+    }
+
+    .layout-page-inline-card {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      left: auto;
+      bottom: auto;
+      width: 240px;
+      z-index: 1;
+    }
+
+    .layout-page-bottom {
+      display: none;
+    }
+
+    .layout-page .layout-minimap {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+    }
+
+    .toggle-outline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 32px;
+      padding: 0 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--foreground);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .toggle-outline[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--foreground) 7%, transparent);
+      color: var(--foreground);
+      border-color: var(--border-default);
+    }
+
+    .toggle-outline-sm {
+      height: 28px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+
+    .toggle-outline-lg {
+      height: 36px;
+      padding: 0 12px;
+      font-size: 13px;
+    }
+
+    .toggle-outline-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      font-size: 12px;
+      color: inherit;
+      flex-shrink: 0;
+    }
+
+    .status-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 6px;
+      border: 1px solid currentColor;
+      background: var(--surface-disabled);
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 500;
+      font-family: var(--font-sans);
+    }
+
+    .status-tag-success {
+      color: #17c317;
+    }
+
+    .status-tag-pending {
+      color: #4f87ff;
+    }
+
+    .status-tag-warning {
+      color: #f2bc00;
+    }
+
+    .status-tag-error {
+      color: #ff5bb7;
+    }
+
+    .btn-solid {
+      background: var(--button-primary-bg);
+      border-color: transparent;
+      color: var(--button-primary-fg);
+    }
+
+    .btn-solid:hover {
+      background: var(--button-primary-bg-hover);
+      border-color: transparent;
+      color: var(--button-primary-fg);
+      transform: none;
+    }
+
+    .btn-solid:active {
+      background: var(--button-primary-bg-press);
+      border-color: transparent;
+      color: var(--button-primary-fg);
+      transform: none;
+    }
+
+    /* Hover simulation for soft buttons */
+    .preview-hover.btn:not(.btn-solid):not(.btn-ghost) {
+      background: color-mix(in srgb, var(--button-secondary-bg) 95%, black) !important;
+      border-color: var(--border-default) !important;
+    }
+    .preview-hover.btn.btn-solid {
+      background: var(--button-primary-bg-hover) !important;
+      color: var(--button-primary-fg) !important;
+    }
+    .preview-hover.btn.btn-ghost {
+      background: color-mix(in srgb, transparent 95%, black) !important;
+      color: var(--button-ghost-fg-hover) !important;
+    }
+    /* Active simulation */
+    .preview-active.btn:not(.btn-solid):not(.btn-ghost) {
+      background: var(--button-secondary-bg-press) !important;
+      border-color: var(--border-default) !important;
+      transform: none;
+    }
+    .preview-active.btn.btn-solid {
+      background: var(--button-primary-bg-press) !important;
+      color: var(--button-primary-fg) !important;
+      transform: none;
+    }
+
+    .preview-icon-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+      color: inherit;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .preview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .preview-inline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    @media (max-width: 1040px) {
+      .preview-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-nav {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="preview-shell">
+    <aside class="preview-nav">
+      <div class="preview-nav-title">Target UI System</div>
+      <a class="preview-nav-link" href="#overview">Overview</a>
+      <a class="preview-nav-link" href="#buttons">Buttons</a>
+      <a class="preview-nav-link" href="#toggle-chip">Toggle &amp; Chip</a>
+      <a class="preview-nav-link" href="#labels-badges">Labels &amp; Badges</a>
+      <a class="preview-nav-link" href="#panels-containers">Card</a>
+      <a class="preview-nav-link" href="#data-viz-exempt">Data Viz Exempt</a>
+      <a class="preview-nav-link" href="#module-matrix">Module Mapping Matrix</a>
+    </aside>
+
+    <div class="preview-main">
+    <header class="preview-head" id="overview">
+      <h1 class="preview-title">Target UI System Preview</h1>
+      <p class="preview-sub">说明：这是 <code>pto</code> 的目标态组件规范页。<code>Default</code> 使用中性黑白 <code>solid</code>；<code>Accent</code> 只替换 <code>solid</code> 的前景与背景，不影响其他透明白黑组件。模块迁移时，以本页的组件形态、状态和映射规则为准。</p>
+      <div class="preview-controls">
+        <div class="preview-control-group">
+          <span class="preview-control-label">Theme</span>
+          <button class="theme-switch-btn is-active" type="button" data-theme-mode="dark">Dark</button>
+          <button class="theme-switch-btn" type="button" data-theme-mode="light">Light</button>
+        </div>
+        <div class="preview-control-group">
+          <span class="preview-control-label">Solid Tone</span>
+          <button class="theme-switch-btn is-active" type="button" data-accent-scope="default">Default</button>
+          <button class="theme-switch-btn" type="button" data-accent-scope="accent">Accent</button>
+        </div>
+        <div class="preview-control-group">
+          <span class="preview-control-label">Accent</span>
+          <input class="accent-picker" id="accentPicker" type="color" value="#5b8cff" aria-label="Accent color picker">
+          <input class="accent-input" id="accentInput" type="text" value="#5B8CFF" spellcheck="false" aria-label="Accent hex input">
+        </div>
+      </div>
+    </header>
+
+    <section class="preview-section">
+      <div class="preview-section-title">Module Target Examples</div>
+      <div class="preview-fullpage">
+        <div class="layout-page-frame">
+        <div class="layout-page">
+          <div class="layout-header layout-page-topbar">
+            <div class="layout-header-left">
+              <a class="home-link" href="#" onclick="return false;" aria-label="Back To Home">⌂</a>
+              <div class="layout-header-brand">
+                <span class="layout-header-dot"></span>
+                Pass-IR
+              </div>
+              <button class="btn" type="button">Select Graph</button>
+              <div class="toolbar-sep"></div>
+              <span class="graph-title">mini-attn / after / semantic</span>
+              <div class="graph-stats">
+                <span class="stat-chip">124 nodes</span>
+                <span class="stat-chip">18 groups</span>
+              </div>
+            </div>
+            <div class="layout-header-right">
+              <button class="btn btn-ghost btn-icon" type="button">⌕</button>
+              <button class="btn btn-ghost btn-icon" type="button">⋯</button>
+            </div>
+          </div>
+          <div class="layout-page-canvas">
+            <div class="card-demo layout-page-inline-card">
+              <div class="card-demo-header">
+                <div class="card-demo-title">Action List In Card</div>
+                <div class="card-demo-description">Secondary controls and mode switches.</div>
+              </div>
+              <div class="card-demo-content">
+                <button class="cp-btn" type="button" style="width:100%;">
+                  <span class="cp-btn-icon">S</span>
+                  <span class="cp-btn-text">
+                    <span class="cp-btn-label">Semantic</span>
+                    <span class="cp-btn-sub">selected mode</span>
+                  </span>
+                </button>
+                <button class="cp-btn action-row-selected" type="button" style="width:100%;">
+                  <span class="cp-btn-icon">L</span>
+                  <span class="cp-btn-text">
+                    <span class="cp-btn-label">Latency</span>
+                    <span class="cp-btn-sub">current mode</span>
+                  </span>
+                </button>
+                <button class="cp-btn" type="button" style="width:100%;">
+                  <span class="cp-btn-icon">C</span>
+                  <span class="cp-btn-text">
+                    <span class="cp-btn-label">Compact</span>
+                    <span class="cp-btn-sub">dense layout</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="card-demo" style="position:absolute; left:20px; bottom:20px; width:260px; z-index:1;">
+              <div class="card-demo-header">
+                <div class="card-demo-title">Selected Event</div>
+                <div class="card-demo-description">Compact context near the selection.</div>
+              </div>
+              <div class="card-demo-content">
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Window</div>
+                <div class="card-demo-input">12.4ms → 18.1ms</div>
+                </div>
+              </div>
+            </div>
+            <div class="layout-minimap">
+              <div class="layout-minimap-grid"></div>
+              <div class="layout-minimap-frame"></div>
+              <div class="layout-minimap-viewport"></div>
+            </div>
+          </div>
+          <aside class="layout-sidepanel">
+            <div class="layout-sidepanel-head">
+              <div>
+                <div class="layout-sidepanel-title">Right Panel</div>
+                <div class="layout-sidepanel-sub">Inspector / diagnostics / detail shell.</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" type="button">×</button>
+            </div>
+            <div class="card-demo-content" style="padding:0; border-top:none;">
+              <div class="card-demo-field">
+                <div class="card-demo-label">Node</div>
+                <div class="card-demo-input">fuse_attention</div>
+              </div>
+              <div class="card-demo-field">
+                <div class="card-demo-label">Mode</div>
+                <div class="card-demo-input">Semantic</div>
+              </div>
+            </div>
+            <div class="preview-inline">
+              <button class="btn btn-solid" type="button">Focus</button>
+              <button class="btn" type="button">Open Source</button>
+            </div>
+          </aside>
+        </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ① Core Variants -->
+    <section class="preview-section" id="buttons">
+      <div class="preview-section-title">Buttons</div>
+      <div class="preview-caption">共享按钮语义只保留 soft / solid / ghost / disabled，加上 icon-only 与 destructive 作为受控变体。模块级 CTA、工具栏按钮、入口按钮都先归到这里。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Button Matching Rules</div>
+            <div class="preview-card-class">solid vs soft decision</div>
+          </div>
+          <div class="preview-stage preview-stack">
+            <div class="preview-inline">
+              <button class="btn btn-solid" type="button">Run Analysis</button>
+              <button class="btn" type="button">Open Local Resource</button>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">solid: primary workflow commit</span>
+            <span class="token-badge">soft: entry / open / import / choose</span>
+            <span class="state-badge">Rule</span>
+          </div>
+          <div class="preview-note">`solid` 只给真正推进主流程的唯一主动作，例如 Run、Generate、Apply、Execute、Start。`soft` 给打开、导入、选择、浏览、加载、本地资源这类入口动作，例如 Open Pass Folder、Open single JSON、加载本地资源。判断标准不是按钮位置，而是点击后是否立即提交或推进核心流程。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Soft</div>
+            <div class="preview-card-class">.btn</div>
+          </div>
+          <div class="preview-stage">
+            <button class="btn" type="button">Default</button>
+            <button class="btn preview-hover" type="button">Hover</button>
+            <button class="btn preview-active" type="button">Pressed</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">--button-secondary-bg</span>
+            <span class="token-badge">--button-secondary-border</span>
+            <span class="token-badge">--button-secondary-fg</span>
+            <span class="state-badge">Use for open/import/load</span>
+          </div>
+          <div class="preview-note">默认按钮。用于打开、导入、选择、浏览、加载、本地资源、次级确认。凡是不直接提交主流程的入口动作，默认都走 `soft`。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Solid</div>
+            <div class="preview-card-class">.btn .btn-solid</div>
+          </div>
+          <div class="preview-stage">
+            <button class="btn btn-solid" type="button">提交</button>
+            <button class="btn btn-solid preview-hover" type="button">Hover</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">bg: --foreground</span>
+            <span class="token-badge">color: --background</span>
+            <span class="state-badge">Use for run/apply/submit</span>
+          </div>
+          <div class="preview-note">主操作 CTA。只用于真正提交或推进主流程的唯一主动作，例如 Run、Generate、Apply、Execute、Start。不要给“打开本地资源”这类入口动作用 `solid`。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Ghost</div>
+            <div class="preview-card-class">.btn .btn-ghost</div>
+          </div>
+          <div class="preview-stage">
+            <button class="btn btn-ghost" type="button">取消</button>
+            <button class="btn btn-ghost preview-hover" type="button">Hover</button>
+            <button class="btn btn-ghost btn-icon" type="button">×</button>
+            <button class="btn btn-ghost btn-icon preview-hover" type="button">+</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">bg: transparent</span>
+            <span class="token-badge">--button-ghost-fg</span>
+            <span class="token-badge">--button-ghost-bg-hover</span>
+          </div>
+          <div class="preview-note">轻操作：取消、关闭、更多、icon-only 按钮。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Disabled</div>
+            <div class="preview-card-class">[disabled]</div>
+          </div>
+          <div class="preview-stage">
+            <button class="btn" type="button" disabled>Soft</button>
+            <button class="btn btn-solid" type="button" disabled>Solid</button>
+            <button class="btn btn-ghost" type="button" disabled>Ghost</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">opacity: --button-disabled-opacity (0.42)</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ② Toggle & Chip -->
+    <section class="preview-section" id="toggle-chip">
+      <div class="preview-section-title">Toggle &amp; Chip</div>
+      <div class="preview-caption">这里按 shadcn / Base UI 的组件边界拆开：<code>Toggle</code> 是单个二态开关，<code>Toggle Group</code> 是互斥切换，<code>Chip Filter</code> 是轻量筛选标签。方向切换、版本切换、视图切换都并入 <code>Toggle Group</code>，不再单列 pill 组件。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Toggle</div>
+            <div class="preview-card-class">outline toggle, icon + label</div>
+          </div>
+          <div class="preview-stage">
+            <button class="toggle-outline" type="button" aria-pressed="false">
+              <span class="toggle-outline-icon">I</span>
+              Italic
+            </button>
+            <button class="toggle-outline" type="button" aria-pressed="true">
+              <span class="toggle-outline-icon">B</span>
+              Bold
+            </button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">border: --border-default</span>
+            <span class="token-badge">pressed bg: foreground 7% tint</span>
+            <span class="token-badge">radius: 6px</span>
+            <span class="state-badge">Shared</span>
+          </div>
+          <div class="preview-note">单个 toggle 采用独立 outline 控件，不直接复用普通按钮。更接近 shadcn 的 `variant=&quot;outline&quot;` 结构。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Toggle Sizes</div>
+            <div class="preview-card-class">size=&quot;sm&quot; / default / &quot;lg&quot;</div>
+          </div>
+          <div class="preview-stage">
+            <button class="toggle-outline toggle-outline-sm" type="button" aria-pressed="false">Small</button>
+            <button class="toggle-outline" type="button" aria-pressed="false">Default</button>
+            <button class="toggle-outline toggle-outline-lg" type="button" aria-pressed="false">Large</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">sm: h-8 px-2.5</span>
+            <span class="token-badge">default: h-8 px-2.5</span>
+            <span class="token-badge">lg: h-9 px-3</span>
+            <span class="state-badge">Shared</span>
+          </div>
+          <div class="preview-note">整体尺寸收小一号。默认尺寸现在收敛到原来的 small 档，避免 toggle 比普通控制项更重。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Toggle Group</div>
+            <div class="preview-card-class">.sw-toggle-btn / .sw-view-mode-btn / .model-btn.active</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <button class="toggle-outline" type="button" aria-pressed="true">Before</button>
+              <button class="toggle-outline" type="button" aria-pressed="false">After</button>
+            </div>
+            <div class="preview-inline">
+              <button class="toggle-outline" type="button" aria-pressed="false">单视图</button>
+              <button class="toggle-outline" type="button" aria-pressed="true">Diff</button>
+            </div>
+            <div class="preview-inline">
+              <button class="toggle-outline" type="button" aria-pressed="false">TB</button>
+              <button class="toggle-outline" type="button" aria-pressed="true">LR</button>
+              <button class="toggle-outline" type="button" aria-pressed="false">v3.2</button>
+              <button class="toggle-outline" type="button" aria-pressed="true">v3.3</button>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">base: outline toggle</span>
+            <span class="token-badge">selected via aria-pressed</span>
+            <span class="state-badge">Shared</span>
+          </div>
+          <div class="preview-note">互斥切换用一组 outline toggle 组成，不再用普通按钮叠加 `.is-selected` 假装 toggle。方向切换和版本切换也收进这里，不再保留 pill 分类。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Chip Filter</div>
+            <div class="preview-card-class">.sw-chip-btn + compact filter semantics</div>
+          </div>
+          <div class="preview-stage">
+            <button class="sw-chip-btn is-active" type="button" style="background: rgba(255,255,255,0.3); color: #fff; border-color: transparent;">AIC</button>
+            <button class="sw-chip-btn" type="button">AIV</button>
+            <button class="sw-chip-btn" type="button">CPU</button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">compact spacing</span>
+            <span class="token-badge">selected: rgba(255,255,255,0.3) + #fff</span>
+            <span class="state-badge">Module Variant</span>
+          </div>
+          <div class="preview-note">chip 是筛选器，不是普通 toggle。选中态保持低干扰，用 30% 白底加白字，不使用纯白实心填充。</div>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="preview-section" id="labels-badges">
+      <div class="preview-section-title">Labels &amp; Badges</div>
+      <div class="preview-caption">状态标签与 badge 不并入按钮系统。这里定义的是目标态信息标记层：默认保持低干扰，只有确实承载状态或等级时才使用颜色。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Neutral Badge</div>
+            <div class="preview-card-class">.badge-neutral</div>
+          </div>
+          <div class="preview-stage">
+            <span class="state-badge">Default</span>
+            <span class="state-badge">Inspector</span>
+            <span class="state-badge">Shared</span>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">bg: --surface-disabled</span>
+            <span class="token-badge">border: --border-default</span>
+            <span class="token-badge">fg: --foreground-secondary</span>
+            <span class="state-badge">Shared</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Semantic Status</div>
+            <div class="preview-card-class">.badge-neutral + semantic color</div>
+          </div>
+          <div class="preview-stage">
+            <span class="status-tag status-tag-success">success</span>
+            <span class="status-tag status-tag-pending">pending</span>
+            <span class="status-tag status-tag-warning">warning</span>
+            <span class="status-tag status-tag-error">error</span>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">base: neutral badge shape</span>
+            <span class="token-badge">semantic colors: success / info / warning / danger</span>
+            <span class="state-badge">Shared</span>
+          </div>
+          <div class="preview-note">Semantic Status 只是 Neutral Badge 的语义色版本，结构、尺寸、圆角都保持一致，只叠加文字和描边颜色。</div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Inline Label</div>
+            <div class="preview-card-class">.label-inline</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline" style="gap: 8px;">
+              <span style="font-size: 11px; color: var(--foreground-muted); text-transform: uppercase; letter-spacing: 0.08em;">Pass</span>
+              <span style="font-size: 13px; color: var(--foreground); font-weight: 600;">fuse_attention</span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">label: --foreground-muted</span>
+            <span class="token-badge">value: --foreground</span>
+            <span class="state-badge">Shared</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Module-Only Status Pill</div>
+            <div class="preview-card-class">timeline / swimlane / graph status</div>
+          </div>
+          <div class="preview-stage">
+            <span class="state-badge" style="background: rgba(255,255,255,0.08); color: #f0f0f0;">Gap</span>
+            <span class="state-badge" style="background: rgba(255,190,0,0.14); color: #ffc75a;">Fallback</span>
+            <span class="state-badge" style="background: rgba(0,196,140,0.15); color: #55d8aa;">Resolved</span>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">status-specific semantic tint</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="preview-section" id="panels-containers">
+      <div class="preview-section-title">Card</div>
+      <div class="preview-caption">这一节只展示真正属于 shadcn 语义的 Card。重点不是外框，而是 <code>CardHeader</code>、<code>CardAction</code>、<code>CardContent</code>、<code>CardFooter</code> 这类 slot 结构。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Swimlane Resource Panel</div>
+            <div class="preview-card-class">.sw-resource-panel -> CardHeader + CardContent</div>
+          </div>
+          <div class="preview-stage">
+            <div class="card-demo">
+              <div class="card-demo-header">
+                <div class="card-demo-title">Local Resource Library</div>
+                <div class="card-demo-description">Load stitched traces, inspect available samples, and keep resource actions grouped in one compact card.</div>
+              </div>
+              <div class="card-demo-content">
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Current Source</div>
+                  <div class="card-demo-input">stitched_after.json</div>
+                </div>
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Samples</div>
+                  <div class="card-demo-input">before / after / diff</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">slots: header + content</span>
+            <span class="token-badge">bg: --background-elevated</span>
+            <span class="state-badge">Shared</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Execution Overlay Detail Panel</div>
+            <div class="preview-card-class">.eo-detail-panel -> CardHeader + CardAction + CardContent</div>
+          </div>
+          <div class="preview-stage">
+            <div class="card-demo">
+              <div class="card-demo-header">
+                <div class="card-demo-header-row">
+                  <div>
+                    <div class="card-demo-title">Node Detail</div>
+                    <div class="card-demo-description">Execution diagnostics, dependency lookup, and node metadata should read like a structured analysis card.</div>
+                  </div>
+                  <button class="btn btn-ghost btn-icon" type="button">×</button>
+                </div>
+              </div>
+              <div class="card-demo-content">
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Node</div>
+                  <div class="card-demo-input">q_proj_fused</div>
+                </div>
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Pipeline</div>
+                  <div class="card-demo-input">Query · Core 3</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">slots: header + action + content</span>
+            <span class="token-badge">action: link/ghost button</span>
+            <span class="state-badge">Shared</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Swimlane Task Popup</div>
+            <div class="preview-card-class">.sw-task-popup -> CardContent + CardFooter</div>
+          </div>
+          <div class="preview-stage">
+            <div class="card-demo">
+              <div class="card-demo-header">
+                <div class="card-demo-title">Task Detail</div>
+                <div class="card-demo-description">Popup detail should behave like a content card with clear metadata rows and footer actions.</div>
+              </div>
+              <div class="card-demo-content">
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Kernel</div>
+                  <div class="card-demo-input">matmul_128x64</div>
+                </div>
+                <div class="card-demo-field">
+                  <div class="card-demo-label">Window</div>
+                  <div class="card-demo-input">12.4ms → 18.1ms</div>
+                </div>
+              </div>
+              <div class="card-demo-footer">
+                <button class="btn btn-solid" type="button">Focus Task</button>
+                <button class="btn" type="button">Open Source</button>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">slots: content + footer</span>
+            <span class="token-badge">footer: stacked actions</span>
+            <span class="state-badge">Shared</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="preview-section" id="data-viz-exempt">
+      <div class="preview-section-title">Data Viz Exempt</div>
+      <div class="preview-caption">这一节同时收两类内容：一类是必须豁免的 data-viz 颜色系统，例如 stitch、dependency、colormap；另一类是可复用的图形 pattern，例如 swimlane 事件条和 graph node 结构。前者不并入共享 token，后者作为视觉模式保留。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Swimlane Stitch Colors</div>
+            <div class="preview-card-class">--sw-stitch-0 ~ --sw-stitch-4</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <span class="preview-swatch" style="background: var(--sw-stitch-0);"></span>
+              <span class="preview-swatch" style="background: var(--sw-stitch-1);"></span>
+              <span class="preview-swatch" style="background: var(--sw-stitch-2);"></span>
+              <span class="preview-swatch" style="background: var(--sw-stitch-3);"></span>
+              <span class="preview-swatch" style="background: var(--sw-stitch-4);"></span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">role: stitched lanes</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Dependency Lines</div>
+            <div class="preview-card-class">.sw-dep-line-* / .sw-dep-dot-*</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <span class="preview-swatch" style="background: #7dd3fc;"></span>
+              <span class="preview-swatch" style="background: #a78bfa;"></span>
+              <span class="preview-swatch" style="background: #34d399;"></span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">role: relation encoding</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Graph Node / Edge Semantics</div>
+            <div class="preview-card-class">model / graph / overlay semantics</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <span class="state-badge" style="background: rgba(16,185,129,0.16); color: #10b981;">Op</span>
+              <span class="state-badge" style="background: rgba(244,114,182,0.16); color: #f472b6;">Tensor</span>
+              <span class="state-badge" style="background: rgba(96,165,250,0.16); color: #60a5fa;">Pass</span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">role: chart semantics</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Colormap Modules</div>
+            <div class="preview-card-class">heatmap / latency / density / scalar ramp</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <span class="preview-swatch" style="background: linear-gradient(90deg, #1d4ed8, #06b6d4, #22c55e, #facc15, #f97316, #ef4444); width: 180px;"></span>
+              <span class="preview-swatch" style="background: linear-gradient(90deg, #111827, #374151, #9ca3af, #f3f4f6); width: 140px;"></span>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">role: scalar mapping / colormap</span>
+            <span class="token-badge">examples: heat, latency, density</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Module Surface</div>
+            <div class="preview-card-class">graph / swimlane / canvas surface</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-panel" style="background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.08);">
+              <div class="preview-panel-title">Canvas Surface</div>
+              <div class="preview-panel-sub">图面板、泳道布景、overlay surface 允许保留模块特定处理，不并入 Card。</div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">surface gradient</span>
+            <span class="token-badge">border: module-specific</span>
+            <span class="state-badge">Exempt</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Swimlane Event Pattern</div>
+            <div class="preview-card-class">swimlane module: three-segment event bar</div>
+          </div>
+          <div class="preview-stage">
+            <div class="pattern-event">
+              <div class="pattern-event-segments">
+                <div class="pattern-event-segment pattern-event-segment-in">in</div>
+                <div class="pattern-event-segment pattern-event-segment-compute">compute</div>
+                <div class="pattern-event-segment pattern-event-segment-out">out</div>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">pattern: ingress / compute / egress</span>
+            <span class="token-badge">source: swimlane /.sw-bar-segment-*</span>
+            <span class="state-badge">Pattern</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Graph Node Pattern</div>
+            <div class="preview-card-class">pass-ir module: normal + compact node</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-inline">
+              <div class="pattern-node">
+                <div class="pattern-node-top">Tensor (1215)</div>
+                <div class="pattern-node-body">
+                  <div><strong>shape:</strong> [32, 64]</div>
+                  <div><strong>dtype:</strong> fp32</div>
+                  <div><strong>offset:</strong> [0, 0]</div>
+                </div>
+              </div>
+              <div class="pattern-node pattern-node-compact">
+                <div class="pattern-node-top">MatMul</div>
+                <div class="pattern-node-body">
+                  <div><strong>core:</strong> 3</div>
+                  <div><strong>dur:</strong> 5.7ms</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">pattern: title band + metadata body</span>
+            <span class="token-badge">source: pass-ir graph node</span>
+            <span class="token-badge">variants: normal / compact</span>
+            <span class="state-badge">Pattern</span>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ③ Module Mapping -->
+    <section class="preview-section" id="module-matrix">
+      <div class="preview-section-title">Module Mapping Matrix</div>
+      <div class="preview-caption">这块是 migrate 阶段的输入索引。它不再只列按钮，而是按五大组件域说明每个模块最终应该收敛到哪里，哪些继续保留模块专属。</div>
+      <div class="preview-grid">
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Pass-IR 入口</div>
+            <div class="preview-card-class">原 .btn-md-primary / .btn-md-text</div>
+          </div>
+          <div class="preview-stage preview-stack">
+            <div class="preview-inline">
+              <button class="btn" type="button">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M1.5 4h4.5l1 1.5H14a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H2a.5.5 0 01-.5-.5V4z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Open Pass Folder
+              </button>
+              <button class="btn" type="button">Open single JSON</button>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">Open Pass Folder → .btn</span>
+            <span class="token-badge">Open single JSON → .btn</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Swimlane 工具栏</div>
+            <div class="preview-card-class">resource entry / search utility</div>
+          </div>
+          <div class="preview-stage">
+            <button class="btn" type="button">加载本地资源</button>
+            <button class="sw-search-icon-btn" type="button">
+              <span class="preview-icon-box">⌕</span>
+            </button>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">加载本地资源 → .btn</span>
+            <span class="token-badge">search-icon → ghost pattern</span>
+          </div>
+        </article>
+
+        <article class="preview-card">
+          <div class="preview-card-head">
+            <div class="preview-card-title">Action List In Card</div>
+            <div class="preview-card-class">Card content pattern: .cp-btn / .mm-btn / .panel-toggle-btn</div>
+          </div>
+          <div class="preview-stage">
+            <div class="preview-stack" style="max-width: 320px;">
+              <button class="cp-btn" type="button">
+                <span class="cp-btn-icon">A</span>
+                <span class="cp-btn-text">
+                  <span class="cp-btn-label">Semantic</span>
+                  <span class="cp-btn-sub">inspector mode</span>
+                </span>
+              </button>
+              <button class="cp-btn action-row-selected" type="button">
+                <span class="cp-btn-icon">L</span>
+                <span class="cp-btn-text">
+                  <span class="cp-btn-label">Latency</span>
+                  <span class="cp-btn-sub">current mode</span>
+                </span>
+              </button>
+              <button class="cp-btn" type="button">
+                <span class="cp-btn-icon">C</span>
+                <span class="cp-btn-text">
+                  <span class="cp-btn-label">Compact</span>
+                  <span class="cp-btn-sub">dense layout</span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="preview-meta">
+            <span class="token-badge">outer container: card</span>
+            <span class="token-badge">inner pattern: action list rows</span>
+            <span class="token-badge">one row can be selected</span>
+          </div>
+          <div class="preview-note">这类内容本质上不是独立组件大类，而是 `Card Content` 里的 action list pattern。外层是 card，内层是一组操作行，其中一项通常表示当前选中模式。</div>
+        </article>
+
+      </div>
+    </section>
+
+    </div>
+  </main>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const themeButtons = Array.from(document.querySelectorAll('[data-theme-mode]'));
+      const scopeButtons = Array.from(document.querySelectorAll('[data-accent-scope]'));
+      const accentInput = document.getElementById('accentInput');
+      const accentPicker = document.getElementById('accentPicker');
+      const layoutPage = document.querySelector('.layout-page');
+      const layoutPageFrame = document.querySelector('.layout-page-frame');
+      let accentScope = 'default';
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const hexToRgb = (hex) => {
+        const normalized = hex.replace('#', '').trim();
+        if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
+        return {
+          r: parseInt(normalized.slice(0, 2), 16),
+          g: parseInt(normalized.slice(2, 4), 16),
+          b: parseInt(normalized.slice(4, 6), 16),
+        };
+      };
+
+      const rgbToHex = ({ r, g, b }) =>
+        `#${[r, g, b].map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+
+      const mixRgb = (rgb, target, ratio) => ({
+        r: rgb.r * (1 - ratio) + target.r * ratio,
+        g: rgb.g * (1 - ratio) + target.g * ratio,
+        b: rgb.b * (1 - ratio) + target.b * ratio,
+      });
+
+      const toRgba = (rgb, alpha) => `rgba(${Math.round(rgb.r)}, ${Math.round(rgb.g)}, ${Math.round(rgb.b)}, ${alpha})`;
+
+      const relativeLuminance = ({ r, g, b }) => {
+        const convert = (value) => {
+          const channel = value / 255;
+          return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * convert(r) + 0.7152 * convert(g) + 0.0722 * convert(b);
+      };
+
+      const applyTheme = (mode) => {
+        root.dataset.previewMode = mode;
+        themeButtons.forEach((button) => {
+          button.classList.toggle('is-active', button.dataset.themeMode === mode);
+        });
+      };
+
+      const fitLayoutPage = () => {
+        if (!layoutPage || !layoutPageFrame) return;
+        const availableWidth = layoutPageFrame.clientWidth;
+        const scale = Math.min(1, availableWidth / 1440);
+        layoutPage.style.transform = `scale(${scale})`;
+        layoutPageFrame.style.height = `${1080 * scale}px`;
+      };
+
+      const clearAccentOverrides = () => {
+        [
+          '--primary',
+          '--primary-hover',
+          '--primary-foreground',
+          '--accent',
+          '--focus-ring',
+          '--state-selected',
+          '--state-focus',
+          '--button-primary-bg',
+          '--button-primary-bg-hover',
+          '--button-primary-bg-press',
+          '--button-primary-fg',
+        ].forEach((token) => root.style.removeProperty(token));
+      };
+
+      const applyAccent = (hex) => {
+        const rgb = hexToRgb(hex);
+        if (!rgb) return false;
+
+        const hover = mixRgb(rgb, { r: 255, g: 255, b: 255 }, 0.12);
+        const press = mixRgb(rgb, { r: 0, g: 0, b: 0 }, 0.12);
+        const primaryForeground = relativeLuminance(rgb) > 0.42 ? '#101418' : '#F8FBFF';
+
+        clearAccentOverrides();
+
+        if (accentScope === 'accent') {
+          root.style.setProperty('--button-primary-bg', rgbToHex(rgb));
+          root.style.setProperty('--button-primary-bg-hover', rgbToHex(hover));
+          root.style.setProperty('--button-primary-bg-press', rgbToHex(press));
+          root.style.setProperty('--button-primary-fg', primaryForeground);
+          return true;
+        }
+
+        root.style.setProperty('--button-primary-bg', 'var(--foreground)');
+        root.style.setProperty('--button-primary-bg-hover', 'color-mix(in srgb, var(--foreground) 95%, black)');
+        root.style.setProperty('--button-primary-bg-press', 'color-mix(in srgb, var(--foreground) 90%, black)');
+        root.style.setProperty('--button-primary-fg', 'var(--background)');
+        return true;
+      };
+
+      themeButtons.forEach((button) => {
+        button.addEventListener('click', () => applyTheme(button.dataset.themeMode));
+      });
+
+      scopeButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          accentScope = button.dataset.accentScope;
+          scopeButtons.forEach((item) => {
+            item.classList.toggle('is-active', item === button);
+          });
+          applyAccent(accentPicker.value);
+        });
+      });
+
+      accentPicker.addEventListener('input', () => {
+        accentInput.value = accentPicker.value.toUpperCase();
+        applyAccent(accentPicker.value);
+      });
+
+      accentInput.addEventListener('change', () => {
+        const value = accentInput.value.trim().startsWith('#') ? accentInput.value.trim() : `#${accentInput.value.trim()}`;
+        if (applyAccent(value)) {
+          const normalized = value.toUpperCase();
+          accentInput.value = normalized;
+          accentPicker.value = normalized;
+        }
+      });
+
+      applyTheme('dark');
+      scopeButtons.forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.accentScope === accentScope);
+      });
+      applyAccent(accentPicker.value);
+      fitLayoutPage();
+      window.addEventListener('resize', fitLayoutPage);
+    })();
+  </script>
+</body>
+</html>
