@@ -6,135 +6,250 @@
 <title>Compute Graph Viewer</title>
 <link rel="stylesheet" href="../css/style.css">
 <style>
-/* ── pass-ir 控制面板独立样式（不依赖 style.css 中的 .cp-* 规则）── */
-#colorPanel {
-  position: absolute;
-  top: 60px; right: 12px;
-  width: 160px;
-  background: rgba(18, 19, 24, 0.90);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 12px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+body.layout-page {
+  position: relative;
 }
-#colorPanel .cp-header {
+
+body.layout-page .toolbar.layout-header {
+  backdrop-filter: blur(12px);
+}
+
+body.layout-page #viewport.layout-page-canvas {
+  top: auto;
+  left: auto;
+}
+
+body.layout-page #colorPanel {
+  width: 220px;
+}
+
+body.layout-page #colorPanel.visible {
+  display: block;
+}
+
+body.layout-page #colorPanel.card-demo {
+  box-shadow: var(--panel-shell-shadow);
+  position: absolute;
+}
+
+body.layout-page #colorPanel .card-demo-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 11px 7px;
+  gap: 8px;
+  padding: 10px 10px 8px;
 }
-#colorPanel .cp-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+
+body.layout-page #colorPanelToggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+
+body.layout-page #colorPanel .card-demo-title {
+  font-size: 13px;
+  padding-right: 28px;
+}
+
+body.layout-page #colorPanel > .card-demo-content {
+  gap: 10px;
+  padding: 10px;
+}
+
+.color-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.color-panel-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.color-panel-group-label {
+  font: var(--text-label);
+  color: var(--foreground-muted);
   text-transform: uppercase;
-  color: rgba(245,246,248,0.38);
-}
-#colorPanel .cp-section {
-  padding: 0 10px 10px;
-}
-#colorPanel .cp-section-label {
-  font-size: 10px;
-  font-weight: 600;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(245,246,248,0.25);
-  margin-bottom: 5px;
 }
-#colorPanel .cp-buttons {
+
+.color-panel-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-direction: column;
+  gap: 8px;
 }
+
 #colorPanel .cp-btn {
-  all: unset;
-  box-sizing: border-box;
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 8px;
+  width: 100%;
+  min-height: 38px;
+  gap: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#colorPanel .cp-btn-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+  border: 1px solid var(--border-default);
+  color: var(--foreground-secondary);
+}
+
+#colorPanel .cp-btn-label {
   font-size: 13px;
-  font-weight: 500;
-  color: rgba(245,246,248,0.50);
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.07);
-  cursor: pointer;
-  transition: background 120ms, color 120ms, border-color 120ms;
-  white-space: nowrap;
+  line-height: 1.1;
 }
-#colorPanel .cp-btn:hover {
-  background: rgba(255,255,255,0.09);
-  color: rgba(245,246,248,0.85);
+
+#colorPanel .cp-btn-sub {
+  font-size: 11px;
+  line-height: 1.05;
+  color: rgba(255, 255, 255, 0.75);
 }
-#colorPanel .cp-btn.active {
-  background: rgba(127,85,212,0.22);
-  border-color: rgba(127,85,212,0.45);
-  color: #c4aef8;
+
+#colorPanel .action-row-selected .cp-btn-icon {
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent) !important;
+  border-color: var(--border-default) !important;
+  color: var(--foreground) !important;
 }
-#colorPanel .cp-divider {
-  height: 1px;
-  margin: 0 10px 8px;
-  background: rgba(255,255,255,0.07);
-  flex-shrink: 0;
+
+body.layout-page #colorPanel .cp-btn.is-selected .cp-btn-sub,
+body.layout-page #colorPanel .cp-btn.active .cp-btn-sub,
+body.layout-page #colorPanel .cp-btn.action-row-selected .cp-btn-sub {
+  color: rgba(255, 255, 255, 0.75);
 }
-#colorPanel .legend {
-  padding: 0 10px 10px;
+
+.color-panel-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px 10px;
+  gap: 8px;
+  padding-top: 2px;
 }
-#colorPanel .legend-item {
-  display: flex;
+
+.color-panel-legend .legend-item {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  color: rgba(245,246,248,0.38);
+  gap: 6px;
+  padding: 0 8px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+  color: var(--foreground-secondary);
+  font: var(--text-label);
 }
-#colorPanel .legend-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+
+.color-panel-legend .legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
   flex-shrink: 0;
 }
-#colorPanel .panel-toggle-btn {
-  all: unset;
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
+
+body.layout-page #colorPanel.is-collapsed {
+  width: 44px;
+  min-width: 44px;
+  padding: 6px;
+}
+
+body.layout-page #colorPanel.is-collapsed .card-demo-header {
+  justify-content: flex-start;
+  padding: 0;
+  min-height: 32px;
+}
+
+body.layout-page #colorPanel.is-collapsed .card-demo-title,
+body.layout-page #colorPanel.is-collapsed > .card-demo-content {
+  display: none;
+}
+
+body.layout-page #colorPanel.is-collapsed .panel-toggle-collapse {
+  display: none;
+}
+
+body.layout-page #colorPanel.is-collapsed .panel-toggle-expand {
+  display: inline;
+}
+
+body.layout-page #minimap.layout-minimap {
+  right: 16px;
+  bottom: 16px;
+}
+
+body.layout-page #minimap.visible {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: rgba(245,246,248,0.35);
-  font-size: 13px;
-  line-height: 1;
-  transition: background 120ms, color 120ms;
 }
-#colorPanel .panel-toggle-btn:hover {
-  background: rgba(255,255,255,0.08);
-  color: rgba(245,246,248,0.8);
+
+body.layout-page .layout-minimap-view {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: rgba(62, 62, 62, 0.96);
 }
-#colorPanel .panel-toggle-expand { display: none; }
-#colorPanel.is-collapsed .panel-toggle-collapse { display: none; }
-#colorPanel.is-collapsed .panel-toggle-expand { display: block; }
-#colorPanel.is-collapsed {
-  width: 30px;
-  height: 30px;
-  top: 64px;
-  border-radius: 8px;
+
+body.layout-page .layout-minimap-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.45;
 }
-#colorPanel.is-collapsed .cp-title { display: none; }
-#colorPanel.is-collapsed .cp-section,
-#colorPanel.is-collapsed .cp-divider,
-#colorPanel.is-collapsed .legend { display: none; }
-#colorPanel.is-collapsed .cp-header {
-  padding: 7px;
-  justify-content: center;
+
+body.layout-page #minimapCanvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
+
+body.layout-page #detailPanel.detail-panel.layout-sidepanel {
+  width: min(320px, calc(100vw - 48px));
+  min-height: 0;
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  right: auto;
+  bottom: auto;
+  border-left: none;
+  transform: translate3d(0, 8px, 0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 18;
+  padding: 0;
+}
+
+body.layout-page #detailPanel.detail-panel.layout-sidepanel.open {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.layout-page #detailPanel.card-demo {
+  box-shadow: var(--panel-shell-shadow);
+}
+
+body.layout-page #detailPanel .card-demo-header {
+  padding: 14px 16px 12px;
+}
+
+body.layout-page #detailPanel .card-demo-content {
+  gap: 14px;
+  max-height: min(52vh, 440px);
+  overflow-y: auto;
+}
+
 /* ── Preview 模式（iframe 嵌入，隐藏所有 UI chrome）── */
 body.preview header.toolbar,
 body.preview #navBar,
@@ -167,20 +282,34 @@ body.preview #viewport * {
 }
 </style>
 </head>
-<body class="pass-ir-page">
+<body class="pass-ir-page layout-page">
 
-<header class="toolbar">
-  <div class="toolbar-l">
-    <a class="home-link" href="../launch.html" title="Back To Home" aria-label="Back To Home">
+<header class="toolbar layout-header layout-page-topbar">
+  <div class="toolbar-l layout-header-left">
+    <a class="home-link btn btn-ghost btn-icon" href="../launch.html" title="Back To Home" aria-label="Back To Home">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
       </svg>
     </a>
+    <div class="layout-header-brand">
+      <span class="layout-header-dot"></span>
+      Pass-IR
+    </div>
     <button class="cf-reopen-btn" id="cfReopenBtn" title="Show Control Flow" style="display:none;">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <rect x="1" y="2" width="4" height="10" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/>
         <path d="M7 5l3 2-3 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
+    </button>
+    <input type="file" id="fileInput" accept=".json">
+    <input type="file" id="dirInput" webkitdirectory directory multiple accept=".json">
+    <div class="toolbar-sep"></div>
+    <span class="graph-title" id="graphTitle"></span>
+    <div class="graph-stats" id="graphStats"></div>
+  </div>
+  <div class="toolbar-r layout-header-right">
+    <button class="btn lock-exit" id="graphLockExit" type="button" hidden aria-label="退出链路锁定" title="退出链路锁定">
+      <span class="lock-exit-label" id="graphLockLabel">退出链路锁定</span>
     </button>
     <div class="graph-picker" id="graphPicker">
       <button class="btn" id="loadBtn">
@@ -196,17 +325,9 @@ body.preview #viewport * {
         </svg>
       </button>
       <div class="graph-menu" id="graphMenu">
-        <button class="graph-menu-item" data-sample="../deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json" data-label="LOOP_RESHAPE · PATH0">
+        <button class="graph-menu-item" data-sample="samples/mini-attn.json" data-label="Mini Self-Attention">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/></svg>
-          LOOP_RESHAPE · PATH0
-        </button>
-        <button class="graph-menu-item" data-sample="../deepseek_out_pass/After_000_RemoveRedundantReshape_TENSOR_IndexerPrologQuantQuantLoop_Unroll1_PATH0_6.json" data-label="QuantLoop · PATH0">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/></svg>
-          QuantLoop · PATH0
-        </button>
-        <button class="graph-menu-item" data-sample="../deepseek_out_pass/sample_computation_graph.json" data-label="MLA Prolog Quant · Sample">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/><rect x="7" y="7" width="4" height="4" rx="1" fill="currentColor" fill-opacity="0.6"/></svg>
-          MLA Prolog Quant · Sample
+          Mini Self-Attention
         </button>
         <div class="graph-menu-sep"></div>
         <button class="graph-menu-item" id="graphMenuLocal">
@@ -225,14 +346,6 @@ body.preview #viewport * {
         </button>
       </div>
     </div>
-    <button class="btn lock-exit" id="graphLockExit" type="button" hidden aria-label="退出链路锁定" title="退出链路锁定">
-      <span class="lock-exit-label" id="graphLockLabel">退出链路锁定</span>
-    </button>
-    <input type="file" id="fileInput" accept=".json">
-    <input type="file" id="dirInput" webkitdirectory directory multiple accept=".json">
-    <div class="toolbar-sep"></div>
-    <span class="graph-title" id="graphTitle"></span>
-    <div class="graph-stats" id="graphStats"></div>
   </div>
 </header>
 
@@ -303,7 +416,7 @@ body.preview #viewport * {
   </div>
 </div>
 
-<div class="viewport" id="viewport">
+<div class="viewport layout-page-canvas" id="viewport">
   <div class="graph-root" id="graphRoot">
     <svg class="edges-svg" id="edgesSvg" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -339,13 +452,13 @@ body.preview #viewport * {
       <h2 class="empty-title">Compute Graph Viewer</h2>
       <p class="empty-sub">Visualize Ascend NPU computation graphs</p>
       <div class="empty-actions">
-        <button class="btn-md-primary" id="emptyLoadBtn">
+        <button class="btn btn-solid" id="emptyLoadBtn">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M1.5 4h4.5l1 1.5H14a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H2a.5.5 0 01-.5-.5V4z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           Open Pass Folder
         </button>
-        <button class="btn-md-text" id="emptyLoadFileBtn">Open single JSON file</button>
+        <button class="btn btn-ghost" id="emptyLoadFileBtn">Open single JSON file</button>
         <div class="recent-row" id="recentRow">
           <span class="recent-label">Recent</span>
           <button class="recent-chip" id="recentChip">
@@ -369,81 +482,126 @@ body.preview #viewport * {
   </div>
 
   <!-- Color panel (top-right of canvas) -->
-  <div class="color-panel" id="colorPanel">
-    <div class="cp-header cp-header-main">
-      <span class="cp-title">图形设置</span>
+  <div class="color-panel card-demo layout-page-inline-card" id="colorPanel">
+    <div class="card-demo-header">
+      <div class="card-demo-title">View Mode</div>
       <button class="panel-toggle-btn" id="colorPanelToggle" type="button" aria-label="Collapse color panel" title="Collapse">
         <span class="panel-toggle-icon panel-toggle-collapse">−</span>
         <span class="panel-toggle-icon panel-toggle-expand">+</span>
       </button>
     </div>
-    <div class="cp-section">
-      <div class="cp-section-label">视图</div>
-      <div class="cp-buttons">
-        <button class="cp-btn active" data-view-mode="original">原始</button>
-        <button class="cp-btn" data-view-mode="grouped">聚合</button>
-      </div>
-    </div>
-    <div class="cp-divider"></div>
-    <div class="cp-section">
-      <div class="cp-section-label">染色</div>
-      <div class="cp-buttons">
-        <button class="cp-btn active" data-mode="semantic">语义</button>
-        <button class="cp-btn" data-mode="engineMemory">执行单元</button>
-        <button class="cp-btn" data-mode="subgraph">子图</button>
-        <button class="cp-btn" data-mode="latency">时延</button>
-      </div>
-    </div>
-    <div class="cp-divider"></div>
-    <div class="legend" id="legend">
-      <span class="legend-item"><span class="legend-dot" style="background:var(--incast-accent)"></span>Incast</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--op-accent)"></span>Op</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--tensor-accent)"></span>Tensor</span>
-      <span class="legend-item"><span class="legend-dot" style="background:var(--outcast-accent)"></span>Outcast</span>
+    <div class="card-demo-content">
+      <section class="color-panel-group">
+        <div class="color-panel-group-head">
+          <div class="color-panel-group-label">View</div>
+        </div>
+        <div class="card-demo-content" style="padding:0; gap:8px; border-top:none;">
+          <button class="cp-btn" data-view-mode="original" type="button" style="width:100%;">
+            <span class="cp-btn-icon icon-purple">O</span>
+            <span class="cp-btn-text">
+              <span class="cp-btn-label">原始</span>
+              <span class="cp-btn-sub">完整 node graph</span>
+            </span>
+          </button>
+          <button class="cp-btn action-row-selected" data-view-mode="grouped" type="button" style="width:100%;">
+            <span class="cp-btn-icon icon-blue">G</span>
+            <span class="cp-btn-text">
+              <span class="cp-btn-label">聚合</span>
+              <span class="cp-btn-sub">grouped structure</span>
+            </span>
+          </button>
+        </div>
+      </section>
+      <section class="color-panel-group">
+        <div class="color-panel-group-head">
+          <div class="color-panel-group-label">Color Mode</div>
+        </div>
+        <div class="card-demo-content" style="padding:0; gap:8px; border-top:none;">
+          <button class="cp-btn" data-mode="semantic" type="button" style="width:100%;">
+            <span class="cp-btn-icon icon-purple">S</span>
+            <span class="cp-btn-text">
+              <span class="cp-btn-label">Semantic</span>
+              <span class="cp-btn-sub">Highlight operator and tensor semantics.</span>
+            </span>
+          </button>
+          <button class="cp-btn action-row-selected" data-mode="latency" type="button" style="width:100%;">
+            <span class="cp-btn-icon icon-blue">L</span>
+            <span class="cp-btn-text">
+              <span class="cp-btn-label">Latency</span>
+              <span class="cp-btn-sub">Reveal hotspots by execution latency.</span>
+            </span>
+          </button>
+          <button class="cp-btn" data-mode="subgraph" type="button" style="width:100%;">
+            <span class="cp-btn-icon icon-green">C</span>
+            <span class="cp-btn-text">
+              <span class="cp-btn-label">Compact</span>
+              <span class="cp-btn-sub">Show subgraph ownership in a denser view.</span>
+            </span>
+          </button>
+        </div>
+      </section>
+      <section class="color-panel-group">
+        <div class="color-panel-group-head">
+          <div class="color-panel-group-label">Legend</div>
+        </div>
+        <div class="color-panel-legend" id="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--incast-accent)"></span>Incast</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--op-accent)"></span>Op</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--tensor-accent)"></span>Tensor</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--outcast-accent)"></span>Outcast</span>
+        </div>
+      </section>
     </div>
   </div>
 
   <!-- Minimap with zoom controls -->
-  <div class="minimap" id="minimap">
+  <div class="minimap layout-minimap" id="minimap">
     <button class="panel-toggle-btn mm-toggle-btn" id="minimapToggle" type="button" aria-label="Collapse minimap" title="Collapse">
       <span class="panel-toggle-icon panel-toggle-collapse">−</span>
       <span class="panel-toggle-icon panel-toggle-expand">+</span>
     </button>
-    <canvas id="minimapCanvas" width="360" height="210"></canvas>
-    <div class="minimap-viewport" id="minimapViewport"></div>
-    <div class="minimap-controls">
-      <button class="mm-btn" id="zoomOutBtn" title="Zoom Out">
+    <div class="layout-minimap-view">
+      <div class="layout-minimap-grid"></div>
+      <canvas id="minimapCanvas" width="216" height="122"></canvas>
+      <div class="minimap-viewport" id="minimapViewport"></div>
+    </div>
+    <div class="minimap-controls zoom-control-group">
+      <button class="mm-btn layout-minimap-btn" id="zoomOutBtn" title="Zoom Out">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
-      <span class="zoom-label" id="zoomLabel">100%</span>
-      <button class="mm-btn" id="zoomInBtn" title="Zoom In">
+      <button class="mm-btn layout-minimap-btn" id="zoomInBtn" title="Zoom In">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3v8M3 7h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
-      <div class="mm-sep"></div>
-      <button class="mm-btn mm-fit" id="fitBtn" title="Fit View">
+      <button class="mm-btn layout-minimap-btn mm-fit" id="fitBtn" title="Fit View">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 5V2h3M10 2h3v3M13 9v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
   </div>
 </div>
 
-<aside class="detail-panel" id="detailPanel">
-  <div class="detail-header">
-    <div class="detail-type-badge" id="detailBadge"></div>
-    <span class="detail-name" id="detailName"></span>
-    <button class="btn btn-icon detail-lock" id="detailLock" title="Lock compute flow">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.3"/>
-        <path d="M6 1v2M6 9v2M1 6h2M9 6h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-      </svg>
-    </button>
-    <button class="btn btn-icon detail-close" id="detailClose">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-    </button>
+<aside class="detail-panel layout-sidepanel card-demo" id="detailPanel">
+  <div class="card-demo-header detail-header">
+    <div class="card-demo-header-row">
+      <div>
+        <div class="detail-type-badge" id="detailBadge"></div>
+        <div class="card-demo-title detail-name" id="detailName"></div>
+      </div>
+      <div class="panel-shell-meta">
+        <button class="btn btn-icon detail-lock" id="detailLock" title="Lock compute flow">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M6 1v2M6 9v2M1 6h2M9 6h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn btn-icon detail-close" id="detailClose">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
   </div>
-  <div class="detail-body" id="detailBody"></div>
+  <div class="detail-body card-demo-content" id="detailBody"></div>
 </aside>
 
 <!-- ── Locked Flow Panel ──────────────────────────────────────── -->

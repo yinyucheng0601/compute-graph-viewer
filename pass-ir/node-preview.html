@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Node Style Preview</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #111;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  padding: 40px;
+  color: #fff;
+}
+
+h2 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 20px;
+}
+
+.row {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* ─── 通用卡片结构 ─── */
+.node-card {
+  width: 240px;
+  border-radius: 18px;
+  padding: 10px 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.node-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  margin-bottom: 8px;
+}
+
+.node-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.tag-id { background: #1a1a1a; color: #fff; }
+.tag-sub { background: transparent; border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.7); }
+
+.node-rows { padding: 8px 12px 0; }
+.node-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 0;
+}
+.row-key {
+  font-size: 12px;
+  color: rgba(255,255,255,0.38);
+  font-family: 'JetBrains Mono', monospace;
+  min-width: 52px;
+  flex-shrink: 0;
+}
+.row-val {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── icon circle ─── */
+.pill-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+}
+
+.pill-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tensor-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2px;
+}
+.tensor-shape {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+}
+
+
+/* ═══════════════════════════════════════════
+   A: 当前状态（基线）
+═══════════════════════════════════════════ */
+.a .node-card {
+  background: #3B3B3B;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+  border: 1px solid rgba(148,163,184,0.20);
+}
+
+.a .op-pill, .a .tensor-pill {
+  margin: 0 8px;
+  padding: 7px 12px;
+  border-radius: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 3px 8px rgba(0,0,0,0.35);
+}
+.a .op-pill {
+  background: linear-gradient(180deg, rgba(53,119,246,0.85) 0%, rgba(30,79,212,0.70) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    0 2px 5px rgba(0,0,0,0.20);
+}
+.a .tensor-pill {
+  background: linear-gradient(180deg, rgba(249,115,22,0.85) 0%, rgba(196,90,10,0.70) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.10),
+    0 2px 5px rgba(0,0,0,0.20);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 9px 16px;
+  border-radius: 16px;
+}
+
+
+/* ═══════════════════════════════════════════
+   A2: A 调整版 + D 的彩色发光阴影
+═══════════════════════════════════════════ */
+.a2 .node-card {
+  background: #3B3B3B;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.32);
+  border: 1px solid rgba(148,163,184,0.20);
+}
+
+.a2 .op-pill, .a2 .tensor-pill {
+  margin: 0 8px;
+  padding: 10px 12px;
+  border-radius: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.a2 .op-pill {
+  background: linear-gradient(175deg, #5192ff 0%, #1e55e8 100%);
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.40),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 20px rgba(30,85,232,0.50),
+    0 2px 8px rgba(0,0,0,0.45);
+}
+.a2 .tensor-pill {
+  background: linear-gradient(175deg, #fa8c42 0%, #d45a08 100%);
+  box-shadow:
+    inset 0 0 8px rgba(255,255,255,0.40),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 6px 20px rgba(212,90,8,0.50),
+    0 2px 8px rgba(0,0,0,0.45);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 13px 16px;
+  border-radius: 16px;
+  gap: 3px;
+}
+
+
+/* ═══════════════════════════════════════════
+   B: 全圆胶囊 + 更强 inner white shadow
+═══════════════════════════════════════════ */
+.b .node-card {
+  background: #2e2e2e;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.b .op-pill, .b .tensor-pill {
+  margin: 0 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.28),
+    inset 0 -1px 0 rgba(0,0,0,0.25),
+    0 4px 14px rgba(0,0,0,0.45);
+}
+.b .op-pill { background: linear-gradient(175deg, #4a8fff 0%, #1e55e8 100%); }
+.b .tensor-pill {
+  background: linear-gradient(175deg, #f9823a 0%, #d45a08 100%);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 18px;
+  gap: 3px;
+}
+
+
+/* ═══════════════════════════════════════════
+   C: 全圆 + 白色渐变描边（border-image 技巧）
+═══════════════════════════════════════════ */
+.c .node-card {
+  background: #282828;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.c .op-pill, .c .tensor-pill {
+  margin: 0 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  /* 渐变描边：用 outline + outline-offset 模拟不行，用 ::before */
+}
+
+.c .op-pill::before, .c .tensor-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid transparent;
+  background: linear-gradient(180deg, rgba(255,255,255,0.40) 0%, rgba(255,255,255,0.04) 50%, rgba(0,0,0,0.10) 100%) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.c .op-pill {
+  background: linear-gradient(175deg, #4a8fff 0%, #1e55e8 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(255,255,255,0.22),
+    inset 0 -2px 3px rgba(0,0,0,0.30),
+    0 6px 20px rgba(30,85,232,0.45),
+    0 2px 6px rgba(0,0,0,0.40);
+}
+
+.c .tensor-pill {
+  background: linear-gradient(175deg, #f9823a 0%, #d45a08 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(255,255,255,0.22),
+    inset 0 -2px 3px rgba(0,0,0,0.30),
+    0 6px 20px rgba(212,90,8,0.45),
+    0 2px 6px rgba(0,0,0,0.40);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 18px;
+  gap: 3px;
+}
+
+
+/* ═══════════════════════════════════════════
+   D: C 的基础上 + 卡片更深 + 胶囊彩色光晕
+═══════════════════════════════════════════ */
+.d .node-card {
+  background: #242424;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 14px 32px rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.d .op-pill, .d .tensor-pill {
+  margin: 0 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+.d .op-pill::before, .d .tensor-pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid transparent;
+  background: linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 45%, rgba(0,0,0,0.05) 100%) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.d .op-pill {
+  background: linear-gradient(175deg, #5192ff 0%, #1e55e8 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.35),
+    inset 0 -1.5px 0 rgba(0,0,0,0.35),
+    inset 0 0 12px rgba(255,255,255,0.06),
+    0 8px 24px rgba(30,85,232,0.50),
+    0 2px 8px rgba(0,0,0,0.45);
+}
+
+.d .tensor-pill {
+  background: linear-gradient(175deg, #fa8c42 0%, #d45a08 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.35),
+    inset 0 -1.5px 0 rgba(0,0,0,0.35),
+    inset 0 0 12px rgba(255,255,255,0.06),
+    0 8px 24px rgba(212,90,8,0.50),
+    0 2px 8px rgba(0,0,0,0.45);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 18px;
+  gap: 3px;
+}
+
+</style>
+</head>
+<body>
+
+<h2>A — 当前状态（基线）</h2>
+<div class="row a">
+  <!-- Tensor Node -->
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">2155</span>
+      <span class="node-tag tag-sub">Subgraph-0</span>
+    </div>
+    <div class="tensor-pill">
+      <div class="tensor-name">Tensor_Name</div>
+      <div class="tensor-shape">shape&nbsp;&nbsp;&nbsp;[1,2,128,512]</div>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">offset</span><span class="row-val">[1,2,128,512]</span></div>
+      <div class="node-row"><span class="row-key">asis</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">tobe</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">dtype</span><span class="row-val">fp32</span></div>
+    </div>
+  </div>
+  <!-- Op Node -->
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">10000</span>
+      <span class="node-tag tag-sub">Subgraph-2</span>
+    </div>
+    <div class="op-pill">
+      <div class="pill-icon">fx</div>
+      <span class="pill-text">CALL:Leaf func 054</span>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">InCast</span><span class="row-val">{2154,2155,2156.}</span></div>
+      <div class="node-row"><span class="row-key">OutCast</span><span class="row-val">{2126,2146,2166.}</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>A2 — A 调整版 + D 彩色发光阴影</h2>
+<div class="row a2">
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">2155</span>
+      <span class="node-tag tag-sub">Subgraph-0</span>
+    </div>
+    <div class="tensor-pill">
+      <div class="tensor-name">Tensor_Name</div>
+      <div class="tensor-shape">shape&nbsp;&nbsp;&nbsp;[1,2,128,512]</div>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">offset</span><span class="row-val">[1,2,128,512]</span></div>
+      <div class="node-row"><span class="row-key">asis</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">tobe</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">dtype</span><span class="row-val">fp32</span></div>
+    </div>
+  </div>
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">10000</span>
+      <span class="node-tag tag-sub">Subgraph-2</span>
+    </div>
+    <div class="op-pill">
+      <div class="pill-icon">fx</div>
+      <span class="pill-text">CALL:Leaf func 054</span>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">InCast</span><span class="row-val">{2154,2155,2156.}</span></div>
+      <div class="node-row"><span class="row-key">OutCast</span><span class="row-val">{2126,2146,2166.}</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>B — 全圆胶囊 + 更强 inner white shadow</h2>
+<div class="row b">
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">2155</span>
+      <span class="node-tag tag-sub">Subgraph-0</span>
+    </div>
+    <div class="tensor-pill">
+      <div class="tensor-name">Tensor_Name</div>
+      <div class="tensor-shape">shape&nbsp;&nbsp;&nbsp;[1,2,128,512]</div>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">offset</span><span class="row-val">[1,2,128,512]</span></div>
+      <div class="node-row"><span class="row-key">asis</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">tobe</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">dtype</span><span class="row-val">fp32</span></div>
+    </div>
+  </div>
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">10000</span>
+      <span class="node-tag tag-sub">Subgraph-2</span>
+    </div>
+    <div class="op-pill">
+      <div class="pill-icon">fx</div>
+      <span class="pill-text">CALL:Leaf func 054</span>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">InCast</span><span class="row-val">{2154,2155,2156.}</span></div>
+      <div class="node-row"><span class="row-key">OutCast</span><span class="row-val">{2126,2146,2166.}</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>C — 全圆 + 白色渐变描边（顶亮底暗）</h2>
+<div class="row c">
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">2155</span>
+      <span class="node-tag tag-sub">Subgraph-0</span>
+    </div>
+    <div class="tensor-pill">
+      <div class="tensor-name">Tensor_Name</div>
+      <div class="tensor-shape">shape&nbsp;&nbsp;&nbsp;[1,2,128,512]</div>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">offset</span><span class="row-val">[1,2,128,512]</span></div>
+      <div class="node-row"><span class="row-key">asis</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">tobe</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">dtype</span><span class="row-val">fp32</span></div>
+    </div>
+  </div>
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">10000</span>
+      <span class="node-tag tag-sub">Subgraph-2</span>
+    </div>
+    <div class="op-pill">
+      <div class="pill-icon">fx</div>
+      <span class="pill-text">CALL:Leaf func 054</span>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">InCast</span><span class="row-val">{2154,2155,2156.}</span></div>
+      <div class="node-row"><span class="row-key">OutCast</span><span class="row-val">{2126,2146,2166.}</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>D — C 基础 + 卡片更深 + 彩色光晕阴影</h2>
+<div class="row d">
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">2155</span>
+      <span class="node-tag tag-sub">Subgraph-0</span>
+    </div>
+    <div class="tensor-pill">
+      <div class="tensor-name">Tensor_Name</div>
+      <div class="tensor-shape">shape&nbsp;&nbsp;&nbsp;[1,2,128,512]</div>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">offset</span><span class="row-val">[1,2,128,512]</span></div>
+      <div class="node-row"><span class="row-key">asis</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">tobe</span><span class="row-val">MEM_DEVICE_DDR</span></div>
+      <div class="node-row"><span class="row-key">dtype</span><span class="row-val">fp32</span></div>
+    </div>
+  </div>
+  <div class="node-card">
+    <div class="node-head">
+      <span class="node-tag tag-id">10000</span>
+      <span class="node-tag tag-sub">Subgraph-2</span>
+    </div>
+    <div class="op-pill">
+      <div class="pill-icon">fx</div>
+      <span class="pill-text">CALL:Leaf func 054</span>
+    </div>
+    <div class="node-rows">
+      <div class="node-row"><span class="row-key">InCast</span><span class="row-val">{2154,2155,2156.}</span></div>
+      <div class="node-row"><span class="row-key">OutCast</span><span class="row-val">{2126,2146,2166.}</span></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
