@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CANN 910B Memory Tier Preview</title>
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    :root {
+      --tier-l1: #3577f6;
+      --tier-l0a: #a855f7;
+      --tier-l0b: #7c3aed;
+      --tier-l0c: #f97316;
+      --tier-ub: #22c55e;
+      --mem-card-lg-w: 272px;
+      --mem-card-sm-w: 256px;
+      --mem-card-lg-h: 328px;
+      --mem-card-sm-h: 154px;
+      --mem-card-gap: 14px;
+      --text-dim: rgba(255, 255, 255, 0.72);
+      --mte-line-color: #f59e0b;
+      --mte-pill-bg: #f59e0b;
+      --mte-pill-border: #f59e0b;
+      --mte-pill-text: #1f1300;
+    }
+
+    body { margin: 0; background: var(--background); color: var(--foreground); }
+    .preview-shell { max-width: 1460px; margin: 0 auto; padding: 32px 24px 60px; display: flex; flex-direction: column; gap: 18px; }
+    .preview-title { font: var(--text-display); }
+    .preview-sub { font: var(--text-body); color: var(--foreground-secondary); max-width: 920px; line-height: 1.6; }
+    .preview-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
+    .preview-card { border-radius: 20px; border: 1px solid var(--border-subtle); background: var(--surface-1); padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+    .preview-card h2 { margin: 0; font: var(--text-title-sm); }
+    .preview-note { font: var(--text-body-sm); color: var(--foreground-secondary); line-height: 1.55; }
+    .preview-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+    .preview-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; background: rgba(0,0,0,.82); color: rgba(255,255,255,.88); font: 10px/1.2 var(--text-mono); }
+    .preview-map { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; font: var(--text-label); border: 1px solid rgba(251,191,36,.28); color: #fbbf24; background: rgba(251,191,36,.14); }
+
+    .arch-preview {
+      min-height: 640px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)), var(--surface-0);
+      padding: 22px;
+    }
+
+    #arch-diagram {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 48px;
+      min-height: 180px;
+      position: relative;
+    }
+
+    #mte-overlay-svg text {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #mte-overlay-svg line {
+      transition: stroke 0.18s ease, stroke-width 0.18s ease;
+    }
+
+    .arch-section {
+      flex: 0 1 auto;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: relative;
+      gap: 10px;
+      min-width: 0;
+      border: none;
+      background: none;
+      border-radius: 0;
+    }
+
+    .arch-section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      padding: 0 2px 2px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .gm-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 2px 1px;
+      flex-shrink: 0;
+      border: none;
+      background: none;
+      margin-top: 0;
+    }
+
+    .gm-strip-placeholder {
+      visibility: hidden;
+    }
+
+    .gm-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    .mte-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #f59e0b;
+      border: 1px solid #f59e0b;
+      color: #1f1300;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--text-mono, monospace);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .arch-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      flex: 0 1 auto;
+      min-height: 0;
+    }
+
+    .aic-main-row {
+      display: flex;
+      gap: 52px;
+      flex: 0 1 auto;
+      min-height: 0;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .l0ab-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--mem-card-gap);
+      flex: 0 0 auto;
+    }
+
+    .arch-sep {
+      display: flex;
+      align-items: center;
+      writing-mode: vertical-rl;
+      font-size: 10px;
+      color: var(--text-secondary);
+      padding: 8px 0;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+    }
+
+    .buf-box {
+      border-radius: var(--radius-md);
+      border: 1px solid;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: fit-content;
+      min-width: fit-content;
+      max-width: 100%;
+      flex: 0 0 auto;
+      min-height: 0;
+    }
+
+    .buf-l1  { background-color: rgba(53,119,246,0.12); border-color: rgba(53,119,246,0.38); }
+    .buf-l0a { background-color: rgba(168,85,247,0.12); border-color: rgba(168,85,247,0.38); }
+    .buf-l0b { background-color: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.38); }
+    .buf-l0c { background-color: rgba(249,115,22,0.12); border-color: rgba(249,115,22,0.38); }
+    .buf-ub  { background-color: rgba(135,200,15,0.08); border-color: rgba(135,200,15,0.30); }
+
+    .buf-l1,
+    .buf-l0c,
+    .buf-ub {
+      width: var(--mem-card-lg-w);
+      min-height: var(--mem-card-lg-h);
+    }
+
+    .buf-ub {
+      min-height: var(--mem-card-lg-h);
+    }
+
+    .buf-l0a,
+    .buf-l0b {
+      width: var(--mem-card-sm-w);
+      min-height: var(--mem-card-sm-h);
+    }
+
+    .buf-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .buf-hdr-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .buf-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .buf-stat-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-default);
+      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .buf-stat-tag.is-accent {
+      background: rgba(147,186,255,0.14);
+      border-color: rgba(147,186,255,0.28);
+      color: #c6deff;
+    }
+
+    .buf-meta-list {
+      display: grid;
+      gap: 4px;
+      margin-top: auto;
+      padding-top: 10px;
+    }
+
+    .buf-meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--text-mono, monospace);
+    }
+
+    .buf-meta-key {
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .buf-meta-val {
+      color: var(--text-dim);
+      text-align: right;
+      min-width: 0;
+    }
+
+    .buf-meta-val.is-strong {
+      color: var(--text-primary);
+    }
+
+    .buf-sub-info {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--text-mono, monospace);
+      margin-bottom: 2px;
+    }
+
+    .bpg-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--bpg-cols, 8), 24px);
+      grid-auto-rows: 24px;
+      gap: 4px;
+      flex-shrink: 0;
+      width: fit-content;
+      margin: 0 auto;
+      justify-content: center;
+    }
+
+    .bpg-cell {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: var(--surface-1);
+      border: 1px solid transparent;
+    }
+
+    .bpg-cell.is-l1  { background: rgba(53,119,246,0.72); }
+    .bpg-cell.is-l0a { background: rgba(168,85,247,0.72); }
+    .bpg-cell.is-l0b { background: rgba(124,58,237,0.72); }
+    .bpg-cell.is-l0c { background: rgba(249,115,22,0.72); }
+    .bpg-cell.is-ub  { background: rgba(135,200,15,0.72); }
+
+    .bpg-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .bpg-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--text-secondary);
+      max-width: 80px;
+      overflow: hidden;
+    }
+
+    .bpg-legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .unit-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      width: fit-content;
+      flex-shrink: 0;
+    }
+
+    .unit-box {
+      flex: 0 0 auto;
+      text-align: center;
+      padding: 8px 12px;
+      min-width: 96px;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .cube-box {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      border-radius: var(--radius-md);
+      width: 144px;
+      min-height: var(--mem-card-lg-h);
+      padding: 12px 14px;
+      background: rgba(53,119,246,0.12);
+      border: 1px solid rgba(53,119,246,0.30);
+      color: var(--text-primary);
+      flex: 0 0 auto;
+    }
+
+    .cube-hdr {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: flex-start;
+    }
+
+    .cube-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .cube-sub {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-dim);
+      font-family: var(--text-mono, monospace);
+      white-space: nowrap;
+    }
+
+    .cube-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(147,186,255,0.9);
+      letter-spacing: 0.04em;
+    }
+
+    .mte-legend {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .mte-legend-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .mte-legend-line {
+      position: relative;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mte-legend-line::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      transform: translateY(-50%);
+    }
+
+    .mte-legend-line::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .mte-legend-pill {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: var(--mte-pill-bg);
+      border: 1px solid var(--mte-pill-border);
+      box-shadow: none;
+      font: var(--text-label);
+      color: var(--mte-pill-text);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .mte-legend-line[data-dir="aic-to-aiv"]::before {
+      background: var(--mte-line-color);
+    }
+
+    .mte-legend-line[data-dir="aic-to-aiv"]::after {
+      right: 0;
+      border-top: 1.5px solid var(--mte-line-color);
+      border-right: 1.5px solid var(--mte-line-color);
+    }
+
+    .mte-legend-line[data-dir="aiv-to-aic"]::before {
+      background: var(--mte-line-color);
+    }
+
+    .mte-legend-line[data-dir="aiv-to-aic"]::after {
+      left: 0;
+      border-bottom: 1.5px solid var(--mte-line-color);
+      border-left: 1.5px solid var(--mte-line-color);
+    }
+
+    .mte-legend-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .mte-legend-title {
+      font: var(--text-label);
+      color: var(--foreground);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .mte-legend-note {
+      font: var(--text-body-sm);
+      color: var(--foreground-secondary);
+    }
+  </style>
+</head>
+<body>
+  <main class="preview-shell">
+    <div class="preview-title">CANN 910B Memory Tier Component Preview</div>
+    <div class="preview-sub">这是按 skill 1 规则抽出来、并已批准进入 shared system 的 memory architecture pattern。正式模块目前复用了 toolbar、button、toggle、badge、card shell；这一页定义的是进一步进入共享系统的 memory-tier 结构和 MTE 说明。</div>
+
+    <div class="preview-grid">
+      <section class="preview-card">
+        <h2>Proposed Memory Architecture Pattern</h2>
+        <div class="arch-preview">
+          <div id="arch-diagram">
+            <section class="arch-section" id="arch-aic">
+              <span class="arch-section-label">AIC</span>
+              <div class="gm-strip">
+                <span class="gm-label">GM</span>
+                <span class="mte-arrow">MTE2</span>
+              </div>
+              <div class="arch-inner">
+                <div class="aic-main-row">
+                  <div class="buf-box buf-l1">
+                    <div class="buf-hdr">
+                      <span class="buf-label">L1 Buffer</span>
+                      <div class="buf-hdr-right">
+                        <span class="buf-stat-tag is-accent">31%</span>
+                        <span class="buf-stat-tag">320 KB / 1024 KB</span>
+                      </div>
+                    </div>
+                    <div class="bpg-grid" data-tier="L1" style="--bpg-cols:8"></div>
+                    <div class="bpg-legend">
+                      <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:rgba(53,119,246,0.9)"></span>copy-in</span>
+                    </div>
+                    <div class="buf-meta-list">
+                      <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">row-major</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~20cy</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">704 KB</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x000000 ~ 0x0FFFFF</span></div>
+                    </div>
+                  </div>
+
+                  <div class="l0ab-col">
+                    <div class="buf-box buf-l0a">
+                      <div class="buf-hdr">
+                        <span class="buf-label">L0A</span>
+                        <div class="buf-hdr-right">
+                          <span class="buf-stat-tag is-accent">50%</span>
+                          <span class="buf-stat-tag">32 KB / 64 KB</span>
+                        </div>
+                      </div>
+                      <div class="bpg-grid" data-tier="L0A" style="--bpg-cols:4"></div>
+                      <div class="buf-meta-list">
+                        <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">fracZ</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">32 KB</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x0FFFF</span></div>
+                      </div>
+                    </div>
+
+                    <div class="buf-box buf-l0b">
+                      <div class="buf-hdr">
+                        <span class="buf-label">L0B</span>
+                        <div class="buf-hdr-right">
+                          <span class="buf-stat-tag is-accent">25%</span>
+                          <span class="buf-stat-tag">16 KB / 64 KB</span>
+                        </div>
+                      </div>
+                      <div class="bpg-grid" data-tier="L0B" style="--bpg-cols:4"></div>
+                      <div class="buf-meta-list">
+                        <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">fracZ</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">48 KB</span></div>
+                        <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x0FFFF</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="cube-box">
+                    <div class="cube-hdr">
+                      <span class="cube-title">Cube</span>
+                      <span class="cube-sub">Compute: MMA</span>
+                    </div>
+                    <div class="cube-body">Matrix Core</div>
+                  </div>
+
+                  <div class="buf-box buf-l0c">
+                    <div class="buf-hdr">
+                      <span class="buf-label">L0C</span>
+                      <div class="buf-hdr-right">
+                        <span class="buf-stat-tag is-accent">38%</span>
+                        <span class="buf-stat-tag">96 KB / 256 KB</span>
+                      </div>
+                    </div>
+                    <div class="bpg-grid" data-tier="L0C" style="--bpg-cols:8"></div>
+                    <div class="bpg-legend">
+                      <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:rgba(249,115,22,0.9)"></span>accum</span>
+                    </div>
+                    <div class="buf-meta-list">
+                      <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">nZ</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">160 KB</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x3FFFF</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="unit-row">
+                  <div class="unit-box">FixPipe</div>
+                  <div class="unit-box">Scalar</div>
+                </div>
+              </div>
+            </section>
+
+            <div class="arch-sep">1 : N (AIV)</div>
+
+            <section class="arch-section" id="arch-aiv">
+              <span class="arch-section-label">AIV</span>
+              <div class="gm-strip gm-strip-placeholder" aria-hidden="true">
+                <span class="gm-label">GM</span>
+                <span class="mte-arrow">MTE2</span>
+              </div>
+              <div class="arch-inner">
+                <div class="buf-box buf-ub">
+                  <div class="buf-hdr">
+                    <span class="buf-label">UB</span>
+                    <div class="buf-hdr-right">
+                      <span class="buf-stat-tag is-accent">28%</span>
+                      <span class="buf-stat-tag">72 KB / 256 KB</span>
+                    </div>
+                  </div>
+                  <div class="bpg-grid" data-tier="UB" style="--bpg-cols:8"></div>
+                  <div class="bpg-legend">
+                    <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:rgba(135,200,15,0.9)"></span>vector tile</span>
+                  </div>
+                  <div class="buf-meta-list">
+                    <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">row-major</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~10cy</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">184 KB</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x3FFFF</span></div>
+                  </div>
+                </div>
+
+                <div class="unit-row">
+                  <div class="unit-box">Scalar</div>
+                  <div class="unit-box">Vector</div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <aside class="preview-card">
+        <h2>Approval Metadata</h2>
+        <div class="preview-meta">
+          <span class="preview-map">Approved</span>
+          <span class="preview-badge">new memory-tier visual</span>
+          <span class="preview-badge">shared system pattern</span>
+        </div>
+        <div class="preview-note">这套 pattern 复用了 shared card shell、shared type scale、shared neutral surfaces，并把 memory-tier block 与 MTE 标识确认为新的 shared system pattern。后续应同步进入 `button-preview.html`，再由正式模块消费。</div>
+        <div class="mte-legend">
+          <div class="mte-legend-row">
+            <div class="mte-legend-line" data-dir="aic-to-aiv"><span class="mte-legend-pill">MTE2</span></div>
+            <div class="mte-legend-copy">
+              <div class="mte-legend-title">MTE2</div>
+              <div class="mte-legend-note">AIC memory tier 向 AIV / UB 侧传输</div>
+            </div>
+          </div>
+          <div class="mte-legend-row">
+            <div class="mte-legend-line" data-dir="aiv-to-aic"><span class="mte-legend-pill">MTE3</span></div>
+            <div class="mte-legend-copy">
+              <div class="mte-legend-title">MTE3</div>
+              <div class="mte-legend-note">AIV / UB 侧回传到 AIC memory tier</div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-note">主图里的旧 `MTE2 / MTE3` 连线已去掉，避免错误锚点误导；这部分语义现在只通过 legend 表达。</div>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const PREVIEW_BPG_CONFIG = {
+      L1:  { rows: 8, cols: 8, usedCells: 20, cellClass: 'is-l1' },
+      L0A: { rows: 4, cols: 4, usedCells: 8,  cellClass: 'is-l0a' },
+      L0B: { rows: 4, cols: 4, usedCells: 4,  cellClass: 'is-l0b' },
+      L0C: { rows: 8, cols: 8, usedCells: 24, cellClass: 'is-l0c' },
+      UB:  { rows: 8, cols: 8, usedCells: 18, cellClass: 'is-ub' }
+    };
+
+    document.querySelectorAll('.bpg-grid[data-tier]').forEach((gridEl) => {
+      const tier = gridEl.dataset.tier;
+      const cfg = PREVIEW_BPG_CONFIG[tier];
+      if (!cfg) return;
+      const total = cfg.rows * cfg.cols;
+      const cells = [];
+      for (let i = 0; i < total; i += 1) {
+        cells.push(`<span class="bpg-cell${i < cfg.usedCells ? ` ${cfg.cellClass}` : ''}"></span>`);
+      }
+      gridEl.innerHTML = cells.join('');
+    });
+
+    const MTE_STYLE = getComputedStyle(document.documentElement);
+    const MTE_LINE_COLOR = MTE_STYLE.getPropertyValue('--mte-line-color').trim() || '#f59e0b';
+    const MTE_PILL_BG = MTE_STYLE.getPropertyValue('--mte-pill-bg').trim() || '#f59e0b';
+    const MTE_PILL_BORDER = MTE_STYLE.getPropertyValue('--mte-pill-border').trim() || '#f59e0b';
+    const MTE_PILL_TEXT = MTE_STYLE.getPropertyValue('--mte-pill-text').trim() || '#1f1300';
+
+    const PREVIEW_MTE_ROUTES = [
+      { id: 'mte2-a', label: 'MTE2', reverse: false },
+      { id: 'mte2-b', label: 'MTE2', reverse: false },
+      { id: 'mte3', label: 'MTE3', reverse: true }
+    ];
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs = {}) => {
+      const el = document.createElementNS(NS, tag);
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      return el;
+    };
+
+    function arrowMarker(id, color) {
+      const marker = mk('marker', {
+        id, markerWidth: '8', markerHeight: '8', refX: '7', refY: '4', orient: 'auto'
+      });
+      marker.appendChild(mk('path', {
+        d: 'M1,1 L7,4 L1,7',
+        fill: 'none',
+        stroke: color,
+        'stroke-width': '1.5',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
+      }));
+      return marker;
+    }
+
+    function reverseArrowMarker(id, color) {
+      const marker = mk('marker', {
+        id, markerWidth: '8', markerHeight: '8', refX: '1', refY: '4', orient: 'auto'
+      });
+      marker.appendChild(mk('path', {
+        d: 'M7,1 L1,4 L7,7',
+        fill: 'none',
+        stroke: color,
+        'stroke-width': '1.5',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
+      }));
+      return marker;
+    }
+
+    function edgePt(container, el, side) {
+      const cR = container.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const cy = r.top - cR.top + r.height / 2;
+      if (side === 'left') return { x: r.left - cR.left, y: cy };
+      return { x: r.right - cR.left, y: cy };
+    }
+
+    function initPreviewMteOverlay() {
+      const container = document.getElementById('arch-diagram');
+      if (!container) return;
+
+      let svg = document.getElementById('mte-overlay-svg');
+      if (svg) svg.remove();
+
+      svg = mk('svg', { id: 'mte-overlay-svg' });
+      Object.assign(svg.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        overflow: 'visible',
+        pointerEvents: 'none',
+        zIndex: '50'
+      });
+
+      const defs = mk('defs');
+      PREVIEW_MTE_ROUTES.forEach((route) => {
+        defs.appendChild(arrowMarker(`af-${route.id}`, MTE_LINE_COLOR));
+        defs.appendChild(reverseArrowMarker(`ar-${route.id}`, MTE_LINE_COLOR));
+      });
+      svg.appendChild(defs);
+
+      const els = {};
+      PREVIEW_MTE_ROUTES.forEach((route) => {
+        const g = mk('g', { id: `mte-g-${route.id}` });
+        const line = mk('line', { 'stroke-linecap': 'round' });
+        const labelBg = mk('rect', { width: '32', height: '16', rx: '4', ry: '4' });
+        const labelTxt = mk('text', {
+          'font-size': '9',
+          'font-weight': '700',
+          'font-family': 'ui-monospace,monospace',
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle'
+        });
+        labelTxt.textContent = route.label;
+        g.appendChild(line);
+        g.appendChild(labelBg);
+        g.appendChild(labelTxt);
+        svg.appendChild(g);
+        els[route.id] = { line, labelBg, labelTxt, width: 32, height: 16, reverse: route.reverse };
+      });
+
+      container.appendChild(svg);
+
+      const placeRoute = (id, x1, y1, x2, y2) => {
+        const route = els[id];
+        if (!route) return;
+        route.line.setAttribute('x1', x1);
+        route.line.setAttribute('y1', y1);
+        route.line.setAttribute('x2', x2);
+        route.line.setAttribute('y2', y2);
+        route.line.setAttribute('stroke', MTE_LINE_COLOR);
+        route.line.setAttribute('stroke-width', '2');
+        route.line.setAttribute('marker-end', route.reverse ? 'none' : `url(#af-${id})`);
+        route.line.setAttribute('marker-start', route.reverse ? `url(#ar-${id})` : 'none');
+        route.line.style.filter = 'none';
+
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        route.labelBg.setAttribute('x', mx - route.width / 2);
+        route.labelBg.setAttribute('y', my - route.height / 2);
+        route.labelBg.setAttribute('fill', MTE_PILL_BG);
+        route.labelBg.setAttribute('stroke', MTE_PILL_BORDER);
+        route.labelBg.setAttribute('stroke-width', '1');
+        route.labelTxt.setAttribute('x', mx);
+        route.labelTxt.setAttribute('y', my);
+        route.labelTxt.setAttribute('fill', MTE_PILL_TEXT);
+      };
+
+      const updateLayout = () => {
+        const l1 = container.querySelector('.buf-l1');
+        const l0a = container.querySelector('.buf-l0a');
+        const l0b = container.querySelector('.buf-l0b');
+        const l0c = container.querySelector('.buf-l0c');
+        const ub = container.querySelector('.buf-ub');
+        if (!(l1 && l0a && l0b && l0c && ub)) return;
+
+        const l1Right = edgePt(container, l1, 'right').x;
+        const l0aLeft = edgePt(container, l0a, 'left');
+        const l0bLeft = edgePt(container, l0b, 'left');
+        const l0cRight = edgePt(container, l0c, 'right');
+        const ubLeft = edgePt(container, ub, 'left');
+
+        placeRoute('mte2-a', l1Right, l0aLeft.y, l0aLeft.x, l0aLeft.y);
+        placeRoute('mte2-b', l1Right, l0bLeft.y, l0bLeft.x, l0bLeft.y);
+        const crossY = (l0cRight.y + ubLeft.y) / 2;
+        placeRoute('mte3', ubLeft.x, crossY, l0cRight.x, crossY);
+      };
+
+      updateLayout();
+      new ResizeObserver(updateLayout).observe(container);
+    }
+
+    initPreviewMteOverlay();
+  </script>
+</body>
+</html>
