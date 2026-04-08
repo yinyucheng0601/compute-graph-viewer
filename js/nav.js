@@ -6,6 +6,7 @@
   const PTO_PASS_IR_ENTRY = typeof window.PTO_PASS_IR_ENTRY === 'string'
     ? window.PTO_PASS_IR_ENTRY
     : `${PTO_BASE_PREFIX}pass-ir/index.html`;
+  const PTO_DISABLE_NAV_AUTOLOAD = window.PTO_DISABLE_NAV_AUTOLOAD === true;
 
   function ptoUrl(path) {
     return `${PTO_BASE_PREFIX}${path}`;
@@ -365,10 +366,12 @@
   window.navSelectPath = selectPath;
 
   // ── Initial load ─────────────────────────────────────────────────────────
-  fetch(ptoUrl('nav_index.json'))
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(data => setNavIndex(data, { sourceLabel: data.base_path }))
-    .catch(() => { /* optional navigator; keep hidden without index */ });
+  if (!PTO_DISABLE_NAV_AUTOLOAD) {
+    fetch(ptoUrl('nav_index.json'))
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => setNavIndex(data, { sourceLabel: data.base_path }))
+      .catch(() => { /* optional navigator; keep hidden without index */ });
+  }
 
   // ── Timeline ─────────────────────────────────────────────────────────────
   function buildTimeline() {
