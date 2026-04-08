@@ -759,13 +759,19 @@
 
   function syncColorButtons() {
     document.querySelectorAll('.cp-btn[data-mode]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.mode === colorMode);
+      const selected = btn.dataset.mode === colorMode;
+      btn.classList.toggle('active', selected);
+      btn.classList.toggle('is-selected', selected);
+      btn.classList.toggle('action-row-selected', selected);
     });
   }
 
   function syncViewButtons() {
     document.querySelectorAll('.cp-btn[data-view-mode]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.viewMode === viewMode);
+      const selected = btn.dataset.viewMode === viewMode;
+      btn.classList.toggle('active', selected);
+      btn.classList.toggle('is-selected', selected);
+      btn.classList.toggle('action-row-selected', selected);
     });
   }
 
@@ -1774,13 +1780,15 @@
 
   // ── Transform ─────────────────────────────────────────────────
   function applyTransform(animate) {
+    if (!graphRoot) return;
     graphRoot.style.transition = animate ? 'transform 0.22s ease' : '';
     graphRoot.style.transform  = `translate(${tx}px,${ty}px) scale(${scale})`;
-    zoomLabel.textContent = Math.round(scale * 100) + '%';
+    if (zoomLabel) zoomLabel.textContent = Math.round(scale * 100) + '%';
     if (animate) setTimeout(() => { graphRoot.style.transition = ''; }, 250);
     const edgeVisibilityChanged = updateEdgeVisibilityByScale();
     scheduleViewportRender(!!edgeVisibilityChanged);
     scheduleMinimapUpdate();
+    syncDetailPanelPosition();
   }
 
   function fitView() {
@@ -1802,11 +1810,16 @@
     applyTransform(false);
   }
 
-  fitBtn.addEventListener('click', fitView);
-  zoomInBtn.addEventListener('click',  () => zoomAround(viewport.clientWidth / 2, viewport.clientHeight / 2, 1.25));
-  zoomOutBtn.addEventListener('click', () => zoomAround(viewport.clientWidth / 2, viewport.clientHeight / 2, 0.8));
+  function isModifiedZoomWheel(event) {
+    return !!(event.ctrlKey || event.metaKey);
+  }
+
+  fitBtn?.addEventListener('click', fitView);
+  zoomInBtn?.addEventListener('click',  () => zoomAround(viewport.clientWidth / 2, viewport.clientHeight / 2, 1.25));
+  zoomOutBtn?.addEventListener('click', () => zoomAround(viewport.clientWidth / 2, viewport.clientHeight / 2, 0.8));
 
   viewport.addEventListener('wheel', (e) => {
+    if (!isModifiedZoomWheel(e)) return;
     e.preventDefault();
     const rect = viewport.getBoundingClientRect();
     zoomAround(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 0.89);
@@ -2131,6 +2144,43 @@
     group:   { bg: 'rgba(91,115,255,0.18)',      color: '#5B73FF' },
   };
 
+  function syncDetailPanelPosition(node = null) {
+    if (!detailPanel || !detailPanel.classList.contains('open') || !layout?.positions) return;
+    const anchorId = node?.id || (detailSourceNodeId && layout.positions.has(detailSourceNodeId) ? detailSourceNodeId : selectedNodeId);
+    if (!anchorId) return;
+    const pos = layout.positions.get(anchorId);
+    if (!pos) return;
+
+    const panelWidth = detailPanel.offsetWidth || 320;
+    const panelHeight = detailPanel.offsetHeight || 320;
+    const viewportWidth = viewport.clientWidth;
+    const viewportHeight = viewport.clientHeight;
+    const gap = 16;
+
+    const nodeLeft = tx + pos.x * scale;
+    const nodeTop = ty + pos.y * scale;
+    const nodeRight = nodeLeft + pos.w * scale;
+    const nodeBottom = nodeTop + pos.h * scale;
+
+    let left = nodeRight + gap;
+    let top = nodeTop;
+
+    if (left + panelWidth > viewportWidth - 12) {
+      left = nodeLeft - panelWidth - gap;
+    }
+    if (left < 12) {
+      left = Math.max(12, Math.min(viewportWidth - panelWidth - 12, nodeLeft));
+      top = nodeBottom + gap;
+    }
+    if (top + panelHeight > viewportHeight - 12) {
+      top = Math.max(12, viewportHeight - panelHeight - 12);
+    }
+    if (top < 12) top = 12;
+
+    detailPanel.style.left = `${Math.round(left)}px`;
+    detailPanel.style.top = `${Math.round(top)}px`;
+  }
+
   function openDetail(node, graphModel = graph) {
     const detailModel = graphModel || graph;
     const detailIndex = getGraphIndex(detailModel);
@@ -2162,11 +2212,14 @@
     });
     syncDetailLockButton();
     detailPanel.classList.add('open');
+    requestAnimationFrame(() => syncDetailPanelPosition(node));
   }
 
   function closeDetail() {
     detailPanel.classList.remove('open');
     detailSourceNodeId = null;
+    detailPanel.style.left = '';
+    detailPanel.style.top = '';
     syncDetailLockButton();
   }
   detailClose.addEventListener('click', () => { closeDetail(); selectNode(null, nodesLayer, edgesSvg, renderCache?.edgeElementsByNodeId); selectedNodeId = null; });
