@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyPTO IDE Assistant — Ascend 910B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/ide.css">
+<link rel="stylesheet" href="css/components.css">
+</head>
+<body class="cohere-ui">
+
+<div class="cohere-aura" aria-hidden="true"></div>
+
+<!-- ═══════════════════════════════ TOOLBAR ═══════════════════════════════ -->
+<header class="toolbar">
+  <div class="toolbar-l">
+    <a href="../launch.html" class="home-link" title="Back to Launcher">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M1 7L7 1.5L13 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 5.5V12.5H11V5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <div class="toolbar-sep"></div>
+    <span class="app-title">PyPTO IDE Assistant</span>
+    <span class="chip chip--blue">Ascend 910B</span>
+    <span class="chip chip--green">DaVinci</span>
+  </div>
+  <div class="toolbar-tabs">
+    <button class="tb-tab active" data-scenario="coding" onclick="switchScenario('coding')">Coding</button>
+    <button class="tb-tab" data-scenario="precision" onclick="switchScenario('precision')">Precision Debug</button>
+    <button class="tb-tab" data-scenario="swimlane" onclick="switchScenario('swimlane')">Perf Swimlane</button>
+  </div>
+  <div class="toolbar-r">
+    <span class="status-dot"></span>
+    <span class="status-text">AI Ready</span>
+    <button class="tb-btn" onclick="toggleAIPanel()">✦ AI Assistant</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════ MAIN LAYOUT ══════════════════════════════ -->
+<div id="main-layout">
+
+  <!-- ── EDITOR AREA ── -->
+  <div id="editor-area">
+
+    <!-- ============================== SCENARIO: CODING ============================== -->
+    <div id="scenario-coding" class="scenario active">
+
+      <!-- Left: Spec Input Panel -->
+      <div class="panel panel-left" style="width:340px;min-width:260px;max-width:400px;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#3b82f6">⌨</span>
+          <span class="ph-title">算子规格输入</span>
+          <span class="ph-badge">Op Spec</span>
+        </div>
+        <div class="panel-body scroll coding-form-body">
+
+          <div class="form-section">
+            <div class="form-label">算子名称</div>
+            <input class="form-input" id="op-name" placeholder="e.g. MyGemmOp" value="CustomGemmOp">
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">算子类型</div>
+            <div class="radio-group">
+              <label class="radio-opt active" data-val="gemm"><input type="radio" name="op-type" value="gemm" checked> Cube GEMM</label>
+              <label class="radio-opt" data-val="vector"><input type="radio" name="op-type" value="vector"> Vector UB</label>
+              <label class="radio-opt" data-val="dma"><input type="radio" name="op-type" value="dma"> DMA Copy</label>
+              <label class="radio-opt" data-val="fused"><input type="radio" name="op-type" value="fused"> Fused Op</label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">输入 Tensors</div>
+            <div id="input-tensors-list">
+              <div class="tensor-row" data-idx="0">
+                <input class="ti-name" placeholder="a_mat" value="a_mat">
+                <select class="ti-dtype">
+                  <option>BF16</option><option>FP16</option><option>FP32</option><option>INT8</option>
+                </select>
+                <input class="ti-shape" placeholder="[M,K]" value="[512,256]">
+                <button class="ti-del" onclick="removeTensor(this)">✕</button>
+              </div>
+              <div class="tensor-row" data-idx="1">
+                <input class="ti-name" placeholder="b_mat" value="b_mat">
+                <select class="ti-dtype">
+                  <option>BF16</option><option>FP16</option><option>FP32</option><option>INT8</option>
+                </select>
+                <input class="ti-shape" placeholder="[K,N]" value="[256,512]">
+                <button class="ti-del" onclick="removeTensor(this)">✕</button>
+              </div>
+            </div>
+            <button class="btn-add" onclick="addInputTensor()">+ Add Input</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">输出 Tensors</div>
+            <div id="output-tensors-list">
+              <div class="tensor-row out-row" data-idx="0">
+                <input class="ti-name" placeholder="c_mat" value="c_mat">
+                <select class="ti-dtype">
+                  <option>FP32</option><option>BF16</option><option>FP16</option><option>INT32</option>
+                </select>
+                <input class="ti-shape" placeholder="[M,N]" value="[512,512]">
+                <button class="ti-del" onclick="removeTensor(this)">✕</button>
+              </div>
+            </div>
+            <button class="btn-add" onclick="addOutputTensor()">+ Add Output</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">Tiling 参数</div>
+            <div class="kv-grid">
+              <div class="kv-row">
+                <span class="kv-k">M_tile</span>
+                <input class="kv-v" id="m-tile" value="64">
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">N_tile</span>
+                <input class="kv-v" id="n-tile" value="64">
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">K_tile</span>
+                <input class="kv-v" id="k-tile" value="64">
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">L1 reuse</span>
+                <select class="kv-v" id="l1-reuse">
+                  <option value="A">A (fix B)</option>
+                  <option value="B">B (fix A)</option>
+                  <option value="none">none</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">附加约束</div>
+            <div class="check-list">
+              <label class="ck-item"><input type="checkbox" id="ck-inplace"> inplace=False（精度保护）</label>
+              <label class="ck-item"><input type="checkbox" id="ck-unroll" checked> unroll_list=[1]（精度优先）</label>
+              <label class="ck-item"><input type="checkbox" id="ck-submit"> submit_before_loop=True</label>
+              <label class="ck-item"><input type="checkbox" id="ck-jit" checked> frontend.jit 装饰</label>
+            </div>
+          </div>
+
+        </div>
+        <div class="panel-footer panel-footer--sticky">
+          <button class="btn-primary full-width" onclick="generateCode()">
+            <span>✦</span> AI 生成算子代码
+          </button>
+        </div>
+      </div>
+
+      <!-- Center: Generated Code -->
+      <div class="panel panel-center flex-grow">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#10b981">⟨/⟩</span>
+          <span class="ph-title">生成代码</span>
+          <div class="ph-actions">
+            <button class="ph-act-btn" onclick="copyCode('code-impl')">复制 impl</button>
+            <button class="ph-act-btn" onclick="copyCode('code-test')">复制 test</button>
+            <div class="file-tabs">
+              <button class="ftab active" data-tab="impl" onclick="switchCodeTab('impl',this)">impl.py</button>
+              <button class="ftab" data-tab="test" onclick="switchCodeTab('test',this)">test.py</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;position:relative;">
+          <div id="code-impl" class="code-pane active">
+            <div class="code-placeholder">
+              <div class="cp-icon">⌨</div>
+              <div class="cp-text">填写左侧规格，点击「AI 生成算子代码」</div>
+            </div>
+          </div>
+          <div id="code-test" class="code-pane">
+            <div class="code-placeholder">
+              <div class="cp-icon">⟨/⟩</div>
+              <div class="cp-text">生成 impl.py 后自动生成对应 test.py</div>
+            </div>
+          </div>
+
+          <!-- Constraint Checker Overlay -->
+          <div id="constraint-panel" class="constraint-panel hidden">
+            <div class="ct-header">
+              <span class="ct-title">⚡ 实时约束检查</span>
+              <button onclick="this.closest('.constraint-panel').classList.add('hidden')">✕</button>
+            </div>
+            <div id="constraint-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: AI Chat -->
+      <div class="panel panel-right" style="width:300px;min-width:240px;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#a78bfa">✦</span>
+          <span class="ph-title">AI 助手</span>
+          <button class="ph-act-btn" onclick="clearChat('coding-chat')">清空</button>
+        </div>
+        <div class="panel-body flex-col" style="padding:0;">
+          <div class="chat-messages" id="coding-chat">
+            <div class="chat-msg ai">
+              <div class="cm-avatar">AI</div>
+              <div class="cm-bubble">你好！我是 PyPTO 算子开发助手。<br>请描述你要实现的算子逻辑，或直接填写左侧规格表单，我会为你生成完整的 impl.py 和 test.py。</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <textarea class="chat-input" id="coding-input" placeholder="描述算子需求，例如：实现一个支持 BF16 的 batch GEMM..." onkeydown="handleChatKey(event,'coding')"></textarea>
+            <button class="chat-send" onclick="sendChat('coding')">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== SCENARIO: PRECISION DEBUG ============================== -->
+    <div id="scenario-precision" class="scenario">
+
+      <!-- Left: Compute Graph -->
+      <div class="panel panel-left" style="width:480px;min-width:360px;flex-shrink:0;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#3b82f6">⬡</span>
+          <span class="ph-title">计算图</span>
+          <div class="ph-actions">
+            <button class="ph-act-btn active-toggle" id="risk-overlay-btn" onclick="toggleRiskOverlay()">精度风险</button>
+            <button class="ph-act-btn" onclick="fitGraph()">Fit</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;position:relative;overflow:hidden;">
+          <svg id="precision-graph" width="100%" height="100%">
+            <defs>
+              <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="glow-orange"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g id="pg-transform"></g>
+          </svg>
+          <div class="graph-legend">
+            <div class="gl-item"><span class="gl-dot" style="background:#ef4444"></span>High Risk</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#f97316"></span>Medium</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#10b981"></span>Normal</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#3b82f6;border:2px dashed #60a5fa;background:transparent"></span>Checkpoint</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Debug Workbench -->
+      <div class="panel panel-center flex-grow">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#ef4444">⊘</span>
+          <span class="ph-title">精度调试工作台</span>
+          <div class="ph-actions">
+            <button class="ph-act-btn" onclick="runBinarySearch()">⟳ 二分定位</button>
+            <button class="ph-act-btn" onclick="insertCheckpoint()">+ 插入检查点</button>
+          </div>
+        </div>
+        <div class="panel-body scroll" style="padding:16px;">
+
+          <div class="debug-section" id="selected-op-info">
+            <div class="ds-title">选中算子</div>
+            <div class="ds-placeholder">← 点击计算图中的算子节点</div>
+          </div>
+
+          <div class="debug-section">
+            <div class="ds-title">精度风险矩阵</div>
+            <div class="risk-matrix" id="risk-matrix"></div>
+          </div>
+
+          <div class="debug-section">
+            <div class="ds-title">修复策略推荐</div>
+            <div id="workaround-list" class="wa-list">
+              <div class="wa-item prio-1">
+                <div class="wa-prio">P1</div>
+                <div class="wa-content">
+                  <div class="wa-name">frontend.jit 装饰</div>
+                  <div class="wa-desc">在 kernel 函数上添加 <code>@pypto.frontend.jit</code>，触发编译器精度优化路径</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('jit')">应用</button><button class="btn-mini" onclick="previewWorkaround('jit')">预览</button></div>
+                </div>
+              </div>
+              <div class="wa-item prio-2">
+                <div class="wa-prio">P2</div>
+                <div class="wa-content">
+                  <div class="wa-name">inplace=False</div>
+                  <div class="wa-desc">为 inplace 算子添加 <code>inplace=False</code> 参数，避免数据覆盖精度损失</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('inplace')">应用</button><button class="btn-mini" onclick="previewWorkaround('inplace')">预览</button></div>
+                </div>
+              </div>
+              <div class="wa-item prio-3">
+                <div class="wa-prio">P3</div>
+                <div class="wa-content">
+                  <div class="wa-name">unroll_list=[1]</div>
+                  <div class="wa-desc">关闭 loop unroll 展开，消除浮点累积误差</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('unroll')">应用</button><button class="btn-mini" onclick="previewWorkaround('unroll')">预览</button></div>
+                </div>
+              </div>
+              <div class="wa-item prio-4">
+                <div class="wa-prio">P4</div>
+                <div class="wa-content">
+                  <div class="wa-name">submit_before_loop=True</div>
+                  <div class="wa-desc">在循环前强制 pipeline submit，确保中间结果刷写</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('submit')">应用</button><button class="btn-mini" onclick="previewWorkaround('submit')">预览</button></div>
+                </div>
+              </div>
+              <div class="wa-item prio-5">
+                <div class="wa-prio">P5</div>
+                <div class="wa-content">
+                  <div class="wa-name">+0.0 精度技巧</div>
+                  <div class="wa-desc">关键累加点插入 <code>tensor = tensor + 0.0</code> 强制类型提升</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('plus0')">应用</button><button class="btn-mini" onclick="previewWorkaround('plus0')">预览</button></div>
+                </div>
+              </div>
+              <div class="wa-item prio-6">
+                <div class="wa-prio">P6</div>
+                <div class="wa-content">
+                  <div class="wa-name">Shape 调整</div>
+                  <div class="wa-desc">调整 tile shape 使边界对齐 32B，消除 padding 引入的精度问题</div>
+                  <div class="wa-actions"><button class="btn-mini apply-btn" onclick="applyWorkaround('shape')">应用</button><button class="btn-mini" onclick="previewWorkaround('shape')">预览</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="debug-section" id="checkpoint-section" style="display:none;">
+            <div class="ds-title">检查点对比</div>
+            <div id="checkpoint-results"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: AI Precision Chat -->
+      <div class="panel panel-right" style="width:300px;min-width:240px;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#ef4444">✦</span>
+          <span class="ph-title">精度分析助手</span>
+          <button class="ph-act-btn" onclick="clearChat('precision-chat')">清空</button>
+        </div>
+        <div class="panel-body flex-col" style="padding:0;">
+          <div class="chat-messages" id="precision-chat">
+            <div class="chat-msg ai">
+              <div class="cm-avatar">AI</div>
+              <div class="cm-bubble">精度调试助手已就绪。<br>点击计算图中的节点，我会分析该算子的精度风险并推荐修复策略。</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <textarea class="chat-input" id="precision-input" placeholder="描述精度问题，例如：softmax 输出与 PyTorch 对比误差超过 1e-3..." onkeydown="handleChatKey(event,'precision')"></textarea>
+            <button class="chat-send" onclick="sendChat('precision')">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================== SCENARIO: SWIMLANE ============================== -->
+    <div id="scenario-swimlane" class="scenario">
+
+      <!-- Left: Config -->
+      <div class="panel panel-left" style="width:280px;min-width:220px;flex-shrink:0;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#f97316">≡</span>
+          <span class="ph-title">任务配置</span>
+        </div>
+        <div class="panel-body scroll" style="padding:14px;">
+
+          <div class="form-section">
+            <div class="form-label">Profile 数据源</div>
+            <div class="file-drop-area" id="profile-drop" onclick="document.getElementById('profile-file').click()">
+              <input type="file" id="profile-file" style="display:none" accept=".json,.csv" onchange="loadProfile(this)">
+              <div class="fda-icon">⬆</div>
+              <div class="fda-text">拖拽 profile JSON/CSV<br>或点击上传</div>
+            </div>
+            <button class="btn-secondary full-width" style="margin-top:8px;" onclick="loadDemoProfile()">载入演示数据</button>
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">AIC 核数</div>
+            <input class="form-input" id="aic-count" value="24" type="number" min="1" max="64">
+          </div>
+          <div class="form-section">
+            <div class="form-label">AIV 核数</div>
+            <input class="form-input" id="aiv-count" value="24" type="number" min="1" max="64">
+          </div>
+
+          <div class="form-section">
+            <div class="form-label">高亮模式</div>
+            <div class="radio-group">
+              <label class="radio-opt active"><input type="radio" name="highlight-mode" value="bubble" checked> Bubble 检测</label>
+              <label class="radio-opt"><input type="radio" name="highlight-mode" value="hot"> 热点任务</label>
+              <label class="radio-opt"><input type="radio" name="highlight-mode" value="imbalance"> 负载不均</label>
+            </div>
+          </div>
+
+          <button class="btn-primary full-width" onclick="analyzePerf()">
+            <span>✦</span> AI 分析性能瓶颈
+          </button>
+
+          <div class="stat-cards" id="perf-stats" style="margin-top:16px;">
+            <div class="sc-card">
+              <div class="sc-label">核利用率</div>
+              <div class="sc-val" id="st-util">—</div>
+            </div>
+            <div class="sc-card">
+              <div class="sc-label">Bubble 率</div>
+              <div class="sc-val warning" id="st-bubble">—</div>
+            </div>
+            <div class="sc-card">
+              <div class="sc-label">最长任务</div>
+              <div class="sc-val" id="st-longest">—</div>
+            </div>
+            <div class="sc-card">
+              <div class="sc-label">负载方差</div>
+              <div class="sc-val" id="st-variance">—</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Center: Canvas -->
+      <div class="panel panel-center flex-grow" style="min-width:0;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#f97316">≡</span>
+          <span class="ph-title">任务泳道图</span>
+          <div class="ph-actions">
+            <div class="legend-row">
+              <span class="lg-dot" style="background:#3b82f6"></span><span>DMA</span>
+              <span class="lg-dot" style="background:#f97316"></span><span>Cube</span>
+              <span class="lg-dot" style="background:#10b981"></span><span>Vector</span>
+              <span class="lg-dot bubble-dot"></span><span>Bubble</span>
+            </div>
+            <button class="ph-act-btn" onclick="zoomSwimlane(1.2)">+</button>
+            <button class="ph-act-btn" onclick="zoomSwimlane(0.8)">−</button>
+            <button class="ph-act-btn" onclick="resetSwimlane()">Fit</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;position:relative;overflow:hidden;">
+          <canvas id="swimlane-canvas"></canvas>
+          <div id="swimlane-placeholder" class="canvas-placeholder">
+            <div class="cp-icon">≡</div>
+            <div class="cp-text">载入 Profile 数据后展示泳道图<br>或点击「载入演示数据」快速体验</div>
+          </div>
+          <div id="task-tooltip" class="task-tooltip hidden"></div>
+        </div>
+        <div id="timeline-ruler" class="timeline-ruler"></div>
+      </div>
+
+      <!-- Right: Optimization -->
+      <div class="panel panel-right" style="width:320px;min-width:260px;">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#f97316">✦</span>
+          <span class="ph-title">优化建议</span>
+          <span class="ph-badge" id="opt-score-badge">—</span>
+        </div>
+        <div class="panel-body flex-col" style="padding:0;">
+          <div class="scroll" style="padding:12px;flex:1 1 0;overflow-y:auto;" id="opt-list">
+            <div class="opt-placeholder">点击「AI 分析性能瓶颈」后查看优化建议</div>
+          </div>
+          <div class="chat-divider">AI 性能助手</div>
+          <div class="chat-messages short" id="swimlane-chat">
+            <div class="chat-msg ai">
+              <div class="cm-avatar">AI</div>
+              <div class="cm-bubble">性能分析助手已就绪。载入 profile 数据后我会自动分析 bubble、负载不均等问题。</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <textarea class="chat-input" id="swimlane-input" placeholder="询问性能优化问题..." onkeydown="handleChatKey(event,'swimlane')"></textarea>
+            <button class="chat-send" onclick="sendChat('swimlane')">↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end editor-area -->
+
+</div><!-- end main-layout -->
+
+<!-- ═══════════════════════════════ STATUS BAR ═══════════════════════════════ -->
+<div id="statusbar">
+  <div class="sb-left">
+    <span class="sb-item sb-branch">⎇ pypto-dev</span>
+    <span class="sb-item" id="sb-scenario">Coding</span>
+  </div>
+  <div class="sb-right">
+    <span class="sb-item" id="sb-chip">Ascend 910B</span>
+    <span class="sb-item">DaVinci NPU</span>
+    <span class="sb-item" id="sb-ai-status">✦ AI Ready</span>
+    <span class="sb-item">PyPTO v2.4</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ AI SIDE PANEL ════════════════════════════ -->
+<div id="ai-side-panel" class="hidden">
+  <div class="asp-header">
+    <span class="asp-title">✦ PyPTO AI Assistant</span>
+    <button class="asp-close" onclick="toggleAIPanel()">✕</button>
+  </div>
+  <div class="asp-tabs">
+    <button class="asp-tab active" onclick="switchAspTab('chat',this)">Chat</button>
+    <button class="asp-tab" onclick="switchAspTab('snippets',this)">代码片段</button>
+    <button class="asp-tab" onclick="switchAspTab('docs',this)">API 文档</button>
+  </div>
+  <div class="asp-body" id="asp-chat-panel">
+    <div class="chat-messages tall" id="global-chat">
+      <div class="chat-msg ai">
+        <div class="cm-avatar">AI</div>
+        <div class="cm-bubble">PyPTO AI 全局助手。你可以问我任何关于算子开发、精度调试、性能优化的问题。</div>
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <textarea class="chat-input" id="global-input" placeholder="Ask anything about PyPTO..." onkeydown="handleChatKey(event,'global')"></textarea>
+      <button class="chat-send" onclick="sendChat('global')">↑</button>
+    </div>
+  </div>
+  <div class="asp-body hidden" id="asp-snippets-panel">
+    <div class="snippet-list" id="snippet-list"></div>
+  </div>
+  <div class="asp-body hidden" id="asp-docs-panel">
+    <div class="docs-search">
+      <input class="form-input" placeholder="搜索 API..." id="docs-search-input" oninput="searchDocs(this.value)">
+    </div>
+    <div class="docs-list" id="docs-list"></div>
+  </div>
+</div>
+
+<script src="js/ide.js"></script>
+<script src="js/coding.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/swimlane.js"></script>
+</body>
+</html>
