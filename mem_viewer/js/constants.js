@@ -11,13 +11,72 @@ const TOBE_TO_TIER = { 1: 'L1', 2: 'L0A', 3: 'L0B', 4: 'L0C', 15: 'DDR' };
 const TIERS = ['L1', 'L0A', 'L0B', 'L0C'];  // on-chip tiers shown in arch diagram
 const TIER_CAPACITY = { L1: 1024, L0A: 64, L0B: 64, L0C: 256 };
 const TIER_CAP_BYTES = { L1: 1048576, L0A: 65536, L0B: 65536, L0C: 262144, UB: 262144 };
+const ENGINE_MEMORY_LEGEND_COLORS = {
+  cube: '#8B5CF6',
+  l0:   '#1DB7D9',
+  l1:   '#22B8B5',
+  gm:   '#8DD61A',
+  neutral: '#6B7280',
+};
+const TIER_ENGINE_GROUP = {
+  L1: 'l1',
+  L0A: 'l0',
+  L0B: 'l0',
+  L0C: 'l0',
+  UB: 'l0',
+  DDR: 'gm',
+};
+const MEMORY_TIER_VISUALS = {
+  L1: {
+    chip: ENGINE_MEMORY_LEGEND_COLORS.l1,
+    bg: 'rgba(34,184,181,0.14)',
+    border: 'rgba(34,184,181,0.34)',
+    active: '#31D4D0',
+    glow: 'rgba(34,184,181,0.34)',
+  },
+  L0A: {
+    chip: ENGINE_MEMORY_LEGEND_COLORS.l0,
+    bg: 'rgba(29,183,217,0.14)',
+    border: 'rgba(29,183,217,0.36)',
+    active: '#3FD0EE',
+    glow: 'rgba(29,183,217,0.34)',
+  },
+  L0B: {
+    chip: '#17AFD2',
+    bg: 'rgba(29,183,217,0.11)',
+    border: 'rgba(29,183,217,0.31)',
+    active: '#36C6E6',
+    glow: 'rgba(29,183,217,0.30)',
+  },
+  L0C: {
+    chip: '#129FC1',
+    bg: 'rgba(29,183,217,0.09)',
+    border: 'rgba(29,183,217,0.26)',
+    active: '#2CBADA',
+    glow: 'rgba(29,183,217,0.26)',
+  },
+  UB: {
+    chip: '#55CAE6',
+    bg: 'rgba(29,183,217,0.08)',
+    border: 'rgba(29,183,217,0.24)',
+    active: '#74DCF4',
+    glow: 'rgba(29,183,217,0.22)',
+  },
+  DDR: {
+    chip: ENGINE_MEMORY_LEGEND_COLORS.gm,
+    bg: 'rgba(141,214,26,0.10)',
+    border: 'rgba(141,214,26,0.28)',
+    active: '#A7ED44',
+    glow: 'rgba(141,214,26,0.26)',
+  },
+};
 const TIER_COLORS = {
-  L1:  '#3b82f6',
-  L0A: '#a78bfa',
-  L0B: '#7c3aed',
-  L0C: '#f97316',
-  UB:  '#10b981',
-  DDR: '#6b7280',
+  L1:  MEMORY_TIER_VISUALS.L1.chip,
+  L0A: MEMORY_TIER_VISUALS.L0A.chip,
+  L0B: MEMORY_TIER_VISUALS.L0B.chip,
+  L0C: MEMORY_TIER_VISUALS.L0C.chip,
+  UB:  MEMORY_TIER_VISUALS.UB.chip,
+  DDR: MEMORY_TIER_VISUALS.DDR.chip,
 };
 
 // Pixel grid config: rows × cols × bytes-per-cell
@@ -108,6 +167,7 @@ function fmtBytes(b) {
 
 export {
   TOBE_TO_TIER, TIERS, TIER_CAPACITY, TIER_CAP_BYTES, TIER_COLORS,
+  ENGINE_MEMORY_LEGEND_COLORS, TIER_ENGINE_GROUP, MEMORY_TIER_VISUALS,
   BPG_CONFIG, TENSOR_PALETTE, UB_VEC_OPS,
   OP_CATEGORY_COLOR, CUBE_OPS, ALLOC_OPS,
   opByMagic, tensorProducer,
