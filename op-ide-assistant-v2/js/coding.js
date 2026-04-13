@@ -6,58 +6,66 @@
 'use strict';
 
 const DEFAULT_IMPL_TEMPLATE = [
-  '# Cohere-style starter template for PyPTO operator workbench',
+  '# Case-inspired starter template for IndexerPrologQuantQuantLoop',
   'import pypto',
   'import pypto.frontend',
   '',
   '@pypto.frontend.jit',
   '@pypto.op_config(unroll_list=[1], submit_before_loop=True)',
-  'def custom_gemm_kernel(a_mat, b_mat, bias=None):',
+  'def indexer_prolog_quant_quant_loop(q_norm_in, x_in, wk, w_proj, k_cache, k_cache_scale):',
   '    """',
-  '    Starter kernel scaffold for Ascend 910B operator iteration.',
-  '    Replace tile sizes, memory scopes, and epilogue logic as needed.',
+  '    Case scaffold aligned with the Agent demo narrative.',
+  '    Keeps loop_unroll + semantic_label structure so generated code matches PATH0_6 style explanation.',
   '    """',
-  '    M_TILE = 64',
-  '    N_TILE = 64',
-  '    K_TILE = 32',
+  '    T_TILE = 128',
+  '    K_TILE = 128',
+  '    OUT_TILE = 64',
   '',
-  '    a_l1 = pypto.alloc(shape=[M_TILE, K_TILE], dtype="BF16", scope="L1")',
-  '    b_l1 = pypto.alloc(shape=[K_TILE, N_TILE], dtype="BF16", scope="L1")',
-  '    c_l0c = pypto.alloc(shape=[M_TILE, N_TILE], dtype="FP32", scope="L0C")',
+  '    q_l1 = pypto.alloc(shape=[T_TILE, K_TILE], dtype="BF16", scope="L1")',
+  '    x_l1 = pypto.alloc(shape=[T_TILE, K_TILE], dtype="BF16", scope="L1")',
+  '    acc_l0c = pypto.alloc(shape=[T_TILE, OUT_TILE], dtype="FP32", scope="L0C")',
   '',
-  '    for m0 in range(pypto.dim("M") // M_TILE):',
-  '        for n0 in range(pypto.dim("N") // N_TILE):',
-  '            pypto.ops.TILE_COPY_IN(a_mat, a_l1)',
-  '            pypto.ops.TILE_COPY_IN(b_mat, b_l1)',
-  '            pypto.ops.TILE_A_MUL_B(a_l1, b_l1, c_l0c)',
+  '    for t_idx, unroll_len in pypto.loop_unroll(0, pypto.dim("t"), 1, name="IndexerPrologQuantQuantLoop", idx_name="tIdx", unroll_list=[1]):',
+  '        pypto.set_semantic_label("Query-Linear")',
+  '        pypto.ops.TILE_COPY_IN(q_norm_in, q_l1)',
+  '        pypto.ops.TILE_A_MUL_B(q_l1, wk, acc_l0c)',
   '',
-  '            if bias is not None:',
-  '                pypto.ops.TILE_ADD(c_l0c, bias, c_l0c)',
+  '        pypto.set_semantic_label("Key-Linear")',
+  '        pypto.ops.TILE_COPY_IN(x_in, x_l1)',
+  '        pypto.ops.TILE_A_MUL_B(x_l1, wk, acc_l0c)',
   '',
-  '            pypto.ops.TILE_COPY_OUT(c_l0c, "out_tensor")',
+  '        pypto.set_semantic_label("Key-Quant")',
+  '        pypto.scatter_update(k_cache, 0, t_idx, acc_l0c)',
+  '        pypto.scatter_update(k_cache_scale, 0, t_idx, acc_l0c)',
   '',
-  '    return "out_tensor"',
+  '        pypto.set_semantic_label("Weight-Linear")',
+  '        pypto.ops.TILE_A_MUL_B(x_l1, w_proj, acc_l0c)',
+  '        pypto.ops.TILE_COPY_OUT(acc_l0c, "weights_out")',
+  '',
+  '    return "weights_out"',
 ];
 
 const DEFAULT_TEST_TEMPLATE = [
-  '# Smoke test scaffold',
+  '# Case smoke test scaffold',
   'import numpy as np',
   'import torch',
   '',
-  'def test_custom_gemm_kernel_shape_and_dtype():',
-  '    a = torch.randn(512, 256, dtype=torch.bfloat16)',
-  '    b = torch.randn(256, 512, dtype=torch.bfloat16)',
+  'def test_indexer_prolog_quant_quant_loop_shape_and_dtype():',
+  '    q_norm = torch.randn(128, 128, dtype=torch.bfloat16)',
+  '    x = torch.randn(128, 128, dtype=torch.bfloat16)',
   '',
-  '    ref = (a.float() @ b.float()).to(torch.float32)',
-  '    # out = custom_gemm_kernel(a, b)',
+  '    assert tuple(q_norm.shape) == (128, 128)',
+  '    assert x.dtype == torch.bfloat16',
   '',
-  '    assert tuple(ref.shape) == (512, 512)',
-  '    assert ref.dtype == torch.float32',
+  'def test_loop_unroll_and_semantic_labels_present():',
+  '    source = "IndexerPrologQuantQuantLoop Query-Linear Key-Quant Weight-Linear"',
+  '    assert "IndexerPrologQuantQuantLoop" in source',
+  '    assert "Key-Quant" in source',
   '',
   'def test_tile_plan_defaults():',
-  '    tile_plan = {"m_tile": 64, "n_tile": 64, "k_tile": 32}',
-  '    assert tile_plan["m_tile"] % 32 == 0',
-  '    assert tile_plan["n_tile"] % 32 == 0',
+  '    tile_plan = {"t_tile": 128, "out_tile": 64, "k_tile": 128}',
+  '    assert tile_plan["t_tile"] % 32 == 0',
+  '    assert tile_plan["k_tile"] % 32 == 0',
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -117,15 +125,24 @@ function renderCode(paneId, lines) {
 }
 
 function highlight(raw) {
-  // Simple token-based syntax highlight
-  const escaped = escapeHtml(raw);
-  return escaped
-    .replace(/\b(def|class|return|import|from|for|in|range|if|else|elif|with|pass|None|True|False|and|or|not|lambda|yield)\b/g, '<span class="tok-kw">$1</span>')
-    .replace(/(#.*)$/g, '<span class="tok-cmt">$1</span>')
-    .replace(/(@\w[\w.]*)/g, '<span class="tok-dec">$1</span>')
-    .replace(/\b([A-Z][A-Z0-9_]{2,})\b/g, '<span class="tok-fn">$1</span>')
-    .replace(/(["'])([^"']*)\1/g, '<span class="tok-str">$1$2$1</span>')
-    .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+  // Token placeholders prevent later regexes from matching inside inserted span HTML.
+  const tokens = [];
+  const stash = (className, text) => {
+    const idx = tokens.length;
+    tokens.push(`<span class="${className}">${text}</span>`);
+    return `__TOK_${idx}__`;
+  };
+
+  let escaped = escapeHtml(raw);
+
+  escaped = escaped.replace(/(#.*)$/g, match => stash('tok-cmt', match));
+  escaped = escaped.replace(/(["'])([^"']*)\1/g, match => stash('tok-str', match));
+  escaped = escaped.replace(/(@\w[\w.]*)/g, match => stash('tok-dec', match));
+  escaped = escaped.replace(/\b(def|class|return|import|from|for|in|range|if|else|elif|with|pass|None|True|False|and|or|not|lambda|yield)\b/g, match => stash('tok-kw', match));
+  escaped = escaped.replace(/\b([A-Z][A-Z0-9_]{2,})\b/g, match => stash('tok-fn', match));
+  escaped = escaped.replace(/\b(\d+(?:\.\d+)?)\b/g, match => stash('tok-num', match));
+
+  return escaped.replace(/__TOK_(\d+)__/g, (_, idx) => tokens[Number(idx)] || '');
 }
 
 function escapeHtml(s) {

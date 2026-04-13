@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/ide.css">
-<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/ide.css?v=20260413c">
+<link rel="stylesheet" href="css/components.css?v=20260413c">
 </head>
 <body class="cohere-ui">
 
@@ -50,7 +50,7 @@
     <div id="scenario-coding" class="scenario active">
 
       <!-- Left: Spec Input Panel -->
-      <div class="panel panel-left" style="width:340px;min-width:260px;max-width:400px;">
+      <div class="panel panel-left scenario-side scenario-side--left">
         <div class="panel-header">
           <span class="ph-icon" style="color:#3b82f6">⌨</span>
           <span class="ph-title">算子规格输入</span>
@@ -60,36 +60,42 @@
 
           <div class="form-section">
             <div class="form-label">算子名称</div>
-            <input class="form-input" id="op-name" placeholder="e.g. MyGemmOp" value="CustomGemmOp">
+            <input class="form-input" id="op-name" placeholder="e.g. IndexerPrologQuantQuantLoop" value="IndexerPrologQuantQuantLoop">
           </div>
 
           <div class="form-section">
             <div class="form-label">算子类型</div>
             <div class="radio-group">
-              <label class="radio-opt active" data-val="gemm"><input type="radio" name="op-type" value="gemm" checked> Cube GEMM</label>
+              <label class="radio-opt" data-val="gemm"><input type="radio" name="op-type" value="gemm"> Cube GEMM</label>
               <label class="radio-opt" data-val="vector"><input type="radio" name="op-type" value="vector"> Vector UB</label>
               <label class="radio-opt" data-val="dma"><input type="radio" name="op-type" value="dma"> DMA Copy</label>
-              <label class="radio-opt" data-val="fused"><input type="radio" name="op-type" value="fused"> Fused Op</label>
+              <label class="radio-opt active" data-val="fused"><input type="radio" name="op-type" value="fused" checked> Fused Op</label>
             </div>
           </div>
 
           <div class="form-section">
             <div class="form-label">输入 Tensors</div>
+            <div class="tensor-head">
+              <span>Name</span>
+              <span>DType</span>
+              <span>Shape</span>
+              <span></span>
+            </div>
             <div id="input-tensors-list">
               <div class="tensor-row" data-idx="0">
-                <input class="ti-name" placeholder="a_mat" value="a_mat">
+                <input class="ti-name" placeholder="q_norm_in" value="q_norm_in">
                 <select class="ti-dtype">
                   <option>BF16</option><option>FP16</option><option>FP32</option><option>INT8</option>
                 </select>
-                <input class="ti-shape" placeholder="[M,K]" value="[512,256]">
+                <input class="ti-shape" placeholder="[t,q_lora_rank]" value="[t,q_lora_rank]">
                 <button class="ti-del" onclick="removeTensor(this)">✕</button>
               </div>
               <div class="tensor-row" data-idx="1">
-                <input class="ti-name" placeholder="b_mat" value="b_mat">
+                <input class="ti-name" placeholder="x_in" value="x_in">
                 <select class="ti-dtype">
                   <option>BF16</option><option>FP16</option><option>FP32</option><option>INT8</option>
                 </select>
-                <input class="ti-shape" placeholder="[K,N]" value="[256,512]">
+                <input class="ti-shape" placeholder="[t,hidden_dim]" value="[t,hidden_dim]">
                 <button class="ti-del" onclick="removeTensor(this)">✕</button>
               </div>
             </div>
@@ -98,13 +104,19 @@
 
           <div class="form-section">
             <div class="form-label">输出 Tensors</div>
+            <div class="tensor-head">
+              <span>Name</span>
+              <span>DType</span>
+              <span>Shape</span>
+              <span></span>
+            </div>
             <div id="output-tensors-list">
               <div class="tensor-row out-row" data-idx="0">
-                <input class="ti-name" placeholder="c_mat" value="c_mat">
+                <input class="ti-name" placeholder="weights_out" value="weights_out">
                 <select class="ti-dtype">
-                  <option>FP32</option><option>BF16</option><option>FP16</option><option>INT32</option>
+                  <option>FP16</option><option>FP32</option><option>BF16</option><option>INT32</option>
                 </select>
-                <input class="ti-shape" placeholder="[M,N]" value="[512,512]">
+                <input class="ti-shape" placeholder="[t,out_dim]" value="[t,out_dim]">
                 <button class="ti-del" onclick="removeTensor(this)">✕</button>
               </div>
             </div>
@@ -116,7 +128,7 @@
             <div class="kv-grid">
               <div class="kv-row">
                 <span class="kv-k">M_tile</span>
-                <input class="kv-v" id="m-tile" value="64">
+                <input class="kv-v" id="m-tile" value="128">
               </div>
               <div class="kv-row">
                 <span class="kv-k">N_tile</span>
@@ -124,7 +136,7 @@
               </div>
               <div class="kv-row">
                 <span class="kv-k">K_tile</span>
-                <input class="kv-v" id="k-tile" value="64">
+                <input class="kv-v" id="k-tile" value="128">
               </div>
               <div class="kv-row">
                 <span class="kv-k">L1 reuse</span>
@@ -195,7 +207,7 @@
       </div>
 
       <!-- Right: AI Chat -->
-      <div class="panel panel-right" style="width:300px;min-width:240px;">
+      <div class="panel panel-right scenario-side scenario-side--right">
         <div class="panel-header">
           <span class="ph-icon" style="color:#a78bfa">✦</span>
           <span class="ph-title">AI 助手</span>
@@ -205,12 +217,12 @@
           <div class="chat-messages" id="coding-chat">
             <div class="chat-msg ai">
               <div class="cm-avatar">AI</div>
-              <div class="cm-bubble">你好！我是 PyPTO 算子开发助手。<br>请描述你要实现的算子逻辑，或直接填写左侧规格表单，我会为你生成完整的 impl.py 和 test.py。</div>
+              <div class="cm-bubble">你好！我是 PyPTO 算子开发助手。<br>当前默认案例是 <code>IndexerPrologQuantQuantLoop</code>。你可以直接围绕 Query / Key / Weight 这条链路改写左侧规格，我会生成对应的 impl.py 和 test.py。</div>
             </div>
           </div>
           <div class="chat-input-area">
-            <textarea class="chat-input" id="coding-input" placeholder="描述算子需求，例如：实现一个支持 BF16 的 batch GEMM..." onkeydown="handleChatKey(event,'coding')"></textarea>
-            <button class="chat-send" onclick="sendChat('coding')">↑</button>
+            <textarea class="chat-input" id="coding-input" placeholder="例如：保留 loop_unroll 与 semantic_label 结构，生成一个更贴近 PATH0_6 叙事的 fused kernel..." onkeydown="handleChatKey(event,'coding')"></textarea>
+            <button class="chat-send" onclick="sendChat('coding')"><span>Send</span><span aria-hidden="true">↗</span></button>
           </div>
         </div>
       </div>
@@ -219,42 +231,15 @@
     <!-- ============================== SCENARIO: PRECISION DEBUG ============================== -->
     <div id="scenario-precision" class="scenario">
 
-      <!-- Left: Compute Graph -->
-      <div class="panel panel-left" style="width:480px;min-width:360px;flex-shrink:0;">
-        <div class="panel-header">
-          <span class="ph-icon" style="color:#3b82f6">⬡</span>
-          <span class="ph-title">计算图</span>
-          <div class="ph-actions">
-            <button class="ph-act-btn active-toggle" id="risk-overlay-btn" onclick="toggleRiskOverlay()">精度风险</button>
-            <button class="ph-act-btn" onclick="fitGraph()">Fit</button>
-          </div>
-        </div>
-        <div class="panel-body" style="padding:0;position:relative;overflow:hidden;">
-          <svg id="precision-graph" width="100%" height="100%">
-            <defs>
-              <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-              <filter id="glow-orange"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-            </defs>
-            <g id="pg-transform"></g>
-          </svg>
-          <div class="graph-legend">
-            <div class="gl-item"><span class="gl-dot" style="background:#ef4444"></span>High Risk</div>
-            <div class="gl-item"><span class="gl-dot" style="background:#f97316"></span>Medium</div>
-            <div class="gl-item"><span class="gl-dot" style="background:#10b981"></span>Normal</div>
-            <div class="gl-item"><span class="gl-dot" style="background:#3b82f6;border:2px dashed #60a5fa;background:transparent"></span>Checkpoint</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Debug Workbench -->
-      <div class="panel panel-center flex-grow">
+      <!-- Left: Debug Workbench -->
+      <div class="panel panel-left scenario-side scenario-side--left">
         <div class="panel-header">
           <span class="ph-icon" style="color:#ef4444">⊘</span>
           <span class="ph-title">精度调试工作台</span>
-          <div class="ph-actions">
-            <button class="ph-act-btn" onclick="runBinarySearch()">⟳ 二分定位</button>
-            <button class="ph-act-btn" onclick="insertCheckpoint()">+ 插入检查点</button>
-          </div>
+        </div>
+        <div class="panel-subheader panel-subheader-actions">
+          <button class="ph-act-btn" onclick="runBinarySearch()">⟳ 二分定位</button>
+          <button class="ph-act-btn" onclick="insertCheckpoint()">+ 插入检查点</button>
         </div>
         <div class="panel-body scroll" style="padding:16px;">
 
@@ -330,8 +315,35 @@
         </div>
       </div>
 
+      <!-- Center: Compute Graph -->
+      <div class="panel panel-center flex-grow">
+        <div class="panel-header">
+          <span class="ph-icon" style="color:#3b82f6">⬡</span>
+          <span class="ph-title">计算图</span>
+          <div class="ph-actions">
+            <button class="ph-act-btn active-toggle" id="risk-overlay-btn" onclick="toggleRiskOverlay()">精度风险</button>
+            <button class="ph-act-btn" onclick="fitGraph()">Fit</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0;position:relative;overflow:hidden;">
+          <svg id="precision-graph" width="100%" height="100%">
+            <defs>
+              <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="glow-orange"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <g id="pg-transform"></g>
+          </svg>
+          <div class="graph-legend">
+            <div class="gl-item"><span class="gl-dot" style="background:#ef4444"></span>High Risk</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#f97316"></span>Medium</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#10b981"></span>Normal</div>
+            <div class="gl-item"><span class="gl-dot" style="background:#3b82f6;border:2px dashed #60a5fa;background:transparent"></span>Checkpoint</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Right: AI Precision Chat -->
-      <div class="panel panel-right" style="width:300px;min-width:240px;">
+      <div class="panel panel-right scenario-side scenario-side--right">
         <div class="panel-header">
           <span class="ph-icon" style="color:#ef4444">✦</span>
           <span class="ph-title">精度分析助手</span>
@@ -346,7 +358,7 @@
           </div>
           <div class="chat-input-area">
             <textarea class="chat-input" id="precision-input" placeholder="描述精度问题，例如：softmax 输出与 PyTorch 对比误差超过 1e-3..." onkeydown="handleChatKey(event,'precision')"></textarea>
-            <button class="chat-send" onclick="sendChat('precision')">↑</button>
+            <button class="chat-send" onclick="sendChat('precision')"><span>Send</span><span aria-hidden="true">↗</span></button>
           </div>
         </div>
       </div>
@@ -356,7 +368,7 @@
     <div id="scenario-swimlane" class="scenario">
 
       <!-- Left: Config -->
-      <div class="panel panel-left" style="width:280px;min-width:220px;flex-shrink:0;">
+      <div class="panel panel-left scenario-side scenario-side--left">
         <div class="panel-header">
           <span class="ph-icon" style="color:#f97316">≡</span>
           <span class="ph-title">任务配置</span>
@@ -446,7 +458,7 @@
       </div>
 
       <!-- Right: Optimization -->
-      <div class="panel panel-right" style="width:320px;min-width:260px;">
+      <div class="panel panel-right scenario-side scenario-side--right">
         <div class="panel-header">
           <span class="ph-icon" style="color:#f97316">✦</span>
           <span class="ph-title">优化建议</span>
@@ -465,7 +477,7 @@
           </div>
           <div class="chat-input-area">
             <textarea class="chat-input" id="swimlane-input" placeholder="询问性能优化问题..." onkeydown="handleChatKey(event,'swimlane')"></textarea>
-            <button class="chat-send" onclick="sendChat('swimlane')">↑</button>
+            <button class="chat-send" onclick="sendChat('swimlane')"><span>Send</span><span aria-hidden="true">↗</span></button>
           </div>
         </div>
       </div>
@@ -509,7 +521,7 @@
     </div>
     <div class="chat-input-area">
       <textarea class="chat-input" id="global-input" placeholder="Ask anything about PyPTO..." onkeydown="handleChatKey(event,'global')"></textarea>
-      <button class="chat-send" onclick="sendChat('global')">↑</button>
+      <button class="chat-send" onclick="sendChat('global')"><span>Send</span><span aria-hidden="true">↗</span></button>
     </div>
   </div>
   <div class="asp-body hidden" id="asp-snippets-panel">
