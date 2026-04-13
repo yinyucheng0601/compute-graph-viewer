@@ -22,10 +22,11 @@ const ROUTES = [
   { id: 'mte3',   label: 'MTE3', color: '#f97316', ops: new Set([]) },
 ];
 
-const TAG_BG_IDLE    = '#5a3a00';
-const TAG_TXT_IDLE   = 'rgba(255,220,120,0.55)';
-const TAG_BG_ACTIVE  = '#F59E0B';
-const TAG_TXT_ACTIVE = '#ffffff';
+const MTE_LINE_COLOR = '#FFB700';
+const TAG_BG_IDLE    = '#000000';
+const TAG_TXT_IDLE   = '#FFB700';
+const TAG_BG_ACTIVE  = '#FFB700';
+const TAG_TXT_ACTIVE = '#000000';
 
 /* ── SVG helpers ───────────────────────────────────────────────────────────── */
 
@@ -36,10 +37,16 @@ function mk(tag, attrs = {}) {
   return el;
 }
 function arrowMarker(id, color, reverse = false) {
-  const m = mk('marker', { id, markerWidth: '7', markerHeight: '7',
-    refX: reverse ? '1' : '6', refY: '3.5', orient: 'auto' });
+  const m = mk('marker', { id, markerWidth: '8', markerHeight: '8',
+    refX: reverse ? '1' : '7', refY: '4', orient: 'auto' });
   m.appendChild(mk('path', {
-    d: reverse ? 'M7,0 L7,7 L0,3.5 Z' : 'M0,0 L0,7 L7,3.5 Z', fill: color }));
+    d: reverse ? 'M7,1 L1,4 L7,7' : 'M1,1 L7,4 L1,7',
+    fill: 'none',
+    stroke: color,
+    'stroke-width': '1.5',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  }));
   return m;
 }
 
@@ -58,8 +65,7 @@ function buildDdrCard() {
   card.id        = 'ddr-card';
   card.className = 'buf-box buf-ddr';
   card.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                height:100%;gap:6px;">
+    <div class="buf-ddr-body">
       <span class="buf-label">DDR</span>
       <span class="cube-sub">off-chip</span>
     </div>`;
@@ -90,9 +96,9 @@ export function initMteOverlay() {
 
   const defs = mk('defs');
   for (const r of ROUTES) {
-    defs.appendChild(arrowMarker(`af-${r.id}`, r.color));
-    defs.appendChild(arrowMarker(`ar-${r.id}`, r.color, true));
-    defs.appendChild(arrowMarker(`af-idle-${r.id}`, 'rgba(160,160,160,0.4)'));
+    defs.appendChild(arrowMarker(`af-${r.id}`, MTE_LINE_COLOR));
+    defs.appendChild(arrowMarker(`ar-${r.id}`, MTE_LINE_COLOR, true));
+    defs.appendChild(arrowMarker(`af-idle-${r.id}`, '#FFB700'));
   }
   svg.appendChild(defs);
 
@@ -108,10 +114,12 @@ export function initMteOverlay() {
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
     });
     labelTxt.textContent = r.label;
-    g.appendChild(labelBg);
-    g.appendChild(labelTxt);
+    const labelGroup = mk('g', { id: `mte-label-${r.id}` });
+    labelGroup.appendChild(labelBg);
+    labelGroup.appendChild(labelTxt);
+    g.appendChild(labelGroup);
     svg.appendChild(g);
-    els[r.id] = { line, labelBg, labelTxt, LW, LH };
+    els[r.id] = { line, labelBg, labelTxt, labelGroup, LW, LH };
   }
 
   container.appendChild(svg);
@@ -197,9 +205,9 @@ export function renderMteOverlay(step) {
   // DDR card highlight
   const ddrEl = document.getElementById('ddr-card');
   if (ddrEl) {
-    ddrEl.style.backgroundColor = mte1On ? 'rgba(53,119,246,0.18)' : '';
-    ddrEl.style.borderColor     = mte1On ? 'rgba(53,119,246,0.65)' : '';
-    ddrEl.style.boxShadow       = mte1On ? '0 0 14px rgba(53,119,246,0.40)' : '';
+    ddrEl.style.backgroundColor = mte1On ? 'rgba(141,214,26,0.16)' : '';
+    ddrEl.style.borderColor     = mte1On ? 'rgba(141,214,26,0.52)' : '';
+    ddrEl.style.boxShadow       = mte1On ? '0 0 14px rgba(141,214,26,0.30)' : '';
   }
 
   for (const r of ROUTES) {
@@ -210,19 +218,20 @@ export function renderMteOverlay(step) {
     const isReverse = r.id === 'mte1' && opName === 'COPY_OUT';
 
     if (isActive) {
-      e.line.setAttribute('stroke',          r.color);
-      e.line.setAttribute('stroke-width',    '2.5');
+      e.line.setAttribute('stroke',          MTE_LINE_COLOR);
+      e.line.setAttribute('stroke-width',    '2');
       e.line.removeAttribute('stroke-dasharray');
       e.line.setAttribute('marker-end',   isReverse ? 'none'             : `url(#af-${r.id})`);
       e.line.setAttribute('marker-start', isReverse ? `url(#ar-${r.id})` : 'none');
-      e.line.style.filter = `drop-shadow(0 0 4px ${r.color})`;
+      e.line.style.filter = 'none';
       e.labelBg.setAttribute('fill',          TAG_BG_ACTIVE);
-      e.labelBg.setAttribute('stroke',        r.color);
-      e.labelBg.setAttribute('stroke-width',  '1.5');
+      e.labelBg.setAttribute('stroke',        MTE_LINE_COLOR);
+      e.labelBg.setAttribute('stroke-width',  '1');
       e.labelTxt.setAttribute('fill', TAG_TXT_ACTIVE);
+      e.labelGroup?.parentNode?.appendChild(e.labelGroup);
       e.labelBg.style.display = e.labelTxt.style.display = '';
     } else {
-      e.line.setAttribute('stroke',          'rgba(160,160,160,0.35)');
+      e.line.setAttribute('stroke',          '#FFB700');
       e.line.setAttribute('stroke-width',    '1');
       e.line.setAttribute('stroke-dasharray','5 4');
       e.line.setAttribute('marker-end',   r.ops.size > 0 ? `url(#af-idle-${r.id})` : 'none');
@@ -232,9 +241,10 @@ export function renderMteOverlay(step) {
         e.labelBg.style.display = e.labelTxt.style.display = 'none';
       } else {
         e.labelBg.setAttribute('fill',         TAG_BG_IDLE);
-        e.labelBg.setAttribute('stroke',       'rgba(200,140,0,0.30)');
+        e.labelBg.setAttribute('stroke',       '#FFB700');
         e.labelBg.setAttribute('stroke-width', '1');
         e.labelTxt.setAttribute('fill', TAG_TXT_IDLE);
+        e.labelGroup?.parentNode?.appendChild(e.labelGroup);
         e.labelBg.style.display = e.labelTxt.style.display = '';
       }
     }

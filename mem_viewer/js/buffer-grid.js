@@ -1,16 +1,10 @@
 import { TENSOR_META } from '../data/ops.js';
-import { BPG_CONFIG, TIER_CAP_BYTES, TENSOR_PALETTE, TIER_COLORS, fmtBytes, opByMagic } from './constants.js';
+import { BPG_CONFIG, TIER_CAP_BYTES, fmtBytes, opByMagic, MEMORY_TIER_VISUALS } from './constants.js';
 import { SCHEDULE, getLiveTensorsAtStep, getActiveTensors } from './schedule.js';
 
-/* ============================================================
-   Stable palette assignment: sorted magic → palette index
-   ============================================================ */
-const _allMagics = Object.keys(TENSOR_META).map(Number).sort((a, b) => a - b);
-const _paletteIndex = new Map(_allMagics.map((m, i) => [m, i % TENSOR_PALETTE.length]));
-
-function tensorColor(magic) {
-  const idx = _paletteIndex.get(magic) ?? 0;
-  return TENSOR_PALETTE[idx];
+function getTierFill(tier) {
+  const visual = MEMORY_TIER_VISUALS[tier] ?? MEMORY_TIER_VISUALS.L0A;
+  return visual.chip;
 }
 
 /* ============================================================
@@ -21,6 +15,7 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
   if (!cfg) return;
   const totalCells = cfg.rows * cfg.cols;
   const capBytes = TIER_CAP_BYTES[tier];
+  const tierVisual = MEMORY_TIER_VISUALS[tier] ?? MEMORY_TIER_VISUALS.L0A;
 
   // Allocate cells per tensor in magic order
   const cellMap = new Array(totalCells).fill(null); // null = empty, else { magic, color }
@@ -31,7 +26,7 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
     const meta = TENSOR_META[magic];
     const bytes = meta?.b ?? cfg.bpc; // fallback: 1 cell
     const nCells = Math.max(1, Math.ceil(bytes / cfg.bpc));
-    const color = tensorColor(magic);
+    const color = getTierFill(tier);
     usedBytes += bytes;
     for (let c = 0; c < nCells && cursor < totalCells; c++, cursor++) {
       cellMap[cursor] = { magic, color };
@@ -52,9 +47,16 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
       cell.style.background = color;
       cell.style.opacity = '0.75';
       const isActive = activeMagics.has(magic);
+      cell.style.boxShadow = isActive ? `0 0 0 1px ${tierVisual.active} inset, 0 0 12px ${tierVisual.glow}` : '';
       if (isActive) cell.classList.add('bpg-active');
-      if (inputSet.has(magic))  cell.classList.add('bpg-read');
-      if (outputSet.has(magic)) cell.classList.add('bpg-write');
+      if (inputSet.has(magic)) {
+        cell.classList.add('bpg-read');
+        cell.style.borderColor = tier === 'DDR' ? MEMORY_TIER_VISUALS.L1.active : tierVisual.active;
+      }
+      if (outputSet.has(magic)) {
+        cell.classList.add('bpg-write');
+        cell.style.borderColor = tier === 'DDR' ? MEMORY_TIER_VISUALS.DDR.active : tierVisual.active;
+      }
 
       // Data attributes for tooltip
       const meta = TENSOR_META[magic] ?? {};
@@ -69,6 +71,8 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
       cell.dataset.sh     = meta.sh ? JSON.stringify(meta.sh) : '[]';
       cell.dataset.sz     = fmtBytes(meta.b ?? 0);
       cell.dataset.rw     = rw;
+      cell.textContent = String(magic);
+      cell.setAttribute('aria-label', `Tensor ${magic}`);
     } else {
       cell.classList.add('bpg-empty');
     }
@@ -80,11 +84,11 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
   const pctEl = document.getElementById(`pct-${tier}`);
   const usedEl = document.getElementById(`used-${tier}`);
   const freeEl = document.getElementById(`free-${tier}`);
-  if (pctEl) { pctEl.textContent = `${pct}%`; pctEl.style.color = TIER_COLORS[tier] || '#3b82f6'; }
+  if (pctEl) { pctEl.textContent = `${pct}%`; }
   if (usedEl) usedEl.textContent = `${fmtBytes(usedBytes)} / ${fmtBytes(capBytes)}`;
   if (freeEl) {
     const freeBytes = Math.max(0, capBytes - usedBytes);
-    freeEl.textContent = freeBytes > 0 ? `··· ${fmtBytes(freeBytes)} FREE ···` : '· FULL ·';
+    freeEl.textContent = freeBytes > 0 ? fmtBytes(freeBytes) : '0 B';
   }
 
   // Update legend (up to 5 tensors)
@@ -97,15 +101,15 @@ function buildAndRenderBpg(tier, liveMagics, activeMagics, inputSet, outputSet) 
       const name = meta.s || `T${magic}`;
       const item = document.createElement('div');
       item.className = 'bpg-legend-item';
-      item.innerHTML = `<div class="bpg-legend-dot" style="background:${tensorColor(magic)}"></div>`
-                     + `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span>`;
+      item.innerHTML = `<div class="bpg-legend-dot" style="background:${getTierFill(tier)}"></div>`
+                     + `<span class="bpg-legend-label">Tensor:</span>`
+                     + `<span class="bpg-legend-value">${name}</span>`;
       legendEl.appendChild(item);
     }
     if (liveMagics.length > 5) {
       const more = document.createElement('div');
       more.className = 'bpg-legend-item';
-      more.style.color = 'var(--text-dim)';
-      more.textContent = `+${liveMagics.length - 5}…`;
+      more.innerHTML = `<span class="bpg-legend-label">More:</span><span class="bpg-legend-value">+${liveMagics.length - 5}</span>`;
       legendEl.appendChild(more);
     }
   }
@@ -153,7 +157,12 @@ export function initBpgTooltip() {
     let shapeStr = '?';
     try { shapeStr = JSON.parse(sh).join(' × '); } catch {}
 
-    tip.style.borderColor = rw === 'r' ? '#3b82f6' : rw === 'w' ? '#10b981' : (color || '#3b82f6');
+    const tooltipBorder = rw === 'r'
+      ? MEMORY_TIER_VISUALS.L1.active
+      : rw === 'w'
+        ? MEMORY_TIER_VISUALS.DDR.active
+        : (color || MEMORY_TIER_VISUALS.L0A.active);
+    tip.style.borderColor = tooltipBorder;
     tip.innerHTML = `
       <div style="font-size:10px;font-weight:700;color:var(--text-primary);margin-bottom:4px">${tier} · Tensor</div>
       <hr class="bt-divider">

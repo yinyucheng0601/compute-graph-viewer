@@ -190,16 +190,16 @@ function opcodeToCategory(opcode) {
 // ── Engine + Memory mode helpers ──────────────────────────────────────────
 
 const ENGINE_MEMORY_COLORS = {
-  'engine:vector': '#3B82F6',      // blue
+  'engine:vector': '#1DB7D9',      // L0 cyan-blue
   'engine:cube': '#8B5CF6',        // purple
-  'memory:gm': '#14B8A6',          // teal
-  'memory:l1': '#0EA5A4',          // dark teal
-  'memory:l0': '#06B6D4',          // cyan
-  'memory:ub': '#22D3EE',          // light cyan
-  'memory:local': '#5EEAD4',       // mint
+  'memory:gm': '#8DD61A',          // lime
+  'memory:l1': '#22B8B5',          // teal
+  'memory:l0': '#1DB7D9',          // cyan-blue
+  'memory:ub': '#1DB7D9',          // grouped into L0 family
+  'memory:local': '#55CAE6',       // light L0 tint
   'memory:register': '#64748B',    // slate
-  'memory:workspace': '#2DD4BF',   // turquoise
-  'memory:allocated': '#0F766E',   // deep teal
+  'memory:workspace': '#55CAE6',   // light L0 tint
+  'memory:allocated': '#22B8B5',   // L1/L0-adjacent util memory
   'memory:unknown': '#6B7280',     // neutral
 };
 
@@ -209,7 +209,7 @@ const MEM_TYPE_CODE_TO_KEY = {
   2: 'memory:l0',
   3: 'memory:l0',
   4: 'memory:l0',
-  5: 'memory:ub',
+  5: 'memory:l0',
   6: 'memory:local',
   7: 'memory:register',
   8: 'memory:workspace',
@@ -222,7 +222,7 @@ const ENGINE_MEMORY_LABELS = {
   'memory:gm': 'GM',
   'memory:l1': 'L1',
   'memory:l0': 'L0',
-  'memory:ub': 'UB',
+  'memory:ub': 'L0',
   'memory:local': 'Local',
   'memory:register': 'Register',
   'memory:workspace': 'Workspace',
@@ -247,7 +247,7 @@ function normalizeMemTypeValue(v) {
   const s = String(v).toUpperCase();
   if (s.includes('L1')) return 'memory:l1';
   if (s.includes('L0')) return 'memory:l0';
-  if (s.includes('UB')) return 'memory:ub';
+  if (s.includes('UB')) return 'memory:l0';
   if (s.includes('GM')) return 'memory:gm';
   if (s.includes('REG')) return 'memory:register';
   if (s.includes('LOCAL')) return 'memory:local';

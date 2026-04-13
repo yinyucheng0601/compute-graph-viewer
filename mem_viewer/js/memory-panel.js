@@ -1,5 +1,5 @@
 import { getLiveTensorsAtStep, getActiveTensors, SCHEDULE } from './schedule.js';
-import { opByMagic, UB_VEC_OPS } from './constants.js';
+import { opByMagic, UB_VEC_OPS, ENGINE_MEMORY_LEGEND_COLORS, MEMORY_TIER_VISUALS } from './constants.js';
 
 /* ============================================================
    Memory Panel Rendering — dark mode
@@ -7,10 +7,10 @@ import { opByMagic, UB_VEC_OPS } from './constants.js';
 
 // Dark mode palette: semi-transparent colored tints on dark bg
 const ARCH_TIER_COLORS = {
-  L1:  { bg: 'rgba(53,119,246,0.85)',  border: 'rgba(53,119,246,0.9)',  text: '#ffffff', activeBorder: '#3577F6' },
-  L0A: { bg: 'rgba(168,85,247,0.85)',  border: 'rgba(168,85,247,0.9)',  text: '#ffffff', activeBorder: '#A855F7' },
-  L0B: { bg: 'rgba(124,58,237,0.85)',  border: 'rgba(124,58,237,0.9)',  text: '#ffffff', activeBorder: '#7c3aed' },
-  L0C: { bg: 'rgba(249,115,22,0.85)',  border: 'rgba(249,115,22,0.9)',  text: '#ffffff', activeBorder: '#f97316' },
+  L1:  { bg: 'rgba(34,184,181,0.85)', border: 'rgba(34,184,181,0.92)', text: '#ffffff', activeBorder: MEMORY_TIER_VISUALS.L1.active },
+  L0A: { bg: 'rgba(29,183,217,0.85)', border: 'rgba(29,183,217,0.92)', text: '#ffffff', activeBorder: MEMORY_TIER_VISUALS.L0A.active },
+  L0B: { bg: 'rgba(29,183,217,0.80)', border: 'rgba(29,183,217,0.88)', text: '#ffffff', activeBorder: MEMORY_TIER_VISUALS.L0B.active },
+  L0C: { bg: 'rgba(29,183,217,0.74)', border: 'rgba(29,183,217,0.84)', text: '#ffffff', activeBorder: MEMORY_TIER_VISUALS.L0C.active },
 };
 
 const ARCH_TIERS = ['L1', 'L0A', 'L0B', 'L0C'];
@@ -74,36 +74,43 @@ function renderDaVinciHighlights(step) {
   // Cube MMA
   const cubeEl = document.getElementById('cube-unit');
   if (cubeEl) {
-    cubeEl.style.background    = cubeActive ? 'rgba(249,115,22,0.25)' : '';
-    cubeEl.style.borderColor   = cubeActive ? '#f97316' : '';
-    cubeEl.style.boxShadow     = cubeActive ? '0 0 12px rgba(249,115,22,0.5)' : '';
-    cubeEl.style.transform     = cubeActive ? 'scale(1.03)' : '';
-    cubeEl.style.transition    = 'all 0.25s ease';
+    cubeEl.classList.toggle('is-active', cubeActive);
   }
 
   // FixPipe
   const fixEl = document.getElementById('fixpipe-unit');
   if (fixEl) {
-    fixEl.style.color      = cubeActive ? '#fbbf24' : '';
-    fixEl.style.borderBottom = cubeActive ? '1px solid rgba(251,191,36,0.4)' : '';
-    fixEl.style.transition = 'all 0.25s ease';
+    fixEl.classList.toggle('is-active', cubeActive);
   }
 
   // Vector
   const vecEl = document.getElementById('vector-unit');
   if (vecEl) {
-    vecEl.style.background  = vecActive ? 'rgba(16,185,129,0.20)' : '';
-    vecEl.style.borderColor = vecActive ? '#10b981' : '';
-    vecEl.style.boxShadow   = vecActive ? '0 0 10px rgba(16,185,129,0.45)' : '';
-    vecEl.style.transition  = 'all 0.25s ease';
+    vecEl.classList.toggle('is-active', vecActive);
   }
 
   // AIC / AIV region backgrounds
   const aicEl = document.getElementById('arch-aic');
-  if (aicEl) aicEl.style.background = anyAIC ? 'rgba(59,130,246,0.05)' : '';
+  if (aicEl) aicEl.style.background = anyAIC ? 'rgba(29,183,217,0.05)' : '';
 
   const aivEl = document.getElementById('arch-aiv');
-  if (aivEl) aivEl.style.background = anyAIV ? 'rgba(16,185,129,0.05)' : '';
+  if (aivEl) aivEl.style.background = anyAIV ? 'rgba(29,183,217,0.04)' : '';
+
+  if (cubeEl) {
+    cubeEl.style.backgroundColor = cubeActive ? 'rgba(139,92,246,0.18)' : '';
+    cubeEl.style.borderColor = cubeActive ? 'rgba(139,92,246,0.44)' : '';
+    cubeEl.style.boxShadow = cubeActive ? `0 0 18px ${hexToRgba(ENGINE_MEMORY_LEGEND_COLORS.cube, 0.28)}` : '';
+  }
+  if (fixEl) {
+    fixEl.style.color = cubeActive ? ENGINE_MEMORY_LEGEND_COLORS.cube : '';
+    fixEl.style.textShadow = cubeActive ? `0 0 12px ${hexToRgba(ENGINE_MEMORY_LEGEND_COLORS.cube, 0.28)}` : '';
+  }
+  if (vecEl) {
+    vecEl.style.backgroundColor = vecActive ? 'rgba(29,183,217,0.16)' : '';
+    vecEl.style.borderColor = vecActive ? 'rgba(29,183,217,0.34)' : '';
+    vecEl.style.color = vecActive ? '#8FE5F5' : '';
+    vecEl.style.boxShadow = vecActive ? '0 0 16px rgba(29,183,217,0.24)' : '';
+  }
 }
 
 export { hexToRgba, renderMemoryPanel, renderDaVinciHighlights };
