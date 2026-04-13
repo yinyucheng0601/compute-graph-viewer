@@ -328,8 +328,9 @@ function createTensorRow(idx, isOut) {
   const div = document.createElement('div');
   div.className = 'tensor-row' + (isOut ? ' out-row' : '');
   div.dataset.idx = idx;
+  const defaultName = `${isOut ? 'output' : 'input'}_${idx}`;
   div.innerHTML = `
-    <input class="ti-name" placeholder="${isOut ? 'output' : 'input'}_${idx}" value="">
+    <input class="ti-name" placeholder="${defaultName}" value="${defaultName}">
     <select class="ti-dtype">
       ${isOut ? '<option>FP32</option><option>BF16</option><option>FP16</option><option>INT32</option>'
               : '<option>BF16</option><option>FP16</option><option>FP32</option><option>INT8</option>'}
