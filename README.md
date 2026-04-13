@@ -92,7 +92,9 @@ PTO 使用四层 Design Token 架构，所有颜色、排版、间距通过 CSS 
 ```
 tokens/foundation.css   # 原始值：色盘、字号、间距、圆角、阴影、动效
 tokens/semantic.css     # 语义映射：background / foreground / border / surface / 交互状态
-css/style.css           # 场景 Token + Alias Token（模块消费层）
+tokens/components.css   # 组件规格：toolbar / button / input / panel / card / tag
+tokens/generate_tokens.py # 生成器：从三份 CSS token 源导出 tokens.js / tokens.json
+css/style.css           # 节点图场景 Token + alias（模块消费层）
 ```
 
 ### Token 概览
@@ -108,11 +110,18 @@ css/style.css           # 场景 Token + Alias Token（模块消费层）
 
 **semantic.css（深色主题 :root）**
 - Background：`--background`、`--background-elevated`
-- Surface：`--surface-1 ~ 3`（纯中性灰）
-- Foreground：`--foreground` / `secondary` / `muted` / `disabled`
+- Surface：`--surface-1 ~ 4`（纯中性灰）
+- Foreground：`--foreground` / `secondary` / `muted` / `disabled`（HOS alpha 四档：0.90 / 0.60 / 0.40 / 0.25）
 - Border：`--border-subtle / default / strong`（白色 alpha，纯中性）
 - 语义色：`--primary` / `accent` / `success` / `warning` / `danger`
+- Tone：`--tone-critical-bg / warning-bg / info-bg` 与 `--tone-*-strong`
 - 交互状态叠加：`--state-hover / press / selected / focus`
+
+**components.css**
+- Toolbar：`--comp-toolbar-height / bg / border`
+- Button：primary / secondary / ghost 高度、圆角、前景背景
+- Input / Panel / Card / Table / Tag：统一尺寸与边框语义
+- Typography Composites：7 个排版角色（`--text-display / title-1 / title-2 / body / body-sm / label / mono`），消费方直接用 `font: var(--text-body)` 即可
 
 **css/style.css（场景 Token）**
 - Pass-IR 节点面：`--node-bg-elevated / hover / selected`（比画布略亮）
@@ -123,14 +132,34 @@ css/style.css           # 场景 Token + Alias Token（模块消费层）
 
 | 模块 | 接入 | 说明 |
 |------|------|------|
-| pass-ir | ✅ | 节点卡片全部 token 化，边框去蓝偏 |
-| swimlane | ✅ | |
-| execution-overlay | ✅ | |
-| model-architecture | ✅ | |
-| source-flow | ✅ | |
-| pypto-swimlane-perf-tool | ✅ | 含本地扩展 token（tone-* 系列） |
-| mem_viewer / op-ide-assistant / indexer-exec | ✅ | |
-| graph-prototype-lab | ⚪ | 独立实验，未接入 |
+| pypto-swimlane-perf-tool | ✅ | `style.css + foundation + semantic + components`，保留少量场景扩展 |
+| swimlane / swimlane-bench | ✅ | `style.css + foundation + semantic + components` |
+| mem_viewer / source-flow / execution-overlay / indexer-exec | ✅ | 通过 `css/style.css` 间接消费共享 token |
+| pass-ir | ✅ | 通过 `css/style.css` 间接消费共享 token，节点提升面已统一到共享 `surface-4` |
+| op-ide-assistant | △ | 仅接入 `foundation.css + semantic.css`，缺 `components.css` 与 `css/style.css` |
+| graph-prototype-lab | ✕ | 仅手工镜像 token 数值，未实际 import 共享 token |
+| model-architecture | ✕ | 仅手工镜像 token 数值，未实际 import 共享 token |
+| devui | ✕ | Angular bundle 体系，尚未接入当前静态 token 路径 |
+
+### 当前缺口
+
+- `tokens/tokens.js`、`tokens/tokens.json` 现为生成产物，不应手工维护；单一来源是三份 CSS token 源。
+- `graph-prototype-lab`、`model-architecture` 已做视觉对齐，但还不是设计系统真实接入。
+- `op-ide-assistant` 仍维护自己的组件变量映射，后续适合拆成“壳层接入 style.css + 组件层复用”两步。
+
+### Token 生成
+
+更新 token 快照时执行：
+
+```bash
+python3 tokens/generate_tokens.py
+```
+
+规则：
+
+- 修改 token → 改 `foundation.css` / `semantic.css` / `components.css`
+- 运行生成器
+- 不要直接编辑 `tokens.js` 或 `tokens.json`
 
 ---
 
