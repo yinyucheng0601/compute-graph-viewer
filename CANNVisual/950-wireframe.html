@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ascend 950 Package Wireframe</title>
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    :root {
+      --bg: var(--background);
+      --panel: var(--background-elevated);
+      --panel-2: var(--surface-1);
+      --ink: var(--foreground);
+      --muted: var(--foreground-secondary);
+      --line: var(--border-default);
+      --line-strong: var(--border-strong, rgba(255, 255, 255, 0.96));
+      --hover: var(--foreground);
+      --pulse: var(--foreground-secondary);
+      --accent: var(--primary);
+      --overlay: var(--surface-2);
+      --shadow: 0 0 0 1px var(--border-subtle), 0 24px 80px rgba(0, 0, 0, 0.56);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Fira Code", "IBM Plex Mono", "Consolas", monospace;
+      --sans: "IBM Plex Sans", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+      --tier-l1: var(--highlight-copy-blue-source, #3b82f6);
+      --tier-l0a: var(--highlight-l0a-violet-source, #8b5cf6);
+      --tier-l0b: var(--highlight-l0b-deep-violet-source, #6d28d9);
+      --tier-l0c: var(--highlight-accum-orange-source, #f97316);
+      --tier-ub: var(--highlight-ub-green-source, #22c55e);
+
+      --tier-l1-bg: color-mix(in srgb, var(--tier-l1) 12%, transparent);
+      --tier-l1-border: color-mix(in srgb, var(--tier-l1) 38%, transparent);
+      --tier-l1-fill: color-mix(in srgb, var(--tier-l1) 72%, transparent);
+
+      --tier-l0a-bg: color-mix(in srgb, var(--tier-l0a) 12%, transparent);
+      --tier-l0a-border: color-mix(in srgb, var(--tier-l0a) 38%, transparent);
+      --tier-l0a-fill: color-mix(in srgb, var(--tier-l0a) 72%, transparent);
+
+      --tier-l0b-bg: color-mix(in srgb, var(--tier-l0b) 12%, transparent);
+      --tier-l0b-border: color-mix(in srgb, var(--tier-l0b) 38%, transparent);
+      --tier-l0b-fill: color-mix(in srgb, var(--tier-l0b) 72%, transparent);
+
+      --tier-l0c-bg: color-mix(in srgb, var(--tier-l0c) 12%, transparent);
+      --tier-l0c-border: color-mix(in srgb, var(--tier-l0c) 38%, transparent);
+      --tier-l0c-fill: color-mix(in srgb, var(--tier-l0c) 72%, transparent);
+
+      --tier-ub-bg: color-mix(in srgb, var(--tier-ub) 8%, transparent);
+      --tier-ub-border: color-mix(in srgb, var(--tier-ub) 30%, transparent);
+      --tier-ub-fill: color-mix(in srgb, var(--tier-ub) 72%, transparent);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    body {
+      font-family: var(--sans);
+      background-image:
+        linear-gradient(var(--border-subtle) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .page {
+      width: min(1800px, 100%);
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font: 11px/1 var(--mono);
+      letter-spacing: 0.08em;
+      color: var(--ink);
+      background: var(--surface-2);
+    }
+
+    .package-shell {
+      position: relative;
+      padding: 0;
+    }
+
+    .package-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(140px, 0.8fr) minmax(460px, 2.6fr) minmax(140px, 0.8fr) minmax(460px, 2.6fr) minmax(140px, 0.8fr);
+      gap: 48px;
+      align-items: start;
+      min-height: 760px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 5;
+    }
+
+    .overlay path,
+    .overlay line,
+    .overlay polyline {
+      stroke: var(--border-default);
+      fill: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .overlay .data-link {
+      stroke-width: 1.5;
+      marker-end: url(#arrow-end);
+      marker-start: url(#arrow-start);
+    }
+
+    .overlay .fabric-link {
+      stroke-width: 2.5;
+      marker-end: url(#arrow-end-heavy);
+      marker-start: url(#arrow-start-heavy);
+    }
+
+    .diagram-block {
+      position: relative;
+      z-index: 2;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      background: var(--surface-1);
+      min-width: 0;
+    }
+
+    .diagram-title {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      font: 12px/1.2 var(--mono);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--foreground-secondary);
+    }
+
+    .diagram-body {
+      padding: 12px;
+    }
+
+    .hbm {
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hbm-list {
+      display: grid;
+      gap: 10px;
+      font: 12px/1.4 var(--mono);
+      color: var(--ink);
+    }
+
+    .hbm-list div {
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--surface-2);
+    }
+
+    .hbm-arrow {
+      margin-top: auto;
+      padding-top: 12px;
+      text-align: center;
+      font: 12px/1.2 var(--mono);
+      color: var(--foreground-secondary);
+      letter-spacing: 0.08em;
+    }
+
+    .compute-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .cache-band {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      font: 12px/1 var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: var(--surface-2);
+    }
+
+    .core-cluster {
+      padding: 14px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      background: var(--surface-2);
+    }
+
+    .cluster-title {
+      margin-bottom: 10px;
+      font: 11px/1.2 var(--mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--foreground-secondary);
+    }
+
+    .core-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .ai-core {
+      min-height: 54px;
+      padding: 8px;
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      background: var(--primary);
+      color: var(--foreground);
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, filter 160ms ease;
+      font-family: var(--mono);
+    }
+
+    .ai-core-id {
+      font: 13px/1 var(--mono);
+      letter-spacing: 0.04em;
+      color: var(--foreground);
+    }
+
+    .ai-core:hover,
+    .ai-core:focus-visible {
+      outline: none;
+      transform: translateY(-1px);
+      filter: brightness(1.2);
+      box-shadow: 0 0 0 2px var(--primary), 0 0 16px color-mix(in srgb, var(--primary) 40%, transparent);
+    }
+
+
+    .compute-footer {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .footer-cell,
+    .d2d-cell {
+      min-height: 54px;
+    }
+
+    .io-item {
+      min-height: 42px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      font: 12px/1.25 var(--mono);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: var(--surface-2);
+    }
+
+    .io-die {
+      min-height: 0;
+    }
+
+    .io-list {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .io-ext-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-subtle);
+    }
+
+    .io-ext-item {
+      text-align: center;
+      font: 10px/1.6 var(--mono);
+      color: var(--foreground-secondary);
+      letter-spacing: 0.06em;
+      padding: 6px 4px;
+      text-transform: uppercase;
+    }
+
+    .io-ext-target {
+      display: block;
+      color: var(--ink);
+    }
+
+    .d2d {
+      min-height: 220px;
+      align-self: center;
+    }
+
+    .d2d .diagram-body {
+      display: grid;
+      gap: 10px;
+      align-content: center;
+      min-height: 168px;
+    }
+
+    .connector-note {
+      margin-top: 18px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .connector-note table {
+      width: 100%;
+      border-collapse: collapse;
+      font: 12px/1.4 var(--mono);
+    }
+
+    .connector-note th,
+    .connector-note td {
+      border-bottom: 1px solid var(--border-subtle);
+      border-right: 1px solid var(--border-subtle);
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .connector-note th:last-child,
+    .connector-note td:last-child {
+      border-right: none;
+    }
+
+    .connector-note tr:last-child td {
+      border-bottom: none;
+    }
+
+    dialog {
+      width: min(1500px, calc(100vw - 40px));
+      max-width: none;
+      padding: 0;
+      border: 1px solid var(--border-default);
+      border-radius: 22px;
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 40px 120px rgba(0, 0, 0, 0.72);
+      margin: auto;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.82);
+      backdrop-filter: blur(4px);
+    }
+
+    .modal {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: min(840px, calc(100vh - 64px));
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .modal-title {
+      margin: 0;
+      font: 15px/1 var(--mono);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .modal-stats {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .stat {
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      font: 12px/1 var(--mono);
+      letter-spacing: 0.08em;
+      min-width: 88px;
+      text-align: center;
+      background: var(--surface-2);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .button,
+    .close-button {
+      border: 1px solid var(--border-default);
+      background: var(--surface-2);
+      color: var(--ink);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font: 12px/1 var(--mono);
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+
+    .button:hover,
+    .close-button:hover {
+      background: var(--surface-3);
+      border-color: var(--border-default);
+    }
+
+    .close-button {
+      min-width: 40px;
+      padding-inline: 0;
+    }
+
+    .modal-body {
+      padding: 18px 20px 20px;
+      overflow: auto;
+    }
+
+    .modal-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .section {
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--surface-1);
+    }
+
+    .section-title {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      font: 13px/1 var(--mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--foreground-secondary);
+    }
+
+    .section-inner {
+      padding: 16px;
+    }
+
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .node {
+      position: relative;
+      min-height: 72px;
+      padding: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font: 12px/1.25 var(--mono);
+      letter-spacing: 0.06em;
+      background: var(--surface-2);
+      transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+
+    .node.active {
+      border-color: var(--border-default);
+      background: var(--surface-3);
+      box-shadow: 0 0 0 1px var(--border-default);
+    }
+
+    .node.pulse {
+      animation: pulse 900ms ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 0 0 0 1px var(--border-default);
+        background: var(--surface-2);
+      }
+      50% {
+        box-shadow: 0 0 0 2px var(--primary);
+        background: var(--surface-3);
+      }
+    }
+
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 16px/1 var(--mono);
+      color: var(--muted);
+    }
+
+    .arrow.active {
+      color: var(--ink);
+      text-shadow: 0 0 10px color-mix(in srgb, var(--foreground) 34%, transparent);
+    }
+
+    .flow-grid.aic {
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+    }
+
+    .flow-grid.aiv {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .instruction-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .instruction-list {
+      padding: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      min-height: 92px;
+      font: 11px/1.45 var(--mono);
+      color: var(--foreground-secondary);
+      background: var(--surface-2);
+      transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .instruction-list.active {
+      color: var(--ink);
+      border-color: var(--border-default);
+      background: var(--surface-3);
+    }
+
+    .step-strip {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .step-item {
+      padding: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      font: 11px/1.35 var(--mono);
+      min-height: 82px;
+      background: var(--surface-2);
+      color: var(--foreground-secondary);
+      transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .step-item.active {
+      color: var(--ink);
+      border-color: var(--border-default);
+      background: var(--surface-3);
+    }
+
+    .step-item strong {
+      display: block;
+      margin-bottom: 6px;
+      color: inherit;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .instr-row {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .flow-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .flow-sep {
+      flex-shrink: 0;
+      font: 14px/1 var(--mono);
+      color: var(--muted);
+      text-align: center;
+      padding: 0 2px;
+    }
+
+    .mte-label {
+      display: block;
+      font: 10px/1.4 var(--mono);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--foreground-secondary);
+      margin-top: 4px;
+    }
+
+    .node.flow-tall {
+      min-height: 140px;
+      align-self: stretch;
+    }
+
+    .node.flow-wide {
+      min-width: 180px;
+    }
+
+    .node.sm {
+      min-height: 44px;
+      font-size: 11px;
+      padding: 8px;
+    }
+
+    .instr-seq {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .instr-seq .instruction-list {
+      flex: 1;
+      min-width: 120px;
+      min-height: 0;
+      padding: 10px;
+    }
+
+    #uma-tag rect {
+      fill: var(--panel);
+      stroke: var(--border-default);
+      stroke-width: 1;
+    }
+
+    #uma-tag text {
+      fill: var(--foreground-secondary);
+      font: 11px/1 var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 1500px) {
+      .package-grid {
+        grid-template-columns: 150px 1fr 120px 1fr 150px;
+      }
+    }
+
+    @media (max-width: 1280px) {
+      .page {
+        padding: 18px;
+      }
+
+      .package-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .io-list {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .d2d {
+        min-height: 0;
+      }
+
+      .overlay {
+        display: none;
+      }
+
+      .flow-grid.aic,
+      .flow-grid.aiv,
+      .instruction-grid,
+      .step-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 900px) {
+      .page-header,
+      .modal-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .core-grid,
+      .compute-footer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .flow-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .arrow {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .core-grid,
+      .compute-footer,
+      .instruction-grid,
+      .step-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .page {
+        padding: 12px;
+      }
+    }
+
+    .buf-box {
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      background: var(--surface-2);
+      padding: 12px 14px;
+    }
+    .buf-box.tier-l1  { border-color: var(--tier-l1-border);  background: var(--tier-l1-bg); }
+    .buf-box.tier-l0a { border-color: var(--tier-l0a-border); background: var(--tier-l0a-bg); }
+    .buf-box.tier-l0b { border-color: var(--tier-l0b-border); background: var(--tier-l0b-bg); }
+    .buf-box.tier-l0c { border-color: var(--tier-l0c-border); background: var(--tier-l0c-bg); }
+    .buf-box.tier-ub  { border-color: var(--tier-ub-border);  background: var(--tier-ub-bg); }
+
+    .node.tier-l1  { border-color: var(--tier-l1-border);  background: var(--tier-l1-bg); }
+    .node.tier-l0a { border-color: var(--tier-l0a-border); background: var(--tier-l0a-bg); }
+    .node.tier-l0b { border-color: var(--tier-l0b-border); background: var(--tier-l0b-bg); }
+    .node.tier-l0c { border-color: var(--tier-l0c-border); background: var(--tier-l0c-bg); }
+    .node.tier-ub  { border-color: var(--tier-ub-border);  background: var(--tier-ub-bg); }
+
+    .node.tier-primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--foreground);
+    }
+
+    .aic-main-row {
+      display: flex;
+      flex-direction: row;
+      gap: 12px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+    .aic-buf-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      justify-content: center;
+    }
+    .buf-label {
+      font: 11px/1.3 var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--foreground-secondary);
+      margin-bottom: 4px;
+    }
+    .buf-label.primary-label {
+      color: var(--foreground);
+    }
+
+    /* ── Memory Tier Visualization (ported from component-preview.html) ── */
+    :root {
+      --mte-line-color: var(--highlight-mte-amber-source, #f59e0b);
+      --mte-pill-bg: var(--highlight-mte-amber-source, #f59e0b);
+      --mte-pill-border: var(--highlight-mte-amber-source, #f59e0b);
+      --mte-pill-text: var(--highlight-mte-amber-1000, #1f1300);
+      --buf-stat-accent-bg: color-mix(in srgb, var(--tier-l1) 14%, transparent);
+      --buf-stat-accent-border: color-mix(in srgb, var(--tier-l1) 28%, transparent);
+      --buf-stat-accent-fg: var(--highlight-copy-blue-100, #dbeafe);
+      --mem-card-lg-w: 272px;
+      --mem-card-sm-w: 256px;
+      --mem-card-lg-h: 328px;
+      --mem-card-sm-h: 154px;
+      --mem-card-gap: 14px;
+      --text-dim: color-mix(in srgb, var(--foreground) 72%, transparent);
+      --radius-md: 12px;
+    }
+
+    #arch-diagram {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 32px;
+      min-height: 180px;
+      position: relative;
+      padding: 8px 4px;
+    }
+
+    #mte-overlay-svg line {
+      transition: stroke 0.18s ease, stroke-width 0.18s ease;
+    }
+
+    #mte-overlay-svg text {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .arch-section {
+      flex: 0 1 auto;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: relative;
+      gap: 10px;
+      min-width: 0;
+      border: none;
+      background: none;
+      border-radius: 0;
+    }
+
+    .arch-section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--foreground-secondary);
+      padding: 0 2px 2px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .arch-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      flex: 0 1 auto;
+      min-height: 0;
+    }
+
+    .arch-aic-row {
+      display: flex;
+      gap: 32px;
+      flex: 0 1 auto;
+      min-height: 0;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .l0ab-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--mem-card-gap);
+      flex: 0 0 auto;
+    }
+
+    .arch-sep {
+      display: flex;
+      align-items: center;
+      writing-mode: vertical-rl;
+      font-size: 10px;
+      color: var(--foreground-secondary);
+      padding: 8px 0;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+    }
+
+    /* buf-box overrides for the arch diagram */
+    .arch-section .buf-box {
+      border-radius: var(--radius-md);
+      border: 1px solid;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: fit-content;
+      min-width: fit-content;
+      max-width: 100%;
+      flex: 0 0 auto;
+      min-height: 0;
+      background: none;
+    }
+
+    .arch-section .buf-l1  { background-color: var(--tier-l1-bg);  border-color: var(--tier-l1-border); }
+    .arch-section .buf-l0a { background-color: var(--tier-l0a-bg); border-color: var(--tier-l0a-border); }
+    .arch-section .buf-l0b { background-color: var(--tier-l0b-bg); border-color: var(--tier-l0b-border); }
+    .arch-section .buf-l0c { background-color: var(--tier-l0c-bg); border-color: var(--tier-l0c-border); }
+    .arch-section .buf-ub  { background-color: var(--tier-ub-bg);  border-color: var(--tier-ub-border); }
+
+    .arch-section .buf-l1,
+    .arch-section .buf-l0c,
+    .arch-section .buf-ub {
+      width: var(--mem-card-lg-w);
+      min-height: var(--mem-card-lg-h);
+    }
+
+    .arch-section .buf-l0a,
+    .arch-section .buf-l0b {
+      width: var(--mem-card-sm-w);
+      min-height: var(--mem-card-sm-h);
+    }
+
+    .buf-hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .buf-hdr-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .arch-section .buf-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--foreground);
+      white-space: nowrap;
+      letter-spacing: 0;
+      text-transform: none;
+      margin-bottom: 0;
+    }
+
+    .buf-stat-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-default);
+      background: var(--surface-3);
+      color: var(--foreground);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .buf-stat-tag.is-accent {
+      background: var(--buf-stat-accent-bg);
+      border-color: var(--buf-stat-accent-border);
+      color: var(--buf-stat-accent-fg);
+    }
+
+    .buf-meta-list {
+      display: grid;
+      gap: 4px;
+      margin-top: auto;
+      padding-top: 10px;
+    }
+
+    .buf-meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    .buf-meta-key {
+      color: var(--foreground-secondary);
+      flex-shrink: 0;
+    }
+
+    .buf-meta-val {
+      color: var(--text-dim);
+      text-align: right;
+      min-width: 0;
+    }
+
+    .buf-meta-val.is-strong {
+      color: var(--foreground);
+    }
+
+    .bpg-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--bpg-cols, 8), 24px);
+      grid-auto-rows: 24px;
+      gap: 4px;
+      flex-shrink: 0;
+      width: fit-content;
+      margin: 0 auto;
+      justify-content: center;
+    }
+
+    .bpg-cell {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: var(--surface-1);
+      border: 1px solid transparent;
+    }
+
+    .bpg-cell.is-l1  { background: var(--tier-l1-fill); }
+    .bpg-cell.is-l0a { background: var(--tier-l0a-fill); }
+    .bpg-cell.is-l0b { background: var(--tier-l0b-fill); }
+    .bpg-cell.is-l0c { background: var(--tier-l0c-fill); }
+    .bpg-cell.is-ub  { background: var(--tier-ub-fill); }
+
+    .bpg-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .bpg-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--foreground-secondary);
+      max-width: 80px;
+      overflow: hidden;
+    }
+
+    .bpg-legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .cube-box {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      border-radius: var(--radius-md);
+      width: 144px;
+      min-height: var(--mem-card-lg-h);
+      padding: 12px 14px;
+      background: var(--tier-l1-bg);
+      border: 1px solid var(--tier-l1-border);
+      color: var(--foreground);
+      flex: 0 0 auto;
+    }
+
+    .cube-hdr {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: flex-start;
+    }
+
+    .cube-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--foreground);
+      white-space: nowrap;
+    }
+
+    .cube-sub {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--foreground-secondary);
+      font-family: var(--mono);
+      white-space: nowrap;
+    }
+
+    .cube-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--foreground-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    .mte-arrow {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: var(--mte-pill-bg);
+      border: 1px solid var(--mte-pill-border);
+      color: var(--mte-pill-text);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .unit-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      width: fit-content;
+      flex-shrink: 0;
+    }
+
+    .unit-box {
+      flex: 0 0 auto;
+      text-align: center;
+      padding: 8px 12px;
+      min-width: 96px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-3);
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--foreground-secondary);
+    }
+
+    .gm-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 2px 1px;
+      flex-shrink: 0;
+      border: none;
+      background: none;
+      margin-top: 0;
+    }
+
+    .gm-strip-placeholder {
+      visibility: hidden;
+    }
+
+    .gm-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--foreground-secondary);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1 class="title">Ascend 950 Package Wireframe</h1>
+        <p class="subtitle">黑白线框示意图，包含 HBM / Compute Die / D2D / IO Die、16 个 AI Core 缩略图与可步进的 AI Core Detail Modal。</p>
+      </div>
+      <div class="legend" aria-label="Legend">
+        <span class="chip">HBM ↔ Compute: 双向实线</span>
+        <span class="chip">Compute ↔ D2D: 粗双向线</span>
+        <span class="chip">Compute ↔ IO: 双向实线</span>
+      </div>
+    </header>
+
+    <section class="package-shell">
+      <div class="package-grid" id="package-grid">
+        <svg class="overlay" id="package-overlay" aria-hidden="true">
+          <defs>
+            <marker id="arrow-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"></path>
+            </marker>
+            <marker id="arrow-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 10 1 L 1 5 L 10 9" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"></path>
+            </marker>
+            <marker id="arrow-end-heavy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"></path>
+            </marker>
+            <marker id="arrow-start-heavy" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 10 1 L 1 5 L 10 9" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"></path>
+            </marker>
+          </defs>
+          <g id="uma-tag" style="display:none">
+            <rect id="uma-tag-rect" rx="12" ry="12"></rect>
+            <text id="uma-tag-text" text-anchor="middle" dominant-baseline="middle">Unified Memory Access</text>
+          </g>
+          <path class="data-link" id="link-hbm-a"></path>
+          <path class="data-link" id="link-hbm-b"></path>
+          <path class="fabric-link" id="link-fabric"></path>
+          <path class="fabric-link" id="link-fabric-b"></path>
+          <path class="data-link" id="link-io-a"></path>
+          <path class="data-link" id="link-io-b"></path>
+        </svg>
+
+        <section class="diagram-block hbm tier-l1" id="hbm-a" style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);">
+          <div class="diagram-title">HBM Stack A</div>
+          <div class="diagram-body">
+            <div class="hbm-list">
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-fill);"><span>HBM PHY</span><span>PHY</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Controller Array</span><span>CTRL</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Channel 0-3</span><span>C0-3</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Channel 4-7</span><span>C4-7</span></div>
+            </div>
+            <div class="hbm-arrow">&larr; Bandwidth &rarr;</div>
+          </div>
+        </section>
+
+        <section class="diagram-block compute-die" id="compute-a">
+          <div class="diagram-title">Compute Die A</div>
+          <div class="diagram-body">
+            <div class="compute-stack">
+              <div class="cache-band" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);"><span>L3 Cache</span></div>
+              <div class="cache-band" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);"><span>L2 Cache</span></div>
+              <div class="core-cluster">
+                <div class="cluster-title">AI Core Cluster (4 × 4 Grid)</div>
+                <div class="core-grid" id="core-grid-a"></div>
+              </div>
+              <div class="compute-footer">
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">CCU</div>
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">DVPP Cluster</div>
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">TS Sys</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="diagram-block d2d" id="fabric">
+          <div class="diagram-title">D2D Fabric</div>
+        </section>
+
+        <section class="diagram-block compute-die" id="compute-b">
+          <div class="diagram-title">Compute Die B</div>
+          <div class="diagram-body">
+            <div class="compute-stack">
+              <div class="cache-band" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);"><span>L3 Cache</span></div>
+              <div class="cache-band" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);"><span>L2 Cache</span></div>
+              <div class="core-cluster">
+                <div class="cluster-title">AI Core Cluster (4 × 4 Grid)</div>
+                <div class="core-grid" id="core-grid-b"></div>
+              </div>
+              <div class="compute-footer">
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">CCU</div>
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">DVPP Cluster</div>
+                <div class="footer-cell diagram-block" style="display:flex;align-items:center;justify-content:center;font:12px/1 var(--mono);letter-spacing:0.1em;text-transform:uppercase;border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">TS Sys</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="diagram-block hbm" id="hbm-b" style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);">
+          <div class="diagram-title">HBM Stack B</div>
+          <div class="diagram-body">
+            <div class="hbm-list">
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-fill);"><span>HBM PHY</span><span>PHY</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Controller Array</span><span>CTRL</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Channel 0-3</span><span>C0-3</span></div>
+              <div style="border-color:var(--tier-l1-border);background:var(--tier-l1-bg);"><span>Channel 4-7</span><span>C4-7</span></div>
+            </div>
+            <div class="hbm-arrow">&larr; Bandwidth &rarr;</div>
+          </div>
+        </section>
+
+        <div aria-hidden="true"></div>
+
+        <section class="diagram-block io-die" id="io-a">
+          <div class="diagram-title">IO Die A</div>
+          <div class="diagram-body">
+            <div class="io-list">
+              <div class="io-item" style="border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">PCIe</div>
+              <div class="io-item" style="border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">RoCE</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">HiBL × 2</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">HiZQ × 1</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">DMA</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">Link Control</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">Gateway</div>
+            </div>
+            <div class="io-ext-row">
+              <div class="io-ext-item">↓ PCIe<span class="io-ext-target">to Host</span></div>
+              <div class="io-ext-item">↓ RoCE<span class="io-ext-target">to Network</span></div>
+              <div class="io-ext-item">↓ HiBL × 2<span class="io-ext-target">to Peer NPU</span></div>
+            </div>
+          </div>
+        </section>
+
+        <div aria-hidden="true"></div>
+
+        <section class="diagram-block io-die" id="io-b">
+          <div class="diagram-title">IO Die B</div>
+          <div class="diagram-body">
+            <div class="io-list">
+              <div class="io-item" style="border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">PCIe</div>
+              <div class="io-item" style="border-color:var(--tier-l0b-border);background:var(--tier-l0b-bg);">RoCE</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">HiBL × 2</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">HiZQ × 1</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">DMA</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">Link Control</div>
+              <div class="io-item" style="border-color:var(--tier-l0a-border);background:var(--tier-l0a-bg);">Gateway</div>
+            </div>
+            <div class="io-ext-row">
+              <div class="io-ext-item">↓ PCIe<span class="io-ext-target">to Host</span></div>
+              <div class="io-ext-item">↓ RoCE<span class="io-ext-target">to Network</span></div>
+              <div class="io-ext-item">↓ HiBL × 2<span class="io-ext-target">to Peer NPU</span></div>
+            </div>
+          </div>
+        </section>
+
+        <div aria-hidden="true"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <dialog id="core-dialog">
+    <div class="modal">
+      <div class="modal-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="close-button" id="close-dialog" type="button" aria-label="Close">×</button>
+          <h2 class="modal-title" id="modal-title">AI Core Detail</h2>
+        </div>
+        <div class="modal-stats">
+          <div class="stat" id="stat-m">M = 64</div>
+          <div class="stat" id="stat-k">K = 128</div>
+          <div class="stat" id="stat-n">N = 64</div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div id="arch-diagram" style="position:relative">
+
+          <section class="arch-section" id="arch-aic">
+            <span class="arch-section-label">AIC</span>
+            <div class="gm-strip">
+              <span class="gm-label">GM</span>
+              <span class="mte-arrow">MTE2</span>
+            </div>
+            <div class="arch-inner">
+              <div class="arch-aic-row">
+                <div class="buf-box buf-l1">
+                  <div class="buf-hdr">
+                    <span class="buf-label">L1 Buffer</span>
+                    <div class="buf-hdr-right">
+                      <span class="buf-stat-tag is-accent">31%</span>
+                      <span class="buf-stat-tag">320 KB / 1024 KB</span>
+                    </div>
+                  </div>
+                  <div class="bpg-grid" data-tier="L1" style="--bpg-cols:8"></div>
+                  <div class="bpg-legend">
+                    <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:var(--tier-l1)"></span>copy-in</span>
+                  </div>
+                  <div class="buf-meta-list">
+                    <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">row-major</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~20cy</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">704 KB</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x000000 ~ 0x0FFFFF</span></div>
+                  </div>
+                </div>
+
+                <div class="l0ab-col">
+                  <div class="buf-box buf-l0a">
+                    <div class="buf-hdr">
+                      <span class="buf-label">L0A</span>
+                      <div class="buf-hdr-right">
+                        <span class="buf-stat-tag is-accent">50%</span>
+                        <span class="buf-stat-tag">32 KB / 64 KB</span>
+                      </div>
+                    </div>
+                    <div class="bpg-grid" data-tier="L0A" style="--bpg-cols:4"></div>
+                    <div class="buf-meta-list">
+                      <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">fracZ</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">32 KB</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x0FFFF</span></div>
+                    </div>
+                  </div>
+
+                  <div class="buf-box buf-l0b">
+                    <div class="buf-hdr">
+                      <span class="buf-label">L0B</span>
+                      <div class="buf-hdr-right">
+                        <span class="buf-stat-tag is-accent">25%</span>
+                        <span class="buf-stat-tag">16 KB / 64 KB</span>
+                      </div>
+                    </div>
+                    <div class="bpg-grid" data-tier="L0B" style="--bpg-cols:4"></div>
+                    <div class="buf-meta-list">
+                      <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">fracZ</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">48 KB</span></div>
+                      <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x0FFFF</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cube-box">
+                  <div class="cube-hdr">
+                    <span class="cube-title">Cube</span>
+                    <span class="cube-sub">Compute: MMA</span>
+                  </div>
+                  <div class="cube-body">Matrix Core</div>
+                </div>
+
+                <div class="buf-box buf-l0c">
+                  <div class="buf-hdr">
+                    <span class="buf-label">L0C</span>
+                    <div class="buf-hdr-right">
+                      <span class="buf-stat-tag is-accent">38%</span>
+                      <span class="buf-stat-tag">96 KB / 256 KB</span>
+                    </div>
+                  </div>
+                  <div class="bpg-grid" data-tier="L0C" style="--bpg-cols:8"></div>
+                  <div class="bpg-legend">
+                    <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:var(--tier-l0c)"></span>accum</span>
+                  </div>
+                  <div class="buf-meta-list">
+                    <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">nZ</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~5cy</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">160 KB</span></div>
+                    <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x3FFFF</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="unit-row">
+                <div class="unit-box">FixPipe</div>
+                <div class="unit-box">Scalar</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="arch-sep">1 : N (AIV)</div>
+
+          <section class="arch-section" id="arch-aiv">
+            <span class="arch-section-label">AIV</span>
+            <div class="gm-strip gm-strip-placeholder" aria-hidden="true">
+              <span class="gm-label">GM</span>
+              <span class="mte-arrow">MTE2</span>
+            </div>
+            <div class="arch-inner">
+              <div class="buf-box buf-ub">
+                <div class="buf-hdr">
+                  <span class="buf-label">UB</span>
+                  <div class="buf-hdr-right">
+                    <span class="buf-stat-tag is-accent">28%</span>
+                    <span class="buf-stat-tag">72 KB / 256 KB</span>
+                  </div>
+                </div>
+                <div class="bpg-grid" data-tier="UB" style="--bpg-cols:8"></div>
+                <div class="bpg-legend">
+                  <span class="bpg-legend-item"><span class="bpg-legend-dot" style="background:var(--tier-ub)"></span>vector tile</span>
+                </div>
+                <div class="buf-meta-list">
+                  <div class="buf-meta-row"><span class="buf-meta-key">Format:</span><span class="buf-meta-val">row-major</span></div>
+                  <div class="buf-meta-row"><span class="buf-meta-key">Latency:</span><span class="buf-meta-val">~10cy</span></div>
+                  <div class="buf-meta-row"><span class="buf-meta-key">Free:</span><span class="buf-meta-val is-strong">184 KB</span></div>
+                  <div class="buf-meta-row"><span class="buf-meta-key">Address:</span><span class="buf-meta-val">0x00000 ~ 0x3FFFF</span></div>
+                </div>
+              </div>
+
+              <div class="unit-row">
+                <div class="unit-box">Scalar</div>
+                <div class="unit-box">Vector</div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const coreData = [];
+    for (let die = 0; die < 2; die += 1) {
+      for (let i = 0; i < 16; i += 1) {
+        const row = Math.floor(i / 4) + 1;
+        const col = (i % 4) + 1;
+        coreData.push({
+          id: `${die === 0 ? "A" : "B"}-${i + 1}`,
+          seq: i + 1,
+          die: die === 0 ? "Compute Die A" : "Compute Die B",
+          label: `Core ${i + 1}`,
+          m: 64 + row * 32,
+          k: 128 + col * 32,
+          n: 64 + ((row + col) % 3) * 32
+        });
+      }
+    }
+
+    const gridA = document.getElementById("core-grid-a");
+    const gridB = document.getElementById("core-grid-b");
+
+    function createCoreButton(core) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ai-core";
+      button.dataset.coreId = core.id;
+      button.dataset.die = core.die;
+      button.dataset.label = core.label;
+      button.dataset.m = String(core.m);
+      button.dataset.k = String(core.k);
+      button.dataset.n = String(core.n);
+      button.innerHTML = `<span class="ai-core-id">${core.seq}</span>`;
+      return button;
+    }
+
+    coreData.slice(0, 16).forEach((core) => gridA.appendChild(createCoreButton(core)));
+    coreData.slice(16).forEach((core) => gridB.appendChild(createCoreButton(core)));
+
+    const dialog = document.getElementById("core-dialog");
+    const modalTitle = document.getElementById("modal-title");
+    const statM = document.getElementById("stat-m");
+    const statK = document.getElementById("stat-k");
+    const statN = document.getElementById("stat-n");
+    const closeDialogButton = document.getElementById("close-dialog");
+
+    // ── BPG Grid Init ──────────────────────────────────────────────────────
+    const PREVIEW_BPG_CONFIG = {
+      L1:  { rows: 8, cols: 8, usedCells: 20, cellClass: 'is-l1' },
+      L0A: { rows: 4, cols: 4, usedCells: 8,  cellClass: 'is-l0a' },
+      L0B: { rows: 4, cols: 4, usedCells: 4,  cellClass: 'is-l0b' },
+      L0C: { rows: 8, cols: 8, usedCells: 24, cellClass: 'is-l0c' },
+      UB:  { rows: 8, cols: 8, usedCells: 18, cellClass: 'is-ub' }
+    };
+
+    function initBpgGrids() {
+      document.querySelectorAll('#arch-diagram .bpg-grid[data-tier]').forEach((gridEl) => {
+        const tier = gridEl.dataset.tier;
+        const cfg = PREVIEW_BPG_CONFIG[tier];
+        if (!cfg) return;
+        const total = cfg.rows * cfg.cols;
+        const cells = [];
+        for (let i = 0; i < total; i += 1) {
+          cells.push(`<span class="bpg-cell${i < cfg.usedCells ? ` ${cfg.cellClass}` : ''}"></span>`);
+        }
+        gridEl.innerHTML = cells.join('');
+      });
+    }
+
+    // ── MTE Overlay ────────────────────────────────────────────────────────
+    const MTE_STYLE = getComputedStyle(document.documentElement);
+    const MTE_LINE_COLOR = MTE_STYLE.getPropertyValue('--mte-line-color').trim() || '#f59e0b';
+    const MTE_PILL_BG = MTE_STYLE.getPropertyValue('--mte-pill-bg').trim() || '#f59e0b';
+    const MTE_PILL_BORDER = MTE_STYLE.getPropertyValue('--mte-pill-border').trim() || '#f59e0b';
+    const MTE_PILL_TEXT = MTE_STYLE.getPropertyValue('--mte-pill-text').trim() || '#1f1300';
+
+    const PREVIEW_MTE_ROUTES = [
+      { id: 'mte2-a', label: 'MTE2', reverse: false },
+      { id: 'mte2-b', label: 'MTE2', reverse: false },
+      { id: 'mte3',   label: 'MTE3', reverse: true }
+    ];
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const mkSvg = (tag, attrs = {}) => {
+      const el = document.createElementNS(NS, tag);
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      return el;
+    };
+
+    function arrowMarker(id, color) {
+      const marker = mkSvg('marker', {
+        id, markerWidth: '8', markerHeight: '8', refX: '7', refY: '4', orient: 'auto'
+      });
+      marker.appendChild(mkSvg('path', {
+        d: 'M1,1 L7,4 L1,7',
+        fill: 'none',
+        stroke: color,
+        'stroke-width': '1.5',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
+      }));
+      return marker;
+    }
+
+    function reverseArrowMarker(id, color) {
+      const marker = mkSvg('marker', {
+        id, markerWidth: '8', markerHeight: '8', refX: '1', refY: '4', orient: 'auto'
+      });
+      marker.appendChild(mkSvg('path', {
+        d: 'M7,1 L1,4 L7,7',
+        fill: 'none',
+        stroke: color,
+        'stroke-width': '1.5',
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
+      }));
+      return marker;
+    }
+
+    function edgePt(container, el, side) {
+      const cR = container.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const cy = r.top - cR.top + r.height / 2;
+      if (side === 'left') return { x: r.left - cR.left, y: cy };
+      return { x: r.right - cR.left, y: cy };
+    }
+
+    let mteResizeObserver = null;
+
+    function initPreviewMteOverlay() {
+      const container = document.getElementById('arch-diagram');
+      if (!container) return;
+
+      let svg = document.getElementById('mte-overlay-svg');
+      if (svg) svg.remove();
+
+      svg = mkSvg('svg', { id: 'mte-overlay-svg' });
+      Object.assign(svg.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        overflow: 'visible',
+        pointerEvents: 'none',
+        zIndex: '50'
+      });
+
+      const defs = mkSvg('defs');
+      PREVIEW_MTE_ROUTES.forEach((route) => {
+        defs.appendChild(arrowMarker(`af-${route.id}`, MTE_LINE_COLOR));
+        defs.appendChild(reverseArrowMarker(`ar-${route.id}`, MTE_LINE_COLOR));
+      });
+      svg.appendChild(defs);
+
+      const els = {};
+      PREVIEW_MTE_ROUTES.forEach((route) => {
+        const g = mkSvg('g', { id: `mte-g-${route.id}` });
+        const line = mkSvg('line', { 'stroke-linecap': 'round' });
+        const labelBg = mkSvg('rect', { width: '32', height: '16', rx: '4', ry: '4' });
+        const labelTxt = mkSvg('text', {
+          'font-size': '9',
+          'font-weight': '700',
+          'font-family': 'ui-monospace,monospace',
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle'
+        });
+        labelTxt.textContent = route.label;
+        g.appendChild(line);
+        g.appendChild(labelBg);
+        g.appendChild(labelTxt);
+        svg.appendChild(g);
+        els[route.id] = { line, labelBg, labelTxt, width: 32, height: 16, reverse: route.reverse };
+      });
+
+      container.appendChild(svg);
+
+      const placeRoute = (id, x1, y1, x2, y2) => {
+        const route = els[id];
+        if (!route) return;
+        route.line.setAttribute('x1', x1);
+        route.line.setAttribute('y1', y1);
+        route.line.setAttribute('x2', x2);
+        route.line.setAttribute('y2', y2);
+        route.line.setAttribute('stroke', MTE_LINE_COLOR);
+        route.line.setAttribute('stroke-width', '2');
+        route.line.setAttribute('marker-end', route.reverse ? 'none' : `url(#af-${id})`);
+        route.line.setAttribute('marker-start', route.reverse ? `url(#ar-${id})` : 'none');
+        route.line.style.filter = 'none';
+
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        route.labelBg.setAttribute('x', mx - route.width / 2);
+        route.labelBg.setAttribute('y', my - route.height / 2);
+        route.labelBg.setAttribute('fill', MTE_PILL_BG);
+        route.labelBg.setAttribute('stroke', MTE_PILL_BORDER);
+        route.labelBg.setAttribute('stroke-width', '1');
+        route.labelTxt.setAttribute('x', mx);
+        route.labelTxt.setAttribute('y', my);
+        route.labelTxt.setAttribute('fill', MTE_PILL_TEXT);
+      };
+
+      const updateLayout = () => {
+        const l1  = container.querySelector('.buf-l1');
+        const l0a = container.querySelector('.buf-l0a');
+        const l0b = container.querySelector('.buf-l0b');
+        const l0c = container.querySelector('.buf-l0c');
+        const ub  = container.querySelector('.buf-ub');
+        if (!(l1 && l0a && l0b && l0c && ub)) return;
+
+        const l1Right  = edgePt(container, l1,  'right').x;
+        const l0aLeft  = edgePt(container, l0a, 'left');
+        const l0bLeft  = edgePt(container, l0b, 'left');
+        const l0cRight = edgePt(container, l0c, 'right');
+        const ubLeft   = edgePt(container, ub,  'left');
+
+        placeRoute('mte2-a', l1Right, l0aLeft.y, l0aLeft.x, l0aLeft.y);
+        placeRoute('mte2-b', l1Right, l0bLeft.y, l0bLeft.x, l0bLeft.y);
+        const crossY = (l0cRight.y + ubLeft.y) / 2;
+        placeRoute('mte3', ubLeft.x, crossY, l0cRight.x, crossY);
+      };
+
+      updateLayout();
+      if (mteResizeObserver) mteResizeObserver.disconnect();
+      mteResizeObserver = new ResizeObserver(updateLayout);
+      mteResizeObserver.observe(container);
+    }
+
+    function openCoreDialog(button) {
+      modalTitle.textContent = `${button.dataset.die} · ${button.dataset.label} Detail`;
+      statM.textContent = `M = ${button.dataset.m}`;
+      statK.textContent = `K = ${button.dataset.k}`;
+      statN.textContent = `N = ${button.dataset.n}`;
+      dialog.showModal();
+      initBpgGrids();
+      // rAF ensures dialog layout is done before measuring positions
+      requestAnimationFrame(() => initPreviewMteOverlay());
+    }
+
+    document.querySelectorAll(".ai-core").forEach((button) => {
+      button.addEventListener("click", () => openCoreDialog(button));
+    });
+
+    closeDialogButton.addEventListener("click", () => dialog.close());
+
+    dialog.addEventListener("close", () => {
+      const svg = document.getElementById('mte-overlay-svg');
+      if (svg) svg.remove();
+      if (mteResizeObserver) { mteResizeObserver.disconnect(); mteResizeObserver = null; }
+    });
+
+    dialog.addEventListener("click", (event) => {
+      const rect = dialog.getBoundingClientRect();
+      const inDialog =
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width;
+      if (!inDialog) {
+        dialog.close();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (dialog.open && event.key === "Escape") {
+        dialog.close();
+      }
+    });
+
+    function anchorPoint(from, to, edge) {
+      const fromRect = from.getBoundingClientRect();
+      const toRect = to.getBoundingClientRect();
+      const containerRect = document.getElementById("package-grid").getBoundingClientRect();
+      const points = {
+        left: {
+          x: fromRect.left - containerRect.left,
+          y: fromRect.top - containerRect.top + fromRect.height / 2
+        },
+        right: {
+          x: fromRect.left - containerRect.left + fromRect.width,
+          y: fromRect.top - containerRect.top + fromRect.height / 2
+        },
+        top: {
+          x: fromRect.left - containerRect.left + fromRect.width / 2,
+          y: fromRect.top - containerRect.top
+        },
+        bottom: {
+          x: fromRect.left - containerRect.left + fromRect.width / 2,
+          y: fromRect.top - containerRect.top + fromRect.height
+        }
+      };
+      const target = {
+        left: {
+          x: toRect.left - containerRect.left,
+          y: toRect.top - containerRect.top + toRect.height / 2
+        },
+        right: {
+          x: toRect.left - containerRect.left + toRect.width,
+          y: toRect.top - containerRect.top + toRect.height / 2
+        },
+        top: {
+          x: toRect.left - containerRect.left + toRect.width / 2,
+          y: toRect.top - containerRect.top
+        },
+        bottom: {
+          x: toRect.left - containerRect.left + toRect.width / 2,
+          y: toRect.top - containerRect.top + toRect.height
+        }
+      };
+      return { from: points[edge.from], to: target[edge.to] };
+    }
+
+    function setPath(id, fromEl, toEl, edge, bend = 0) {
+      const path = document.getElementById(id);
+      const overlay = document.getElementById("package-overlay");
+      const grid = document.getElementById("package-grid");
+      const rect = grid.getBoundingClientRect();
+      overlay.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+      overlay.setAttribute("width", rect.width);
+      overlay.setAttribute("height", rect.height);
+      const { from, to } = anchorPoint(fromEl, toEl, edge);
+      const midX = from.x + (to.x - from.x) / 2;
+      const midY = from.y + (to.y - from.y) / 2;
+
+      if (bend === 0) {
+        path.setAttribute("d", `M ${from.x} ${from.y} L ${to.x} ${to.y}`);
+        return;
+      }
+
+      if (bend === 1) {
+        path.setAttribute("d", `M ${from.x} ${from.y} L ${from.x} ${midY} L ${to.x} ${midY} L ${to.x} ${to.y}`);
+        return;
+      }
+
+      if (bend === 3) {
+        path.setAttribute("d", `M ${from.x} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${to.x} ${to.y}`);
+        return;
+      }
+      path.setAttribute("d", `M ${from.x} ${from.y} C ${midX} ${from.y}, ${midX} ${to.y}, ${to.x} ${to.y}`);
+    }
+
+    function drawOverlay() {
+      if (window.innerWidth <= 1280) {
+        return;
+      }
+      const umaTag = document.getElementById("uma-tag");
+      const fabricEl = document.getElementById("fabric");
+      const fabricR = fabricEl.getBoundingClientRect();
+      const gridR = document.getElementById("package-grid").getBoundingClientRect();
+      const cx = fabricR.left - gridR.left + fabricR.width / 2;
+      const cy = fabricR.top - gridR.top + fabricR.height / 2;
+      const tw = 178; const th = 26;
+      document.getElementById("uma-tag-rect").setAttribute("x", cx - tw / 2);
+      document.getElementById("uma-tag-rect").setAttribute("y", cy - th / 2);
+      document.getElementById("uma-tag-rect").setAttribute("width", tw);
+      document.getElementById("uma-tag-rect").setAttribute("height", th);
+      document.getElementById("uma-tag-text").setAttribute("x", cx);
+      document.getElementById("uma-tag-text").setAttribute("y", cy);
+      umaTag.style.display = "";
+
+      setPath("link-hbm-a", document.getElementById("hbm-a"), document.getElementById("compute-a"), { from: "right", to: "left" }, 3);
+      setPath("link-hbm-b", document.getElementById("compute-b"), document.getElementById("hbm-b"), { from: "right", to: "left" }, 3);
+      setPath("link-fabric", document.getElementById("compute-a"), document.getElementById("fabric"), { from: "right", to: "left" }, 3);
+      setPath("link-fabric-b", document.getElementById("fabric"), document.getElementById("compute-b"), { from: "right", to: "left" }, 3);
+      setPath("link-io-a", document.getElementById("compute-a"), document.getElementById("io-a"), { from: "bottom", to: "top" }, 0);
+      setPath("link-io-b", document.getElementById("compute-b"), document.getElementById("io-b"), { from: "bottom", to: "top" }, 0);
+    }
+
+    window.addEventListener("resize", drawOverlay);
+    window.addEventListener("load", drawOverlay);
+  </script>
+</body>
+</html>
