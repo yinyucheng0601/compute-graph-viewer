@@ -20,6 +20,14 @@ function computeFixedLayout(visibleGraph) {
     maxY = Math.max(maxY, y + h);
   });
 
+  expandFixedGroupBounds(visibleGraph, positions);
+  maxX = 0;
+  maxY = 0;
+  positions.forEach((rect) => {
+    maxX = Math.max(maxX, rect.x + rect.w);
+    maxY = Math.max(maxY, rect.y + rect.h);
+  });
+
   const edges = visibleGraph.edges.map((edge) => {
     const srcRect = positions.get(edge.source);
     const tgtRect = positions.get(edge.target);
@@ -45,6 +53,44 @@ function computeFixedLayout(visibleGraph) {
   });
 
   return {positions, edges, canvasW: maxX + 80, canvasH: maxY + 80};
+}
+
+function expandFixedGroupBounds(visibleGraph, positions) {
+  const GROUP_PAD = {top: 52, right: 18, bottom: 18, left: 18};
+  const groups = visibleGraph.nodes
+    .filter((node) => node.kind === "group" && node.expanded)
+    .sort((left, right) => (right.data?.depth || 0) - (left.data?.depth || 0));
+
+  groups.forEach((group) => {
+    const childIds = visibleGraph.childrenByParent.get(group.id) || [];
+    const groupRect = positions.get(group.id);
+    if (!groupRect || !childIds.length) {
+      return;
+    }
+
+    let minX = groupRect.x;
+    let minY = groupRect.y;
+    let maxX = groupRect.x + groupRect.w;
+    let maxY = groupRect.y + groupRect.h;
+
+    childIds.forEach((childId) => {
+      const childRect = positions.get(childId);
+      if (!childRect) {
+        return;
+      }
+      minX = Math.min(minX, childRect.x - GROUP_PAD.left);
+      minY = Math.min(minY, childRect.y - GROUP_PAD.top);
+      maxX = Math.max(maxX, childRect.x + childRect.w + GROUP_PAD.right);
+      maxY = Math.max(maxY, childRect.y + childRect.h + GROUP_PAD.bottom);
+    });
+
+    positions.set(group.id, {
+      x: minX,
+      y: minY,
+      w: maxX - minX,
+      h: maxY - minY,
+    });
+  });
 }
 
 function fixedEdgePoints(edge, src, tgt) {

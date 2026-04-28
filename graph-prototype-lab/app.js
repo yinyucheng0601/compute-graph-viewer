@@ -1,7 +1,7 @@
-import * as dataAdapters from "./data-adapters.js?v=20260317c";
-import {createInitialState, materializeVisibleGraph} from "./graph-ir.js?v=20260317c";
-import {computeLayout} from "./layout-engine.js?v=20260317c";
-import {GraphRenderer} from "./renderer.js?v=20260317c";
+import * as dataAdapters from "./data-adapters.js?v=20260428";
+import {createInitialState, materializeVisibleGraph} from "./graph-ir.js?v=20260428";
+import {computeLayout} from "./layout-engine.js?v=20260428";
+import {GraphRenderer} from "./renderer.js?v=20260428";
 
 const loadGraphSample = dataAdapters.loadGraphSample;
 
@@ -113,13 +113,15 @@ function syncInitialSample() {
   }
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("sample") || params.get("model");
-  if (requested === "deepseek-v4" || requested === "v4") {
+  if (!requested || requested === "deepseek-v4" || requested === "v4") {
     sampleSelect.value = "deepseek-v4";
+  } else {
+    sampleSelect.value = requested;
   }
 }
 
 function getSelectedSampleKey() {
-  return sampleSelect?.value || "source-graph";
+  return sampleSelect?.value || "deepseek-v4";
 }
 
 async function rerender(options = {}) {

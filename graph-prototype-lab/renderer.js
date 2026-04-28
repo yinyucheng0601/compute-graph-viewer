@@ -228,7 +228,7 @@ export class GraphRenderer {
 
     const selected = this.selection?.kind === "node" && this.selection.id === node.id;
     const surface = createSvgElement("rect", {
-      class: `group-surface stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
+      class: `group-surface stage-${node.data?.stage || "default"} ${parentColorClass(node)}${selected ? " is-selected" : ""}`,
       x: rect.x,
       y: rect.y,
       width: rect.w,
@@ -241,7 +241,7 @@ export class GraphRenderer {
       x: rect.x,
       y: rect.y,
       width: rect.w,
-      height: node.expanded ? 30 : rect.h,
+      height: node.expanded ? 40 : rect.h,
       rx: 18,
       ry: 18,
     });
@@ -259,7 +259,7 @@ export class GraphRenderer {
     const subtitle = createSvgElement("text", {
       class: "group-subtitle",
       x: rect.x + 12,
-      y: rect.y + 32,
+      y: rect.y + 34,
     });
     subtitle.textContent = compactGroupDescription(node, rect.w - 46);
     subtitle.setAttribute("text-anchor", "start");
@@ -321,10 +321,23 @@ export class GraphRenderer {
     const coreX = rect.x + (node.inboxWidth || 0);
     const coreY = rect.y + (rect.h - node.coreHeight) / 2;
 
+    if (node.data?.rawType === "Title") {
+      const label = createSvgElement("text", {
+        class: "graph-title-label",
+        x: coreX,
+        y: coreY + 28,
+      });
+      label.textContent = node.label;
+      label.setAttribute("text-anchor", "start");
+      group.removeAttribute("data-node-id");
+      group.appendChild(label);
+      return group;
+    }
+
     if (node.kind === "op") {
       // Render ops as group-card style: gray fill, left-aligned, matches collapsed group appearance
       const surface = createSvgElement("rect", {
-        class: `group-surface kind-op stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
+        class: `group-surface kind-op stage-${node.data?.stage || "default"} ${parentColorClass(node)}${selected ? " is-selected" : ""}`,
         x: coreX, y: coreY, width: node.coreWidth, height: node.coreHeight, rx: 14, ry: 14,
       });
       const headerBand = createSvgElement("rect", {
@@ -353,7 +366,7 @@ export class GraphRenderer {
     } else {
       const centerX = coreX + node.coreWidth / 2;
       const surface = createSvgElement("rect", {
-        class: `node-surface kind-${node.kind} stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
+        class: `node-surface kind-${node.kind} stage-${node.data?.stage || "default"} ${parentColorClass(node)}${selected ? " is-selected" : ""}`,
         x: coreX, y: coreY, width: node.coreWidth, height: node.coreHeight, rx: 12, ry: 12,
       });
       group.appendChild(surface);
@@ -578,22 +591,36 @@ function splitLabel(label, maxChars) {
 function compactGroupDescription(node, maxWidth) {
   const description = node.data?.description || stageDescription(node.data?.stage);
   const text = String(description || "Container for related graph operations.").trim();
-  const maxChars = Math.max(18, Math.floor(maxWidth / 6.6));
+  const maxChars = Math.max(14, Math.floor(maxWidth / 8.5));
   return text.length > maxChars ? `${text.slice(0, maxChars - 3)}...` : text;
 }
 
 function stageDescription(stage) {
   const descriptions = {
-    attention: "Attention path for token mixing and KV reads.",
-    csa: "Compressed sparse attention path.",
-    indexer: "Routing, top-k selection, and lookup path.",
-    mlp: "Feed-forward or expert MLP path.",
-    core: "Main transformer data path.",
-    compressor: "Token-level compression and state update path.",
-    cache: "Runtime KV cache storage.",
-    state: "Persistent state carried across updates.",
+    attention: "注意力计算路径，负责 token 混合和 KV 读取。",
+    csa: "压缩稀疏注意力路径。",
+    indexer: "路由、top-k 选择和索引检索路径。",
+    mlp: "前馈网络或专家 MLP 路径。",
+    core: "主干 Transformer 数据流。",
+    compressor: "token 级压缩和状态更新路径。",
+    cache: "运行时 KV cache 存储。",
+    state: "跨步骤保留的 KV 或 score 状态。",
   };
-  return descriptions[String(stage || "")] || "Container for related graph operations.";
+  return descriptions[String(stage || "")] || "相关算子的模块容器。";
+}
+
+function parentColorClass(node) {
+  const parentKey = node.kind === "group" ? node.id : (node.visibleParentId || node.parentId || "");
+  if (!parentKey) {
+    return "parent-color-default";
+  }
+  return `parent-color-${stableHash(parentKey) % 10}`;
+}
+
+function stableHash(value) {
+  return String(value).split("").reduce((hash, char) => {
+    return ((hash << 5) - hash + char.charCodeAt(0)) >>> 0;
+  }, 0);
 }
 
 function collapseAnnotations(items) {
