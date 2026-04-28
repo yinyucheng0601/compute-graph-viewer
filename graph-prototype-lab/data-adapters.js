@@ -115,6 +115,7 @@ function mapSourceNodeKind(type) {
     case "Outcast":
       return "boundary";
     case "Operation":
+    case "Title":
       return "op";
     case "Group":
     case "Cluster":
