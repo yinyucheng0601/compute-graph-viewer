@@ -261,9 +261,7 @@ export class GraphRenderer {
       x: rect.x + 12,
       y: rect.y + 32,
     });
-    subtitle.textContent = node.expanded
-      ? `${node.hasChildren ? "expanded" : "empty"} group`
-      : `${node.hasChildren ? "collapsed" : "leaf"} group`;
+    subtitle.textContent = compactGroupDescription(node, rect.w - 46);
     subtitle.setAttribute("text-anchor", "start");
     group.appendChild(subtitle);
 
@@ -575,6 +573,27 @@ function splitLabel(label, maxChars) {
     lines[1] = lines[1].length > maxChars ? `${lines[1].slice(0, maxChars - 3)}...` : lines[1];
   }
   return lines.slice(0, 2);
+}
+
+function compactGroupDescription(node, maxWidth) {
+  const description = node.data?.description || stageDescription(node.data?.stage);
+  const text = String(description || "Container for related graph operations.").trim();
+  const maxChars = Math.max(18, Math.floor(maxWidth / 6.6));
+  return text.length > maxChars ? `${text.slice(0, maxChars - 3)}...` : text;
+}
+
+function stageDescription(stage) {
+  const descriptions = {
+    attention: "Attention path for token mixing and KV reads.",
+    csa: "Compressed sparse attention path.",
+    indexer: "Routing, top-k selection, and lookup path.",
+    mlp: "Feed-forward or expert MLP path.",
+    core: "Main transformer data path.",
+    compressor: "Token-level compression and state update path.",
+    cache: "Runtime KV cache storage.",
+    state: "Persistent state carried across updates.",
+  };
+  return descriptions[String(stage || "")] || "Container for related graph operations.";
 }
 
 function collapseAnnotations(items) {
