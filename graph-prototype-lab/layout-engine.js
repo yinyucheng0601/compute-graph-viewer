@@ -1,5 +1,66 @@
 export async function computeLayout(visibleGraph) {
+  if (visibleGraph.layoutMode === "fixed") {
+    return { ...computeFixedLayout(visibleGraph), engine: "fixed" };
+  }
   return { ...computeDagreLayout(visibleGraph), engine: "dagre" };
+}
+
+function computeFixedLayout(visibleGraph) {
+  const positions = new Map();
+  let maxX = 0;
+  let maxY = 0;
+
+  visibleGraph.nodes.forEach((node) => {
+    const x = Number(node.data?.x ?? 0);
+    const y = Number(node.data?.y ?? 0);
+    const w = Number(node.displayWidth ?? node.coreWidth ?? node.data?.width ?? 160);
+    const h = Number(node.displayHeight ?? node.coreHeight ?? node.data?.height ?? 48);
+    positions.set(node.id, {x, y, w, h});
+    maxX = Math.max(maxX, x + w);
+    maxY = Math.max(maxY, y + h);
+  });
+
+  const edges = visibleGraph.edges.map((edge) => {
+    const srcRect = positions.get(edge.source);
+    const tgtRect = positions.get(edge.target);
+    const srcNode = visibleGraph.byId.get(edge.source);
+    const tgtNode = visibleGraph.byId.get(edge.target);
+    if (!srcRect || !tgtRect) {
+      return {id: edge.id, source: edge.source, target: edge.target, points: [], labelPoint: null};
+    }
+    const src = coreRect(srcRect, srcNode);
+    const tgt = coreRect(tgtRect, tgtNode);
+    const points = fixedEdgePoints(edge, src, tgt);
+    points.forEach((p) => {
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    });
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      points,
+      labelPoint: findMidPoint(points),
+    };
+  });
+
+  return {positions, edges, canvasW: maxX + 80, canvasH: maxY + 80};
+}
+
+function fixedEdgePoints(edge, src, tgt) {
+  const sourceSide = edge.data?.sourceSide || "bottom";
+  const targetSide = edge.data?.targetSide || "top";
+  const sourcePoint = sideAnchor(src, sourceSide);
+  const targetPoint = sideAnchor(tgt, targetSide);
+  const via = Array.isArray(edge.data?.points) ? edge.data.points : [];
+  return [sourcePoint, ...via.map((p) => ({x: Number(p.x), y: Number(p.y)})), targetPoint];
+}
+
+function sideAnchor(rect, side) {
+  if (side === "top") return {x: rect.x + rect.w / 2, y: rect.y};
+  if (side === "bottom") return {x: rect.x + rect.w / 2, y: rect.y + rect.h};
+  if (side === "left") return {x: rect.x, y: rect.y + rect.h / 2};
+  return {x: rect.x + rect.w, y: rect.y + rect.h / 2};
 }
 
 function computeDagreLayout(visibleGraph) {

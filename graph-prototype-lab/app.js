@@ -5,6 +5,7 @@ import {GraphRenderer} from "./renderer.js?v=20260317c";
 
 const loadGraphSample = dataAdapters.loadGraphSample;
 
+const sampleSelect = document.getElementById("sampleSelect");
 const tensorModeSelect = document.getElementById("tensorModeSelect");
 const fitBtn = document.getElementById("fitBtn");
 const reloadBtn = document.getElementById("reloadBtn");
@@ -37,10 +38,15 @@ bootstrap();
 
 async function bootstrap() {
   bindControls();
+  syncInitialSample();
   await loadSelectedSample({fit: true});
 }
 
 function bindControls() {
+  sampleSelect?.addEventListener("change", async () => {
+    await loadSelectedSample({fit: true, hardReload: true});
+  });
+
   tensorModeSelect.addEventListener("change", async () => {
     if (!state.ui) {
       return;
@@ -79,13 +85,14 @@ async function loadSelectedSample(options = {}) {
   emptyState.hidden = true;
 
   try {
-    const graph = await loadGraphSample("source-graph");
+    const graph = await loadGraphSample(getSelectedSampleKey(), {hardReload: options.hardReload});
     if (token !== state.loadingToken) {
       return;
     }
     state.canonicalGraph = graph;
     state.ui = createInitialState(graph);
-    state.ui.tensorMode = tensorModeSelect.value || "auto";
+    state.ui.tensorMode = graph.preferredTensorMode || tensorModeSelect.value || "auto";
+    tensorModeSelect.value = state.ui.tensorMode;
     syncDirectionButtons();
     await rerender({fit: options.fit});
   } catch (error) {
@@ -98,6 +105,21 @@ async function loadSelectedSample(options = {}) {
     detailSummary.textContent = "Source graph loading failed.";
     detailBody.innerHTML = `<pre class="insp-code">${escHtml(String(error.stack || error.message || error))}</pre>`;
   }
+}
+
+function syncInitialSample() {
+  if (!sampleSelect) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get("sample") || params.get("model");
+  if (requested === "deepseek-v4" || requested === "v4") {
+    sampleSelect.value = "deepseek-v4";
+  }
+}
+
+function getSelectedSampleKey() {
+  return sampleSelect?.value || "source-graph";
 }
 
 async function rerender(options = {}) {
@@ -142,7 +164,7 @@ function buildStatsString(materialized, elapsed) {
 
 function syncDirectionButtons() {
   document.querySelectorAll("[data-direction]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.direction === state.ui?.direction);
+    button.classList.toggle("is-selected", button.dataset.direction === state.ui?.direction);
   });
 }
 

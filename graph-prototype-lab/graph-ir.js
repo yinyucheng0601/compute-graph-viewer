@@ -2,8 +2,8 @@ export function createInitialState(graph) {
   const expanded = new Set(graph.initialExpanded || []);
   return {
     expanded,
-    direction: "TB",
-    tensorMode: "auto",
+    direction: graph.initialDirection || "TB",
+    tensorMode: graph.preferredTensorMode || "auto",
     selection: null,
   };
 }
@@ -127,6 +127,7 @@ export function materializeVisibleGraph(graph, options) {
         ),
       },
     },
+    layoutMode: graph.layoutMode || "dagre",
   };
 }
 
@@ -314,6 +315,12 @@ function estimateNodeSizing(node, tensorMode, direction = "LR") {
 }
 
 function estimateCoreWidth(node) {
+  if (Number.isFinite(Number(node.data?.width)) && (node.kind !== "group" || node.expanded)) {
+    return Number(node.data.width);
+  }
+  if (node.kind === "group" && !node.expanded && Number.isFinite(Number(node.data?.collapsedWidth))) {
+    return Number(node.data.collapsedWidth);
+  }
   const labelLength = String(node.label || "").length;
   if (node.kind === "group") {
     if (node.expanded) {
@@ -331,6 +338,12 @@ function estimateCoreWidth(node) {
 }
 
 function estimateCoreHeight(node) {
+  if (Number.isFinite(Number(node.data?.height)) && (node.kind !== "group" || node.expanded)) {
+    return Number(node.data.height);
+  }
+  if (node.kind === "group" && !node.expanded && Number.isFinite(Number(node.data?.collapsedHeight))) {
+    return Number(node.data.collapsedHeight);
+  }
   if (node.kind === "group" && node.expanded) {
     return 72;
   }
