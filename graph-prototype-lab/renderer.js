@@ -8,6 +8,9 @@ export class GraphRenderer {
     this.scene = null;
     this.selection = null;
     this.dragState = null;
+    this.minimapSvg = document.getElementById("miniMapSvg");
+    this.zoomInBtn = document.getElementById("zoomInBtn");
+    this.zoomOutBtn = document.getElementById("zoomOutBtn");
 
     this.svg.setAttribute("viewBox", `0 0 ${this.svg.clientWidth || 1000} ${this.svg.clientHeight || 700}`);
 
@@ -59,21 +62,11 @@ export class GraphRenderer {
 
   installInteractions() {
     this.svg.addEventListener("wheel", (event) => {
-      if (!this.scene) {
-        return;
-      }
       event.preventDefault();
-      const rect = this.svg.getBoundingClientRect();
-      const cx = event.clientX - rect.left;
-      const cy = event.clientY - rect.top;
-      const factor = event.deltaY < 0 ? 1.12 : 0.89;
-      const nextScale = clamp(this.transform.scale * factor, 0.04, 3.2);
-      const ratio = nextScale / this.transform.scale;
-      this.transform.tx = cx - ratio * (cx - this.transform.tx);
-      this.transform.ty = cy - ratio * (cy - this.transform.ty);
-      this.transform.scale = nextScale;
-      this.applyTransform();
     }, {passive: false});
+
+    this.zoomInBtn?.addEventListener("click", () => this.zoomBy(1.18));
+    this.zoomOutBtn?.addEventListener("click", () => this.zoomBy(0.84));
 
     this.svg.addEventListener("mousedown", (event) => {
       if (!this.scene) {
@@ -114,6 +107,7 @@ export class GraphRenderer {
       "transform",
       `translate(${this.transform.tx}, ${this.transform.ty}) scale(${this.transform.scale})`
     );
+    this.renderMinimap();
   }
 
   render() {
@@ -172,6 +166,58 @@ export class GraphRenderer {
       }
       this.annotationLayer.appendChild(this.renderAnnotations(node, rect, graph.direction || "LR"));
     });
+
+    this.renderMinimap();
+  }
+
+  zoomBy(factor) {
+    if (!this.scene) {
+      return;
+    }
+    const rect = this.svg.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const nextScale = clamp(this.transform.scale * factor, 0.04, 3.2);
+    const ratio = nextScale / this.transform.scale;
+    this.transform.tx = cx - ratio * (cx - this.transform.tx);
+    this.transform.ty = cy - ratio * (cy - this.transform.ty);
+    this.transform.scale = nextScale;
+    this.applyTransform();
+  }
+
+  renderMinimap() {
+    if (!this.minimapSvg || !this.scene) {
+      return;
+    }
+
+    clearChildren(this.minimapSvg);
+    const {graph, layout} = this.scene;
+    this.minimapSvg.setAttribute("viewBox", `0 0 ${layout.canvasW} ${layout.canvasH}`);
+
+    graph.nodes.forEach((node) => {
+      const rect = layout.positions.get(node.id);
+      if (!rect) return;
+      this.minimapSvg.appendChild(createSvgElement("rect", {
+        class: `minimap-node minimap-${node.kind}`,
+        x: rect.x,
+        y: rect.y,
+        width: rect.w,
+        height: rect.h,
+        rx: node.kind === "group" ? 14 : 8,
+        ry: node.kind === "group" ? 14 : 8,
+      }));
+    });
+
+    const svgRect = this.svg.getBoundingClientRect();
+    this.minimapSvg.appendChild(createSvgElement("rect", {
+      class: "minimap-viewport",
+      x: -this.transform.tx / this.transform.scale,
+      y: -this.transform.ty / this.transform.scale,
+      width: svgRect.width / this.transform.scale,
+      height: svgRect.height / this.transform.scale,
+      rx: 18,
+      ry: 18,
+    }));
   }
 
   renderGroup(node, rect) {
@@ -182,7 +228,7 @@ export class GraphRenderer {
 
     const selected = this.selection?.kind === "node" && this.selection.id === node.id;
     const surface = createSvgElement("rect", {
-      class: `group-surface${selected ? " is-selected" : ""}`,
+      class: `group-surface stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
       x: rect.x,
       y: rect.y,
       width: rect.w,
@@ -280,7 +326,7 @@ export class GraphRenderer {
     if (node.kind === "op") {
       // Render ops as group-card style: gray fill, left-aligned, matches collapsed group appearance
       const surface = createSvgElement("rect", {
-        class: `group-surface${selected ? " is-selected" : ""}`,
+        class: `group-surface kind-op stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
         x: coreX, y: coreY, width: node.coreWidth, height: node.coreHeight, rx: 14, ry: 14,
       });
       const headerBand = createSvgElement("rect", {
@@ -309,7 +355,7 @@ export class GraphRenderer {
     } else {
       const centerX = coreX + node.coreWidth / 2;
       const surface = createSvgElement("rect", {
-        class: `node-surface kind-${node.kind}${selected ? " is-selected" : ""}`,
+        class: `node-surface kind-${node.kind} stage-${node.data?.stage || "default"}${selected ? " is-selected" : ""}`,
         x: coreX, y: coreY, width: node.coreWidth, height: node.coreHeight, rx: 12, ry: 12,
       });
       group.appendChild(surface);

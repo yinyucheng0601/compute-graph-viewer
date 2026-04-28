@@ -1,4 +1,5 @@
 const SOURCE_SAMPLE_URL = "../data/source-graph.json";
+const DEEPSEEK_V4_SAMPLE_URL = "../data/deepseek-v4-architecture.json";
 
 export const SAMPLE_CATALOG = [
   {
@@ -6,9 +7,17 @@ export const SAMPLE_CATALOG = [
     label: "Source Graph",
     description: "Annotated source graph sample from data/source-graph.json.",
   },
+  {
+    key: "deepseek-v4",
+    label: "DeepSeek V4 Pro",
+    description: "Interactive DeepSeek V4 Pro architecture map.",
+  },
 ];
 
-export async function loadGraphSample(_sampleKey, _options = {}) {
+export async function loadGraphSample(sampleKey, _options = {}) {
+  if (sampleKey === "deepseek-v4") {
+    return loadArchitectureSample();
+  }
   return loadSourceSample();
 }
 
@@ -17,6 +26,14 @@ async function loadSourceSample() {
   return parseSourceSampleGraph(raw, {
     sampleLabel: "Source Graph",
     source: SOURCE_SAMPLE_URL,
+  });
+}
+
+async function loadArchitectureSample() {
+  const raw = await fetchJson(DEEPSEEK_V4_SAMPLE_URL);
+  return parseSourceSampleGraph(raw, {
+    sampleLabel: raw.graph_name || "DeepSeek V4 Pro",
+    source: DEEPSEEK_V4_SAMPLE_URL,
   });
 }
 
@@ -50,6 +67,15 @@ function parseSourceSampleGraph(data, context) {
         sourceRef: rawNode.source_ref || null,
         sourceLines: rawNode.source_lines || [],
         sourceCode: rawNode.source_code || "",
+        x: rawNode.x,
+        y: rawNode.y,
+        width: rawNode.width,
+        height: rawNode.height,
+        collapsedWidth: rawNode.collapsedWidth,
+        collapsedHeight: rawNode.collapsedHeight,
+        stage: rawNode.stage || "",
+        description: rawNode.description || rawNode.details || "",
+        badge: rawNode.badge || "",
         index,
       },
     });
@@ -71,11 +97,14 @@ function parseSourceSampleGraph(data, context) {
     label: context.sampleLabel,
     nodes,
     edges,
-    initialExpanded: [],
+    initialExpanded: data.initialExpanded || [],
+    initialDirection: data.initialDirection || "TB",
+    preferredTensorMode: data.preferredTensorMode || "edges",
+    layoutMode: data.layoutMode || "dagre",
     meta: {
       sampleLabel: context.sampleLabel,
       source: context.source,
-      description: "Flat DAG sample with explicit tensor and boundary nodes.",
+      description: data.description || "Flat DAG sample with explicit tensor and boundary nodes.",
     },
   };
 }
