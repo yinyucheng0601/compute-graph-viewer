@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>触点 01：架构理解</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+<nav class="topnav"><div class="brand">触点 01 · 架构理解</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 01 · Mental Model</div>
+  <h1>架构理解不是总图，而是代码如何落到硬件的解释链</h1>
+  <p class="lead">开发者第一次写 kernel 时，需要同时理解执行层级、内存层级、编译层级和工具层级。竞品差异不在“有没有架构图”，而在能否把一个具体算子展开成可预测的执行故事。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 概念入口</h3><p>CUDA 用 grid/block/thread 建立 SIMT 心智；ROCm 借 HIP 降低迁移门槛；Triton 从 program/block/tile 入口减少线程细节。</p><div class="pill-row"><span class="pill hot">学习成本</span><span class="pill blue">首屏文档</span></div></div>
+    <div class="dense-card"><h3>02 代码到硬件</h3><p>关键是把 launch 参数、program_id、warp/wavefront、寄存器、shared/LDS 和 HBM 映射回源码决策。</p><div class="pill-row"><span class="pill good">可解释性</span><span class="pill warn">抽象泄漏</span></div></div>
+    <div class="dense-card"><h3>03 术语迁移</h3><p>CUDA 术语不可直接套到 AMD 或 Triton。迁移表应说明可复用概念、等价概念和危险类比。</p><div class="pill-row"><span class="pill blue">CUDA → HIP</span><span class="pill blue">Thread → Program</span></div></div>
+    <div class="dense-card"><h3>04 示例展开</h3><p>最佳示例不是 toy kernel，而是把 add、reduction、matmul、attention 分别展开执行路径和性能风险。</p><div class="pill-row"><span class="pill good">任务切片</span><span class="pill hot">P0</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：mental model 的组织方式</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">硬件协同的完整 SIMT 模型</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">CUDA 风格入口 + AMD 差异解释</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">block/tile 级数据流模型</div></th></tr></thead>
+    <tbody>
+      <tr><td>界面/证据</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA mapping</div><div class="mb">kernel&lt;&lt;&lt;grid, block&gt;&gt;&gt;
+blockIdx.x → row tile
+threadIdx.x → lane work
+shared[] → reusable tile</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>HIP mapping</div><div class="mb">hipLaunchKernelGGL(...)
+threadIdx/blockIdx 保留
+wavefront=64
+LDS 替代 shared mental model</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton mapping</div><div class="mb">@triton.jit
+pid = tl.program_id(0)
+offs = pid*BLOCK + arange
+tl.load / tl.store with mask</div></div></td></tr>
+      <tr><td>优势</td><td>标准心智最稳定，源码、PTX、SASS、Profiler 指标和硬件行为能形成解释闭环。<div class="score s5"><span></span><span></span><span></span><span></span><span></span></div></td><td>迁移入口熟悉，HIP 保留大量 CUDA 语法，可降低组织切换成本。<div class="score s3"><span></span><span></span><span></span><span></span><span></span></div></td><td>把 DNN 算子从逐线程上移到 tile 数据流，初始认知负担低。<div class="score s4"><span></span><span></span><span></span><span></span><span></span></div></td></tr>
+      <tr><td>劣势</td><td>概念栈厚，用户容易先被 stream、memory、occupancy、PTX 等名词淹没。</td><td>CUDA-like 容易制造“等价错觉”，wavefront、LDS、工具链差异需要额外显性化。</td><td>底层行为被编译器隐藏，性能异常时需要重新理解 IR、layout 和 backend。</td></tr>
+      <tr><td>一句话结论</td><td>最强解释链，但入门路径要任务化。</td><td>迁移路径友好，但差异诊断必须产品化。</td><td>高生产率入口，但需要透明的编译解释层。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：代码到硬件的任务切片解释器</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：每个示例都能展开为 execution story</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>示例旁固定放“执行展开”</b><span>对每个 kernel 展示数据分块、并行粒度、内存路径、同步点和最可能瓶颈，不让用户在总图和源码之间跳转。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>提供 CUDA 迁移术语表</b><span>把 warp/wavefront、shared/LDS、block/program、stream/queue 拆成“相同、相似、危险不同”三类。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>架构图按任务过滤</b><span>用户选择 reduction、matmul、copy、attention 后，只高亮相关硬件层级和工具入口，减少首屏噪音。</span></div></div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Execution Story prototype</div>
+      <div class="shotbody">
+        <div class="matrix"><div class="ok">Source<br><b>line 42</b></div><div class="ok">Tile<br><b>128 x 64</b></div><div class="warn">Memory<br><b>L2 miss risk</b></div><div class="bad">Action<br><b>try swizzle</b></div></div>
+        <div class="mt"><div class="mtbar"><span class="mtt">story</span></div><div class="mb">1. block/program owns one row tile
+2. each lane loads contiguous vector
+3. shared/LDS caches reduction window
+4. profiler should show lower memory transactions</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>硬件真实复杂度 vs 入门心智简洁性</div><div><b>推荐</b>按任务解释架构，不按硬件分类解释任务。</div><div><b>验证指标</b>新用户 30 分钟内能解释一个 kernel 的数据流和瓶颈假设。</div></div>
+</section>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CUDA vs ROCm vs Triton 开发者体验竞品分析</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">芯片/算子开发者体验分析</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#products">产品</a>
+      <a href="#overview">目录</a>
+      <a href="#journey">旅程</a>
+      <a href="#touchpoints">触点</a>
+      <a href="#evidence-docs">界面</a>
+      <a href="#roadmap">路线图</a>
+      <a href="#findings">结论</a>
+      <a href="#sources">来源</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Competitive UX Report · 2026-04-30</div>
+    <h1>CUDA vs ROCm vs Triton：芯片/算子开发者体验竞品分析</h1>
+    <p class="lead">本报告把芯片 SDK、GPU 编程栈和算子 DSL 视为开发者产品，围绕开发者能否建立正确 mental model、写出可解释的 kernel、定位问题、稳定调优和接入生产链路进行分析。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>3</strong><span>分析对象：CUDA、ROCm/HIP、Triton</span></div>
+      <div class="card metric"><strong>21</strong><span>细分触点：从环境、架构、算子到生产集成</span></div>
+      <div class="card metric"><strong>6</strong><span>旅程阶段：从环境搭建到持续优化</span></div>
+      <div class="card metric"><strong>9</strong><span>可复用设计亮点和产品优先级</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="overview">
+    <h2>目录</h2>
+    <p class="lead">报告的阅读顺序是：先看三类产品分别代表什么，再看开发者旅程中哪里最痛，然后用 7 类触点解释差异；每类触点都合并展示开发者问题、竞品处理方式和可迁移方向，最后收敛到 P0/P1/P2 触点方向汇总。</p>
+    <div class="journey-map">
+      <div class="jm-head">位置</div><div class="jm-head">01 产品定位</div><div class="jm-head">02 旅程低谷</div><div class="jm-head">03 触点框架</div><div class="jm-head">04 视觉证据</div><div class="jm-head">05 路线图</div><div class="jm-head">06 产品结论</div>
+      <div class="jm-label">回答问题</div><div class="jm-cell">这三个竞品分别代表哪类开发者体验？</div><div class="jm-cell">开发者在哪些阶段最容易失败或焦虑？</div><div class="jm-cell">每个触点比较什么 UX 决策？</div><div class="jm-cell">真实页面和复刻界面证明了什么？</div><div class="jm-cell">哪些模块先做，哪些后做？</div><div class="jm-cell">每个竞品给我们的三条核心启发是什么？</div>
+      <div class="jm-label">本页内容</div><div class="jm-cell">CUDA / ROCm / Triton 定位、用户、任务、竞品角色。</div><div class="jm-cell">环境、心智、编写、调试、调优、集成六阶段矩阵。</div><div class="jm-cell">架构、内存、调试、Profiler、编译、算子、生态七类触点。</div><div class="jm-cell">官方截图 + Profiler/Debug/Operator/Compiler/Stack Doctor 示意。</div><div class="jm-cell">Stack Doctor、Error Explainer、Profile Notebook 等优先级。</div><div class="jm-cell">按 CUDA、ROCm、Triton 各列三条洞察。</div>
+      <div class="jm-label">输出结果</div><div class="jm-cell">明确比较对象不是同一层级，但都是开发者心中的替代参照。</div><div class="jm-cell">定位三个最低谷：装不对、错不明、慢不知改哪。</div><div class="jm-cell">把“看不懂的大触点”拆成可行动的小决策。</div><div class="jm-cell">避免空泛判断，用界面/工具形态说明证据。</div><div class="jm-cell">把分析收敛成 P0/P1/P2 建设顺序。</div><div class="jm-cell">为自研 SDK/算子平台提炼产品化原则。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="products">
+    <h2>竞争产品基本介绍与分析定位</h2>
+    <p class="lead">这三类产品不是同一层级，但正好覆盖开发者会拿来比较的三种体验：完整 GPU SDK、开放替代栈、面向 DNN 算子的高生产率 DSL。后续所有触点都围绕“任务成功率”比较，而不是单纯比较 API 覆盖度。</p>
+    <div class="grid cols-3">
+      <div class="card profile-row">
+        <div class="logo-tile logo-cuda">CU</div>
+        <div>
+          <h3>CUDA</h3>
+          <p><b>定位：</b>NVIDIA GPU 全栈开发平台。<br><b>用户：</b>GPU kernel 工程师、框架团队、HPC/AI 基础设施团队。<br><b>任务：</b>写 kernel、调试、Profiler 调优、接入框架和部署生态。<br><b>竞争角色：</b>成熟基线和事实标准。</p>
+        </div>
+      </div>
+      <div class="card profile-row">
+        <div class="logo-tile logo-rocm">RO</div>
+        <div>
+          <h3>ROCm / HIP</h3>
+          <p><b>定位：</b>AMD 开放 GPU 软件栈和 CUDA 风格迁移路径。<br><b>用户：</b>平台团队、框架团队、需要 AMD GPU 支持的工程团队。<br><b>任务：</b>CUDA 迁移、双栈维护、rocprof/rocgdb 诊断。<br><b>竞争角色：</b>直接替代竞品。</p>
+        </div>
+      </div>
+      <div class="card profile-row">
+        <div class="logo-tile logo-triton">TR</div>
+        <div>
+          <h3>Triton</h3>
+          <p><b>定位：</b>面向 DNN 自定义算子的 Python DSL 和编译器。<br><b>用户：</b>AI 研究员、模型优化工程师、框架工程师。<br><b>任务：</b>快速实现 fused op、matmul、attention、layernorm。<br><b>竞争角色：</b>跨界标杆。</p>
+        </div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>分析维度</th><th>CUDA</th><th>ROCm / HIP</th><th>Triton</th></tr></thead>
+      <tbody>
+        <tr><td>产品层级</td><td>完整 GPU SDK 和事实标准生态。</td><td>开放 GPU 软件栈和 CUDA 风格迁移入口。</td><td>面向 DNN 自定义算子的 Python DSL 和编译器。</td></tr>
+        <tr><td>核心用户</td><td>GPU kernel 工程师、框架团队、HPC/AI 基础设施团队。</td><td>平台团队、框架团队、需要 AMD GPU 支持的工程团队。</td><td>AI 研究员、模型优化工程师、框架工程师。</td></tr>
+        <tr><td>主要任务</td><td>写 kernel、调试、Profiler 调优、框架接入、部署维护。</td><td>CUDA 迁移、双栈维护、rocprof/rocgdb 诊断、版本适配。</td><td>快速实现 fused op、matmul、attention、layernorm、autotune。</td></tr>
+        <tr><td>竞品角色</td><td>成熟基线：工具链闭环和生态密度最高。</td><td>直接替代：开放性和迁移路径是核心差异。</td><td>跨界标杆：高生产率算子开发体验最值得借鉴。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">本报告将开发者体验拆成 21 个可比较的决策点：从“如何建立硬件心智”“数据如何移动”“错误如何定位”，到“性能建议如何落到源码”“编译器如何解释优化”“算子如何进入生产链路”。这些决策点共同决定一个芯片 SDK 是否可诊断、可解释、可复现、可生产。</div>
+  </section>
+
+  <section class="floor" id="architecture">
+    <div class="kicker">Product Architecture Comparison</div>
+    <h2>CUDA、ROCm/HIP、Triton 的产品架构对比</h2>
+    <p class="lead">这一页比较的是三类产品如何把“用户代码”连接到“GPU 硬件执行”。CUDA 是完整 GPU SDK，覆盖从语言、库到工具和硬件的闭环；ROCm/HIP 是 AMD 的开放 GPU 软件栈，重点提供 CUDA 风格迁移路径；Triton 是面向深度学习自定义算子的 Python DSL，重点提升写算子和调参数的效率。</p>
+    <div class="arch-compare">
+      <div class="screenshot arch-card"><div class="shotbar"><span class="dots"></span>CUDA stack</div><div class="shotbody"><p class="arch-intro"><b>CUDA：</b>NVIDIA 的完整 GPU 开发平台，开发者可以从 CUDA C++ 写 kernel，也可以通过 cuBLAS、cuDNN、NCCL 等库和 Nsight 工具链完成调试、调优和生产部署。</p><div class="arch arch-compact">
+        <div class="arch-layer"><div class="arch-label">应用</div><div class="arch-boxes"><div class="arch-box">PyTorch / JAX</div><div class="arch-box">HPC / Custom</div></div></div>
+        <div class="arch-layer"><div class="arch-label">库</div><div class="arch-boxes"><div class="arch-box">cuBLAS</div><div class="arch-box">cuDNN</div><div class="arch-box">NCCL</div></div></div>
+        <div class="arch-layer"><div class="arch-label">接口</div><div class="arch-boxes"><div class="arch-box">CUDA C++</div><div class="arch-box">Runtime / Driver</div></div></div>
+        <div class="arch-layer"><div class="arch-label">工具</div><div class="arch-boxes"><div class="arch-box">nvcc / PTX</div><div class="arch-box">Nsight / cuda-gdb</div></div></div>
+        <div class="arch-layer"><div class="arch-label">硬件</div><div class="arch-boxes"><div class="arch-box">SM / Warp</div><div class="arch-box">Tensor Core / HBM</div></div></div>
+      </div><div class="arch-note">判断：源码、编译产物、Profiler 指标到硬件行为的解释链最完整；代价是概念栈厚、NVIDIA 绑定强。</div></div></div>
+      <div class="screenshot arch-card"><div class="shotbar"><span class="dots"></span>ROCm / HIP stack</div><div class="shotbody"><p class="arch-intro"><b>ROCm / HIP：</b>AMD 的开放 GPU 软件栈。HIP 提供接近 CUDA 的编程接口，帮助团队迁移已有 CUDA 资产，但仍需要理解 AMD wavefront、LDS、gfx 目标和版本矩阵。</p><div class="arch arch-compact">
+        <div class="arch-layer"><div class="arch-label">应用</div><div class="arch-boxes"><div class="arch-box">PyTorch ROCm</div><div class="arch-box">HPC / AI</div></div></div>
+        <div class="arch-layer"><div class="arch-label">库</div><div class="arch-boxes"><div class="arch-box">rocBLAS</div><div class="arch-box">MIOpen</div><div class="arch-box">RCCL</div></div></div>
+        <div class="arch-layer"><div class="arch-label">接口</div><div class="arch-boxes"><div class="arch-box">HIP C++</div><div class="arch-box">HIP / HSA Runtime</div></div></div>
+        <div class="arch-layer"><div class="arch-label">工具</div><div class="arch-boxes"><div class="arch-box">hipcc / LLVM</div><div class="arch-box">rocprof / rocgdb</div></div></div>
+        <div class="arch-layer"><div class="arch-label">硬件</div><div class="arch-boxes"><div class="arch-box">CU / Wavefront</div><div class="arch-box">LDS / HBM</div></div></div>
+      </div><div class="arch-note">判断：开放栈和 CUDA 风格迁移入口清楚；关键缺口是把硬件差异、工具差异、版本矩阵变成可执行诊断。</div></div></div>
+      <div class="screenshot arch-card"><div class="shotbar"><span class="dots"></span>Triton stack</div><div class="shotbody"><p class="arch-intro"><b>Triton：</b>面向 DNN 自定义算子的 Python DSL 和 JIT 编译器。它不是完整 GPU SDK，而是把常见算子开发从逐线程编程提升到 block/tile 数据流表达。</p><div class="arch arch-compact">
+        <div class="arch-layer"><div class="arch-label">工作流</div><div class="arch-boxes"><div class="arch-box">Python</div><div class="arch-box">PyTorch Extension</div></div></div>
+        <div class="arch-layer"><div class="arch-label">API</div><div class="arch-boxes"><div class="arch-box">@triton.jit</div><div class="arch-box">tl.load / tl.dot</div></div></div>
+        <div class="arch-layer"><div class="arch-label">编译</div><div class="arch-boxes"><div class="arch-box">Triton IR</div><div class="arch-box">MLIR / LLVM</div></div></div>
+        <div class="arch-layer"><div class="arch-label">调试</div><div class="arch-boxes"><div class="arch-box">TRITON_INTERPRET</div><div class="arch-box">device_assert</div></div></div>
+        <div class="arch-layer"><div class="arch-label">后端</div><div class="arch-boxes"><div class="arch-box">NVIDIA GPU</div><div class="arch-box">AMD GPU</div></div></div>
+      </div><div class="arch-note">判断：高频 DNN 算子开发效率最高；关键缺口是自动优化、IR、后端和真实 profiler 结果之间的解释链。</div></div></div>
+    </div>
+  </section>
+
+  <section class="floor" id="evidence-docs">
+    <h2>视觉证据 01：官方文档如何组织学习入口</h2>
+    <p class="lead">芯片 SDK 的第一界面通常不是 IDE，而是官方文档。文档的导航结构会直接影响开发者能否快速找到 programming model、安装兼容、调试工具、Profiler 和 API 参考。</p>
+    <div class="grid cols-3">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>CUDA Programming Guide 13.1</div>
+        <div class="shotbody flush"><img class="real-shot" src="./assets/cuda-docs.png" alt="CUDA Programming Guide 13.1 官方文档截图"></div>
+        <div class="evidence-caption">CUDA 的文档入口把学习路径拆成基础概念、CUDA C++、高级特性和技术附录。它的优势是“从入门到专家”的层级完整，但用户也容易被大量概念淹没。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>ROCm Documentation 7.2.2</div>
+        <div class="shotbody flush"><img class="real-shot" src="./assets/rocm-docs.png" alt="AMD ROCm 官方文档截图"></div>
+        <div class="evidence-caption">ROCm 首页把兼容矩阵、安装、AI/HPC 和系统优化放在显著位置，说明“是否支持当前硬件和框架组合”本身就是核心体验问题。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>Triton Documentation</div>
+        <div class="shotbody flush"><img class="real-shot" src="./assets/triton-docs.png" alt="Triton 官方文档截图"></div>
+        <div class="evidence-caption">Triton 把 tutorials、Python API、Gluon、MLIR dialects 和 debugging 放在同一入口，强调 Python 工作流和编译器能力是同一个产品体验。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="evidence-profiler">
+    <h2>视觉证据 02：Profiler 需要把指标变成行动</h2>
+    <p class="lead">性能分析工具不能只展示计数器。成熟的 Profiler 要回答“哪一行代码造成了这个指标”“和上一次基线结果相比变化多少”“下一步最小改动是什么”。</p>
+    <div class="grid cols-3">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>Nsight Compute documentation</div>
+        <div class="shotbody flush"><img class="real-shot" src="./assets/nsight-compute.png" alt="Nsight Compute 官方文档截图"></div>
+        <div class="evidence-caption">Nsight Compute 文档明确强调交互式性能分析器、API 调试器、图形化报告、基线对比和命令行入口。这说明 CUDA 的性能工具不仅有指标，还在组织完整的调优工作流。</div>
+      </div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Profile Experiment</div><div class="shotbody"><div class="metric-bar"><span>Runtime</span><div class="bar-track"><div class="bar-fill" style="width:58%"></div></div><b>-22%</b></div><div class="metric-bar"><span>DRAM tx</span><div class="bar-track"><div class="bar-fill" style="width:72%"></div></div><b>high</b></div><div class="mini-panel">建议必须包含：证据指标、疑似原因、最小改动、预期变化、实验结果。</div></div></div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>rocprof trace style</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">trace output</span></div><div class="mb">HIP_API_TRACE
+KERNEL_TRACE
+MEMORY_COPY_TRACE
+PMC_COUNTERS
+output: csv / json / pftrace</div></div><div class="evidence-caption">ROCm 的 trace/counter 数据适合自动化，但仍需要一层解释把 counter 变成“改哪一行、预期变化多少”。</div></div></div>
+    </div>
+  </section>
+
+  <section class="floor" id="evidence-debug">
+    <h2>视觉证据 03：调试界面要把错误还原成原因</h2>
+    <p class="lead">GPU 错误经常延迟暴露。一个好的调试界面要把 illegal memory access、assert、数值偏差这些现象映射回 kernel、源码行、thread/program 坐标和可复现输入。</p>
+    <div class="grid cols-3">
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>CUDA correctness</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">compute sanitizer</span></div><div class="mb"><span class="err">Invalid global read</span>
+kernel: fused_softmax
+line:   softmax.cu:88
+thread: (127,0,0)</div></div><div class="evidence-caption">CUDA 的优势是能把 runtime fault 映射到源码位置和线程坐标，减少“只知道崩了但不知道改哪”的时间。</div></div></div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Triton interpreter</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">TRITON_INTERPRET=1</span></div><div class="mb">inspect offsets
+check mask
+compare with torch reference
+pdb before GPU run</div></div><div class="evidence-caption">Triton 的 CPU/Python 侧 interpreter 很有启发：先在更可观察的环境里排查 offset、mask、shape 逻辑，再进入 GPU 工具。</div></div></div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Kernel Error Explainer</div><div class="shotbody"><div class="matrix"><div class="bad">Symptom<br><b>OOB read</b></div><div class="warn">Likely cause<br><b>mask missing</b></div><div class="ok">Line<br><b>kernel.py:42</b></div><div class="ok">Next<br><b>inspect</b></div></div><div class="evidence-caption">自研平台应把错误报告组织成症状、疑似原因、源码位置和下一条排查命令，而不是只输出底层 runtime error。</div></div></div>
+    </div>
+  </section>
+
+  <section class="floor" id="evidence-production">
+    <h2>视觉证据 04：从写算子到上线前检查</h2>
+    <p class="lead">这一页展示开发者把 kernel 做成可交付功能时需要看到的三类信息：算子是否正确且够快、编译器把代码改成了什么、当前环境和版本组合能不能稳定上线。</p>
+    <div class="grid cols-3">
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Operator Lab</div><div class="shotbody"><div class="matrix"><div class="ok">Correct<br><b>pass</b></div><div class="warn">Edge<br><b>mask</b></div><div class="ok">Tune<br><b>B256</b></div><div class="ok">Export<br><b>torch</b></div></div><div class="evidence-caption">算子工作台应把 reference、correctness test、edge shape、autotune、benchmark 和 framework export 放在同一条路径里。</div></div></div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Compile Explanation</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">compile chain</span></div><div class="mb">source line
+→ IR / MLIR / LLVM
+→ register pressure
+→ occupancy risk
+→ profiler metric</div></div><div class="evidence-caption">编译解释层要说明自动优化为何触发或未触发，并把源码、IR、寄存器、occupancy 和 profiler 结果连接起来。</div></div></div>
+      <div class="screenshot"><div class="shotbar"><span class="dots"></span>Stack Doctor</div><div class="shotbody"><div class="matrix"><div class="ok">GPU SKU<br><b>supported</b></div><div class="ok">Runtime<br><b>matched</b></div><div class="warn">Framework<br><b>minor drift</b></div><div class="bad">Custom Op ABI<br><b>rebuild</b></div></div><div class="evidence-caption">版本矩阵应变成可执行检查器：直接告诉用户当前环境是否支持、哪里漂移、应该使用哪个容器或重建命令。</div></div></div>
+    </div>
+  </section>
+
+  <section class="floor" id="journey">
+    <h2>开发者旅程地图</h2>
+    <div class="legend-row">
+      <div class="legend-item"><span class="legend-swatch normal"></span>常规阶段：信息量可控，主要问题是学习和理解。</div>
+      <div class="legend-item"><span class="legend-swatch low"></span>浅橙色：高摩擦阶段，失败会直接阻断任务或显著增加焦虑。</div>
+      <div class="legend-item"><span class="legend-swatch hot"></span>浅蓝色：高机会阶段，适合把工具能力转化为产品化模块。</div>
+    </div>
+    <div class="journey-map">
+      <div class="jm-head">阶段</div><div class="jm-head">1 环境</div><div class="jm-head">2 心智</div><div class="jm-head">3 编写</div><div class="jm-head">4 调试</div><div class="jm-head">5 调优</div><div class="jm-head">6 集成</div>
+      <div class="jm-label">用户行为</div><div class="jm-cell low">装驱动、SDK、容器、框架 wheel，确认 GPU/架构支持。</div><div class="jm-cell">读 programming guide，理解线程/内存/编译模型。</div><div class="jm-cell hot">选择 CUDA/HIP/Triton，写起步模板、参考实现和启动代码。</div><div class="jm-cell low">处理非法访问、数值偏差、异步错误、shape 边界。</div><div class="jm-cell hot">做性能分析、保存基线结果、尝试 tile/配置、记录实验。</div><div class="jm-cell low">接 PyTorch/CI/容器，处理 ABI、升级和性能回归。</div>
+      <div class="jm-label">关键触点</div><div class="jm-cell"><a href="./tp-ecosystem.html#direction">Stack Doctor</a><br>检查 GPU、驱动、runtime、框架包、容器镜像和自定义算子 ABI 是否匹配。</div><div class="jm-cell"><a href="./tp-architecture.html">架构理解</a><br>解释 kernel launch、数据分块、线程/程序抽象、内存层级和硬件执行之间的对应关系。</div><div class="jm-cell"><a href="./tp-operator.html">Operator Lab</a><br>从参考实现、shape/stride、边界测试、自动调参到基准测试的完整算子工作流。</div><div class="jm-cell"><a href="./tp-debug.html">Error Explainer</a><br>把非法访问或数值偏差映射到源码行、program/thread 坐标、可复现输入和下一条排查命令。</div><div class="jm-cell"><a href="./tp-profiler.html">Profile Notebook</a><br>把性能指标关联到源码行和实验基线，并把每条建议写清证据、原因、改动和预期收益。</div><div class="jm-cell"><a href="./tp-ecosystem.html">Production Gate</a><br>把正确性、边界 shape、latency p95、ABI 漂移和升级风险放入 CI 与发布门禁。</div>
+      <div class="jm-label">摩擦</div><div class="jm-cell low">“我装对了吗？”<br>版本组合过多，失败延迟到运行期。</div><div class="jm-cell">“这张总图和我的代码有什么关系？”</div><div class="jm-cell">“写对了，但不知道是否高效。”</div><div class="jm-cell low">“报错是后果，不是原因。”</div><div class="jm-cell low">“指标很多，但下一步不知道改哪行。”</div><div class="jm-cell">“本地能跑，CI/生产升级后失效。”</div>
+      <div class="jm-label">机会</div><div class="jm-cell hot">可执行版本矩阵 + 修复命令。</div><div class="jm-cell hot">execution story + 迁移术语表。</div><div class="jm-cell hot">任务模板 + layout 可视化。</div><div class="jm-cell hot">错误解释树 + 最短排查命令。</div><div class="jm-cell hot">建议五字段 + 实验记录。</div><div class="jm-cell hot">性能门禁 + ABI 预检。</div>
+    </div>
+    <svg class="curve" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-label="情绪曲线">
+      <polyline points="0,64 160,80 320,48 480,84 650,38 820,50 1000,68" fill="none" stroke="#3b82f6" stroke-width="5"/>
+      <line x1="0" y1="82" x2="1000" y2="82" stroke="#dfe4ee"/>
+    </svg>
+    <table>
+      <thead><tr><th>低谷</th><th>主要焦虑</th><th>机会方向</th></tr></thead>
+      <tbody>
+        <tr><td>环境搭建</td><td>兼容性焦虑</td><td>提供版本矩阵检查器和一键可复现环境。</td></tr>
+        <tr><td>调试定位</td><td>可靠性焦虑</td><td>把错误从“后果”映射回“最可能的 kernel 行为原因”。</td></tr>
+        <tr><td>性能调优</td><td>成本焦虑</td><td>把 profiler 结论转换为按收益排序的改动建议。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="touchpoints">
+    <h2>开发者旅途七大触点</h2>
+    <p class="lead">下表是后续 7 个详细分析章节的目录。每一行都从一个具体开发者问题出发，说明要比较哪些产品细节、三个竞品的差异在哪里，以及自研平台可以借鉴成什么能力。</p>
+    <table>
+      <thead><tr><th>触点类</th><th>开发者问题</th><th>细分比较点</th><th>竞品差异要点</th><th>建议沉淀的能力</th></tr></thead>
+      <tbody>
+        <tr><td><a href="./tp-architecture.html">01 架构理解</a></td><td>这段代码如何落到硬件？</td><td>文档如何解释线程/内存/编译模型；一个 kernel 的 launch 参数、数据分块、内存访问和硬件执行如何对应；CUDA 术语迁移到 HIP/Triton 时哪些概念可复用、哪些容易误导；示例是否能从 toy code 展开到真实算子</td><td>CUDA 解释链最完整；ROCm 需要显性化 AMD 差异；Triton 降低线程级心智负担。</td><td>Execution Story</td></tr>
+        <tr><td><a href="./tp-memory.html">02 内存操作</a></td><td>数据在哪里、何时移动、为什么慢？</td><td>tensor 在 host、device、cache、临时 buffer 之间如何移动；地址表达式是否导致非连续访问；shared memory/LDS 如何影响复用、同步和 bank conflict；边界 mask 或 if 分支是否隐藏错误和性能损失</td><td>CUDA 控制最细；ROCm 迁移后需重建性能直觉；Triton 表达紧凑但后端行为需解释。</td><td>Memory Path Inspector</td></tr>
+        <tr><td><a href="./tp-debug.html">03 调试工具</a></td><td>错误报告如何回到可修改源码？</td><td>错误是否能定位到 kernel、源码行和 thread/program 坐标；是否能查看 lane、shared/LDS、局部变量；是否能与 torch/numpy reference 对齐数值误差；是否能给出下一条最短排查命令</td><td>CUDA 工具最完整；ROCm 命令行能力强但导览弱；Triton interpreter 降低前置排查成本。</td><td>Kernel Error Explainer</td></tr>
+        <tr><td><a href="./tp-profiler.html">04 性能分析</a></td><td>Profiler 指标下一步该改什么？</td><td>Profiler 首屏是否告诉用户先看哪类指标；指标能否回到源码行、IR 或指令；每次调优是否保存基线结果和失败实验；性能建议是否说明证据、原因、最小改动和预期收益</td><td>Nsight 是标杆；rocprof 数据开放但解释弱；Triton 实验快但依赖外部 profiler。</td><td>Profile Experiment Notebook</td></tr>
+        <tr><td><a href="./tp-compiler.html">05 编译器栈</a></td><td>编译器把我的代码改成了什么？</td><td>编译失败是否给出目标架构、参数和最小复现命令；源码能否跳到 IR、PTX/SASS/LLVM 或 MLIR；sm/gfx target 和 ABI 风险是否提前暴露；unroll、vectorize、layout、swizzle 等优化为何触发或未触发是否可解释</td><td>CUDA 有 PTX/SASS；ROCm 有 LLVM 开放性；Triton 有 MLIR/JIT 但透明度要补。</td><td>Compile Explanation View</td></tr>
+        <tr><td><a href="./tp-operator.html">06 算子实现</a></td><td>如何从 reference 到正确且足够快的 op？</td><td>从空文件到可运行算子需要多少样板；shape、stride、contiguous 假设是否显性；autotune 是否解释候选配置和选择原因；是否默认生成 reference、边界测试、benchmark 和框架导出</td><td>CUDA/HIP 控制强但样板重；Triton 高效但有抽象边界。</td><td>Operator Lab</td></tr>
+        <tr><td><a href="./tp-ecosystem.html">07 生态集成</a></td><td>本地跑通后如何进入生产？</td><td>算子如何接入 PyTorch/TensorFlow/JAX；driver、runtime、compiler、framework、GPU arch 版本是否可检查；correctness、latency p95、ABI drift 是否进入 CI；社区教程、问题解法和默认框架支持是否足够密集</td><td>CUDA 生态省心；ROCm 更依赖兼容矩阵；Triton 依赖框架和底层 backend。</td><td>Stack Doctor + Production Gate</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">读法：左侧是旅程中暴露的开发者问题，中间是可以拿三个竞品横向比较的维度，右侧是这些比较最终指向的自研平台建设方向。下方 7 个章节会把每一类触点完整展开。</div>
+  </section>
+
+
+  <section class="floor touchpoint-composite" id="detail-architecture">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 01 · 架构理解</div>
+  <h1>架构理解不是总图，而是代码如何落到硬件的解释链</h1>
+  <p class="lead">开发者第一次写 kernel 时，需要同时理解执行层级、内存层级、编译层级和工具层级。竞品差异不在“有没有架构图”，而在能否把一个具体算子展开成可预测的执行故事。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 概念入口</h3><p>CUDA 用 grid/block/thread 建立 SIMT 心智；ROCm 借 HIP 降低迁移门槛；Triton 从 program/block/tile 入口减少线程细节。</p><div class="pill-row"><span class="pill hot">学习成本</span><span class="pill blue">首屏文档</span></div></div>
+    <div class="dense-card"><h3>02 代码到硬件</h3><p>关键是把 launch 参数、program_id、warp/wavefront、寄存器、shared/LDS 和 HBM 映射回源码决策。</p><div class="pill-row"><span class="pill good">可解释性</span><span class="pill warn">抽象泄漏</span></div></div>
+    <div class="dense-card"><h3>03 术语迁移</h3><p>CUDA 术语不可直接套到 AMD 或 Triton。迁移表应说明可复用概念、等价概念和危险类比。</p><div class="pill-row"><span class="pill blue">CUDA → HIP</span><span class="pill blue">Thread → Program</span></div></div>
+    <div class="dense-card"><h3>04 示例展开</h3><p>最佳示例不是 toy kernel，而是把 add、reduction、matmul、attention 分别展开执行路径和性能风险。</p><div class="pill-row"><span class="pill good">任务切片</span><span class="pill hot">P0</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：mental model 的组织方式</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">硬件协同的完整 SIMT 模型</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">CUDA 风格入口 + AMD 差异解释</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">block/tile 级数据流模型</div></th></tr></thead>
+    <tbody>
+      <tr><td>界面/证据</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA mapping</div><div class="mb">kernel&lt;&lt;&lt;grid, block&gt;&gt;&gt;
+blockIdx.x → row tile
+threadIdx.x → lane work
+shared[] → reusable tile</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>HIP mapping</div><div class="mb">hipLaunchKernelGGL(...)
+threadIdx/blockIdx 保留
+wavefront=64
+LDS 替代 shared mental model</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton mapping</div><div class="mb">@triton.jit
+pid = tl.program_id(0)
+offs = pid*BLOCK + arange
+tl.load / tl.store with mask</div></div></td></tr>
+      <tr><td>优势</td><td>标准心智最稳定，源码、PTX、SASS、Profiler 指标和硬件行为能形成解释闭环。<div class="score s5"><span></span><span></span><span></span><span></span><span></span></div></td><td>迁移入口熟悉，HIP 保留大量 CUDA 语法，可降低组织切换成本。<div class="score s3"><span></span><span></span><span></span><span></span><span></span></div></td><td>把 DNN 算子从逐线程上移到 tile 数据流，初始认知负担低。<div class="score s4"><span></span><span></span><span></span><span></span><span></span></div></td></tr>
+      <tr><td>劣势</td><td>概念栈厚，用户容易先被 stream、memory、occupancy、PTX 等名词淹没。</td><td>CUDA-like 容易制造“等价错觉”，wavefront、LDS、工具链差异需要额外显性化。</td><td>底层行为被编译器隐藏，性能异常时需要重新理解 IR、layout 和 backend。</td></tr>
+      <tr><td>一句话结论</td><td>最强解释链，但入门路径要任务化。</td><td>迁移路径友好，但差异诊断必须产品化。</td><td>高生产率入口，但需要透明的编译解释层。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：代码到硬件的任务切片解释器</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：每个示例都能展开为 execution story</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>示例旁固定放“执行展开”</b><span>对每个 kernel 展示数据分块、并行粒度、内存路径、同步点和最可能瓶颈，不让用户在总图和源码之间跳转。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>提供 CUDA 迁移术语表</b><span>把 warp/wavefront、shared/LDS、block/program、stream/queue 拆成“相同、相似、危险不同”三类。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>架构图按任务过滤</b><span>用户选择 reduction、matmul、copy、attention 后，只高亮相关硬件层级和工具入口，减少首屏噪音。</span></div></div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Execution Story prototype</div>
+      <div class="shotbody">
+        <div class="matrix"><div class="ok">Source<br><b>line 42</b></div><div class="ok">Tile<br><b>128 x 64</b></div><div class="warn">Memory<br><b>L2 miss risk</b></div><div class="bad">Action<br><b>try swizzle</b></div></div>
+        <div class="mt"><div class="mtbar"><span class="mtt">story</span></div><div class="mb">1. block/program owns one row tile
+2. each lane loads contiguous vector
+3. shared/LDS caches reduction window
+4. profiler should show lower memory transactions</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>硬件真实复杂度 vs 入门心智简洁性</div><div><b>推荐</b>按任务解释架构，不按硬件分类解释任务。</div><div><b>验证指标</b>新用户 30 分钟内能解释一个 kernel 的数据流和瓶颈假设。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-memory">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 02 · 内存与数据搬运</div>
+  <h1>内存体验的关键不是 API 名称，而是数据在哪里、何时移动、为什么慢</h1>
+  <p class="lead">算子开发者最容易在主机端/设备端边界、全局内存/共享内存/本地存储层级、访存合并、边界 mask 和异步拷贝上犯错。优秀产品需要在写代码前提示风险，在性能分析后给出可执行改动。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 主机/设备边界</h3><p>显式 copy、统一内存、框架 tensor 所在 device 需要一致解释，否则错误常在运行后才出现。</p><ul><li>风险：隐式数据拷贝</li><li>机会：数据驻留图</li></ul></div>
+    <div class="dense-card"><h3>02 访问合并</h3><p>访存合并和内存事务是调优入门门槛。产品应能从源码地址表达式推断潜在风险。</p><ul><li>风险：stride 不连续</li><li>机会：源码行预警</li></ul></div>
+    <div class="dense-card"><h3>03 Shared / LDS</h3><p>缓存 tile 可以提速，也可能引入 bank conflict、同步遗漏和占用下降。</p><ul><li>风险：过度缓存</li><li>机会：tile advisor</li></ul></div>
+    <div class="dense-card"><h3>04 Mask / Boundary</h3><p>Triton 的 mask 降低越界风险，但也可能隐藏低效访问；CUDA/HIP 则依赖显式 if。</p><ul><li>风险：边界分支</li><li>机会：mask coverage</li></ul></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：数据搬运和内存层级的可理解性</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">显式控制 + 工具指标完整</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">CUDA 风格 API + AMD memory model</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">tl.load/store + mask + block pointer</div></th></tr></thead>
+    <tbody>
+      <tr><td>界面/代码</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA</div><div class="mb">cudaMemcpyAsync(d_x, h_x, n, H2D, s);
+__shared__ float tile[128];
+if (idx &lt; n) y[idx] = x[idx];</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>HIP</div><div class="mb">hipMemcpyAsync(d_x, h_x, n, H2D, s);
+__shared__ float tile[128];
+wavefront access pattern differs</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">offs = pid * BLOCK + tl.arange(0, BLOCK)
+x = tl.load(ptr + offs, mask=offs &lt; n)
+tl.store(out + offs, x)</div></div></td></tr>
+      <tr><td>优势</td><td>控制最细，Nsight 可观察 memory transactions、L2、shared throughput、bank conflict 等指标。</td><td>API 迁移成本低，HIP 让 CUDA 用户快速进入 AMD GPU，但仍可触达底层计数器。</td><td>地址和 mask 表达紧凑，block pointer 降低复杂 tile 访问样板代码。</td></tr>
+      <tr><td>劣势</td><td>用户必须自己建立“地址表达式 → 事务 → cache → occupancy”的因果链。</td><td>CUDA 风格代码迁移后，性能直觉不一定成立，wavefront/LDS 差异容易被忽视。</td><td>编译器自动优化让内存行为更难预测，profile 异常时需要看 IR/后端。</td></tr>
+      <tr><td>适合场景</td><td>极限调优、复杂数据布局、硬件特性充分利用。</td><td>CUDA 代码迁移、多硬件支持、开放栈生产部署。</td><td>tile 友好的 DNN 算子、快速探索、fused op。</td></tr>
+      <tr><td>总结</td><td>最强但最重。</td><td>迁移友好但需差异提示。</td><td>最轻但需要解释编译器行为。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Memory Path Inspector</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：每个内存建议都必须回到源码地址表达式</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>数据驻留图</b><span>从 tensor/device/copy API 生成 host、device、cache、temporary buffer 的路径图，标出 hidden copy 和同步边界。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>访问模式预检</b><span>静态分析 idx/stride/mask，提前提示非连续访问、边界分支、可能的 bank conflict。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>Profile 后行动建议</b><span>每条建议包含证据指标、疑似地址表达式、最小改动、预期指标变化，避免“只给 counter”。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Memory Path Inspector</div><div class="shotbody">
+      <div class="metric-bar"><span>Global transaction</span><div class="bar-track"><div class="bar-fill" style="width:78%"></div></div><b>high</b></div>
+      <div class="metric-bar"><span>L2 hit rate</span><div class="bar-track"><div class="bar-fill" style="width:41%"></div></div><b>low</b></div>
+      <div class="mini-panel"><b>source clue</b><br>line 37: ptr + row * stride + col. stride=1536 causes non-contiguous lane access.</div>
+      <div class="pill-row"><span class="pill warn">try vectorized load</span><span class="pill blue">transpose tile</span><span class="pill good">expected L2 +20%</span></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>显式控制 vs 自动优化</div><div><b>推荐</b>把 profiler 结论绑定到地址表达式和数据路径。</div><div><b>验证指标</b>用户能在 2 次实验内判断瓶颈是否来自访存。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-debug">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 03 · 调试定位</div>
+  <h1>调试体验的目标是把 runtime fault 还原成可修改的源码原因</h1>
+  <p class="lead">GPU 错误常常延迟暴露：非法访问、异步同步、数值偏差、shape/stride 错误、mask 漏洞。成熟工具要把“报错现象”变成“最短排查路径”。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 错误定位</h3><p>能否从 invalid read / assert / launch failure 回到 kernel、源码行、线程/程序 ID。</p><div class="pill-row"><span class="pill hot">P0</span><span class="pill blue">source line</span></div></div>
+    <div class="dense-card"><h3>02 断点变量</h3><p>cuda-gdb/rocgdb 保留传统调试器能力，但学习和配置成本偏高。</p><div class="pill-row"><span class="pill warn">专家工具</span></div></div>
+    <div class="dense-card"><h3>03 数值对齐</h3><p>DNN 算子常需要 torch/reference 对比，定位误差从哪一层 tile 或 mask 开始扩散。</p><div class="pill-row"><span class="pill good">reference diff</span></div></div>
+    <div class="dense-card"><h3>04 解释式排查</h3><p>Triton interpreter 先在 CPU/Python 侧收窄问题，是很强的体验启发。</p><div class="pill-row"><span class="pill blue">TRITON_INTERPRET</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：从错误到原因的路径长度</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">Compute Sanitizer + cuda-gdb</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">ROCgdb + rocprof trace</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">interpreter + assert/print</div></th></tr></thead>
+    <tbody>
+      <tr><td>典型界面</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>compute-sanitizer</div><div class="mb"><span class="err">Invalid global read</span>
+kernel: fused_softmax
+line: softmax.cu:88
+thread: (127,0,0)</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>rocgdb</div><div class="mb">break kernel
+info threads
+print lane_id
+print shared_tile[tid]</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>TRITON_INTERPRET=1</div><div class="mb">inspect offsets
+check mask
+compare with torch
+pdb before GPU run</div></div></td></tr>
+      <tr><td>优势</td><td>工具链成熟，错误类型、源码关联、memory/race/initcheck 覆盖广。</td><td>传统调试器心智可复用，适合底层工程师深入 kernel 状态。</td><td>Python-first，能在进入 GPU 前定位 shape、mask、offset 逻辑问题。</td></tr>
+      <tr><td>劣势</td><td>新用户不知道先跑哪个工具，异步错误仍需要同步点和最小复现。</td><td>导览弱，工具名和底层组件多，迁移用户容易迷路。</td><td>interpreter 有类型和间接访问限制，真实性能/并发问题仍需外部 profiler。</td></tr>
+      <tr><td>成功体验</td><td>报错直接给源码行、线程坐标、访问地址和建议检查项。</td><td>能把 wavefront/lane/LDS 状态暴露给专家，但需要更强上层解释。</td><td>用户先用 reference diff 收窄到 Python 逻辑，再切 GPU 工具验证。</td></tr>
+      <tr><td>总结</td><td>完整但入口多。</td><td>能力在，导览弱。</td><td>低门槛，但边界明确。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Kernel Error Explainer</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：错误报告必须给“下一条命令”和“最可能原因”</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>统一错误分类</b><span>把 launch failure、illegal memory、race、assert、numerical mismatch 映射到固定排查树。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>源码关联 + 坐标复现</b><span>报告 kernel 名、源码行、program/thread 坐标、shape/stride、mask 值，让用户能构造最小复现。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>参考实现对比</b><span>内置 torch/numpy reference diff，显示首次超差 tile、误差分布和可疑 load/store。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Error Explainer prototype</div><div class="shotbody">
+      <div class="matrix"><div class="bad">Symptom<br><b>OOB read</b></div><div class="warn">Likely cause<br><b>mask missing</b></div><div class="ok">Line<br><b>kernel.py:42</b></div><div class="ok">Next<br><b>run inspect</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">recommended path</span></div><div class="mb">1. print offsets for pid=31
+2. compare mask coverage with n_elements
+3. run reference diff on tile [31]
+4. rerun sanitizer with sync launch</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>专家工具深度 vs 新用户排查路径</div><div><b>推荐</b>先解释错误，再暴露底层工具。</div><div><b>验证指标</b>非法访问类问题平均定位时间下降 50%。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-profiler">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 04 · 性能分析</div>
+  <h1>Profiler 的价值不是指标密度，而是把指标变成实验假设</h1>
+  <p class="lead">算子调优需要在计数器、时间线、源码行、基线结果和实验记录之间来回跳转。成熟体验应把“为什么慢”翻译为“下一次最小改动是什么”。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 指标入口</h3><p>新用户需要 roofline、memory、occupancy、launch overhead 的优先级，而不是完整 counter 海洋。</p><div class="pill-row"><span class="pill hot">指标过载</span></div></div>
+    <div class="dense-card"><h3>02 Source correlation</h3><p>Nsight 的关键标杆：指标能回到源码行和指令附近，减少猜测。</p><div class="pill-row"><span class="pill good">CUDA 标杆</span></div></div>
+    <div class="dense-card"><h3>03 基线对比</h3><p>调优是实验过程。缺少基线结果、备注和失败记录，团队会重复试错。</p><div class="pill-row"><span class="pill blue">实验管理</span></div></div>
+    <div class="dense-card"><h3>04 Rule 建议</h3><p>建议必须含证据、原因、改动、预期指标变化，否则只是“看起来专业”。</p><div class="pill-row"><span class="pill warn">可信度</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：profile 结果能否回到行动</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">Nsight Compute / Systems</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">rocprof / ROCProfiler</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">benchmark + external profiler</div></th></tr></thead>
+    <tbody>
+      <tr><td>典型界面</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Nsight style</div><div class="mb">Section: Memory Workload
+Source: kernel.cu:42
+Rule: Uncoalesced access
+Baseline: -18% vs v3</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>rocprofv3</div><div class="mb">HIP_API_TRACE
+KERNEL_TRACE
+MEMORY_COPY_TRACE
+PMC_COUNTERS
+output: csv/json/pftrace</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">@triton.testing.perf_report
+基准测试配置
+autotune candidates
+profile with ncu/rocprof</div></div></td></tr>
+      <tr><td>优势</td><td>图形化报告、源码关联、基线对比、分析规则、CLI 自动化完整，是体验标杆。</td><td>trace/counter 适合自动化和底层分析，开放数据便于接入自研解释层。</td><td>基准测试/自动调参与 Python 工作流贴近，适合快速实验多个 tile 配置。</td></tr>
+      <tr><td>劣势</td><td>工具重，指标体系对新手仍复杂；跨团队沉淀需要额外实验记录。</td><td>偏底层，很多 counter 到源码行动之间缺解释层。</td><td>依赖外部 profiler，Triton 代码、IR、后端指标之间的桥还不够直观。</td></tr>
+      <tr><td>行动性评分</td><td>高：源码行关联 + 规则建议 + 基线对比。<div class="score s5"><span></span><span></span><span></span><span></span><span></span></div></td><td>中：数据足，解释靠人。<div class="score s3"><span></span><span></span><span></span><span></span><span></span></div></td><td>中高：实验快，解释链短板。<div class="score s4"><span></span><span></span><span></span><span></span><span></span></div></td></tr>
+      <tr><td>总结</td><td>标杆是“指标 → 源码 → 建议”。</td><td>机会是给 counter 加解释层。</td><td>机会是连接 autotune、IR 和 profiler。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Profile Experiment Notebook</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：把 profile 当实验记录，而不是一次性截图</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>每条建议五字段</b><span>证据指标、疑似原因、最小改动、预期指标变化、实验结果，强制形成闭环。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>基线结果与失败实验</b><span>保存每次配置、代码 hash、输入 shape、硬件和结果，失败实验同样可搜索。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>跨层跳转</b><span>从指标跳到源码、IR、汇编或 launch 配置；从源码行反查相关 counter。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Profile Experiment</div><div class="shotbody">
+      <div class="metric-bar"><span>Runtime</span><div class="bar-track"><div class="bar-fill" style="width:58%"></div></div><b>-22%</b></div>
+      <div class="metric-bar"><span>DRAM tx</span><div class="bar-track"><div class="bar-fill" style="width:72%"></div></div><b>high</b></div>
+      <div class="mini-panel"><b>hypothesis</b><br>Line 42 load pattern causes scattered transactions. Try block swizzle and vectorized load.</div>
+      <div class="pill-row"><span class="pill good">基线已保存</span><span class="pill blue">配置 B128x4</span><span class="pill warn">需要复跑</span></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>指标完整性 vs 行动清晰度</div><div><b>推荐</b>默认只暴露可行动 Top 3，保留专家展开查看完整指标的能力。</div><div><b>验证指标</b>每次调优实验都有可复现基线结果。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-compiler">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 05 · 编译器栈</div>
+  <h1>编译器体验的关键是解释“我的代码被改成了什么”</h1>
+  <p class="lead">算子平台越自动化，开发者越需要知道 JIT、IR、target arch、寄存器、occupancy 和 fallback 的影响。编译器不能只在失败时出现，它应成为性能解释链的一部分。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 编译日志</h3><p>错误信息需要包含目标架构、宏、include、IR 阶段和最小复现命令。</p><div class="pill-row"><span class="pill hot">build failure</span></div></div>
+    <div class="dense-card"><h3>02 IR 可视化</h3><p>CUDA 有 PTX/SASS 解释链；Triton 借 MLIR 提供高层优化空间；ROCm 继承 LLVM 开放性。</p><div class="pill-row"><span class="pill blue">PTX</span><span class="pill blue">MLIR</span><span class="pill blue">LLVM</span></div></div>
+    <div class="dense-card"><h3>03 Target arch</h3><p>sm/gfx 目标、feature gate、binary compatibility 决定能否跑、跑得快不快。</p><div class="pill-row"><span class="pill warn">ABI</span><span class="pill warn">arch</span></div></div>
+    <div class="dense-card"><h3>04 自动优化解释</h3><p>unroll、vectorize、layout、swizzle、inline 决策需要解释，否则 profiler 结果难回到源码。</p><div class="pill-row"><span class="pill good">explain pass</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：编译产物的可解释性</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">nvcc / PTX / SASS</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">hipcc / clang / LLVM AMDGPU</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">JIT / Triton IR / MLIR / LLVM</div></th></tr></thead>
+    <tbody>
+      <tr><td>链路</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA</div><div class="mb">.cu → nvcc
+→ PTX
+→ ptxas
+→ cubin/SASS</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>ROCm</div><div class="mb">.hip → hipcc
+→ clang
+→ LLVM AMDGPU
+→ code object</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">Python AST
+→ Triton IR
+→ MLIR dialects
+→ LLVM/backend</div></div></td></tr>
+      <tr><td>优势</td><td>PTX/SASS、编译选项和 profiler 指标之间的生态成熟，专家可继续展开查看。</td><td>LLVM 开放性强，适合接入自研工具和 compiler pass 解释。</td><td>JIT 与 Python 工作流融合，自动生成和 autotune 的迭代速度快。</td></tr>
+      <tr><td>劣势</td><td>底层闭源部分限制完全解释；新手不易理解 PTX/SASS 与源码的关系。</td><td>错误信息常暴露底层栈，迁移用户需要知道更多工具链组件。</td><td>自动优化边界不透明，IR/backend 指标和源码之间缺默认可视化。</td></tr>
+      <tr><td>失败体验</td><td>常见是 arch mismatch、模板错误、register pressure，需要更好的归因。</td><td>常见是 gfx 支持、依赖版本、clang 错误，信息量大但导航弱。</td><td>常见是 unsupported op、shape/meta 参数、JIT cache，Python 用户容易被 compiler 细节打断。</td></tr>
+      <tr><td>总结</td><td>专家可解释性最强。</td><td>开放但需要包装。</td><td>高效但要补透明度。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Compile Explanation View</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：编译器每次重要决策都可追问</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>阶段时间线</b><span>显示 frontend、IR lowering、optimization、codegen、link 的耗时和失败点。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>源码到 IR 对照</b><span>从源码行跳到 IR、指令、寄存器和 profiler 指标，解释自动优化是否生效。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>Arch / ABI Doctor</b><span>编译前检查 target、driver、runtime、framework extension ABI，避免运行时才发现 mismatch。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Compile Explanation</div><div class="shotbody">
+      <div class="matrix"><div class="ok">Frontend<br><b>42 ms</b></div><div class="ok">Lowering<br><b>118 ms</b></div><div class="warn">Reg<br><b>96/thread</b></div><div class="bad">Risk<br><b>occupancy</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">why</span></div><div class="mb">line 51: accumulator kept in registers
+pass: vectorize_load succeeded
+pass: unroll rejected (register pressure)
+try: reduce BLOCK_M or split reduction</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>自动编译效率 vs 可解释控制</div><div><b>推荐</b>默认摘要，按需展开 IR/指令。</div><div><b>验证指标</b>编译失败能在报告内给出最小复现命令。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-operator">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 06 · 算子实现</div>
+  <h1>算子实现体验取决于“控制力、样板成本、实验速度”的平衡</h1>
+  <p class="lead">CUDA/HIP 让开发者拥有极限控制，但要显式管理线程、同步、内存和编译参数；Triton 把高频 DNN 算子提升为 tile 级表达，但需要解释编译器和后端边界。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 起步模板</h3><p>从空文件到可跑 kernel 需要多少样板：include、launch、框架绑定、测试、benchmark。</p><div class="pill-row"><span class="pill hot">首个算子</span></div></div>
+    <div class="dense-card"><h3>02 形状与步长</h3><p>DNN 工程里大部分错误来自 layout 假设，平台应让 shape、stride、contiguous 风险显性化。</p><div class="pill-row"><span class="pill warn">布局风险</span></div></div>
+    <div class="dense-card"><h3>03 Autotune</h3><p>配置搜索要能解释为什么选择某个 BLOCK、num_warps、pipeline stage。</p><div class="pill-row"><span class="pill good">Triton 亮点</span></div></div>
+    <div class="dense-card"><h3>04 参考实现与测试</h3><p>算子平台应默认生成正确性、dtype、边界 shape 和性能回归测试。</p><div class="pill-row"><span class="pill blue">生产化</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：同一个 fused op 的工作流成本</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">逐线程控制</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">CUDA 风格迁移</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">tile 级 DSL</div></th></tr></thead>
+    <tbody>
+      <tr><td>代码形态</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA</div><div class="mb">__global__ void fused(...) {
+  int tid = threadIdx.x;
+  int row = blockIdx.x;
+  // explicit load/sync/reduce/store
+}</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>HIP</div><div class="mb">__global__ void fused(...) {
+  int tid = threadIdx.x;
+  int row = blockIdx.x;
+  // port CUDA, retune for AMD
+}</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">@triton.jit
+def fused(x, y, BLOCK):
+  pid = tl.program_id(0)
+  offs = pid*BLOCK + tl.arange(0, BLOCK)
+  vals = tl.load(x+offs, mask=...)</div></div></td></tr>
+      <tr><td>优势</td><td>控制力最强，适合极限优化和复杂硬件特性。</td><td>迁移路径清楚，适合维护 CUDA/HIP 双栈。</td><td>样板少、实验快、autotune 贴合 Python 工作流。</td></tr>
+      <tr><td>劣势</td><td>开发周期长，正确性和性能都靠专家经验。</td><td>迁移后仍需重调，性能差异常来自硬件心智不一致。</td><td>不适合所有控制场景，后端行为和边界限制需要解释。</td></tr>
+      <tr><td>最佳任务</td><td>自定义 memory layout、底层同步、硬件特性。</td><td>已有 CUDA 资产迁移和供应链多元化。</td><td>matmul、softmax、layernorm、attention、量化/反量化。</td></tr>
+      <tr><td>总结</td><td>专家模式。</td><td>迁移模式。</td><td>生产率模式。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Operator Lab</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：从 reference 到 benchmark 的一体化工作台</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>模板按任务生成</b><span>用户选择 reduction、elementwise、matmul、attention 后生成 kernel、binding、reference、test、benchmark。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>Shape/stride 可视化</b><span>每次运行展示 tensor layout、tile coverage、mask coverage 和边界分支。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>Autotune 可解释</b><span>显示每个候选配置的性能、资源占用、失败原因和推荐理由。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Operator Lab</div><div class="shotbody">
+      <div class="matrix"><div class="ok">正确性<br><b>通过</b></div><div class="ok">最佳配置<br><b>B256 W4</b></div><div class="warn">边界 shape<br><b>需要 mask</b></div><div class="ok">导出<br><b>PyTorch</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">generated workflow</span></div><div class="mb">op init layernorm --backend triton
+op test --dtypes fp16,bf16 --edge-shapes
+op tune --metric latency,p50,p95
+op export --framework torch</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>极限控制 vs 开发效率</div><div><b>推荐</b>默认高层模板，同时允许用户逐层展开到底层代码、IR、profile 指标和硬件事件。</div><div><b>验证指标</b>首个正确 fused op 的时间从天级降到小时级。</div></div>
+    </div>
+  </section>
+
+  <section class="floor touchpoint-composite" id="detail-ecosystem">
+    <div class="touchpoint-block touchpoint-intro">
+<div class="kicker">触点 07 · 生态集成</div>
+  <h1>生态集成决定 kernel 能否进入真实生产链路</h1>
+  <p class="lead">开发者写出一个快 kernel 只是开始。生产化还需要框架扩展、容器、CI、版本矩阵、ABI、性能回归、发布和升级策略。体验机会在于把这些隐性工程成本前置。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 框架绑定</h3><p>PyTorch/TensorFlow/JAX 扩展模板、dtype、stream、autograd、fallback 决定落地速度。</p><div class="pill-row"><span class="pill hot">P0</span></div></div>
+    <div class="dense-card"><h3>02 版本矩阵</h3><p>driver/runtime/compiler/framework/container/arch 组合是 GPU 产品最大摩擦之一。</p><div class="pill-row"><span class="pill warn">兼容焦虑</span></div></div>
+    <div class="dense-card"><h3>03 CI 与回归测试</h3><p>性能回归和正确性边界需要进入 CI，否则算子很难长期维护。</p><div class="pill-row"><span class="pill blue">生产链路</span></div></div>
+    <div class="dense-card"><h3>04 社区解法密度</h3><p>CUDA 的真正优势还包括教程、StackOverflow、示例、人才供给和默认框架支持。</p><div class="pill-row"><span class="pill good">生态护城河</span></div></div>
+  </div>
+    </div>
+    <div class="touchpoint-block touchpoint-compare">
+<h2>竞品横向比较：进入生产链路的阻力</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">事实标准生态</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">开放替代生态</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">Python/框架内嵌生态</div></th></tr></thead>
+    <tbody>
+      <tr><td>入口</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA stack</div><div class="mb">PyTorch CUDA default
+cuBLAS/cuDNN/NCCL
+NVIDIA containers
+Nsight in workflow</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>ROCm stack</div><div class="mb">PyTorch ROCm image
+rocBLAS/MIOpen/RCCL
+compatibility matrix
+rocprof traces</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton stack</div><div class="mb">pip install triton
+@triton.jit in Python
+torch integration
+自动调参配置</div></div></td></tr>
+      <tr><td>优势</td><td>问题解法密度高、框架默认支持、容器和库成熟。</td><td>开放路线利于供应链多元化，HIP 迁移故事清晰。</td><td>安装和实验贴近 Python，研究到产品迭代快。</td></tr>
+      <tr><td>劣势</td><td>供应商绑定强，跨硬件可移植性弱。</td><td>版本/硬件/框架组合更敏感，用户更依赖兼容矩阵。</td><td>不是完整 SDK，生产链路仍依赖底层 CUDA/ROCm 和框架策略。</td></tr>
+      <tr><td>生产风险</td><td>多架构 binary、驱动升级、闭源工具依赖。</td><td>镜像版本、gfx 支持、框架 wheels、性能差异。</td><td>JIT cache、backend support、框架升级、autotune 稳定性。</td></tr>
+      <tr><td>总结</td><td>省心基线。</td><td>可替代但需可诊断。</td><td>高效入口但非完整闭环。</td></tr>
+    </tbody>
+  </table>
+    </div>
+    <div class="touchpoint-block touchpoint-direction">
+<h2>我们的方向：Stack Doctor + Production Gate</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：版本矩阵必须从文档变成可执行检查器</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>一键环境体检</b><span>检查 GPU SKU、driver、runtime、compiler、framework、container、custom op ABI，并给修复命令。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>框架扩展模板</b><span>生成 PyTorch extension、fallback、dtype dispatch、stream handling 和 CI workflow。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>性能门禁</b><span>把 correctness、edge shape、latency p50/p95、throughput、memory footprint 放进 release gate。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Stack Doctor</div><div class="shotbody">
+      <div class="matrix"><div class="ok">GPU SKU<br><b>supported</b></div><div class="ok">Runtime<br><b>matched</b></div><div class="warn">Framework<br><b>minor drift</b></div><div class="bad">Custom Op ABI<br><b>rebuild</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">recommended action</span></div><div class="mb">1. use matching container image
+2. rebuild extension with target arch
+3. 升级前保存性能基线
+4. add performance gate to CI</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>生态复杂度 vs 可复现生产环境</div><div><b>推荐</b>把兼容矩阵和 CI 门禁产品化。</div><div><b>验证指标</b>升级后 ABI/性能回归可在 CI 阶段拦截。</div></div>
+    </div>
+  </section>
+
+  <section class="floor" id="roadmap">
+    <h2>触点方向汇总</h2>
+    <p class="lead">从前面的旅程和触点分析可以收敛出一条建设顺序：先解决环境、调试、调优三类最容易阻断任务的问题，再提升算子开发效率、编译解释能力和生产集成能力。</p>
+    <table class="priority-table">
+      <thead><tr><th>优先级</th><th>模块</th><th>解决的旅程低谷</th><th>竞品证据</th><th>阶段目标</th></tr></thead>
+      <tbody>
+        <tr><td>P0</td><td>Stack Doctor</td><td>环境搭建、版本矩阵、ABI 重建</td><td>ROCm 首页把兼容矩阵前置；CUDA 容器/Toolkit 生态成熟</td><td>把文档矩阵变成可执行检查器</td></tr>
+        <tr><td>P0</td><td>Kernel Error Explainer</td><td>非法访问、数值偏差、异步错误</td><td>CUDA Compute Sanitizer + Triton interpreter</td><td>错误报告直接给源码行、坐标和下一条命令</td></tr>
+        <tr><td>P0</td><td>Profile Experiment Notebook</td><td>指标不可行动、实验不可复现</td><td>Nsight 源码行关联 / 基线对比 / 分析规则</td><td>每条性能建议包含证据、原因、改动、预期和结果</td></tr>
+        <tr><td>P1</td><td>Operator Lab</td><td>首个算子、shape/stride、autotune</td><td>Triton Python-first + autotune</td><td>从 reference 到 benchmark 一体化</td></tr>
+        <tr><td>P1</td><td>Compile Explanation View</td><td>IR/target arch/编译失败不可解释</td><td>CUDA PTX/SASS、ROCm LLVM、Triton MLIR</td><td>源码、IR、指令、指标跨层跳转</td></tr>
+        <tr><td>P2</td><td>Production Gate</td><td>CI、升级、性能回归</td><td>CUDA 生态默认支持；ROCm 镜像和矩阵依赖强</td><td>把 correctness 和 latency p95 纳入发布门禁</td></tr>
+      </tbody>
+    </table>
+    <div class="dense-grid">
+      <div class="dense-card"><h3>P0 依赖关系</h3><p>Stack Doctor 是所有模块前置；Error Explainer 依赖源码映射；Profile Notebook 依赖基线结果存储。</p></div>
+      <div class="dense-card"><h3>P0 首版边界</h3><p>不做完整 IDE；先覆盖 CLI/HTML 报告、JSON 输出和可复制命令。</p></div>
+      <div class="dense-card"><h3>P1 生产率</h3><p>Operator Lab 和 Compile Explanation View 负责把 reference、autotune、IR、profile 接起来。</p></div>
+      <div class="dense-card"><h3>P2 生产化</h3><p>Production Gate 把 correctness、edge shape、latency p95、ABI drift 放进 CI。</p></div>
+    </div>
+  </section>
+
+  <section class="floor" id="findings">
+    <h2>核心结论</h2>
+    <p class="lead">总体判断：自研芯片 SDK 的差异化机会不是“比 CUDA 更像 CUDA”，而是在 CUDA 的成熟解释链、ROCm 的可迁移开放性、Triton 的高生产率工作流之间，做出可诊断、可解释、可复现、可生产的算子开发工作台。</p>
+    <table>
+      <thead><tr><th>分析维度</th><th>CUDA</th><th>ROCm / HIP</th><th>Triton</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>竞品角色</td>
+          <td><div class="ph-name">成熟基线</div><div class="ph-sub">事实标准 / 完整 SDK</div></td>
+          <td><div class="ph-name">直接替代</div><div class="ph-sub">开放迁移 / 双栈支持</div></td>
+          <td><div class="ph-name">跨界标杆</div><div class="ph-sub">算子 DSL / 高生产率</div></td>
+        </tr>
+        <tr>
+          <td>产品能力优势</td>
+          <td>完整解释链：源码、编译产物、Profiler 指标、调试工具、库和框架生态能相互印证。</td>
+          <td>迁移入口友好：HIP 保留 CUDA 风格，ROCm 开放栈和 LLVM 生态利于供应链多元化。</td>
+          <td>高生产率入口：Python-first、@triton.jit、tile/block 抽象、autotune 让 DNN 自定义算子实验速度显著提升。</td>
+        </tr>
+        <tr>
+          <td>体验风险与边界</td>
+          <td>概念栈厚、供应商绑定强，新用户容易先被 stream、memory、occupancy、PTX/SASS 淹没。</td>
+          <td>“CUDA-like”容易制造等价错觉，wavefront、LDS、gfx 支持、版本矩阵和框架组合会放大落地风险。</td>
+          <td>不是完整 SDK，底层 profiler、backend、IR 和生产部署仍依赖 CUDA/ROCm/框架生态；自动优化也需要解释。</td>
+        </tr>
+        <tr>
+          <td>可迁移设计原则</td>
+          <td>自研平台不能只追 API 覆盖度，必须优先做源码行关联、基线对比、错误解释和一键可复现环境。</td>
+          <td>兼容 API 只解决上手，必须同步提供 Stack Doctor、迁移差异诊断和硬件模型解释。</td>
+          <td>自研平台应提供 Operator Lab：reference、测试、benchmark、autotune、profile、export 一体化，而不是让用户从零拼工具链。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="sources">
+    <h2>资料来源</h2>
+    <ul class="source-list">
+      <li><a href="https://docs.nvidia.com/cuda/archive/13.1.0/cuda-programming-guide/index.html">NVIDIA CUDA Programming Guide 13.1</a></li>
+      <li><a href="https://docs.nvidia.com/nsight-compute/NsightCompute/index.html">NVIDIA Nsight Compute 2026.1.1 documentation</a></li>
+      <li><a href="https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html">NVIDIA CUDA Toolkit 13.x Release Notes</a></li>
+      <li><a href="https://rocm.docs.amd.com/en/latest/">AMD ROCm Documentation 7.2.2</a></li>
+      <li><a href="https://rocm.docs.amd.com/projects/rocprofiler/en/latest/how-to/using-rocprof.html">AMD ROCProfiler: Using rocprof</a></li>
+      <li><a href="https://triton-lang.org/main/index.html">Triton official documentation</a></li>
+      <li><a href="https://triton-lang.org/main/programming-guide/chapter-1/introduction.html">Triton Programming Guide: Introduction</a></li>
+      <li><a href="https://triton-lang.org/main/programming-guide/chapter-3/debugging.html">Triton Programming Guide: Debugging</a></li>
+      <li><a href="https://triton-lang.org/main/python-api/triton.language.html">Triton language API</a></li>
+      <li><a href="https://github.com/triton-lang/triton">triton-lang/triton GitHub repository</a></li>
+    </ul>
+  </section>
+  <script src="./nav.js"></script>
+</body>
+</html>

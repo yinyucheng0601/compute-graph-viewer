@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>触点 03：调试工具</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">触点 03 · 调试工具</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 03 · Debugging</div>
+  <h1>调试体验的目标是把 runtime fault 还原成可修改的源码原因</h1>
+  <p class="lead">GPU 错误常常延迟暴露：非法访问、异步同步、数值偏差、shape/stride 错误、mask 漏洞。成熟工具要把“报错现象”变成“最短排查路径”。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 错误定位</h3><p>能否从 invalid read / assert / launch failure 回到 kernel、源码行、线程/程序 ID。</p><div class="pill-row"><span class="pill hot">P0</span><span class="pill blue">source line</span></div></div>
+    <div class="dense-card"><h3>02 断点变量</h3><p>cuda-gdb/rocgdb 保留传统调试器能力，但学习和配置成本偏高。</p><div class="pill-row"><span class="pill warn">专家工具</span></div></div>
+    <div class="dense-card"><h3>03 数值对齐</h3><p>DNN 算子常需要 torch/reference 对比，定位误差从哪一层 tile 或 mask 开始扩散。</p><div class="pill-row"><span class="pill good">reference diff</span></div></div>
+    <div class="dense-card"><h3>04 解释式排查</h3><p>Triton interpreter 先在 CPU/Python 侧收窄问题，是很强的体验启发。</p><div class="pill-row"><span class="pill blue">TRITON_INTERPRET</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：从错误到原因的路径长度</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">Compute Sanitizer + cuda-gdb</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">ROCgdb + rocprof trace</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">interpreter + assert/print</div></th></tr></thead>
+    <tbody>
+      <tr><td>典型界面</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>compute-sanitizer</div><div class="mb"><span class="err">Invalid global read</span>
+kernel: fused_softmax
+line: softmax.cu:88
+thread: (127,0,0)</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>rocgdb</div><div class="mb">break kernel
+info threads
+print lane_id
+print shared_tile[tid]</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>TRITON_INTERPRET=1</div><div class="mb">inspect offsets
+check mask
+compare with torch
+pdb before GPU run</div></div></td></tr>
+      <tr><td>优势</td><td>工具链成熟，错误类型、源码关联、memory/race/initcheck 覆盖广。</td><td>传统调试器心智可复用，适合底层工程师深入 kernel 状态。</td><td>Python-first，能在进入 GPU 前定位 shape、mask、offset 逻辑问题。</td></tr>
+      <tr><td>劣势</td><td>新用户不知道先跑哪个工具，异步错误仍需要同步点和最小复现。</td><td>导览弱，工具名和底层组件多，迁移用户容易迷路。</td><td>interpreter 有类型和间接访问限制，真实性能/并发问题仍需外部 profiler。</td></tr>
+      <tr><td>成功体验</td><td>报错直接给源码行、线程坐标、访问地址和建议检查项。</td><td>能把 wavefront/lane/LDS 状态暴露给专家，但需要更强上层解释。</td><td>用户先用 reference diff 收窄到 Python 逻辑，再切 GPU 工具验证。</td></tr>
+      <tr><td>总结</td><td>完整但入口多。</td><td>能力在，导览弱。</td><td>低门槛，但边界明确。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：Kernel Error Explainer</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：错误报告必须给“下一条命令”和“最可能原因”</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>统一错误分类</b><span>把 launch failure、illegal memory、race、assert、numerical mismatch 映射到固定排查树。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>源码关联 + 坐标复现</b><span>报告 kernel 名、源码行、program/thread 坐标、shape/stride、mask 值，让用户能构造最小复现。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>参考实现对比</b><span>内置 torch/numpy reference diff，显示首次超差 tile、误差分布和可疑 load/store。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Error Explainer prototype</div><div class="shotbody">
+      <div class="matrix"><div class="bad">Symptom<br><b>OOB read</b></div><div class="warn">Likely cause<br><b>mask missing</b></div><div class="ok">Line<br><b>kernel.py:42</b></div><div class="ok">Next<br><b>run inspect</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">recommended path</span></div><div class="mb">1. print offsets for pid=31
+2. compare mask coverage with n_elements
+3. run reference diff on tile [31]
+4. rerun sanitizer with sync launch</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>专家工具深度 vs 新用户排查路径</div><div><b>推荐</b>先解释错误，再暴露底层工具。</div><div><b>验证指标</b>非法访问类问题平均定位时间下降 50%。</div></div>
+</section>
+</body>
+</html>
