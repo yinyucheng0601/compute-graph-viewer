@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>视觉证据与界面示意</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+<nav class="topnav">
+  <div class="brand">视觉证据与界面示意</div>
+  <div class="navlinks">
+    <a href="./index.html#touchpoints">返回总览</a>
+    <a href="#docs">文档</a>
+    <a href="#profiler">Profiler</a>
+    <a href="#debug">Debug</a>
+    <a href="#operator">算子</a>
+    <a href="#compiler">编译</a>
+    <a href="#matrix">版本</a>
+  </div>
+</nav>
+
+<section class="floor" id="docs">
+  <h1>真实截图 01：官方文档信息架构</h1>
+  <p class="lead">芯片 SDK 的第一触点通常是官方文档。下面是 2026-04-30 抓取的官方页面截图，用来观察它们如何组织 programming model、安装/兼容、工具、API 和教程入口。</p>
+  <div class="grid cols-3">
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>CUDA Programming Guide 13.1</div>
+      <div class="shotbody flush"><img class="real-shot" src="./assets/cuda-docs.png" alt="CUDA Programming Guide 13.1 官方文档截图"></div>
+      <div class="evidence-caption">CUDA 把学习路径拆成 Introduction、Programming GPUs in CUDA、Advanced CUDA、CUDA Features 和 Technical Appendices，强调从 mental model 到特性参考的递进。</div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>ROCm Documentation 7.2.2</div>
+      <div class="shotbody flush"><img class="real-shot" src="./assets/rocm-docs.png" alt="AMD ROCm 7.2.2 官方文档截图"></div>
+      <div class="evidence-caption">ROCm 首页把兼容矩阵、安装、AI/HPC、系统优化和工具链入口放在主导航中，版本与硬件支持被产品化为第一层入口。</div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Triton Documentation</div>
+      <div class="shotbody flush"><img class="real-shot" src="./assets/triton-docs.png" alt="Triton 官方文档截图"></div>
+      <div class="evidence-caption">Triton 文档从 installation、tutorials、Python API、Gluon、MLIR dialects 到 debugging，突出 Python-first 和 compiler-first 的双重身份。</div>
+    </div>
+  </div>
+</section>
+
+<section class="floor" id="profiler">
+  <h1>真实截图 02：Profiler 文档如何承诺工具能力</h1>
+  <p class="lead">Profiler 的成熟度不只看 counter 数量，还看它是否能把报告、baseline、源码比较、规则和 CLI 自动化组织成稳定工作流。</p>
+  <div class="screenshot">
+    <div class="shotbar"><span class="dots"></span>Nsight Compute official documentation</div>
+    <div class="shotbody flush"><img class="real-shot" src="./assets/nsight-compute.png" alt="NVIDIA Nsight Compute 官方文档截图"></div>
+    <div class="evidence-caption">Nsight Compute 文档直接把 interactive kernel profiler、API debugger、graphical profiler report、baseline comparison、CLI 和自定义规则列为重要能力，这是 CUDA 工具链体验领先的关键证据。</div>
+  </div>
+</section>
+
+<section class="floor" id="profiler-style">
+  <h1>界面示意 03：Profiler 的信息密度</h1>
+  <p class="lead">为了接近原报告的信息密度，这里不只展示指标，还把“证据、原因、改动、预期”放在同一屏，突出性能工具如何转成行动。</p>
+  <div class="grid cols-2">
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Nsight Compute style report</div>
+      <div class="shotbody">
+        <h3>Kernel: fused_layernorm</h3>
+        <div class="metric-bar"><span>DRAM Throughput</span><div class="bar-track"><div class="bar-fill" style="width:72%"></div></div><b>72%</b></div>
+        <div class="metric-bar"><span>L2 Hit Rate</span><div class="bar-track"><div class="bar-fill" style="width:44%"></div></div><b>44%</b></div>
+        <div class="metric-bar"><span>Occupancy</span><div class="bar-track"><div class="bar-fill" style="width:61%"></div></div><b>61%</b></div>
+        <div class="mini-panel">Source correlation: line 42 load pattern maps to high memory transactions.</div>
+        <div class="pill-row"><span class="pill warn">cause: stride load</span><span class="pill blue">try: vectorize</span><span class="pill good">expect: L2 +20%</span></div>
+      </div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>rocprof CLI style trace</div>
+      <div class="shotbody">
+        <div class="mt"><div class="mtbar"><span class="mtt">rocprofv3 output</span></div><div class="mb">HIP_API_TRACE
+KERNEL_TRACE
+MEMORY_COPY_TRACE
+PMC_COUNTERS
+output: csv | json | pftrace | rocpd</div></div>
+        <p>ROCm 的 trace/counter 形态适合自动化，但需要额外解释层把 counter 变成开发者行动。</p>
+        <div class="pill-row"><span class="pill blue">data-rich</span><span class="pill warn">interpretation gap</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="floor" id="debug">
+  <h1>界面示意 04：调试路径</h1>
+  <div class="grid cols-3">
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>CUDA correctness</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">compute sanitizer</span></div><div class="mb"><span class="err">Invalid global read</span>
+kernel: fused_softmax
+line:   softmax.cu:88
+addr:   out of bounds</div></div><p>价值：把 runtime fault 映射到源码位置。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>ROCgdb style</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">debugger</span></div><div class="mb">break kernel
+info threads
+print lane_id
+print shared_tile[tid]</div></div><p>价值：保留传统调试器心智。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Triton interpreter</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">TRITON_INTERPRET=1</span></div><div class="mb">inspect offsets
+check mask
+compare with torch reference
+pdb before GPU run</div></div><p>价值：先在 Python 侧缩小正确性问题。</p></div></div>
+  </div>
+</section>
+
+<section class="floor" id="operator">
+  <h1>界面示意 05：同一个算子的三种工作流</h1>
+  <div class="grid cols-3">
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>CUDA / HIP fused op workflow</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">kernel skeleton</span></div><div class="mb">__global__ void fused_op(...) {
+  int tid = threadIdx.x;
+  int row = blockIdx.x;
+  // explicit memory, sync, reduction
+}</div></div><p>优势是控制细；成本是线程、同步、内存和编译参数都要显式管理。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Triton fused op workflow</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">program skeleton</span></div><div class="mb">@triton.jit
+def fused_op(x, y, BLOCK):
+  pid = tl.program_id(0)
+  offs = pid * BLOCK + tl.arange(0, BLOCK)
+  vals = tl.load(x + offs, mask=...)
+  tl.store(y + offs, vals)</div></div><p>优势是 tile 级表达更紧凑；风险是编译器决策和后端差异要解释清楚。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Operator Lab prototype</div><div class="shotbody"><div class="matrix"><div class="ok">Correct<br><b>pass</b></div><div class="warn">Edge<br><b>mask</b></div><div class="ok">Tune<br><b>B256</b></div><div class="ok">Export<br><b>torch</b></div></div><div class="mt"><div class="mtbar"><span class="mtt">workflow</span></div><div class="mb">init → reference → test
+→ tune → profile → export
+→ CI performance gate</div></div></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compiler">
+  <h1>界面示意 06：编译解释层</h1>
+  <p class="lead">编译器栈需要从隐藏后台变成可追问的解释层：源码、IR、指令、寄存器、occupancy 和 profiler 指标要能互相跳转。</p>
+  <div class="grid cols-3">
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>CUDA compile chain</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">nvcc</span></div><div class="mb">.cu → nvcc
+→ PTX
+→ ptxas
+→ cubin / SASS</div></div><p>价值：专家能从 PTX/SASS 和 profiler 指标回到源码策略。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>ROCm compile chain</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">hipcc</span></div><div class="mb">.hip → hipcc
+→ clang
+→ LLVM AMDGPU
+→ code object</div></div><p>价值：开放 LLVM 链路适合接入自研 pass 和解释器。</p></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Triton compile chain</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">jit</span></div><div class="mb">Python AST
+→ Triton IR
+→ MLIR dialects
+→ LLVM/backend</div></div><p>价值：高层 DSL 的自动优化需要默认解释“为什么这样生成”。</p></div></div>
+  </div>
+</section>
+
+<section class="floor" id="matrix">
+  <h1>界面示意 07：版本矩阵是产品界面</h1>
+  <p class="lead">SDK 生态问题不能只写在文档里。更好的形态是可执行检查器，把本机环境直接映射为风险和修复建议。</p>
+  <div class="screenshot">
+    <div class="shotbar"><span class="dots"></span>Stack Doctor prototype</div>
+    <div class="shotbody">
+      <div class="matrix">
+        <div class="ok">GPU SKU<br><b>supported</b></div>
+        <div class="ok">Runtime<br><b>matched</b></div>
+        <div class="warn">Framework<br><b>minor drift</b></div>
+        <div class="bad">Custom Op ABI<br><b>rebuild</b></div>
+      </div>
+      <div class="mt"><div class="mtbar"><span class="mtt">recommended action</span></div><div class="mb">1. use matching container image
+2. rebuild extension with target arch
+3. capture baseline profile before upgrade</div></div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

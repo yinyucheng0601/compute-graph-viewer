@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>触点 07：生态集成</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">触点 07 · 生态集成</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 07 · Ecosystem</div>
+  <h1>生态集成决定 kernel 能否进入真实生产链路</h1>
+  <p class="lead">开发者写出一个快 kernel 只是开始。生产化还需要框架扩展、容器、CI、版本矩阵、ABI、性能回归、发布和升级策略。体验机会在于把这些隐性工程成本前置。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 Framework Binding</h3><p>PyTorch/TensorFlow/JAX 扩展模板、dtype、stream、autograd、fallback 决定落地速度。</p><div class="pill-row"><span class="pill hot">P0</span></div></div>
+    <div class="dense-card"><h3>02 Version Matrix</h3><p>driver/runtime/compiler/framework/container/arch 组合是 GPU 产品最大摩擦之一。</p><div class="pill-row"><span class="pill warn">兼容焦虑</span></div></div>
+    <div class="dense-card"><h3>03 CI / Regression</h3><p>性能回归和正确性边界需要进入 CI，否则算子很难长期维护。</p><div class="pill-row"><span class="pill blue">生产链路</span></div></div>
+    <div class="dense-card"><h3>04 Community Density</h3><p>CUDA 的真正优势还包括教程、StackOverflow、示例、人才供给和默认框架支持。</p><div class="pill-row"><span class="pill good">生态护城河</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：进入生产链路的阻力</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">事实标准生态</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">开放替代生态</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">Python/框架内嵌生态</div></th></tr></thead>
+    <tbody>
+      <tr><td>入口</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA stack</div><div class="mb">PyTorch CUDA default
+cuBLAS/cuDNN/NCCL
+NVIDIA containers
+Nsight in workflow</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>ROCm stack</div><div class="mb">PyTorch ROCm image
+rocBLAS/MIOpen/RCCL
+compatibility matrix
+rocprof traces</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton stack</div><div class="mb">pip install triton
+@triton.jit in Python
+torch integration
+autotune configs</div></div></td></tr>
+      <tr><td>优势</td><td>问题解法密度高、框架默认支持、容器和库成熟。</td><td>开放路线利于供应链多元化，HIP 迁移故事清晰。</td><td>安装和实验贴近 Python，研究到产品迭代快。</td></tr>
+      <tr><td>劣势</td><td>供应商绑定强，跨硬件可移植性弱。</td><td>版本/硬件/框架组合更敏感，用户更依赖兼容矩阵。</td><td>不是完整 SDK，生产链路仍依赖底层 CUDA/ROCm 和框架策略。</td></tr>
+      <tr><td>生产风险</td><td>多架构 binary、驱动升级、闭源工具依赖。</td><td>镜像版本、gfx 支持、框架 wheels、性能差异。</td><td>JIT cache、backend support、框架升级、autotune 稳定性。</td></tr>
+      <tr><td>总结</td><td>省心基线。</td><td>可替代但需可诊断。</td><td>高效入口但非完整闭环。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：Stack Doctor + Production Gate</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：版本矩阵必须从文档变成可执行检查器</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>一键环境体检</b><span>检查 GPU SKU、driver、runtime、compiler、framework、container、custom op ABI，并给修复命令。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>框架扩展模板</b><span>生成 PyTorch extension、fallback、dtype dispatch、stream handling 和 CI workflow。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>性能门禁</b><span>把 correctness、edge shape、latency p50/p95、throughput、memory footprint 放进 release gate。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Stack Doctor</div><div class="shotbody">
+      <div class="matrix"><div class="ok">GPU SKU<br><b>supported</b></div><div class="ok">Runtime<br><b>matched</b></div><div class="warn">Framework<br><b>minor drift</b></div><div class="bad">Custom Op ABI<br><b>rebuild</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">recommended action</span></div><div class="mb">1. use matching container image
+2. rebuild extension with target arch
+3. capture baseline profile before upgrade
+4. add performance gate to CI</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>生态复杂度 vs 可复现生产环境</div><div><b>推荐</b>把兼容矩阵和 CI 门禁产品化。</div><div><b>验证指标</b>升级后 ABI/性能回归可在 CI 阶段拦截。</div></div>
+</section>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>产品优先级路线图</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">产品优先级路线图</div><div class="navlinks"><a href="./index.html#roadmap">返回总览</a><a href="#p0">P0</a><a href="#p1">P1</a><a href="#p2">P2</a></div></nav>
+
+<section class="floor" id="p0">
+  <div class="kicker">P0 · Task Success</div>
+  <h1>先解决三类最低谷：装不对、错不明、慢不知改哪</h1>
+  <table class="priority-table">
+    <thead><tr><th>优先级</th><th>模块</th><th>覆盖触点</th><th>为什么现在做</th><th>首版验收</th></tr></thead>
+    <tbody>
+      <tr><td>P0</td><td>Stack Doctor</td><td>version matrix、container、framework ABI、arch support</td><td>环境失败发生在旅程最早期，直接阻断试用；ROCm 的兼容矩阵说明这不是文档问题，而是产品入口问题。</td><td>本机扫描后给出 supported / drift / rebuild / unsupported，并生成修复命令。</td></tr>
+      <tr><td>P0</td><td>Kernel Error Explainer</td><td>错误定位、源码行、坐标复现、reference diff</td><td>调试低谷最深；CUDA Compute Sanitizer 和 Triton interpreter 分别证明源码定位和前置解释的价值。</td><td>非法访问报告包含 kernel、源码行、program/thread 坐标、疑似原因、下一条命令。</td></tr>
+      <tr><td>P0</td><td>Profile Experiment Notebook</td><td>指标入口、source correlation、baseline、rule 建议</td><td>性能是 GPU 产品核心价值；Nsight 的 baseline/rule/source correlation 是成熟标杆。</td><td>每条建议包含证据指标、疑似原因、最小改动、预期指标变化、实验结果。</td></tr>
+    </tbody>
+  </table>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>依赖关系</h3><p>Stack Doctor 是所有模块前置；Error Explainer 依赖源码映射；Profile Notebook 依赖 baseline 存储。</p></div>
+    <div class="dense-card"><h3>首版边界</h3><p>不做完整 IDE；先覆盖 CLI/HTML 报告、JSON 输出和可复制命令。</p></div>
+    <div class="dense-card"><h3>核心指标</h3><p>首次可运行时间、非法访问定位时间、每次 profile 是否生成可复现实验记录。</p></div>
+    <div class="dense-card"><h3>竞品差距</h3><p>CUDA 工具深但重；ROCm 数据开放但解释弱；Triton 快但底层链路不透明。</p></div>
+  </div>
+</section>
+
+<section class="floor" id="p1">
+  <div class="kicker">P1 · Productivity</div>
+  <h1>再提升开发效率：从 reference 到 benchmark 的一体化算子工作台</h1>
+  <table class="priority-table">
+    <thead><tr><th>优先级</th><th>模块</th><th>覆盖触点</th><th>设计参照</th><th>首版验收</th></tr></thead>
+    <tbody>
+      <tr><td>P1</td><td>Operator Lab</td><td>skeleton、shape/stride、autotune、reference/test</td><td>Triton 的 Python-first、@triton.jit、autotune 和 benchmark 工作流。</td><td>选择 op 类型后生成 kernel、reference、test、benchmark、export 模板。</td></tr>
+      <tr><td>P1</td><td>Compile Explanation View</td><td>编译日志、IR 可视化、target arch、自动优化解释</td><td>CUDA PTX/SASS、ROCm LLVM、Triton MLIR 都说明编译层是性能解释链核心。</td><td>源码行可跳到 IR/指令/寄存器风险，编译失败给最小复现命令。</td></tr>
+    </tbody>
+  </table>
+  <div class="rec-grid">
+    <div class="rec-panel"><h3>P1 设计原则</h3><div class="rec-item"><div class="rec-num">01</div><div><b>模板不是脚手架，而是工作流</b><span>必须包含 reference、测试、benchmark、profile、export。</span></div></div><div class="rec-item"><div class="rec-num">02</div><div><b>autotune 必须可解释</b><span>显示候选配置、失败原因、资源占用和选择理由。</span></div></div></div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>P1 flow</div><div class="shotbody"><div class="mt"><div class="mtbar"><span class="mtt">operator lifecycle</span></div><div class="mb">init → reference → correctness
+→ tune → profile → explain
+→ export → CI gate</div></div></div></div>
+  </div>
+</section>
+
+<section class="floor" id="p2">
+  <div class="kicker">P2 · Production</div>
+  <h1>最后把算子带入生产：CI、升级、回归和团队知识沉淀</h1>
+  <table class="priority-table">
+    <thead><tr><th>优先级</th><th>模块</th><th>覆盖触点</th><th>为什么后置</th><th>首版验收</th></tr></thead>
+    <tbody>
+      <tr><td>P2</td><td>Production Gate</td><td>framework binding、CI/regression、upgrade、release report</td><td>需要 P0/P1 生成的 correctness/profile/baseline 数据作为输入。</td><td>CI 中拦截 correctness、edge shape、latency p95、memory footprint 和 ABI drift。</td></tr>
+      <tr><td>P2</td><td>Knowledge Base</td><td>失败实验、调优经验、版本风险、迁移差异</td><td>团队规模化后才显著，但从 P0 起应采集结构化数据。</td><td>失败实验和修复建议可搜索，可按 op/hardware/framework 聚合。</td></tr>
+    </tbody>
+  </table>
+  <div class="tension compact"><div><b>路线图张力</b>工具完整度 vs 首版落地速度</div><div><b>取舍</b>先做 P0 的可执行诊断和实验记录，不做完整 IDE。</div><div><b>成功标准</b>环境、调试、调优三个低谷都有清晰下一步。</div></div>
+</section>
+</body>
+</html>

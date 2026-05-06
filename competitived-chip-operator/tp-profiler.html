@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>触点 04：性能分析</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">触点 04 · 性能分析</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 04 · Profiling</div>
+  <h1>Profiler 的价值不是指标密度，而是把指标变成实验假设</h1>
+  <p class="lead">算子调优需要从 counter、timeline、source line、baseline、实验记录之间来回跳转。成熟体验应把“为什么慢”翻译为“下一次最小改动是什么”。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 指标入口</h3><p>新用户需要 roofline、memory、occupancy、launch overhead 的优先级，而不是完整 counter 海洋。</p><div class="pill-row"><span class="pill hot">指标过载</span></div></div>
+    <div class="dense-card"><h3>02 Source correlation</h3><p>Nsight 的关键标杆：指标能回到源码行和指令附近，减少猜测。</p><div class="pill-row"><span class="pill good">CUDA 标杆</span></div></div>
+    <div class="dense-card"><h3>03 Baseline 对比</h3><p>调优是实验过程。缺少 baseline、备注和失败记录，团队会重复试错。</p><div class="pill-row"><span class="pill blue">实验管理</span></div></div>
+    <div class="dense-card"><h3>04 Rule 建议</h3><p>建议必须含证据、原因、改动、预期指标变化，否则只是“看起来专业”。</p><div class="pill-row"><span class="pill warn">可信度</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：profile 结果能否回到行动</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">Nsight Compute / Systems</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">rocprof / ROCProfiler</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">benchmark + external profiler</div></th></tr></thead>
+    <tbody>
+      <tr><td>典型界面</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Nsight style</div><div class="mb">Section: Memory Workload
+Source: kernel.cu:42
+Rule: Uncoalesced access
+Baseline: -18% vs v3</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>rocprofv3</div><div class="mb">HIP_API_TRACE
+KERNEL_TRACE
+MEMORY_COPY_TRACE
+PMC_COUNTERS
+output: csv/json/pftrace</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">@triton.testing.perf_report
+benchmark configs
+autotune candidates
+profile with ncu/rocprof</div></div></td></tr>
+      <tr><td>优势</td><td>图形化报告、源码关联、baseline、rules、CLI 自动化完整，是体验标杆。</td><td>trace/counter 适合自动化和底层分析，开放数据便于接入自研解释层。</td><td>benchmark/autotune 与 Python 工作流贴近，适合快速实验多个 tile config。</td></tr>
+      <tr><td>劣势</td><td>工具重，指标体系对新手仍复杂；跨团队沉淀需要额外实验记录。</td><td>偏底层，很多 counter 到源码行动之间缺解释层。</td><td>依赖外部 profiler，Triton 代码、IR、后端指标之间的桥还不够直观。</td></tr>
+      <tr><td>行动性评分</td><td>高：source line + rule + baseline。<div class="score s5"><span></span><span></span><span></span><span></span><span></span></div></td><td>中：数据足，解释靠人。<div class="score s3"><span></span><span></span><span></span><span></span><span></span></div></td><td>中高：实验快，解释链短板。<div class="score s4"><span></span><span></span><span></span><span></span><span></span></div></td></tr>
+      <tr><td>总结</td><td>标杆是“指标 → 源码 → 建议”。</td><td>机会是给 counter 加解释层。</td><td>机会是连接 autotune、IR 和 profiler。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：Profile Experiment Notebook</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：把 profile 当实验记录，而不是一次性截图</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>每条建议五字段</b><span>证据指标、疑似原因、最小改动、预期指标变化、实验结果，强制形成闭环。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>Baseline 与失败实验</b><span>保存每次 config、代码 hash、输入 shape、硬件和结果，失败实验同样可搜索。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>跨层跳转</b><span>从指标跳到源码、IR、汇编或 launch 配置；从源码行反查相关 counter。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Profile Experiment</div><div class="shotbody">
+      <div class="metric-bar"><span>Runtime</span><div class="bar-track"><div class="bar-fill" style="width:58%"></div></div><b>-22%</b></div>
+      <div class="metric-bar"><span>DRAM tx</span><div class="bar-track"><div class="bar-fill" style="width:72%"></div></div><b>high</b></div>
+      <div class="mini-panel"><b>hypothesis</b><br>Line 42 load pattern causes scattered transactions. Try block swizzle and vectorized load.</div>
+      <div class="pill-row"><span class="pill good">baseline saved</span><span class="pill blue">config B128x4</span><span class="pill warn">needs rerun</span></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>指标完整性 vs 行动清晰度</div><div><b>推荐</b>默认只暴露可行动 Top 3，保留专家下钻。</div><div><b>验证指标</b>每次调优实验都有可复现 baseline。</div></div>
+</section>
+</body>
+</html>

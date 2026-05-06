@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>触点 05：编译器栈</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">触点 05 · 编译器栈</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 05 · Compiler</div>
+  <h1>编译器体验的关键是解释“我的代码被改成了什么”</h1>
+  <p class="lead">算子平台越自动化，开发者越需要知道 JIT、IR、target arch、寄存器、occupancy 和 fallback 的影响。编译器不能只在失败时出现，它应成为性能解释链的一部分。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 编译日志</h3><p>错误信息需要包含目标架构、宏、include、IR 阶段和最小复现命令。</p><div class="pill-row"><span class="pill hot">build failure</span></div></div>
+    <div class="dense-card"><h3>02 IR 可视化</h3><p>CUDA 有 PTX/SASS 解释链；Triton 借 MLIR 提供高层优化空间；ROCm 继承 LLVM 开放性。</p><div class="pill-row"><span class="pill blue">PTX</span><span class="pill blue">MLIR</span><span class="pill blue">LLVM</span></div></div>
+    <div class="dense-card"><h3>03 Target arch</h3><p>sm/gfx 目标、feature gate、binary compatibility 决定能否跑、跑得快不快。</p><div class="pill-row"><span class="pill warn">ABI</span><span class="pill warn">arch</span></div></div>
+    <div class="dense-card"><h3>04 自动优化解释</h3><p>unroll、vectorize、layout、swizzle、inline 决策需要解释，否则 profiler 结果难回到源码。</p><div class="pill-row"><span class="pill good">explain pass</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：编译产物的可解释性</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">nvcc / PTX / SASS</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">hipcc / clang / LLVM AMDGPU</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">JIT / Triton IR / MLIR / LLVM</div></th></tr></thead>
+    <tbody>
+      <tr><td>链路</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA</div><div class="mb">.cu → nvcc
+→ PTX
+→ ptxas
+→ cubin/SASS</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>ROCm</div><div class="mb">.hip → hipcc
+→ clang
+→ LLVM AMDGPU
+→ code object</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">Python AST
+→ Triton IR
+→ MLIR dialects
+→ LLVM/backend</div></div></td></tr>
+      <tr><td>优势</td><td>PTX/SASS、编译选项和 profiler 指标之间的生态成熟，专家可下钻。</td><td>LLVM 开放性强，适合接入自研工具和 compiler pass 解释。</td><td>JIT 与 Python 工作流融合，自动生成和 autotune 的迭代速度快。</td></tr>
+      <tr><td>劣势</td><td>底层闭源部分限制完全解释；新手不易理解 PTX/SASS 与源码的关系。</td><td>错误信息常暴露底层栈，迁移用户需要知道更多工具链组件。</td><td>自动优化边界不透明，IR/backend 指标和源码之间缺默认可视化。</td></tr>
+      <tr><td>失败体验</td><td>常见是 arch mismatch、模板错误、register pressure，需要更好的归因。</td><td>常见是 gfx 支持、依赖版本、clang 错误，信息量大但导航弱。</td><td>常见是 unsupported op、shape/meta 参数、JIT cache，Python 用户容易被 compiler 细节打断。</td></tr>
+      <tr><td>总结</td><td>专家可解释性最强。</td><td>开放但需要包装。</td><td>高效但要补透明度。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：Compile Explanation View</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：编译器每次重要决策都可追问</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>阶段时间线</b><span>显示 frontend、IR lowering、optimization、codegen、link 的耗时和失败点。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>源码到 IR 对照</b><span>从源码行跳到 IR、指令、寄存器和 profiler 指标，解释自动优化是否生效。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>Arch / ABI Doctor</b><span>编译前检查 target、driver、runtime、framework extension ABI，避免运行时才发现 mismatch。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Compile Explanation</div><div class="shotbody">
+      <div class="matrix"><div class="ok">Frontend<br><b>42 ms</b></div><div class="ok">Lowering<br><b>118 ms</b></div><div class="warn">Reg<br><b>96/thread</b></div><div class="bad">Risk<br><b>occupancy</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">why</span></div><div class="mb">line 51: accumulator kept in registers
+pass: vectorize_load succeeded
+pass: unroll rejected (register pressure)
+try: reduce BLOCK_M or split reduction</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>自动编译效率 vs 可解释控制</div><div><b>推荐</b>默认摘要，按需展开 IR/指令。</div><div><b>验证指标</b>编译失败能在报告内给出最小复现命令。</div></div>
+</section>
+</body>
+</html>

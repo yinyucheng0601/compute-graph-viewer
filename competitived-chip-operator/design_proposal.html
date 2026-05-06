@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>优化提案</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+<nav class="topnav">
+  <div class="brand">优化提案</div>
+  <div class="navlinks">
+    <a href="./index.html#touchpoints">返回总览</a>
+    <a href="#northstar">目标</a>
+    <a href="#proposals">方案</a>
+    <a href="#roadmap">路线</a>
+    <a href="#measure">指标</a>
+  </div>
+</nav>
+
+<section class="floor" id="northstar">
+  <div class="kicker">Product Proposal</div>
+  <h1>把芯片 SDK 做成可解释的算子开发工作台</h1>
+  <p class="lead">建议自研芯片/算子平台不要只对标 CUDA 的 API 覆盖度，而要对标开发者任务成功率：能否快速搭好环境、建立 mental model、写出正确算子、定位错误、解释性能瓶颈，并稳定接入框架和部署链路。</p>
+  <div class="grid cols-4">
+    <div class="card metric"><strong>可诊断</strong><span>每个错误都有症状、证据、最短排查路径。</span></div>
+    <div class="card metric"><strong>可解释</strong><span>每个编译和性能结论能回到源码、IR 或硬件事件。</span></div>
+    <div class="card metric"><strong>可复现</strong><span>环境、profile、benchmark、autotune 结果可保存和比较。</span></div>
+    <div class="card metric"><strong>可生产</strong><span>框架接入、CI 门禁、ABI 和性能回归进入默认流程。</span></div>
+  </div>
+</section>
+
+<section class="floor" id="proposals">
+  <h2>六个核心功能模块</h2>
+  <table>
+    <thead><tr><th>模块</th><th>解决问题</th><th>关键能力</th><th>竞品参照</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Stack Doctor</b></td>
+        <td>环境和生态集成不确定</td>
+        <td>自动读取 driver/runtime/framework/GPU SKU，输出支持等级、风险和修复命令。</td>
+        <td>ROCm 兼容矩阵、CUDA 容器生态</td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><b>Kernel Error Explainer</b></td>
+        <td>错误报告只给后果，不给原因</td>
+        <td>非法访问、数值偏差、异步错误映射到源码行、坐标、shape/stride 和下一条命令。</td>
+        <td>Compute Sanitizer、Triton interpreter</td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><b>Profile Experiment</b></td>
+        <td>Profiler 指标不能转成行动</td>
+        <td>把每条性能建议表达为假设、证据、最小改动、预期指标变化和实验结果。</td>
+        <td>Nsight source correlation / baseline</td>
+        <td>P0</td>
+      </tr>
+      <tr>
+        <td><b>Operator Lab</b></td>
+        <td>算子从正确到高性能缺少闭环</td>
+        <td>reference、kernel、随机测试、边界 shape、benchmark、profile、框架绑定模板一体化。</td>
+        <td>Triton Python-first / autotune</td>
+        <td>P1</td>
+      </tr>
+      <tr><td><b>Compile Explanation</b></td><td>编译器优化不可解释</td><td>输出 tile、指令、寄存器、未触发优化和触发条件，关联源码与 IR。</td><td>CUDA PTX/SASS、ROCm LLVM、Triton MLIR</td><td>P1</td></tr>
+      <tr><td><b>Production Gate</b></td><td>本地可跑但生产回归</td><td>CI 中检查 correctness、edge shape、latency p95、memory footprint、ABI drift。</td><td>CUDA 默认生态、ROCm 镜像策略</td><td>P2</td></tr>
+    </tbody>
+  </table>
+  <div class="mt"><div class="mtbar"><div class="mdt"></div><span class="mtt">Recommended workflow</span></div><div class="mb">stack doctor
+  -> create operator lab
+  -> run correctness tests
+  -> kernel error explainer
+  -> profile experiment
+  -> compile explanation
+  -> autotune
+  -> framework integration
+  -> CI regression gate</div></div>
+</section>
+
+<section class="floor" id="roadmap">
+  <h2>落地路线</h2>
+  <div class="grid cols-3">
+    <div class="card">
+      <h3>MVP：先降低失败率</h3>
+      <p>完成 Stack Doctor、Operator Lab 模板、基础 correctness test、benchmark runner。目标是让新开发者在 30 分钟内跑通一个可验证算子。</p>
+    </div>
+    <div class="card">
+      <h3>V1：打通解释链路</h3>
+      <p>接入 profiler、compile explanation、源码行映射和 profile baseline。目标是把性能问题从“看指标”推进到“做实验”。</p>
+    </div>
+    <div class="card">
+      <h3>V2：生产化闭环</h3>
+      <p>加入 CI 性能门禁、版本矩阵、容器镜像、框架扩展模板和回归报告。目标是让算子进入真实产品链路。</p>
+    </div>
+  </div>
+  <div class="tension">
+    <div><b>核心张力</b>追求 CUDA 兼容度 vs 建立自己的可解释体验</div>
+    <div><b>优化方向</b>API 兼容只作为迁移入口，核心差异化应放在诊断、解释和工作台闭环。</div>
+    <div><b>局限性</b>如果底层 profiler、compiler metadata、runtime trace 不开放，上层体验只能做到部分解释。</div>
+  </div>
+</section>
+<section class="floor" id="measure">
+  <h2>成功指标和验收口径</h2>
+  <table>
+    <thead><tr><th>模块</th><th>核心指标</th><th>验收方式</th><th>失败信号</th></tr></thead>
+    <tbody>
+      <tr><td>Stack Doctor</td><td>首次可运行时间、环境失败率</td><td>扫描后输出状态、风险和修复命令；容器建议可直接复制。</td><td>用户仍需要人工查版本表。</td></tr>
+      <tr><td>Error Explainer</td><td>非法访问定位时间、reference diff 覆盖率</td><td>错误报告包含源码行、坐标、疑似原因和下一条命令。</td><td>只输出 runtime error，没有排查路径。</td></tr>
+      <tr><td>Profile Experiment</td><td>实验可复现率、建议采纳率</td><td>每次 profile 自动生成 baseline、shape、config、代码 hash 和结果。</td><td>用户用截图和手工表格记录调优。</td></tr>
+      <tr><td>Operator Lab</td><td>首个正确 fused op 时间</td><td>模板自动生成 reference/test/benchmark/export。</td><td>用户仍需从多个文档拼接工作流。</td></tr>
+      <tr><td>Production Gate</td><td>CI 拦截回归数量、升级失败率</td><td>correctness、latency p95、ABI drift 都能在 CI 中失败。</td><td>生产升级后才发现性能或 ABI 问题。</td></tr>
+    </tbody>
+  </table>
+</section>
+</body>
+</html>
