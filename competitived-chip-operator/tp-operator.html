@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>触点 06：算子实现</title><link rel="stylesheet" href="./shared.css"></head>
+<body>
+<nav class="topnav"><div class="brand">触点 06 · 算子实现</div><div class="navlinks"><a href="./index.html#touchpoints">返回总览</a><a href="#split">细分</a><a href="#compare">比较</a><a href="#direction">方向</a></div></nav>
+
+<section class="floor" id="split">
+  <div class="kicker">Touchpoint 06 · Operator Authoring</div>
+  <h1>算子实现体验取决于“控制力、样板成本、实验速度”的平衡</h1>
+  <p class="lead">CUDA/HIP 让开发者拥有极限控制，但要显式管理线程、同步、内存和编译参数；Triton 把高频 DNN 算子提升为 tile 级表达，但需要解释编译器和后端边界。</p>
+  <div class="dense-grid">
+    <div class="dense-card"><h3>01 Skeleton</h3><p>从空文件到可跑 kernel 需要多少样板：include、launch、binding、测试、benchmark。</p><div class="pill-row"><span class="pill hot">首个算子</span></div></div>
+    <div class="dense-card"><h3>02 Shape / Stride</h3><p>DNN 工程里大部分错误来自 layout 假设，平台应让 shape、stride、contiguous 风险显性化。</p><div class="pill-row"><span class="pill warn">layout risk</span></div></div>
+    <div class="dense-card"><h3>03 Autotune</h3><p>配置搜索要能解释为什么选择某个 BLOCK、num_warps、pipeline stage。</p><div class="pill-row"><span class="pill good">Triton 亮点</span></div></div>
+    <div class="dense-card"><h3>04 Reference & Test</h3><p>算子平台应默认生成 correctness、dtype、edge shape、performance regression 测试。</p><div class="pill-row"><span class="pill blue">生产化</span></div></div>
+  </div>
+</section>
+
+<section class="floor" id="compare">
+  <h2>竞品横向比较：同一个 fused op 的工作流成本</h2>
+  <table class="cmp-table">
+    <thead><tr><th>维度</th><th><div class="ph-name">CUDA</div><div class="ph-sub">逐线程控制</div></th><th><div class="ph-name">ROCm / HIP</div><div class="ph-sub">CUDA 风格迁移</div></th><th><div class="ph-name">Triton</div><div class="ph-sub">tile 级 DSL</div></th></tr></thead>
+    <tbody>
+      <tr><td>代码形态</td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>CUDA</div><div class="mb">__global__ void fused(...) {
+  int tid = threadIdx.x;
+  int row = blockIdx.x;
+  // explicit load/sync/reduce/store
+}</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>HIP</div><div class="mb">__global__ void fused(...) {
+  int tid = threadIdx.x;
+  int row = blockIdx.x;
+  // port CUDA, retune for AMD
+}</div></div></td><td class="ui-cell"><div class="mt"><div class="mtbar"><span class="dots"></span>Triton</div><div class="mb">@triton.jit
+def fused(x, y, BLOCK):
+  pid = tl.program_id(0)
+  offs = pid*BLOCK + tl.arange(0, BLOCK)
+  vals = tl.load(x+offs, mask=...)</div></div></td></tr>
+      <tr><td>优势</td><td>控制力最强，适合极限优化和复杂硬件特性。</td><td>迁移路径清楚，适合维护 CUDA/HIP 双栈。</td><td>样板少、实验快、autotune 贴合 Python 工作流。</td></tr>
+      <tr><td>劣势</td><td>开发周期长，正确性和性能都靠专家经验。</td><td>迁移后仍需重调，性能差异常来自硬件心智不一致。</td><td>不适合所有控制场景，后端行为和边界限制需要解释。</td></tr>
+      <tr><td>最佳任务</td><td>自定义 memory layout、底层同步、硬件特性。</td><td>已有 CUDA 资产迁移和供应链多元化。</td><td>matmul、softmax、layernorm、attention、量化/反量化。</td></tr>
+      <tr><td>总结</td><td>专家模式。</td><td>迁移模式。</td><td>生产率模式。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="floor" id="direction">
+  <h2>我们的方向：Operator Lab</h2>
+  <div class="rec-grid">
+    <div class="rec-panel">
+      <h3>核心理念：从 reference 到 benchmark 的一体化工作台</h3>
+      <div class="rec-item"><div class="rec-num">01</div><div><b>模板按任务生成</b><span>用户选择 reduction、elementwise、matmul、attention 后生成 kernel、binding、reference、test、benchmark。</span></div></div>
+      <div class="rec-item"><div class="rec-num">02</div><div><b>Shape/stride 可视化</b><span>每次运行展示 tensor layout、tile coverage、mask coverage 和边界分支。</span></div></div>
+      <div class="rec-item"><div class="rec-num">03</div><div><b>Autotune 可解释</b><span>显示每个候选配置的性能、资源占用、失败原因和推荐理由。</span></div></div>
+    </div>
+    <div class="screenshot"><div class="shotbar"><span class="dots"></span>Operator Lab</div><div class="shotbody">
+      <div class="matrix"><div class="ok">Correctness<br><b>pass</b></div><div class="ok">Best config<br><b>B256 W4</b></div><div class="warn">Edge shape<br><b>needs mask</b></div><div class="ok">Export<br><b>PyTorch</b></div></div>
+      <div class="mt"><div class="mtbar"><span class="mtt">generated workflow</span></div><div class="mb">op init layernorm --backend triton
+op test --dtypes fp16,bf16 --edge-shapes
+op tune --metric latency,p50,p95
+op export --framework torch</div></div>
+    </div></div>
+  </div>
+  <div class="tension compact"><div><b>核心张力</b>极限控制 vs 开发效率</div><div><b>推荐</b>默认高层模板，允许逐层下钻到底层。</div><div><b>验证指标</b>首个正确 fused op 的时间从天级降到小时级。</div></div>
+</section>
+</body>
+</html>
