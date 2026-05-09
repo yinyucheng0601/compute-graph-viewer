@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hardware-Native Systems：面向 Ascend NPU 的 AI 编译运行时栈白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">hw-native-sys · 硬件原生系统</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">目录</a>
+      <a href="#philosophy">哲学</a>
+      <a href="#stack">技术栈</a>
+      <a href="#pto-isa">PTO ISA</a>
+      <a href="#pypto">PyPTO</a>
+      <a href="#simpler">Simpler</a>
+      <a href="#lingqu">Lingqu 层级</a>
+      <a href="#tile-flow">Tile 数据流</a>
+      <a href="#bench">基准</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Open-Source Whitepaper · 2026-05-08</div>
+    <h1>Hardware-Native Systems<br>面向 Ascend NPU 的 AI 编译运行时栈</h1>
+    <p class="lead">hw-native-sys 是一个开源社区，目标是在异构 NPU/GPGPU 上构建一套硬件原生的 AI Infra 与 MLsys 生态：从 Python DSL、多层 IR、虚拟 ISA、运行时调度，一直贯穿到 8 级硬件层级与万卡级超节点。本文系统梳理它的技术栈、关键概念和落地数据。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>7</strong><span>开源仓库：pypto / pypto-lib / PTOAS / pto-isa / simpler / 顶层设计文档</span></div>
+      <div class="card metric"><strong>90+</strong><span>PTO 虚拟 ISA tile 指令，覆盖计算、搬运、通信</span></div>
+      <div class="card metric"><strong>8</strong><span>Lingqu 机器层级：从 Core 到 Global Coordinator</span></div>
+      <div class="card metric"><strong>2.79×</strong><span>Flash Attention 在 Ascend 910B2 上对 torch_npu 加速</span></div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">仓库地图 · 完整技术栈</h3>
+    <p class="lead" style="margin-top:6px">六个开源仓库分别承担 DSL、算子库、编译器、ISA、运行时与顶层设计文档；点击仓库名即可跳转到 GitHub。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>仓库</th>
+          <th>定位</th>
+          <th>主要语言</th>
+          <th>承担的层</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><a href="https://github.com/hw-native-sys/pypto"><b>pypto</b></a></td><td>Python 友好的 tile 编程框架，多层 IR 入口。</td><td>Python 65% / C++ 34.8%</td><td>DSL / 前端</td></tr>
+        <tr><td><a href="https://github.com/hw-native-sys/pypto-lib"><b>pypto-lib</b></a></td><td>Tensor 级算子库 + 端到端 LLM 模型（Qwen3、DeepSeek V3.2/V4）。</td><td>Python</td><td>算子库 / 应用层</td></tr>
+        <tr><td><a href="https://github.com/hw-native-sys/PTOAS"><b>PTOAS</b></a></td><td>基于 LLVM 19.1.7 / MLIR 的 .pto Bytecode 编译器与汇编器，out-of-tree。</td><td>C++ 61.9% / Python 32.3%</td><td>编译器 / IR</td></tr>
+        <tr><td><a href="https://github.com/hw-native-sys/pto-isa"><b>pto-isa</b></a></td><td>PTO 虚拟 ISA 的参考实现、头文件与 CPU 模拟器（A2/A3/A5）。</td><td>C++</td><td>虚拟 ISA</td></tr>
+        <tr><td><a href="https://github.com/hw-native-sys/simpler"><b>simpler</b></a></td><td>Ascend 上的模块化运行时：协调 AICPU + AICore，三程序模型。</td><td>C++ 76.6% / Python 17.8%</td><td>运行时 / 调度</td></tr>
+        <tr><td><a href="https://github.com/hw-native-sys/pypto_top_level_documents"><b>pypto_top_level_documents</b></a></td><td>顶层设计文档：层级、async、sharded_tensor、TPUSH/TPOP、Serving 规划。</td><td>Markdown</td><td>架构 RFC</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="overview">
+    <h2>目录</h2>
+    <p class="lead">本白皮书的阅读顺序是：先理解硬件原生哲学和组织形态，再自顶向下穿过技术栈——DSL、IR、虚拟 ISA、运行时——然后在硬件层级、张量通信和真实基准里看到这条解释链落地，最后收敛到结论与术语。</p>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:16%">位置</th>
+          <th>回答问题</th>
+          <th>本页内容</th>
+          <th>输出结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>01 哲学</b><br><span class="ph-sub">Hardware-Native</span></td>
+          <td>为什么需要硬件原生系统？</td>
+          <td>"Hardware-Native" 哲学、四大焦点、仓库地图。</td>
+          <td>硬件原生不是口号，是模型与硬件之间的对齐策略。</td>
+        </tr>
+        <tr>
+          <td><b>02 技术栈</b><br><span class="ph-sub">7-layer stack</span></td>
+          <td>六个仓库如何拼出完整栈？</td>
+          <td>应用 / 库 / 编译器 / ISA / 运行时 / 硬件七层。</td>
+          <td>每一层都有独立仓库和独立设计文档。</td>
+        </tr>
+        <tr>
+          <td><b>03 PTO ISA</b><br><span class="ph-sub">virtual ISA</span></td>
+          <td>虚拟 ISA 解决什么问题？</td>
+          <td>PTO 作为 tile 维度的 PTX，>90 指令。</td>
+          <td>让算子在 A2/A3/A5 三代上有同一份语义。</td>
+        </tr>
+        <tr>
+          <td><b>04 PyPTO</b><br><span class="ph-sub">DSL / IR</span></td>
+          <td>如何把 Python 代码降到 Tile？</td>
+          <td>Tensor → Tile → Block → Execution Graph。</td>
+          <td>Tile 是一等公民：shape、mask、event flag 全在 IR。</td>
+        </tr>
+        <tr>
+          <td><b>05 Simpler</b><br><span class="ph-sub">runtime</span></td>
+          <td>运行时如何调度异构核？</td>
+          <td>Orchestrator-Scheduler-Worker 三元组。</td>
+          <td>异步硬件统一抽象：函数返回 ≠ 任务完成。</td>
+        </tr>
+        <tr>
+          <td><b>06 Lingqu</b><br><span class="ph-sub">L0–L7</span></td>
+          <td>从单核到全局如何组织？</td>
+          <td>Lingqu L0–L7：Core / Die / Chip / Host / Pod / Cluster / Global。</td>
+          <td>同一套 Orch-Sched-Worker 协议递归到全局。</td>
+        </tr>
+        <tr>
+          <td><b>07 数据流</b><br><span class="ph-sub">tile flow</span></td>
+          <td>tile 之间如何流动？</td>
+          <td>TPUSH/TPOP/TFREE、sharded_tensor、complete_in_future。</td>
+          <td>scope-depth 多层 ring + 显式 free，降低峰值显存。</td>
+        </tr>
+        <tr>
+          <td><b>08 基准</b><br><span class="ph-sub">benchmarks</span></td>
+          <td>真实场景下能跑多快？</td>
+          <td>Flash Attention、DeepSeek V4、UBL128 部署场景。</td>
+          <td>90% KV 压缩、EP128 部署、3.2 Tbps 内域 SU。</td>
+        </tr>
+        <tr>
+          <td><b>09 结论</b><br><span class="ph-sub">findings</span></td>
+          <td>这套栈的差异化在哪？</td>
+          <td>硬件原生 vs 兼容路线的取舍。</td>
+          <td>不是"比 CUDA 更像 CUDA"，是把 tile 抽象做到底。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="philosophy">
+    <div class="kicker">Section 01 · 硬件原生哲学</div>
+    <h2>"Hardware-Native"：从硬件真相反推系统软件</h2>
+    <p class="lead">hw-native-sys 不是从 SDK 接口往下做设计，而是从 Ascend 芯片的物理 tile 真相往上做设计。本节回答两个问题：这种思想从哪里来？最终的层级架构是怎么一步步反推出来的？</p>
+
+    <h3 style="margin-top:1rem">一、思想来源：MLsys 编译器社区的十年路径，遇上 NPU 物理现实</h3>
+    <p>"Hardware-Native" 不是一个新概念——它在 AI 编译器社区里已经被验证、被反复重写。hw-native-sys 把社区累积的方法论带到 NPU 生态，但拒绝继续套用 GPU 中心的抽象。下面三条路径，是这个哲学的三条直接前驱：</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>① 编译器路径</h3>
+        <p><b>代表：</b>Apache TVM、MLIR、IREE。<br><b>贡献：</b>用统一多层 IR 把"模型"和"硬件"接起来；自动调度、张量化、图改写。</p>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ 教会社区"硬件感知 IR"应该长什么样。</p>
+        <div class="pill-row"><span class="pill blue">unified IR</span><span class="pill blue">auto-schedule</span></div>
+      </div>
+      <div class="card">
+        <h3>② DSL 路径</h3>
+        <p><b>代表：</b>Triton、TileLang、Halide。<br><b>贡献：</b>把"按线程编程"提升成"按 tile / block 数据流编程"，让算子作者直接表达切分。</p>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ 验证了 tile 抽象在 DNN 算子上是高生产率的。</p>
+        <div class="pill-row"><span class="pill blue">tile DSL</span><span class="pill blue">block ptr</span></div>
+      </div>
+      <div class="card">
+        <h3>③ 硬件现实：NPU ≠ GPU</h3>
+        <p><b>代表：</b>Ascend AIC（Cube）+ AIV（Vector）+ AICPU 三类核心。<br><b>关键差异：</b>它的最小单元不是 SIMT 线程，而是<b>一组矩阵 / 向量 / 控制三种异构核协作</b>。</p>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ "warp / SM" 心智在这里水土不服。</p>
+        <div class="pill-row"><span class="pill hot">tile-first</span><span class="pill warn">非 SIMT</span></div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:1rem">
+      <b>组织来源：</b>hw-native-sys 的主要贡献者带着 Apache TVM、MLIR 等编译器社区的工作经验进入 NPU 生态——他们已经知道"统一 IR + 张量化 + 自动调度"能走多远，也知道这条路在 GPU 中心抽象下会卡在哪里。把"硬件感知 IR"的方法论搬到 Ascend，但<b>拒绝继续用 SIMT 抽象做表层包装</b>——这就是 "Hardware-Native" 哲学的字面来源。
+    </div>
+
+    <h3 style="margin-top:1.4rem">二、架构反推：从硬件真相到 7 层栈</h3>
+    <p>如果 tile 是 Ascend 的硬件真相，那么所有上层抽象都必须以 tile 为枢纽。下面 6 步是<b>从硬件向上的反向构造</b>——每一条推论都是上一条的逻辑后果。这解释了为什么 hw-native-sys 长成现在这个 6 仓库 7 层的形状，而不是别的形状。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">起点</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Ascend 硬件真相：tile 是天然单元，AIC + AIV 异构协作</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 1</div>
+        <div class="arch-boxes">
+          <div class="arch-box">tile 必须是 IR 一等公民 → 多层 IR：Tensor → <b>Tile</b> → Block → Execution</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 2</div>
+        <div class="arch-boxes">
+          <div class="arch-box">需虚拟 ISA 锁住跨代差异 → <b>PTO</b>（pto-isa）</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 3</div>
+        <div class="arch-boxes">
+          <div class="arch-box">DSL 必须能显式声明层级与角色 → <b>@pl.function</b>（pypto）</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 4</div>
+        <div class="arch-boxes">
+          <div class="arch-box">运行时必须递归到 L7 → <b>Orchestrator-Scheduler-Worker</b>（simpler）</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 5</div>
+        <div class="arch-boxes">
+          <div class="arch-box">通信必须是 IR 节点而非 runtime cleverness → <b>TPUSH/TPOP / sharded_tensor</b></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">推论 6</div>
+        <div class="arch-boxes">
+          <div class="arch-box">编译器要把 PTO 翻译到具体代际 → <b>PTOAS</b>（基于 LLVM 19.1.7 / MLIR）</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">终点</div>
+        <div class="arch-boxes">
+          <div class="arch-box">六个仓库 / 七层栈：pypto · pypto-lib · PTOAS · pto-isa · simpler · 顶层文档</div>
+        </div>
+      </div>
+      <div class="arch-note">这套架构不是"集成多种已有思想"的拼装，而是"承认硬件真相后必然如此"。每个仓库都是某一推论的物质化，缺一条推论就缺一个仓库。</div>
+    </div>
+
+    <div class="callout">
+      <b>组织自我陈述：</b>"Our philosophy is 'Hardware-Native': we believe that to achieve peak performance and efficiency, system software—from compilers to kernels—must be designed with a deep awareness of the underlying hardware architecture. We aim to bridge the gap between rapidly evolving AI models and the diverse landscape of emerging NPU/GPU accelerators."
+    </div>
+
+    <h3 style="margin-top:1.4rem">三、哲学落到工作面：四个相互咬合的焦点</h3>
+    <p class="lead">把上面的反推过程切成可同时推进的工作流，就形成 hw-native-sys 自我陈述的四大焦点。它们不是并列的子项目，而是同一条思路的四个截面。</p>
+
+    <div class="grid cols-4">
+      <div class="card">
+        <h3>AI Compilers &amp; IR</h3>
+        <p>多层 IR 与编译器：Tensor → Tile → Block → 硬件指令。承担"推论 1 + 推论 6"。</p>
+        <div class="pill-row"><span class="pill blue">PTOAS</span><span class="pill blue">MLIR</span></div>
+      </div>
+      <div class="card">
+        <h3>High-Performance Kernels</h3>
+        <p>Tile 维度的高性能内核库：Flash / Paged Attention、matmul、layernorm。承担"推论 3"。</p>
+        <div class="pill-row"><span class="pill blue">pypto-lib</span><span class="pill good">Qwen3 / DeepSeek</span></div>
+      </div>
+      <div class="card">
+        <h3>Distributed Training Infra</h3>
+        <p>从单核到 EP128 的并行策略与通信。承担"推论 4 + 推论 5"。</p>
+        <div class="pill-row"><span class="pill blue">simpler</span><span class="pill warn">UBL128</span></div>
+      </div>
+      <div class="card">
+        <h3>HW-SW Co-design</h3>
+        <p>把 ISA 演进做成开源接口，让上层不被锁死在某一代。承担"推论 2"。</p>
+        <div class="pill-row"><span class="pill hot">Ascend A2/A3/A5</span></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>授权约束：</b>所有仓库使用 <b>CANN Open Software License Agreement v2.0</b>，明确限定"用于搭载华为 AI 处理器（Ascend、麒麟、跃影等）的系统"。这意味着 hw-native-sys 采取一种 <b>开源即规范</b>（open-source-as-spec）的策略——代码公开但目标硬件锁定，与 Apache/MIT 风格的宽松开源不同。代价是生态广度让位，回报是与硬件演进对齐的速度。
+    </div>
+  </section>
+
+  <section class="floor" id="stack">
+    <div class="kicker">Section 02 · 技术栈</div>
+    <h2>七层栈：从应用到硅片的完整解释链</h2>
+    <p class="lead">hw-native-sys 把开发者会触碰到的每一层都做成独立仓库：算法工程师在 Tensor 层写模型，性能工程师在 Tile 层写算子，编译器工程师在 IR 层接入 backend，所有层级共享同一套 PTO ISA 语义。这种垂直解耦让"我的 Python 代码到底跑在哪条 wave 上"成为可解释问题。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">应用</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Qwen3-14B / 32B</div>
+          <div class="arch-box">DeepSeek V3.2 / V4</div>
+          <div class="arch-box">Flash / Paged Attention</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">DSL · 前端</div>
+        <div class="arch-boxes">
+          <div class="arch-box">pypto</div>
+          <div class="arch-box">@pl.function</div>
+          <div class="arch-box">pl.range / parallel / pipeline / spmd</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">算子库</div>
+        <div class="arch-boxes">
+          <div class="arch-box">pypto-lib kernels</div>
+          <div class="arch-box">mini LLM engine</div>
+          <div class="arch-box">golden / reference</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">编译器 · IR</div>
+        <div class="arch-boxes">
+          <div class="arch-box">PTOAS (LLVM 19.1.7)</div>
+          <div class="arch-box">PTO Dialect → EmitC / Linalg</div>
+          <div class="arch-box">ptoas / ptobc CLI</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">虚拟 ISA</div>
+        <div class="arch-boxes">
+          <div class="arch-box">pto-isa (>90 instructions)</div>
+          <div class="arch-box">CPU 模拟器</div>
+          <div class="arch-box">A2 / A3 / A5 后端</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">运行时</div>
+        <div class="arch-boxes">
+          <div class="arch-box">simpler · Orchestrator</div>
+          <div class="arch-box">Scheduler / Worker</div>
+          <div class="arch-box">tensormap_and_ringbuffer</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">硬件</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Ascend 910B (A2)</div>
+          <div class="arch-box">Ascend 910C (A3)</div>
+          <div class="arch-box">Ascend 950 (A5)</div>
+        </div>
+      </div>
+      <div class="arch-note">判断：每层独立可替换、每层都暴露 IR 工件——这让"profiler 指标 → IR pass → 源码行"这条链路不依赖闭源工具就能贯通。</div>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:1.4rem">
+      <div class="card">
+        <h3>三类目标用户</h3>
+        <p><b>算法工程师：</b>Tensor 级 Python API，关心模型而不是 tile。<br><b>算子工程师：</b>Tile / Block 级，显式控制 buffer 和 pipeline。<br><b>编译/框架后端：</b>ISA / Block 级，构建新编译器或框架插件。</p>
+      </div>
+      <div class="card">
+        <h3>跨代迁移</h3>
+        <p>同一套 pypto 算子可在 A2 / A3 / A5 三代芯片上复用，差异由 PTO ISA 实现层吸收。<br>开发者验证流程：<code>-p a2a3sim</code> → <code>-p a2a3</code> → <code>-p a5</code>。</p>
+      </div>
+      <div class="card">
+        <h3>开源-规范双重身份</h3>
+        <p>PTOAS 和 pto-isa 公开使开发者可以阅读 IR 演进、提交 issue、接入第三方后端；CANN OSL 限定运行硬件，使生态聚焦在 Ascend 上演化。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="pto-isa">
+    <div class="kicker">Section 03 · PTO 虚拟 ISA</div>
+    <h2>PTO：tile 维度的 PTX，把代际差异挡在硬件背后</h2>
+    <p class="lead">PTO（Parallel Tile Operation）是 Ascend CANN 定义的一套 tile 级虚拟指令集。它的角色和 NVIDIA PTX 类似——做一层"虚拟 ISA"承担向上稳定、向下适配，让算子作者写一次就能跨代，把寄存器分配、pipe 映射这些代际差异留给后端。</p>
+
+    <div class="callout">
+      <b>原文定位：</b>"Parallel Tile Operation (PTO) is a virtual ISA for tile-oriented programming defined by Ascend CANN... uses a higher-level tile programming model to bridge implementation differences across generations."
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>计算指令</h3>
+        <p>matmul、vector op、reduce、softmax 等 tile 级别的算术单元，覆盖 AIC（Cube）和 AIV（Vector）两类核心。</p>
+        <div class="pill-row"><span class="pill blue">tensor.cmp</span><span class="pill blue">tensor.cmps</span><span class="pill good">L0 tiling</span></div>
+      </div>
+      <div class="card">
+        <h3>搬运指令</h3>
+        <p>GM ↔ UB / SRAM 之间的 tile 搬运，含 <code>tile_shape</code> 物理布局提示，把短跨步 TLOAD 合并成一次连续 burst。</p>
+        <div class="pill-row"><span class="pill warn">A2/A3 burst 512B</span><span class="pill warn">A5 burst 128B</span></div>
+      </div>
+      <div class="card">
+        <h3>通信指令</h3>
+        <p>跨核 ring：TPUSH / TPOP / TFREE 六指令；跨节点 SDMA / RoCE / URMA / CCU 通过 <code>complete_in_future</code> 抽象成异步 token。</p>
+        <div class="pill-row"><span class="pill hot">32 cross-core flags</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">三程序模型：一次部署 = 三个产物</h3>
+    <p class="lead">每个 PTO kernel 在 Ascend 上展开为三个协作的程序产物，分别跑在不同硬件单元上，通过定义的 API 互相调用。这是 simpler 运行时调度的最小单位。</p>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">Host</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Host .so（编排逻辑）</div>
+          <div class="arch-box">launch / sync / shape 推断</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">AICPU</div>
+        <div class="arch-boxes">
+          <div class="arch-box">AICPU .so（控制流）</div>
+          <div class="arch-box">不规则形状 / 通用计算 / dispatch</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">AICore</div>
+        <div class="arch-boxes">
+          <div class="arch-box">AICore .o（密集算子）</div>
+          <div class="arch-box">AIC（Cube）+ AIV（Vector）</div>
+        </div>
+      </div>
+      <div class="arch-note">判断：一份算子 = 三个二进制产物。任何上线问题都要求"三个产物的版本与 ABI 一致"，所以版本矩阵必须可执行检查。</div>
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">PTO ISA 在 IR 编译链中的位置</span></div>
+      <div class="mb">
+<span class="purple">.py</span>           ── pypto AST
+   ↓
+<span class="purple">Tensor IR</span>    ── tensor 维度运算图
+   ↓
+<span class="purple">Tile IR</span>      ── tile 维度（PTO 的关注点）
+   ↓
+<span class="purple">Block IR</span>     ── block / 多核协作
+   ↓
+<span class="purple">Execution</span>    ── DAG + ringbuffer + tensormap
+   ↓
+<span class="green">PTO Bytecode (.pto)</span>  ── 虚拟 ISA 文本
+   ↓ ptoas
+<span class="green">A2 / A3 / A5 二进制</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="pypto">
+    <div class="kicker">Section 04 · PyPTO DSL</div>
+    <h2>PyPTO：把分层调度写成 Python 装饰器</h2>
+    <p class="lead">pypto 是 hw-native-sys 的 Python 入口。它的设计假设是：tile 是一等公民——shape、mask、pipeline、scope 都应在 IR 中显式建模，而不是被隐藏在 runtime cleverness 后面。开发者用 <code>@pl.function</code> 声明一个函数运行在哪个层级、扮演什么角色，编译器据此选择降级路径。</p>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>层级与角色（@pl.function）</h3>
+        <p>函数同时声明 <b>层级（CHIP / CORE_GROUP / CORE…）</b>和 <b>角色（ORCHESTRATOR / SCHEDULER / WORKER）</b>，IR 据此分配资源、染色（WHITE 控制 / GREEN AIV / RED AIC）。</p>
+        <div class="mt"><div class="mtbar"><span class="mtt">orchestrator on chip</span></div><div class="mb"><span class="purple">@pl.function</span>(level=pl.Level.CHIP,
+             role=pl.Role.ORCHESTRATOR)
+<span class="green">def</span> matmul_kernel(A, B, C):
+    <span class="purple">with</span> pl.at(level=pl.Level.CORE_GROUP,
+                 optimization=pl.chunked_loop_optimizer):
+        ...</div></div>
+      </div>
+      <div class="card">
+        <h3>四种循环语义</h3>
+        <p><code>pl.range</code> 顺序、<code>pl.parallel</code> 数据并行、<code>pl.pipeline</code> 流水化、<code>pl.spmd</code> SPMD。同一份代码用 <b>MPMD</b>（不同核执行不同程序体）方式实际部署，IR 自动按角色拆分。</p>
+        <div class="pill-row">
+          <span class="pill blue">range</span>
+          <span class="pill blue">parallel</span>
+          <span class="pill blue">pipeline</span>
+          <span class="pill blue">spmd</span>
+          <span class="pill good">MPMD 调度</span>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">多层 IR：自顶向下的下沉路径</h3>
+    <div class="grid cols-4">
+      <div class="card">
+        <h3>① Tensor Graph</h3>
+        <p>算法工程师可见层。整张计算图、shape、dtype、devices——还没有 tile 概念。</p>
+      </div>
+      <div class="card">
+        <h3>② Tile Graph</h3>
+        <p>性能工程师可见层。tensor 被切成 tile，<code>tile_shape</code> 物理布局开始起作用。</p>
+      </div>
+      <div class="card">
+        <h3>③ Block Graph</h3>
+        <p>多核协作层。tile 被分配给 AIC / AIV，TPUSH/TPOP 通信、ring buffer 与 scope 出现。</p>
+      </div>
+      <div class="card">
+        <h3>④ Execution Graph</h3>
+        <p>运行时直接消费的 DAG：tensormap、ringbuffer 状态机、async hardware 完成事件全部展开。</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>原文：</b>"Through a multi-level intermediate representation (IR) system, it compiles AI model applications built via APIs from high-level Tensor graphs step by step into hardware instructions."
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">tile_shape 物理布局：把 16 次短 burst 合并成 1 次</span></div>
+      <div class="mb">
+<span class="yellow">Without tile_shape:</span>
+  16 × <span class="err">16B 短跨步 burst</span>     ← 远低于 A2/A3 偏好的 512B
+
+<span class="yellow">With tile_shape=(TM, TN):</span>
+  1  × <span class="green">256B 连续 burst</span>     ← 接近 burst length 上限
+
+T = pl.gm_tensor(shape=(M, N), dtype=pl.fp8, <span class="purple">tile_shape=(TM, TN)</span>)
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="simpler">
+    <div class="kicker">Section 05 · Simpler 运行时</div>
+    <h2>Orchestrator-Scheduler-Worker：一套协议从 L2 递归到 L7</h2>
+    <p class="lead">simpler 是 hw-native-sys 的运行时层，承担把 Execution Graph 真正放到硅上跑。它的关键设计抉择是：每一个层级（chip、host、cluster、global）都使用 <b>同一套 Orchestrator-Scheduler-Worker 三元组</b>。这意味着单核内的微调度和万卡级的全局协调用的是同一个心智模型，只是规模不同。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Orchestrator</h3>
+        <p>构图者。把 Execution Graph 切成本层级可消费的子任务 DAG，向下提交。</p>
+        <div class="pill-row"><span class="pill blue">DAG 提交</span></div>
+      </div>
+      <div class="card">
+        <h3>Scheduler</h3>
+        <p>调度者。维护 ready queue、ring buffer、依赖关系、refcount，决定谁可以开始。</p>
+        <div class="pill-row"><span class="pill blue">ready / refcount</span></div>
+      </div>
+      <div class="card">
+        <h3>Worker</h3>
+        <p>执行者。在被分配的物理资源上运行任务体；跑完通知 scheduler，或挂在 <code>complete_in_future</code> 上等异步硬件。</p>
+        <div class="pill-row"><span class="pill blue">run / wait async</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">complete_in_future：函数返回 ≠ 任务完成</h3>
+    <p class="lead">硬件单元（SDMA、RoCE、URMA、CCU）天然异步：发射后核心就空了，但实际数据搬运还没结束。simpler 把这一类硬件统一抽象成 <b>"延迟完成任务"</b>——worker 函数 return 后核心立即可被 scheduler 复用，但这个任务在 SDMA / RoCE / URMA / CCU 的 CQ entry 或 notification counter 触发前不会标记 COMPLETE。下游任务通过同一个 token 等待。</p>
+
+    <div class="callout">
+      <b>关键 invariant：</b>"A <code>complete_in_future</code> task's function return <b>releases the core</b> but does <b>not complete the task</b>." 这一条让一份调度逻辑同时覆盖单核内的 pipe 重叠和万卡间的 collective 同步——异步硬件不再是特例。
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">异步硬件统一抽象（伪代码）</span></div>
+      <div class="mb">
+<span class="green">tag</span>  = pto2_send_request_entry(<span class="purple">SDMA</span>, rq_id, &amp;desc)
+       pto2_save_expected_completion(<span class="purple">SDMA</span>, cq_id, tag, A)
+
+# Worker A 已 return，core 释放给 Scheduler
+# 下游 Worker B 仍然必须 wait 在 tag 上
+
+worker_b: <span class="yellow">wait_completion</span>(tag)
+          consume(buffer)            <span class="green">// 数据真就绪了</span>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">两种构图模式</h3>
+    <div class="grid cols-2">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>host_build_graph</div>
+        <div class="shotbody">
+          <p>Host 端整图构造：编译期全图就绪，Scheduler 直接消费。<br>优点：开销小、可静态分析。<br>边界：不适合动态 shape / control flow 复杂的工作负载。</p>
+          <div class="pill-row"><span class="pill good">静态优</span><span class="pill warn">动态弱</span></div>
+        </div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>tensormap_and_ringbuffer</div>
+        <div class="shotbody">
+          <p>tensormap 维护 tensor 到物理 buffer 的映射，ringbuffer 在运行时滚动。Worker 通过环上的 slot 消费/释放。<br>优点：动态形状、流式服务、prefill/decode 长上下文。<br>边界：实现更复杂，对 ABI 约束更严。</p>
+          <div class="pill-row"><span class="pill blue">动态</span><span class="pill blue">long-ctx</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="lingqu">
+    <div class="kicker">Section 06 · Lingqu / 灵渠层级</div>
+    <h2>L7 → L0：把全球部署逐级缩放到一个 Core-Group</h2>
+    <p class="lead">simpler 与 pypto 共享一套 <b>Lingqu（灵渠）8 级机器层级</b>，把硬件世界从跨数据中心一路缩放到一个 AIV/AIC/AICPU 组合。每一级都是一个 Orchestrator-Scheduler-Worker 实例；上一级的 Worker 会成为下一级的 Orchestrator。下面先用一张总览图建立递归关系，再用详表和网络边界图展开 8 个层级。</p>
+
+    <h3 style="margin-top:1.4rem">8 级层级关系总览</h3>
+    <p class="lead">下图只回答一个问题：Lingqu 如何把同一套调度协议递归到每一级。每一层画 3 个 sibling，紫色节点是当前递归路径；居中的箭头标出两层之间的网络边界。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>L7 → L0 · 8 级递归层级图</div>
+      <div class="shotbody flush" style="padding:18px 12px;background:#fff">
+        <svg viewBox="0 -32 1200 722" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <defs>
+            <style>
+              .lvl { font-size:16px; font-weight:900; fill:#0f172a; text-anchor:middle; }
+              .lvl-name { font-size:11px; fill:#64748b; text-anchor:middle; }
+              .path-label { font-size:13px; font-weight:800; fill:#5b21b6; text-anchor:middle; }
+              .sib-label { font-size:12px; fill:#64748b; text-anchor:middle; }
+              .boundary-label { font-size:11px; font-weight:900; text-anchor:middle; }
+            </style>
+          </defs>
+
+          <!-- 左侧层级与 icon 列 -->
+          <rect x="0" y="10" width="190" height="658" rx="8" fill="#f1f5f9"/>
+
+          <!-- 顶部列头 -->
+          <text x="95" y="-12" text-anchor="middle" font-size="11" font-weight="800" fill="#475569">层级 / 物理 icon</text>
+          <text x="600" y="-12" text-anchor="middle" font-size="11" font-weight="800" fill="#475569">递归路径（漏斗表示从全球部署逐级缩放到 Core-Group）</text>
+          <text x="1015" y="-12" text-anchor="middle" font-size="11" font-weight="800" fill="#475569">sibling 样例</text>
+
+          <!-- funnel silhouettes -->
+          <polygon points="220,10 980,10 950,66 250,66" fill="#fafbfc" stroke="#cbd5e1"/>
+          <polygon points="250,96 950,96 920,152 280,152" fill="#ffffff" stroke="#cbd5e1"/>
+          <polygon points="280,182 920,182 890,238 310,238" fill="#fafbfc" stroke="#cbd5e1"/>
+          <polygon points="310,268 890,268 860,324 340,324" fill="#ffffff" stroke="#cbd5e1"/>
+          <polygon points="340,354 860,354 830,410 370,410" fill="#fafbfc" stroke="#cbd5e1"/>
+          <polygon points="370,440 830,440 800,496 400,496" fill="#ffffff" stroke="#cbd5e1"/>
+          <polygon points="400,526 800,526 770,582 430,582" fill="#fafbfc" stroke="#cbd5e1"/>
+          <polygon points="430,612 770,612 740,668 460,668" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1.5"/>
+
+          <!-- ============ L7 · Global ============ -->
+          <text class="lvl" x="92" y="32">L7</text><text class="lvl-name" x="92" y="50">Global</text>
+          <circle cx="150" cy="38" r="17" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+          <ellipse cx="150" cy="38" rx="17" ry="6" fill="none" stroke="#7c3aed" stroke-width="1.2"/>
+          <ellipse cx="150" cy="38" rx="9" ry="17" fill="none" stroke="#7c3aed" stroke-width="1.2"/>
+          <line x1="133" y1="38" x2="167" y2="38" stroke="#7c3aed" stroke-width="1.2"/>
+          <rect x="520" y="19" width="160" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="43">Global Coordinator</text>
+          <rect x="1000" y="20" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="32">Global A</text>
+          <rect x="1000" y="40" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="52">Global C</text>
+
+          <line x1="600" y1="70" x2="600" y2="91" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,91 605,91 600,98" fill="#7c3aed"/>
+          <rect x="553" y="74" width="94" height="18" rx="9" fill="#fef2f2" stroke="#fecaca"/>
+          <text class="boundary-label" x="600" y="87" fill="#991b1b">DCN</text>
+
+          <!-- ============ L6 · Cluster ============ -->
+          <text class="lvl" x="92" y="118">L6</text><text class="lvl-name" x="92" y="136">Cluster</text>
+          <rect x="127" y="106" width="46" height="36" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.5"/>
+          <line x1="127" y1="115" x2="173" y2="115" stroke="#cbd5e1"/><line x1="127" y1="124" x2="173" y2="124" stroke="#cbd5e1"/><line x1="127" y1="133" x2="173" y2="133" stroke="#cbd5e1"/>
+          <circle cx="134" cy="111" r="1.4" fill="#7c3aed"/><circle cx="134" cy="120" r="1.4" fill="#7c3aed"/><circle cx="134" cy="129" r="1.4" fill="#7c3aed"/><circle cx="134" cy="138" r="1.4" fill="#7c3aed"/>
+          <rect x="535" y="105" width="130" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="129">Cluster B</text>
+          <rect x="1000" y="106" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="118">Cluster A</text>
+          <rect x="1000" y="126" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="138">Cluster C</text>
+
+          <line x1="600" y1="156" x2="600" y2="177" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,177 605,177 600,184" fill="#7c3aed"/>
+          <rect x="537" y="160" width="126" height="18" rx="9" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text class="boundary-label" x="600" y="173" fill="#1e3a8a">Scale-Out</text>
+
+          <!-- ============ L5 · Service Pool ============ -->
+          <text class="lvl" x="92" y="204">L5</text><text class="lvl-name" x="92" y="222">Service Pool</text>
+          <rect x="128" y="192" width="18" height="15" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.4"/><rect x="153" y="192" width="18" height="15" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.4"/>
+          <rect x="128" y="214" width="18" height="15" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.4"/><rect x="153" y="214" width="18" height="15" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.4"/>
+          <line x1="146" y1="199" x2="153" y2="199" stroke="#7c3aed"/><line x1="146" y1="221" x2="153" y2="221" stroke="#7c3aed"/><line x1="137" y1="207" x2="137" y2="214" stroke="#7c3aed"/><line x1="162" y1="207" x2="162" y2="214" stroke="#7c3aed"/>
+          <rect x="535" y="191" width="130" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="215">Pool 2</text>
+          <rect x="1000" y="192" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="204">Pool 1</text>
+          <rect x="1000" y="212" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="224">Pool 3</text>
+
+          <line x1="600" y1="242" x2="600" y2="263" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,263 605,263 600,270" fill="#7c3aed"/>
+          <rect x="539" y="246" width="122" height="18" rx="9" fill="#f0fdf4" stroke="#bbf7d0"/>
+          <text class="boundary-label" x="600" y="259" fill="#166534">Pool 内互联</text>
+
+          <!-- ============ L4 · Pod ============ -->
+          <text class="lvl" x="92" y="290">L4</text><text class="lvl-name" x="92" y="308">Pod</text>
+          <rect x="126" y="278" width="48" height="36" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+          <rect x="131" y="284" width="8" height="6" fill="#ddd6fe"/><rect x="142" y="284" width="8" height="6" fill="#ddd6fe"/><rect x="153" y="284" width="8" height="6" fill="#ddd6fe"/><rect x="164" y="284" width="8" height="6" fill="#ddd6fe"/>
+          <rect x="131" y="294" width="8" height="6" fill="#ddd6fe"/><rect x="142" y="294" width="8" height="6" fill="#ddd6fe"/><rect x="153" y="294" width="8" height="6" fill="#ddd6fe"/><rect x="164" y="294" width="8" height="6" fill="#ddd6fe"/>
+          <text x="150" y="310" text-anchor="middle" font-size="8" font-weight="800" fill="#7c3aed">UBL128</text>
+          <rect x="525" y="277" width="150" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="301">Pod β · UBL128</text>
+          <rect x="1000" y="278" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="290">Pod α</text>
+          <rect x="1000" y="298" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="310">Pod γ</text>
+
+          <line x1="600" y1="328" x2="600" y2="349" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,349 605,349 600,356" fill="#7c3aed"/>
+          <rect x="539" y="332" width="122" height="18" rx="9" fill="#fef2f2" stroke="#fecaca"/>
+          <text class="boundary-label" x="600" y="345" fill="#991b1b">Scale-Up</text>
+
+          <!-- ============ L3 · Host ============ -->
+          <text class="lvl" x="92" y="376">L3</text><text class="lvl-name" x="92" y="394">Host</text>
+          <rect x="126" y="374" width="48" height="22" rx="3" fill="#fff" stroke="#7c3aed" stroke-width="1.5"/>
+          <rect x="132" y="380" width="8" height="10" rx="1" fill="#ddd6fe" stroke="#7c3aed" stroke-width="0.6"/><rect x="143" y="380" width="8" height="10" rx="1" fill="#ddd6fe" stroke="#7c3aed" stroke-width="0.6"/><rect x="154" y="380" width="8" height="10" rx="1" fill="#ddd6fe" stroke="#7c3aed" stroke-width="0.6"/>
+          <rect x="535" y="363" width="130" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="387">Host 2 · 1 OS</text>
+          <rect x="1000" y="364" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="376">Host 1</text>
+          <rect x="1000" y="384" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="396">Host 3</text>
+
+          <line x1="600" y1="414" x2="600" y2="435" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,435 605,435 600,442" fill="#7c3aed"/>
+          <rect x="546" y="418" width="108" height="18" rx="9" fill="#ecfeff" stroke="#a5f3fc"/>
+          <text class="boundary-label" x="600" y="431" fill="#155e75">PCIe / UB</text>
+
+          <!-- ============ L2 · Chip (NPU) ============ -->
+          <text class="lvl" x="92" y="462">L2</text><text class="lvl-name" x="92" y="480">Chip · NPU</text>
+          <rect x="132" y="450" width="36" height="34" rx="2" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <rect x="137" y="455" width="26" height="24" rx="1" fill="#fff" stroke="#7c3aed"/><text x="150" y="471" text-anchor="middle" font-size="8" font-weight="900" fill="#5b21b6">NPU</text>
+          <rect x="535" y="449" width="130" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="473">NPU 2 · 950</text>
+          <rect x="1000" y="450" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="462">NPU 1</text>
+          <rect x="1000" y="470" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="482">NPU 3</text>
+
+          <line x1="600" y1="500" x2="600" y2="521" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,521 605,521 600,528" fill="#7c3aed"/>
+          <rect x="543" y="504" width="114" height="18" rx="9" fill="#ecfeff" stroke="#a5f3fc"/>
+          <text class="boundary-label" x="600" y="517" fill="#155e75">封装互连</text>
+
+          <!-- ============ L1 · Die（可选） ============ -->
+          <text class="lvl" x="92" y="548">L1</text><text class="lvl-name" x="92" y="566">Die · 可选</text>
+          <rect x="126" y="536" width="48" height="34" rx="2" fill="#fff" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="3,2"/>
+          <rect x="133" y="545" width="17" height="17" rx="2" fill="#ddd6fe" stroke="#7c3aed"/><rect x="153" y="545" width="17" height="17" rx="2" fill="#ddd6fe" stroke="#7c3aed"/>
+          <rect x="545" y="535" width="110" height="38" rx="6" fill="#ddd6fe" stroke="#7c3aed" stroke-width="2"/>
+          <text class="path-label" x="600" y="559">die 1</text>
+          <rect x="1000" y="546" width="112" height="16" rx="5" fill="#fff" stroke="#cbd5e1"/><text class="sib-label" x="1056" y="558">die 0</text>
+
+          <line x1="600" y1="586" x2="600" y2="607" stroke="#7c3aed" stroke-width="2"/>
+          <polygon points="595,607 605,607 600,614" fill="#7c3aed"/>
+          <rect x="558" y="590" width="84" height="18" rx="9" fill="#ecfeff" stroke="#a5f3fc"/>
+          <text class="boundary-label" x="600" y="603" fill="#155e75">NoC</text>
+
+          <!-- ============ L0 · Core-Group（叶子层，三类核心并存） ============ -->
+          <text class="lvl" x="92" y="634">L0</text><text class="lvl-name" x="92" y="652">Core-Group</text>
+          <rect x="126" y="624" width="15" height="22" rx="2" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/><text x="133.5" y="639" text-anchor="middle" font-size="8" font-weight="900" fill="#5b21b6">V</text>
+          <rect x="144" y="624" width="15" height="22" rx="2" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/><text x="151.5" y="639" text-anchor="middle" font-size="8" font-weight="900" fill="#991b1b">C</text>
+          <rect x="162" y="624" width="15" height="22" rx="2" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/><text x="169.5" y="639" text-anchor="middle" font-size="7" font-weight="900" fill="#92400e">CPU</text>
+          <rect x="380" y="621" width="120" height="38" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+          <text x="440" y="645" text-anchor="middle" font-size="13" font-weight="700" fill="#5b21b6">AIV · 向量</text>
+          <rect x="540" y="621" width="120" height="38" rx="6" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+          <text x="600" y="645" text-anchor="middle" font-size="13" font-weight="700" fill="#991b1b">AIC · Cube</text>
+          <rect x="700" y="621" width="120" height="38" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <text x="760" y="645" text-anchor="middle" font-size="13" font-weight="700" fill="#92400e">AICPU</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">紫色节点表示当前递归路径；右侧灰色 sibling 只保留样例。漏斗宽度从 L7 到 L0 逐级收窄，表达从全球部署缩放到 Core-Group；网络边界直接贴在居中的下行箭头上。</div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">8 级详表</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:7%">层</th>
+          <th style="width:14%">名称</th>
+          <th style="width:24%">是什么</th>
+          <th style="width:14%">典型规模</th>
+          <th style="width:18%">网络 / 边界</th>
+          <th>调度看到</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>L7</b></td>
+          <td>Global Coordinator</td>
+          <td>跨集群 / 跨数据中心的最顶层协调器。</td>
+          <td>N 个 Cluster</td>
+          <td>DCN（Data Center Network）· 毫秒级</td>
+          <td>仅适合异步复制、checkpoint sync、灾备。</td>
+        </tr>
+        <tr>
+          <td><b>L6</b></td>
+          <td>Cluster</td>
+          <td>整个数据中心机房内的所有 Pod 与 Pool。</td>
+          <td>数千 ~ 数万 NPU</td>
+          <td>DC 内</td>
+          <td>机房功耗、散热、网络隔离。</td>
+        </tr>
+        <tr>
+          <td><b>L5</b></td>
+          <td>Service Pool</td>
+          <td>多个 Pod 通过 Scale-Out CLOS 连接，共同服务一个工作负载（例如一组 LLM 推理实例）。</td>
+          <td>N 个 Pod</td>
+          <td>Scale-Out · CLOS · 16,384 端口</td>
+          <td>高速光互联，适合 DP / PP 跨 Pod。</td>
+        </tr>
+        <tr>
+          <td><b>L4</b></td>
+          <td>Pod</td>
+          <td>多服务器通过高带宽 Scale-Up 总线（统一总线 UB）紧耦合的高带宽域。</td>
+          <td>UBL128 = 8 服务器 / 128 NPU</td>
+          <td>Scale-Up · UB · 3.2 Tbps SU 域</td>
+          <td>EP / TP 并行的最佳粒度。</td>
+        </tr>
+        <tr>
+          <td><b>L3</b></td>
+          <td>Host</td>
+          <td>一个 OS 实例 + 一块母板上的多颗 NPU；Host CPU 跑 Orchestrator，NPU 跑 Worker。</td>
+          <td>4 ~ 8 颗 NPU / Host</td>
+          <td>板内 · PCIe / UB</td>
+          <td>Host-Device 边界。</td>
+        </tr>
+        <tr>
+          <td><b>L2</b></td>
+          <td>Chip (NPU)</td>
+          <td>整颗 NPU 芯片。Ascend 910B（A2）/ 910C（A3）/ 950（A5）三代。</td>
+          <td>数十个 Core-Group / chip</td>
+          <td>片上 NoC + L2 cache</td>
+          <td>HBM、SRAM、跨核环。</td>
+        </tr>
+        <tr>
+          <td><b>L1</b></td>
+          <td>Die（可选）</td>
+          <td>多晶粒拼装层；如 910C 的双 die 设计。单 die 芯片不出现这一层。</td>
+          <td>1 ~ 2 die / chip</td>
+          <td>封装内 · 基板互连</td>
+          <td>跨 die 通信延迟（高于片内 NoC）。</td>
+        </tr>
+        <tr>
+          <td><b>L0</b></td>
+          <td>Core / Core-Group</td>
+          <td>芯片内最小可调度单元，由一组 AIV（向量）+ AIC（Cube）+ AICPU（控制）组成。</td>
+          <td>1 AIV + 1 AIC + 1 AICPU</td>
+          <td>Die 内 · NoC（片上网络）</td>
+          <td>tile 级算子；TPUSH/TPOP 跨核环。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.4rem">层间网络边界总览</h3>
+    <p class="lead">递归图只保留边界名称；这里单独展开这些边界的通信尺度和适合跨越的并行策略。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Lingqu · 网络边界与并行策略</div>
+      <div class="shotbody flush" style="padding:18px 14px;background:#fff">
+        <svg viewBox="0 0 1180 300" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <defs>
+            <marker id="net-arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <text x="36" y="42" font-size="13" font-weight="800" fill="#475569">更远 / 更慢</text>
+          <line x1="130" y1="38" x2="1050" y2="38" stroke="#cbd5e1" stroke-width="2" marker-end="url(#net-arrow)"/>
+          <text x="962" y="28" font-size="13" font-weight="800" fill="#475569">更近 / 更快</text>
+
+          <rect x="50" y="72" width="170" height="150" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+          <text x="135" y="100" text-anchor="middle" font-size="18" font-weight="900" fill="#991b1b">DCN</text>
+          <text x="135" y="124" text-anchor="middle" font-size="12" fill="#7f1d1d">L7 ↔ L6</text>
+          <text x="135" y="152" text-anchor="middle" font-size="12" fill="#475569">跨 DC / 毫秒级</text>
+          <text x="135" y="176" text-anchor="middle" font-size="12" font-weight="800" fill="#991b1b">异步复制</text>
+          <text x="135" y="196" text-anchor="middle" font-size="12" font-weight="800" fill="#991b1b">checkpoint / 灾备</text>
+
+          <rect x="260" y="72" width="190" height="150" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="355" y="100" text-anchor="middle" font-size="18" font-weight="900" fill="#1e3a8a">Scale-Out</text>
+          <text x="355" y="124" text-anchor="middle" font-size="12" fill="#1e40af">L6 ↔ L5</text>
+          <text x="355" y="152" text-anchor="middle" font-size="12" fill="#475569">CLOS / 光互联</text>
+          <text x="355" y="176" text-anchor="middle" font-size="12" font-weight="800" fill="#1e3a8a">DP</text>
+          <text x="355" y="196" text-anchor="middle" font-size="12" font-weight="800" fill="#1e3a8a">PP 跨 Pod</text>
+
+          <rect x="490" y="72" width="190" height="150" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+          <text x="585" y="100" text-anchor="middle" font-size="18" font-weight="900" fill="#166534">Pool 内</text>
+          <text x="585" y="124" text-anchor="middle" font-size="12" fill="#166534">L5 ↔ L4</text>
+          <text x="585" y="152" text-anchor="middle" font-size="12" fill="#475569">高速光互联</text>
+          <text x="585" y="176" text-anchor="middle" font-size="12" font-weight="800" fill="#166534">服务池调度</text>
+          <text x="585" y="196" text-anchor="middle" font-size="12" font-weight="800" fill="#166534">跨 Pod 编排</text>
+
+          <rect x="720" y="72" width="190" height="150" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+          <text x="815" y="100" text-anchor="middle" font-size="18" font-weight="900" fill="#991b1b">Scale-Up</text>
+          <text x="815" y="124" text-anchor="middle" font-size="12" fill="#7f1d1d">L4 ↔ L3</text>
+          <text x="815" y="152" text-anchor="middle" font-size="12" fill="#475569">UB / 3.2 Tbps</text>
+          <text x="815" y="176" text-anchor="middle" font-size="12" font-weight="800" fill="#991b1b">EP</text>
+          <text x="815" y="196" text-anchor="middle" font-size="12" font-weight="800" fill="#991b1b">TP 细粒度通信</text>
+
+          <rect x="950" y="72" width="180" height="150" rx="8" fill="#ecfeff" stroke="#a5f3fc"/>
+          <text x="1040" y="100" text-anchor="middle" font-size="18" font-weight="900" fill="#155e75">片内 / 封装内</text>
+          <text x="1040" y="124" text-anchor="middle" font-size="12" fill="#155e75">L3 ↔ L0</text>
+          <text x="1040" y="152" text-anchor="middle" font-size="12" fill="#475569">PCIe / UB / NoC</text>
+          <text x="1040" y="176" text-anchor="middle" font-size="12" font-weight="800" fill="#155e75">tile 算子</text>
+          <text x="1040" y="196" text-anchor="middle" font-size="12" font-weight="800" fill="#155e75">TPUSH / TPOP</text>
+
+          <text x="50" y="260" font-size="12" fill="#64748b">规则：越靠右，越适合细粒度同步；越靠左，越应退化为异步复制、容灾或粗粒度流水。</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">网络边界从主递归图中拆出，避免一张图同时承担层级结构和并行策略解释。</div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">三类网络：从 Scale Up 到 DCN</h3>
+    <p class="lead">8 个层级跨越的距离不一样，对应的网络也不一样。理解 Lingqu 必须先分清这三种带宽量级——它们决定哪一种并行策略可以在哪一级用。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Scale Up（SU）</h3>
+        <p>Pod 内紧耦合总线，例如统一总线 UB。带宽最高、延迟最低，可以做细粒度通信。</p>
+        <div class="pill-row"><span class="pill good">3.2 Tbps</span><span class="pill blue">L4 内</span></div>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ 适合 EP（Expert Parallel）、TP（Tensor Parallel）。</p>
+      </div>
+      <div class="card">
+        <h3>Scale Out（SO）</h3>
+        <p>Cluster 内 Pod 之间的 CLOS 拓扑。带宽低于 SU，但仍是高速光互联。</p>
+        <div class="pill-row"><span class="pill warn">16,384 端口</span><span class="pill blue">L5–L6</span></div>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ 适合 DP、PP（Pipeline Parallel）跨 pod。</p>
+      </div>
+      <div class="card">
+        <h3>DCN</h3>
+        <p>Data Center Network。跨集群、跨数据中心的长距离网络，延迟显著更高。</p>
+        <div class="pill-row"><span class="pill hot">跨 DC</span><span class="pill blue">L7</span></div>
+        <p style="margin-top:6px;color:var(--muted);font-size:13.5px">→ 仅适合异步复制、checkpoint sync、灾备。</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">放大 L0：IR 染色其实是 L0 内视图</h3>
+    <p class="lead">前面 8 张图描述的是<b>层与层之间</b>的递归调度。但当任务最终下发到一个 Core-Group（L0）后，里面还要再分发一次：哪些指令是控制流（在 AICPU 上）、哪些走向量单元（AIV）、哪些走 Cube 矩阵（AIC）。pypto IR 用三种颜色把这种"L0 内部的再分发"直接画在源码视图上——所以 <b>IR 染色不是与 L0-L7 并列的概念，而是在显微镜里看 L0 时才浮现的一层</b>。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>L0 内部 · IR 三色分发</div>
+      <div class="shotbody">
+        <div class="mt"><div class="mtbar"><span class="mtt">colored IR snippet</span></div><div class="mb">
+<span class="purple">@pl.function</span>(level=pl.Level.CORE_GROUP)
+<span class="green">def</span> attention_block(Q, K, V):
+    <span class="yellow"># WHITE · 控制流 · AICPU</span>
+    if pl.current_depth() == 0:
+        prefetch(K, V)
+
+    <span class="yellow"># GREEN · AIV · 向量单元</span>
+    scores = tl.softmax(Q @ K.T)
+
+    <span class="yellow"># RED · AIC · Cube 矩阵</span>
+    out = tl.dot(scores, V)
+    return out
+        </div></div>
+      </div>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3 style="color:#6b7280">⚪ WHITE · 控制</h3>
+        <p>scheduler 状态、ready check、launch 决策、prefetch 触发。<br><b>跑在哪：</b>AICPU。<br><b>不占用：</b>AIV / AIC 的 SIMD 计算资源。</p>
+      </div>
+      <div class="card">
+        <h3 style="color:#16a34a">🟢 GREEN · AIV</h3>
+        <p>向量单元上的 tile 操作：reduce、softmax、layernorm、layout 变换。<br><b>跑在哪：</b>AIV（向量核）。<br><b>典型频率：</b>每 tile 数微秒。</p>
+      </div>
+      <div class="card">
+        <h3 style="color:#dc2626">🔴 RED · AIC</h3>
+        <p>Cube 单元上的密集算子：matmul、convolution。<br><b>跑在哪：</b>AIC（Cube 矩阵核）。<br><b>典型频率：</b>占据 kernel 大头时间。</p>
+      </div>
+    </div>
+
+    <div class="tension">
+      <div><b>核心张力</b><span>层级丰富 vs 心智简洁。</span></div>
+      <div><b>设计答案</b><span>同一套 Orchestrator-Scheduler-Worker 协议递归到所有层级；IR 染色是 L0 内视图，不是新一层。</span></div>
+      <div><b>底层约束</b><span>异构硬件本身的延迟差异——SDMA、RoCE、URMA、CCU、DCN 必须由开发者理解才能写好。</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="tile-flow">
+    <div class="kicker">Section 07 · Tile 数据流</div>
+    <h2>TPUSH / TPOP / sharded_tensor：把张量通信变成显式语义</h2>
+    <p class="lead">硬件原生的代价是通信不能再是隐式 collective——它必须出现在 IR 中。hw-native-sys 把通信拆成三层：核间用 6 指令 ring 协议，多节点用 sharded_tensor，整个图用 scope-depth 多层 ring 控制峰值显存。三层都有显式 API 和 IR 表示，没有隐藏路径。</p>
+
+    <h3>① 核间：TPUSH / TPOP / TFREE 6 指令</h3>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>AIC ↔ AIV 跨核环（每集群 32 flag）</div>
+      <div class="shotbody">
+        <div class="mt"><div class="mtbar"><span class="mtt">six instructions</span></div><div class="mb">
+tpush_to_aiv      tpop_from_aiv     tfree_from_aiv
+tpush_to_aic      tpop_from_aic     tfree_from_aic
+
+flags:    <span class="purple">P2C</span>「data ready」 + <span class="purple">C2P</span>「space free」  共 32 个 / cluster
+slots:    <span class="green">SLOT_NUM = 8</span>（单向） 或 <span class="green">4 + 4</span>（双向）
+modes:    1:1 / 1:2 ；TileSplitAxis ∈ {NO_SPLIT, UP_DOWN, LEFT_RIGHT}
+A5 优化:   consumer-SRAM aliasing → 零拷贝
+        </div></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">② 多节点：sharded_tensor</h3>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>逻辑视图</h3>
+        <p>看起来是一个全局 tensor，shape 与单卡完全相同。算法代码无须感知物理分布。</p>
+        <div class="callout"><b>原文：</b>"Logically, a sharded_tensor represents a single global tensor."</div>
+      </div>
+      <div class="card">
+        <h3>物理布局</h3>
+        <p>实际存储 = <code>shard_shape × rank_shape</code>，分散在 <code>rank_num</code> 个 rank 上。layout 操作必须额外携带 <code>rank_index</code>，构造时通过阻塞式 all-to-all barrier。</p>
+        <div class="pill-row"><span class="pill warn">实验 API</span><span class="pill blue">ubmem 优先</span></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">③ 多层 ring stack + 显式 pl.free</h3>
+    <p class="lead">单层全局 ring 在长上下文场景下会撑爆显存。pypto 用 <b>scope-depth 索引的多层 ring</b>替代它：每个 scope 进入时新增一层 ring，离开时自然释放。开发者还可以用 <code>pl.free(tensor)</code> 显式提前归还某个 tensor 的引用，强制 scope-exit refcount 提前生效，进一步压低 peak。</p>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">scope 化 ring stack 示意</span></div>
+      <div class="mb">
+<span class="purple">scope_depth = 0</span>  ← 全局 ring（仅持久 tensor）
+  <span class="purple">scope_depth = 1</span>  ← prefill 阶段 ring
+    <span class="purple">scope_depth = 2</span>  ← 单层 attention ring
+       tensor t1, t2, t3
+       <span class="yellow">pl.free(t1)</span>          <span class="green">// 提前归还，refcount 立刻 -1</span>
+    <span class="purple">scope exit</span> → 释放整层 ring
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>关键设计：</b>核间通信、多节点 sharding、生命周期都是 <b>显式 IR 节点</b>而不是 runtime cleverness。这让 profiler 能直接告诉你"这条 TPUSH 卡在哪个 flag 上"和"这一层 ring 把峰值推高了多少 GiB"。
+    </div>
+  </section>
+
+  <section class="floor" id="bench">
+    <div class="kicker">Section 08 · 基准与部署</div>
+    <h2>真实场景：Flash Attention、DeepSeek V4、UBL128</h2>
+    <p class="lead">本节只列 hw-native-sys 自己仓库里写明的数字，不外推。三类证据：单算子加速、模型级 KV 压缩、超节点部署的硬件指标。</p>
+
+    <h3>Flash Attention vs torch_npu（Ascend 910B2）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>seq-len</th>
+          <th>torch_npu 运行时</th>
+          <th>PTO 运行时</th>
+          <th>PTO TFLOPS</th>
+          <th>加速比</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1024</td><td>—</td><td>—</td><td>—</td><td><b>2.79×</b></td></tr>
+        <tr><td>2048</td><td>—</td><td>—</td><td>—</td><td><b>2.18×</b></td></tr>
+        <tr><td>4096</td><td>3262.645 µs</td><td>20.96 µs（局部段）</td><td>25.61 → 168.50</td><td><b>1.33×</b></td></tr>
+        <tr><td>整体范围</td><td colspan="3">仓库自述："overall range 1.12× to 2.79×"</td><td><b>1.12× ~ 2.79×</b></td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.4rem">DeepSeek V4：相对 V3 MLA 的 KV 压缩</h3>
+    <div class="grid cols-3">
+      <div class="card metric"><strong>90%</strong><span>V4 相对 V3 MLA 在 1M 上下文下的 KV 缓存缩减</span></div>
+      <div class="card metric"><strong>5–7 GiB</strong><span>每 1M token prompt 下的 KV 占用</span></div>
+      <div class="card metric"><strong>512 tok</strong><span>chunk size</span></div>
+    </div>
+    <p class="lead">V4 的 KV 压缩组合：<b>compressed sparse attention (CSA) + heavily compressed attention (HCA) + sliding window</b>。pypto-lib 把这个组合作为一等支持的 attention 变体。</p>
+
+    <h3 style="margin-top:1.4rem">UBL128 超节点部署（Ascend 950）</h3>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>128</strong><span>NPU（Ascend 950）</span></div>
+      <div class="card metric"><strong>16</strong><span>CPU</span></div>
+      <div class="card metric"><strong>3.2 Tbps</strong><span>内域 Scale-Up 带宽</span></div>
+      <div class="card metric"><strong>16,384</strong><span>2 层 CLOS Scale-Out 端口</span></div>
+    </div>
+
+    <h3 style="margin-top:1.4rem">三种部署场景：同一份 commit，YAML 切换</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>场景</th>
+          <th>规模</th>
+          <th>EP（Expert Parallel）</th>
+          <th>定位</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>A · PoC</td><td>32 NPU</td><td>EP16</td><td>研发验证 / 单服务器</td></tr>
+        <tr><td>B · 跨服务器</td><td>128 NPU</td><td>EP64</td><td>跨服务器协作</td></tr>
+        <tr><td>C · 完整 UBL128</td><td>256 NPU</td><td>EP128</td><td>满规模生产服务</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <b>原文承诺：</b>"One git commit, one build artifact"——三种部署场景仅通过 YAML 配置切换，不需要重新构建二进制。这一条把 <b>"一次构建多场景部署"</b> 变成了产品级保证。
+    </div>
+
+    <h3 style="margin-top:1.4rem">MTP（Multi-Token Prediction）加速</h3>
+    <div class="metric-bar"><span>MTP4 期望加速（D=3, p_acc=0.85）</span><div class="bar-track"><div class="bar-fill" style="width:80%"></div></div><b>2.5× ~ 2.8×</b></div>
+    <p>每次前向预测 1 到 D+1 token，验收概率 0.85 时收益最高。</p>
+  </section>
+
+  <section class="floor" id="findings">
+    <div class="kicker">Section 09 · 核心结论</div>
+    <h2>结论：硬件原生的差异化不是兼容，是 tile 抽象贯通</h2>
+    <p class="lead">hw-native-sys 的差异化不在于"比 CUDA 更像 CUDA"，而是把 tile 维度从 DSL、IR、虚拟 ISA、运行时一路打穿，再把同一套 Orchestrator-Scheduler-Worker 协议从 L0 递归到 L7。它的代价是开发者需要理解 tile、scope、async 等一手概念；回报是源码-IR-硬件之间的解释链不依赖任何闭源工具就能贯通。</p>
+
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>短期建议（生态侧）</h3>
+        <div class="rec-item">
+          <div class="rec-num">01</div>
+          <div><b>把多层 IR 工具化</b><span>提供 ptobc dump、IR 可视化、scope-depth ring 占用图，让开发者直接看到自己代码降到了哪一层。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">02</div>
+          <div><b>三程序产物的版本检查器</b><span>Host .so / AICPU .so / AICore .o 三者 ABI 漂移是上线最大风险，需要 pre-launch doctor 工具。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">03</div>
+          <div><b>complete_in_future 的可视化</b><span>把异步 token 在 timeline 上画出来，帮新人理解"函数返回 ≠ 任务完成"这一非直觉语义。</span></div>
+        </div>
+      </div>
+      <div class="rec-panel">
+        <h3>长期方向（架构侧）</h3>
+        <div class="rec-item">
+          <div class="rec-num">01</div>
+          <div><b>跨代算子复用率作为 OKR</b><span>同一份 pypto 算子在 A2/A3/A5 的性能保留率，是衡量 PTO 虚拟 ISA 是否真正起到 PTX 角色的最直接指标。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">02</div>
+          <div><b>把 Lingqu 8 层做成可插拔</b><span>让第三方 NPU 后端接入 L0-L1（核内）即可获得 L2-L7 的全部调度能力，把"开源即规范"做成事实。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">03</div>
+          <div><b>sharded_tensor 升级为一等公民</b><span>当前标记为实验 API；把 rank_index 从隐式参数转为 IR 显式节点，能让多节点训练的调试体验追平单卡。</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tension">
+      <div><b>核心张力</b><span>显式 tile 心智 vs 算法工程师快速上手</span></div>
+      <div><b>设计选择</b><span>三层 API 分别面向算法 / 算子 / 编译——同一份 pypto 既能 Tensor 直接调，也能 Tile 显式控制。</span></div>
+      <div><b>底层约束</b><span>CANN OSL v2.0 的硬件限定使 hw-native-sys 在生态广度上让位于深度，但赢得了与硬件演进对齐的速度。</span></div>
+    </div>
+
+    <table style="margin-top:1.4rem">
+      <thead>
+        <tr>
+          <th>分析维度</th>
+          <th><div class="ph-name">PyPTO</div><div class="ph-sub">tile-first DSL</div></th>
+          <th><div class="ph-name">PTO ISA</div><div class="ph-sub">tile-level virtual ISA</div></th>
+          <th><div class="ph-name">Simpler</div><div class="ph-sub">Orch-Sched-Worker runtime</div></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>核心命题</td><td>tile 是 IR 一等公民，scope/async 显式建模。</td><td>跨代稳定接口，类比 PTX 但维度是 tile。</td><td>同一套调度协议覆盖 L0 → L7。</td></tr>
+        <tr><td>关键启发</td><td>层级与角色用装饰器声明，MPMD 实现自动拆分。</td><td>三程序产物模型把硬件异构暴露为可控参数。</td><td>complete_in_future 把异步硬件统一为延迟完成任务。</td></tr>
+        <tr><td>风险与边界</td><td>Tile 心智门槛高，算法工程师需借由 Tensor API 渐进进入。</td><td>License 限定 Ascend，跨厂商可移植性受限。</td><td>tensormap_and_ringbuffer 模式实现复杂度高。</td></tr>
+        <tr><td>证据数据</td><td>跨 A2/A3/A5 三代验证流。</td><td>>90 指令；A2/A3 burst 512B；A5 burst 128B。</td><td>UBL128 上的 EP128 部署 + DeepSeek V4 90% KV 压缩。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Section 10 · 术语表</div>
+    <h2>术语表</h2>
+    <p class="lead">本节按子系统分类列出 hw-native-sys 文档中出现的核心术语，共 <b>8 个分类</b>。专有名词保留英文原名以便与官方文档对照。</p>
+
+    <h3 style="margin-top:1rem">① 哲学与授权</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>Hardware-Native</b></td><td>组织哲学：编译器、运行时、内核都必须深度感知底层硬件架构，而不是套上"通用 GPU"假象。</td></tr>
+        <tr><td><b>CANN OSL v2.0</b></td><td>CANN Open Software License v2.0。所有仓库的授权协议，限定使用于"搭载华为 AI 处理器（Ascend / Kirin / Yueying 等）的系统"。</td></tr>
+        <tr><td><b>CANN</b></td><td>Compute Architecture for Neural Networks。华为 Ascend 的软件栈。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">② DSL · 编程接口（pypto）</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>PyPTO</b></td><td>Python 友好的 tile 编程框架；通过 <code>@pl.function</code> 声明函数运行的层级与角色。</td></tr>
+        <tr><td><b>@pl.function</b></td><td>函数装饰器。同时声明层级（CHIP / CORE_GROUP / CORE…）和角色（ORCHESTRATOR / SCHEDULER / WORKER）。</td></tr>
+        <tr><td><b>pl.at</b></td><td><code>with pl.at(level=…, optimization=…)</code>。在函数内部进入更细的层级或开启特定优化器。</td></tr>
+        <tr><td><b>pl.range / pl.parallel / pl.pipeline / pl.spmd</b></td><td>四种循环语义：顺序 / 数据并行 / 流水化 / SPMD。同一份代码以 MPMD 模式实际部署。</td></tr>
+        <tr><td><b>pl.scope</b></td><td>定义 scope 边界。每进入一层 scope 增加一层 ring，离开时自然释放。</td></tr>
+        <tr><td><b>pl.free</b></td><td>显式提前归还 tensor 引用；强制 scope-exit refcount 提前生效，压低 peak 显存。</td></tr>
+        <tr><td><b>pl.gm_tensor</b></td><td>声明全局内存上的 tensor，可选携带 <code>tile_shape</code> 物理布局提示。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">③ 编译器 · 多层 IR（PTOAS）</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>PTOAS</b></td><td>基于 LLVM 19.1.7 / MLIR 的 .pto Bytecode 汇编器与编译器。提供 PTO Dialect → EmitC / Linalg → C++ 下沉。</td></tr>
+        <tr><td><b>ptoas / ptobc</b></td><td>PTOAS 提供的两个 CLI 工具：assembler 与 bytecode 处理器。</td></tr>
+        <tr><td><b>Tensor Graph</b></td><td>多层 IR 第 1 层。算法工程师可见层，含整张计算图、shape、dtype。</td></tr>
+        <tr><td><b>Tile Graph</b></td><td>多层 IR 第 2 层。tensor 被切成 tile，<code>tile_shape</code> 物理布局开始起作用。</td></tr>
+        <tr><td><b>Block Graph</b></td><td>多层 IR 第 3 层。tile 被分配给 AIC / AIV，TPUSH/TPOP 通信、ring buffer 与 scope 出现。</td></tr>
+        <tr><td><b>Execution Graph</b></td><td>多层 IR 第 4 层。运行时直接消费的 DAG：tensormap、ringbuffer 状态机、async 完成事件全部展开。</td></tr>
+        <tr><td><b>IR 染色 WHITE / GREEN / RED</b></td><td>L0 内视图：WHITE = 控制流（AICPU）、GREEN = AIV 向量、RED = AIC Cube。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">④ 虚拟 ISA · 数据原语（pto-isa）</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>PTO</b></td><td>Parallel Tile Operation。Ascend CANN 定义的 tile 维度虚拟 ISA，含 90+ 标准 tile 指令。</td></tr>
+        <tr><td><b>pto-isa</b></td><td>PTO 虚拟 ISA 的参考实现、头文件与 CPU 模拟器。</td></tr>
+        <tr><td><b>Tile</b></td><td>硬件感知的数据分块。shape、mask、event flag、pipeline 元数据全部在 IR 里显式建模。</td></tr>
+        <tr><td><b>tile_shape</b></td><td>GM tensor 的可选物理布局提示，把短跨步 TLOAD 合并成单次连续 burst（A2/A3 偏好 512 B、A5 偏好 128 B）。</td></tr>
+        <tr><td><b>Block</b></td><td>多核协作粒度；Tile Graph 之后、Execution Graph 之前的 IR 层概念。</td></tr>
+        <tr><td><b>TileSplitAxis</b></td><td>tile 在跨核传递时的切分方向：NO_SPLIT / UP_DOWN / LEFT_RIGHT。</td></tr>
+        <tr><td><b>MPMD</b></td><td>Multiple Program Multiple Data。同一逻辑 kernel 中不同核执行不同程序体。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">⑤ 硬件单元 · 存储 · 代际</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>AIC（AI Cube）</b></td><td>Ascend 的密集矩阵单元。负责 matmul、convolution 等高吞吐算子。</td></tr>
+        <tr><td><b>AIV（AI Vector）</b></td><td>Ascend 的向量单元。负责 reduce、softmax、layernorm、layout 变换等 tile 操作。</td></tr>
+        <tr><td><b>AICPU</b></td><td>Ascend 上的控制 / 通用计算 CPU。负责不规则形状、控制流、prefetch 触发。</td></tr>
+        <tr><td><b>GM</b></td><td>Global Memory。片外主存（HBM）。</td></tr>
+        <tr><td><b>SRAM</b></td><td>片上高速静态存储。</td></tr>
+        <tr><td><b>UB（Unified Buffer）</b></td><td>统一缓冲；A5 上配合 consumer-SRAM aliasing 实现零拷贝。</td></tr>
+        <tr><td><b>Ascend A2 / A3 / A5</b></td><td>三代 Ascend NPU 代号，分别对应 910B / 910C / 950。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">⑥ 硬件层级 · 网络（Lingqu）</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>Lingqu / 灵渠</b></td><td>L0 Core 到 L7 Global Coordinator 的 8 级机器层级体系；每一级一个 OSW 实例。</td></tr>
+        <tr><td><b>L0 Core / Core-Group</b></td><td>芯片内最小可调度单元：1 AIV + 1 AIC + 1 AICPU。</td></tr>
+        <tr><td><b>L1 Die（可选）</b></td><td>多 die 拼装层。例如 Ascend 910C 的双 die 设计。</td></tr>
+        <tr><td><b>L2 Chip</b></td><td>整颗 NPU。Ascend 910B / 910C / 950。</td></tr>
+        <tr><td><b>L3 Host</b></td><td>一个 OS 实例 + 一块母板上的多颗 NPU（典型 4–8 颗）。</td></tr>
+        <tr><td><b>L4 Pod</b></td><td>多服务器通过高带宽 Scale-Up 总线（UB）紧耦合的高带宽域。</td></tr>
+        <tr><td><b>L5 Service Pool</b></td><td>多 Pod 通过 Scale-Out CLOS 连接，共同服务一个工作负载。</td></tr>
+        <tr><td><b>L6 Cluster</b></td><td>整个数据中心机房。</td></tr>
+        <tr><td><b>L7 Global Coordinator</b></td><td>跨集群、跨数据中心的最顶层协调器。</td></tr>
+        <tr><td><b>Scale Up（SU）</b></td><td>Pod 内紧耦合总线（UB）。最高带宽、最低延迟，适合 EP / TP。例如 UBL128 内域 3.2 Tbps。</td></tr>
+        <tr><td><b>Scale Out（SO）</b></td><td>Cluster 内 Pod 之间的 CLOS 拓扑。例如 UBL128 的 2 层 CLOS、16,384 端口。</td></tr>
+        <tr><td><b>DCN</b></td><td>Data Center Network。跨集群、跨 DC 的长距离网络，毫秒级延迟，仅适合异步复制 / checkpoint sync。</td></tr>
+        <tr><td><b>UBL128 / HBD</b></td><td>由 8 PC16 服务器、128 Ascend 950 NPU、16 CPU、3.2 Tbps SU 构成的 High Bandwidth Domain（高带宽域）。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">⑦ 运行时 · 调度（simpler）</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>Simpler</b></td><td>异构调度运行时；协调 AICPU + AICore 三程序模型。</td></tr>
+        <tr><td><b>Orchestrator / Scheduler / Worker</b></td><td>构图者 / 调度者 / 执行者三角色，同一套协议沿 L0–L7 递归复制。</td></tr>
+        <tr><td><b>complete_in_future</b></td><td>worker 函数返回释放核心，但任务保持 RUNNING，直到硬件 CQ entry 或 notification counter 触发后才标记 COMPLETE。</td></tr>
+        <tr><td><b>fanin / fanout refcount</b></td><td>Scheduler 用来决定任务何时 ready 与何时释放的引用计数。</td></tr>
+        <tr><td><b>host_build_graph</b></td><td>构图模式之一：Host 端整图静态构造，编译期全图就绪。开销小、可静态分析。</td></tr>
+        <tr><td><b>tensormap_and_ringbuffer</b></td><td>构图模式之二：运行时滚动环形缓冲，支持动态 shape 与流式服务。</td></tr>
+        <tr><td><b>tensormap</b></td><td>tensor 名 → 物理 buffer 映射，与 ringbuffer 共同支撑动态形状执行。</td></tr>
+        <tr><td><b>scope-depth ring</b></td><td>按 scope 进入深度索引的多层 ring buffer，替代单层全局 ring，控制峰值显存。</td></tr>
+        <tr><td><b>三程序模型</b></td><td>每个 PTO kernel 部署 = Host .so + AICPU .so + AICore .o 三个产物协作。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.2rem">⑧ 通信 · 分布式 · 模型</h3>
+    <table>
+      <thead><tr><th style="width:32%">术语</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><b>TPUSH / TPOP / TFREE</b></td><td>6 指令组成的 AIC↔AIV 跨核 ring 协议，配合 P2C / C2P 双通道 flag。</td></tr>
+        <tr><td><b>P2C / C2P flag</b></td><td>Producer-to-Consumer "data ready" / Consumer-to-Producer "space free"；每集群 32 个跨核 flag。</td></tr>
+        <tr><td><b>SDMA / RoCE / URMA / CCU</b></td><td>四类异步硬件搬运 / 通信单元；通过 <code>complete_in_future</code> 统一抽象成异步 token。</td></tr>
+        <tr><td><b>sharded_tensor</b></td><td>逻辑全局 / 物理 <code>shard_shape × rank_shape</code> 的 tensor；layout op 必须额外携带 <code>rank_index</code>。当前仍是实验 API。</td></tr>
+        <tr><td><b>ubmem</b></td><td>Unified Bus memory 的 import/export，<code>sharded_tensor</code> 的优选后端。</td></tr>
+        <tr><td><b>EP / TP / DP / SP</b></td><td>Expert / Tensor / Data / Sequence Parallel：四种主流并行策略。</td></tr>
+        <tr><td><b>MLA</b></td><td>Multi-head Latent Attention。DeepSeek V3 使用。</td></tr>
+        <tr><td><b>CSA</b></td><td>Compressed Sparse Attention。DeepSeek V4 使用，相对 V3 MLA 实现 90% KV 压缩。</td></tr>
+        <tr><td><b>HCA</b></td><td>Heavily Compressed Attention。DeepSeek V4 使用。</td></tr>
+        <tr><td><b>MTP</b></td><td>Multi-Token Prediction。每次前向预测 1 ~ D+1 个 token；MTP4（D=3, p_acc=0.85）期望加速 2.5–2.8×。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:1.4rem">资料来源</h3>
+    <ul class="source-list">
+      <li><a href="https://github.com/hw-native-sys">hw-native-sys 组织主页</a></li>
+      <li><a href="https://github.com/hw-native-sys/.github">hw-native-sys/.github · 组织 README</a></li>
+      <li><a href="https://github.com/hw-native-sys/pypto">hw-native-sys/pypto · DSL 与多层 IR</a></li>
+      <li><a href="https://github.com/hw-native-sys/pypto-lib">hw-native-sys/pypto-lib · 算子库与 LLM 模型</a></li>
+      <li><a href="https://github.com/hw-native-sys/PTOAS">hw-native-sys/PTOAS · 编译器与汇编器</a></li>
+      <li><a href="https://github.com/hw-native-sys/pto-isa">hw-native-sys/pto-isa · 虚拟 ISA 与 CPU 模拟器</a></li>
+      <li><a href="https://github.com/hw-native-sys/simpler">hw-native-sys/simpler · 运行时</a></li>
+      <li><a href="https://github.com/hw-native-sys/pypto_top_level_documents">hw-native-sys/pypto_top_level_documents · 顶层设计文档</a></li>
+    </ul>
+  </section>
+  <script src="./nav.js"></script>
+</body>
+</html>
