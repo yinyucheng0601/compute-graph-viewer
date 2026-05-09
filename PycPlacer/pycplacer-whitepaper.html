@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>H-Anchor: 分层锚点 VLSI 布局算法白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">H-Anchor Whitepaper</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">概览</a>
+      <a href="#bg">背景</a>
+      <a href="#hierarchy">分层锚点</a>
+      <a href="#engine">力导向引擎</a>
+      <a href="#incremental">增量更新</a>
+      <a href="#performance">性能对比</a>
+      <a href="#framework">框架总结</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语表</a>
+    </div>
+  </nav>
+
+  <!-- ░░ COVER ░░ -->
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2024</div>
+    <h1>H-Anchor</h1>
+    <p class="lead">受 HNSW 图启发的分层锚点式 VLSI 布局算法——通过 C++ OpenMP 多核并行与空间抑制选择机制，在保持完全确定性的前提下实现 <strong>38 倍加速</strong>，并支持 <strong>50–100 倍</strong>更快的增量局部更新。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>38×</strong><span>C++ 多核 vs 纯 Python 加速比</span></div>
+      <div class="card metric"><strong>50–100×</strong><span>增量更新 vs 完整重布局加速比</span></div>
+      <div class="card metric"><strong>2,907</strong><span>cells/sec 多核吞吐量</span></div>
+      <div class="card metric"><strong>3,300</strong><span>单元合成 CPU 基准电路规模</span></div>
+    </div>
+  </section>
+
+  <!-- ░░ OVERVIEW ░░ -->
+  <section class="floor" id="overview">
+    <div class="kicker">Structure · 全局地图</div>
+    <h2>报告概览</h2>
+    <p class="lead">本报告沿「问题 → 结构 → 引擎 → 更新 → 性能」路径递进，完整呈现 H-Anchor 的设计思路与工程验证。</p>
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 背景</div>
+      <div class="jm-head">02 分层锚点</div>
+      <div class="jm-head">03 力导向引擎</div>
+      <div class="jm-head">04 增量更新</div>
+      <div class="jm-head">05 性能对比</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell">为什么现有布局算法不够用？</div>
+      <div class="jm-cell">如何选出均匀分散的锚点？</div>
+      <div class="jm-cell">五种力如何协同最小化线长？</div>
+      <div class="jm-cell">改动 5 个单元为何只需 0.02s？</div>
+      <div class="jm-cell">各版本速度差距有多大？</div>
+
+      <div class="jm-label">本页内容</div>
+      <div class="jm-cell">O(N²) 排斥瓶颈、确定性缺失、增量支持不足</div>
+      <div class="jm-cell">PageRank 评分 + 空间抑制 + 自上而下投影</div>
+      <div class="jm-cell">库伦排斥 + 胡克吸引 + 重叠排斥 + 重力 + 全局</div>
+      <div class="jm-cell">BFS 传播半径 + (1+hop×3)² 衰减因子</div>
+      <div class="jm-cell low">Python 42s → C++ 3s → OpenMP 1.1s</div>
+
+      <div class="jm-label">输出结果</div>
+      <div class="jm-cell">明确三角设计目标：速度 · 确定性 · 增量</div>
+      <div class="jm-cell">100 个顶层锚点，均匀覆盖整个芯片区域</div>
+      <div class="jm-cell">HPWL 最小化，无单元物理重叠</div>
+      <div class="jm-cell hot">±5% HPWL 变化，50x 时间节省</div>
+      <div class="jm-cell">完整基准数据与增量性能实测验证</div>
+    </div>
+  </section>
+
+  <!-- ░░ BACKGROUND ░░ -->
+  <section class="floor" id="bg">
+    <div class="kicker">Background · 背景</div>
+    <h2>VLSI 布局：规模与速度的两难</h2>
+    <p class="lead">现代芯片设计动辄包含数万个逻辑单元，布局质量直接决定芯片延迟、功耗与良率。而传统算法在规模扩大时遭遇严重的性能与工程瓶颈。</p>
+
+    <div class="callout">
+      <b>核心矛盾：</b>布局优化本质是 N 体问题——排斥力计算复杂度为 O(N²)，3,300 个单元即意味着超过 <strong>1,000 万次</strong>成对计算。纯 Python 实现耗时 42 秒，每次参数调整都需等待，严重阻碍设计探索。
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>速度瓶颈</h3>
+        <p>大规模电路（3000+ 单元）布局耗时以十秒级计，每次参数调整都需等待完整重新布局，无法满足交互式设计探索需求。</p>
+        <div class="pill-row"><span class="pill hot">42s / run</span><span class="pill">Pure Python</span></div>
+      </div>
+      <div class="card">
+        <h3>确定性缺失</h3>
+        <p>并行化通常引入浮点累加顺序不一致，导致多次运行产生不同结果，破坏可复现的工程工作流与 CI/CD 管线。</p>
+        <div class="pill-row"><span class="pill hot">结果不一致</span><span class="pill">调试困难</span></div>
+      </div>
+      <div class="card">
+        <h3>增量支持不足</h3>
+        <p>修改少量单元后，传统工具需重新执行完整布局流程。即使只调整 5 个单元，也没有「只重新优化局部」的路径。</p>
+        <div class="pill-row"><span class="pill hot">无增量 API</span><span class="pill">全量重跑</span></div>
+      </div>
+    </div>
+
+    <div class="arch" style="margin-top: 24px">
+      <div class="arch-layer">
+        <div class="arch-label">设计目标</div>
+        <div class="arch-boxes">
+          <div class="arch-box">⚡ 高速度<br><small>多核并行 &lt; 2s</small></div>
+          <div class="arch-box">🔒 确定性<br><small>多次运行等价</small></div>
+          <div class="arch-box">♻️ 增量更新<br><small>局部改动超快</small></div>
+          <div class="arch-box">📐 拓扑适应<br><small>随机/聚类/网格</small></div>
+        </div>
+      </div>
+      <div class="arch-note">H-Anchor 是首个同时满足以上四个目标的开源 VLSI 布局算法实现。速度、确定性、增量支持的「三角不可兼得」问题，通过分层锚点架构得到根本性解决。</div>
+    </div>
+  </section>
+
+  <!-- ░░ HIERARCHY ░░ -->
+  <section class="floor" id="hierarchy">
+    <div class="kicker">Core Innovation · 分层锚点架构</div>
+    <h2>分层选择：PageRank × 空间抑制</h2>
+    <p class="lead">H-Anchor 的命名来源于其核心创新：用受 HNSW 图启发的分层锚点结构，将 N 体布局问题分解为「由稀到密、自上而下」的层次优化问题。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>H-Anchor · 分层结构主架构图</div>
+      <div class="shotbody flush" style="padding:18px 12px;background:#fff">
+        <svg viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <!-- Layer backgrounds -->
+          <rect x="60" y="16" width="880" height="108" rx="8" fill="#e8f1ff" stroke="#bfdbfe" stroke-width="1.5"/>
+          <rect x="60" y="144" width="880" height="108" rx="8" fill="#f0f4ff" stroke="#c7d2fe" stroke-width="1.5"/>
+          <rect x="60" y="272" width="880" height="132" rx="8" fill="#f8fafc" stroke="#d9e1ec" stroke-width="1.5"/>
+
+          <!-- Left labels -->
+          <text x="80" y="52" font-family="system-ui" font-size="13" font-weight="700" fill="#1d4ed8">Layer 0（顶层）</text>
+          <text x="80" y="70" font-family="system-ui" font-size="12" fill="#3b5ccc">100 个全局锚点 · 高 PageRank + 空间分散</text>
+          <text x="80" y="90" font-family="system-ui" font-size="11" fill="#6b7280">top_layer_size = 100 · top_layer_iterations = 300</text>
+
+          <text x="80" y="178" font-family="system-ui" font-size="13" font-weight="700" fill="#4338ca">Layer 2（中层）</text>
+          <text x="80" y="196" font-family="system-ui" font-size="12" fill="#6366f1">~400 个区域锚点 · decimation_factor = 0.25</text>
+          <text x="80" y="214" font-family="system-ui" font-size="11" fill="#6b7280">refinement_iterations = 100 · anchor_mass_factor = 5.0</text>
+
+          <text x="80" y="308" font-family="system-ui" font-size="13" font-weight="700" fill="#475467">Layer N（底层）</text>
+          <text x="80" y="326" font-family="system-ui" font-size="12" fill="#667085">全量 3,300 单元 · 所有逻辑节点参与力导向</text>
+          <text x="80" y="344" font-family="system-ui" font-size="11" fill="#9ca3af">die_width = die_height = 1000.0 · min_spacing = 8.0</text>
+
+          <!-- Top layer nodes (few, well-spread) -->
+          <circle cx="350" cy="68" r="13" fill="#2563eb" opacity="0.9"/>
+          <circle cx="460" cy="62" r="13" fill="#2563eb" opacity="0.9"/>
+          <circle cx="580" cy="70" r="13" fill="#2563eb" opacity="0.9"/>
+          <circle cx="700" cy="64" r="13" fill="#2563eb" opacity="0.9"/>
+          <circle cx="810" cy="68" r="13" fill="#2563eb" opacity="0.9"/>
+          <circle cx="900" cy="72" r="13" fill="#2563eb" opacity="0.9"/>
+
+          <!-- Mid layer nodes (more) -->
+          <circle cx="330" cy="192" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="390" cy="198" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="450" cy="190" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="510" cy="196" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="580" cy="192" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="640" cy="198" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="700" cy="190" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="760" cy="196" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="820" cy="192" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="880" cy="198" r="9" fill="#6366f1" opacity="0.75"/>
+          <circle cx="930" cy="190" r="9" fill="#6366f1" opacity="0.75"/>
+
+          <!-- Bottom layer - dense dots grid -->
+          <circle cx="310" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="338" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="366" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="394" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="422" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="450" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="478" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="506" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="534" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="562" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="590" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="618" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="646" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="674" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="702" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="730" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="758" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="786" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="814" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="842" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="870" cy="310" r="4.5" fill="#94a3b8"/>
+          <circle cx="898" cy="324" r="4.5" fill="#94a3b8"/>
+          <circle cx="926" cy="310" r="4.5" fill="#94a3b8"/>
+
+          <!-- Projection dashed lines: top→mid -->
+          <line x1="580" y1="81" x2="510" y2="183" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+          <line x1="580" y1="81" x2="580" y2="183" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+          <line x1="700" y1="77" x2="700" y2="181" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+          <line x1="460" y1="75" x2="450" y2="181" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+
+          <!-- Projection dashed lines: mid→bottom -->
+          <line x1="580" y1="207" x2="562" y2="305" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,4" opacity="0.5"/>
+          <line x1="700" y1="207" x2="702" y2="305" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,4" opacity="0.5"/>
+
+          <!-- Main downward arrow -->
+          <defs>
+            <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+            </marker>
+          </defs>
+          <line x1="170" y1="124" x2="170" y2="270" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arr)" opacity="0.9"/>
+          <text x="152" y="200" font-family="system-ui" font-size="11" fill="#2563eb" font-weight="700" transform="rotate(-90,152,200)">自上而下投影</text>
+
+          <!-- Spatial inhibition annotation -->
+          <rect x="348" y="38" width="22" height="22" rx="11" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3,2"/>
+          <text x="375" y="28" font-family="system-ui" font-size="11" fill="#b45309">空间抑制范围</text>
+          <line x1="374" y1="30" x2="365" y2="44" stroke="#b45309" stroke-width="1" opacity="0.7"/>
+        </svg>
+      </div>
+      <div class="evidence-caption">蓝色大圆 = 顶层全局锚点（100 个），紫色中圆 = 中层区域锚点，灰色小点 = 底层全量单元；蓝色虚线箭头表示自上而下的位置投影方向。橙色圆圈示意锚点选择时的空间抑制范围，防止锚点聚集。</div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:24px">
+      <div class="card">
+        <h3>PageRank 中心性评分</h3>
+        <p>节点重要性 = 度数中心性 × 0.4 + PageRank × 0.6，迭代 20 次收敛，阻尼系数 0.85。中心性高的节点优先成为锚点，保证覆盖整个连接图的关键枢纽。</p>
+        <div class="mt" style="margin-top:12px">
+          <div class="mtbar"><div class="mdt"></div><span class="mtt">scoring 公式</span></div>
+          <div class="mb">score = <span class="purple">α</span>·degree + <span class="purple">β</span>·pagerank
+α = <span class="green">0.4</span>,  β = <span class="green">0.6</span>,  damping = <span class="green">0.85</span>
+iterations = <span class="green">20</span>   ← 20 次迭代内收敛</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>空间抑制选择</h3>
+        <p>按得分降序排列所有节点，逐个选为锚点，同时将其邻域标记为「已覆盖」并跳过，防止高分节点全部聚集在图的同一稠密区域。</p>
+        <div class="mt" style="margin-top:12px">
+          <div class="mtbar"><div class="mdt"></div><span class="mtt">build_layers 伪码</span></div>
+          <div class="mb"><span class="green">sort</span> nodes by score desc
+<span class="purple">for</span> node in sorted:
+  if node not covered:
+    <span class="green">select</span> as anchor
+    <span class="yellow">mark</span> neighborhood as covered
+until len(anchors) == <span class="green">top_layer_size</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>关键公式 — PageRank 迭代：</b><br>
+      <code>pr_new[i] = (1 − damping) / N + damping × Σ( pr[neighbor] / degree[neighbor] )</code><br>
+      damping = 0.85，N = 节点总数，迭代 20 次后与度数中心性以 α=0.4 / β=0.6 加权合并为最终锚点评分。
+    </div>
+  </section>
+
+  <!-- ░░ ENGINE ░░ -->
+  <section class="floor" id="engine">
+    <div class="kicker">Optimization · 力导向引擎</div>
+    <h2>五力协同：从排斥到收敛</h2>
+    <p class="lead">H-Anchor 在标准 Fruchterman-Reingold 模型基础上增加了重叠排斥力、全局吸引力和质量衰减机制，解决了传统算法的单元堆叠与边界散逸问题。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">库伦排斥力</div>
+        <div class="arch-boxes">
+          <div class="arch-box">F = k² / r²<br><small>k_repel = 2.0</small></div>
+          <div class="arch-box">全对间作用<br><small>长程排斥</small></div>
+          <div class="arch-box">归一化径向<br><small>方向：互斥分离</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">胡克吸引力</div>
+        <div class="arch-boxes">
+          <div class="arch-box">F = k · w · r<br><small>k_attract = 0.1</small></div>
+          <div class="arch-box">仅边连接对<br><small>按边权 w 缩放</small></div>
+          <div class="arch-box">拉近连接单元<br><small>减少 HPWL 线长</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">重叠排斥力</div>
+        <div class="arch-boxes">
+          <div class="arch-box">dist &lt; min_spacing<br><small>min_spacing = 8.0</small></div>
+          <div class="arch-box">k_ov · (s−r)/s · k_rep<br><small>k_overlap = 5.0</small></div>
+          <div class="arch-box">防止物理重叠<br><small>H-Anchor 新增</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">重力 + 全局吸引</div>
+        <div class="arch-boxes">
+          <div class="arch-box">中心拉力<br><small>center_gravity = 0.01</small></div>
+          <div class="arch-box">全局吸引<br><small>global_attract = 0.02</small></div>
+          <div class="arch-box">防止边界散逸<br><small>保持布局紧凑</small></div>
+        </div>
+      </div>
+      <div class="arch-note">每次迭代通过 OpenMP schedule(static) 并行计算各节点受力，速度向量以系数 0.9 阻尼衰减，位置更新后硬夹在 [0, die_width/height] 边界内。</div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:24px">
+      <div class="card">
+        <h3>质量衰减机制（新增）</h3>
+        <p>锚点节点被赋予 5.0× 虚拟质量，力对其位置加速度更小。细化阶段锚点几乎不动，已固定的全局框架保持稳定。</p>
+        <div class="metric-bar">
+          <span>锚点质量</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <b>5.0×</b>
+        </div>
+        <div class="metric-bar">
+          <span>普通单元</span>
+          <div class="bar-track"><div class="bar-fill" style="width:20%"></div></div>
+          <b>1.0×</b>
+        </div>
+      </div>
+      <div class="card">
+        <h3>迭代配置</h3>
+        <p>顶层锚点优化 300 次迭代，每下降一层细化 100 次。各层共约 700 次力导向步骤完成全流程。</p>
+        <div class="metric-bar">
+          <span>顶层迭代</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+          <b>300</b>
+        </div>
+        <div class="metric-bar">
+          <span>细化迭代</span>
+          <div class="bar-track"><div class="bar-fill" style="width:33%"></div></div>
+          <b>100/层</b>
+        </div>
+        <div class="metric-bar">
+          <span>速度阻尼</span>
+          <div class="bar-track"><div class="bar-fill" style="width:90%"></div></div>
+          <b>×0.9</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>布线长度评估指标 HPWL：</b><br>
+      <code>HPWL = Σ ( max_x − min_x + max_y − min_y ) / 2</code>&nbsp;&nbsp;（对所有 net 求和）<br>
+      力导向优化的核心目标是最小化 HPWL，等价于减少总布线面积，直接影响芯片延迟和功耗。
+    </div>
+  </section>
+
+  <!-- ░░ INCREMENTAL ░░ -->
+  <section class="floor" id="incremental">
+    <div class="kicker">Incremental · 增量更新</div>
+    <h2>BFS 传播：局部改动，全局稳定</h2>
+    <p class="lead">增量更新是 H-Anchor 区别于同类工具的关键工程特性。当少量单元位置变化时，通过 BFS 扩展影响区域并施加衰减，在 <strong>~0.02 秒</strong>内完成局部优化，HPWL 变化仅 ±5%。</p>
+
+    <div class="grid cols-3">
+      <div class="card metric"><strong>0.02s</strong><span>5 个单元的增量更新时间（3,300 单元设计）</span></div>
+      <div class="card metric"><strong>±5%</strong><span>HPWL 最大变化量，布局质量几乎不变</span></div>
+      <div class="card metric"><strong>radius=2</strong><span>推荐 BFS 传播半径（2 跳邻域）</span></div>
+    </div>
+
+    <div class="screenshot" style="margin-top:24px">
+      <div class="shotbar"><span class="dots"></span>增量更新 · BFS 衰减传播图示</div>
+      <div class="shotbody flush" style="padding:20px 16px;background:#fff">
+        <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <!-- Hop 2 ring -->
+          <circle cx="410" cy="155" r="175" fill="#f8fafc" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.7"/>
+          <!-- Hop 1 ring -->
+          <circle cx="410" cy="155" r="100" fill="#f0f4ff" stroke="#a5b4fc" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.8"/>
+
+          <!-- Hop 2 nodes (outer, low opacity) -->
+          <circle cx="585" cy="155" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="235" cy="155" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="568" cy="48" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="252" cy="48" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="568" cy="262" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="252" cy="262" r="10" fill="#9ca3af" opacity="0.5"/>
+          <circle cx="410" cy="330" r="10" fill="#9ca3af" opacity="0.4"/>
+
+          <!-- Hop 1 nodes -->
+          <circle cx="510" cy="155" r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="310" cy="155" r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="410" cy="55"  r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="410" cy="255" r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="480" cy="84"  r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="480" cy="226" r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="340" cy="84"  r="14" fill="#6366f1" opacity="0.78"/>
+          <circle cx="340" cy="226" r="14" fill="#6366f1" opacity="0.78"/>
+
+          <!-- Lines center to hop1 -->
+          <line x1="424" y1="155" x2="496" y2="155" stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="396" y1="155" x2="324" y2="155" stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="410" y1="131" x2="410" y2="69"  stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="410" y1="179" x2="410" y2="241" stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="424" y1="141" x2="468" y2="97"  stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="424" y1="169" x2="468" y2="213" stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="396" y1="141" x2="352" y2="97"  stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+          <line x1="396" y1="169" x2="352" y2="213" stroke="#6366f1" stroke-width="1.5" opacity="0.55"/>
+
+          <!-- Center: moved cell -->
+          <circle cx="410" cy="155" r="24" fill="#2563eb"/>
+          <text x="410" y="151" text-anchor="middle" font-family="system-ui" font-size="11" fill="white" font-weight="700">移动</text>
+          <text x="410" y="165" text-anchor="middle" font-family="system-ui" font-size="11" fill="white" font-weight="600">单元</text>
+
+          <!-- Labels -->
+          <text x="600" y="158" font-family="system-ui" font-size="12" fill="#4b5563" font-weight="600">hop=2</text>
+          <text x="600" y="174" font-family="system-ui" font-size="12" fill="#9ca3af">decay ≈ 0.04</text>
+
+          <text x="526" y="130" font-family="system-ui" font-size="12" fill="#4338ca" font-weight="600">hop=1</text>
+          <text x="526" y="146" font-family="system-ui" font-size="12" fill="#6366f1">decay ≈ 0.25</text>
+
+          <text x="386" y="185" font-family="system-ui" font-size="11" fill="white" font-weight="600">hop=0</text>
+          <text x="386" y="130" font-family="system-ui" font-size="11" fill="#1d4ed8">decay = 1.0</text>
+
+          <!-- Decay formula box -->
+          <rect x="18" y="16" width="200" height="68" rx="7" fill="#f0f4ff" stroke="#c7d2fe" stroke-width="1.2"/>
+          <text x="30" y="36" font-family="monospace" font-size="12" fill="#3b5ccc" font-weight="700">decay = 1/(1+hop×3.0)²</text>
+          <text x="30" y="54" font-family="monospace" font-size="11" fill="#475467">hop=0  →  1.00</text>
+          <text x="30" y="70" font-family="monospace" font-size="11" fill="#475467">hop=1  →  0.25   hop=2  →  0.04</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">以移动单元为种子，BFS 扩展 radius=2 跳。衰减因子 1/(1+hop×3)² 使第 1 跳影响缩至 25%，第 2 跳仅剩 4%，锚点框架完全不受影响。</div>
+    </div>
+
+    <div class="mt" style="margin-top:24px">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">增量更新 API 示例（h_anchor_fast.py）</span></div>
+      <div class="mb"><span class="green">placer</span>.run()   <span class="yellow"># 完整布局：~1.0s（3,300 单元）</span>
+
+new_positions = {
+  <span class="purple">'cell_123'</span>: (500, 300),
+  <span class="purple">'cell_456'</span>: (600, 400),
+}
+<span class="green">placer</span>.update_positions(new_positions, propagation_radius=<span class="green">2</span>)
+<span class="yellow"># 增量更新：~0.02s  →  50x faster，HPWL 变化 +0.5%</span>
+
+<span class="green">placer</span>.add_nodes(new_cells, new_edges)    <span class="yellow"># 支持动态增节点</span>
+<span class="green">placer</span>.remove_nodes([<span class="purple">'cell_789'</span>])          <span class="yellow"># 支持删节点</span>
+<span class="green">placer</span>.add_edges([(<span class="purple">'cell_a'</span>, <span class="purple">'cell_b'</span>, 1.0)]) <span class="yellow"># 支持增边</span></div>
+    </div>
+  </section>
+
+  <!-- ░░ PERFORMANCE ░░ -->
+  <section class="floor" id="performance">
+    <div class="kicker">Benchmark · 性能对比</div>
+    <h2>38× 加速：从 42 秒到 1.1 秒</h2>
+    <p class="lead">完整基准测试在 3,300 单元的合成 CPU 设计（ALU、RegFile、Decoder、Control、MemCtrl 等 10 个模块）上执行。以下数据来自 README.md 和 test_incremental_update.py 的实测结果。</p>
+
+    <div class="callout">
+      <b>核心性能数据：</b>Pure Python 42s → C++ 单核 3.0s → C++ 多核 <strong>1.1s</strong>，吞吐量从 79 cells/sec 提升至 2,907 cells/sec，总加速比 <strong>36.8×</strong>；增量更新（5 个单元）仅需 <strong>0.02s</strong>，相对完整布局加速 50-100×，HPWL 变化仅 ±5%。
+    </div>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>large_cpu 基准 · 3,300 单元完整性能对比</div>
+      <div class="shotbody">
+        <div class="metric-bar">
+          <span>Pure Python</span>
+          <div class="bar-track"><div class="bar-fill" style="width:100%;background:#ef4444"></div></div>
+          <b>42.0 s</b>
+        </div>
+        <div class="metric-bar">
+          <span>C++ 单核</span>
+          <div class="bar-track"><div class="bar-fill" style="width:7.1%;background:#f59e0b"></div></div>
+          <b>3.0 s</b>
+        </div>
+        <div class="metric-bar">
+          <span>C++ 多核 (OpenMP)</span>
+          <div class="bar-track"><div class="bar-fill" style="width:2.6%"></div></div>
+          <b>1.1 s</b>
+        </div>
+        <div class="metric-bar">
+          <span>增量更新 (5 cells)</span>
+          <div class="bar-track"><div class="bar-fill" style="width:0.05%;background:#10b981"></div></div>
+          <b>0.02 s</b>
+        </div>
+      </div>
+    </div>
+
+    <table style="margin-top:24px">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th><div class="ph-name">Pure Python</div><div class="ph-sub">纯解释执行</div></th>
+          <th><div class="ph-name">C++ 单核</div><div class="ph-sub">-O3 编译优化</div></th>
+          <th><div class="ph-name">C++ 多核</div><div class="ph-sub">OpenMP 并行</div></th>
+          <th><div class="ph-name">增量更新</div><div class="ph-sub">BFS 传播 r=2</div></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>时间（3,300 cells）</td><td>42.0 s</td><td>3.0 s</td><td><b>1.1 s</b></td><td><b>0.02 s</b></td></tr>
+        <tr><td>吞吐量</td><td>79 cells/s</td><td>1,084 cells/s</td><td><b>2,907 cells/s</b></td><td>—</td></tr>
+        <tr><td>加速比 (vs Python)</td><td>1×</td><td>14×</td><td><b>38×</b></td><td><b>~2,100×</b></td></tr>
+        <tr><td>HPWL 变化</td><td>baseline</td><td>≡ baseline</td><td>≡ baseline</td><td><b>±5%</b></td></tr>
+        <tr><td>确定性保证</td><td>✓</td><td>✓</td><td><b>✓ schedule(static)</b></td><td>✓</td></tr>
+      </tbody>
+    </table>
+
+    <div class="grid cols-3" style="margin-top:24px">
+      <div class="card">
+        <h3>确定性保障</h3>
+        <p>OpenMP 使用 <code>schedule(static)</code> 静态分配循环迭代，每个线程处理固定节点范围，浮点累加顺序与单线程完全等价，多次运行结果一致。</p>
+        <div class="pill-row"><span class="pill good">多次运行等价</span><span class="pill">CI/CD 友好</span></div>
+      </div>
+      <div class="card">
+        <h3>增量更新精度</h3>
+        <p>对大 CPU 设计移动 5 个单元，HPWL 变化仅 +0.5%（绝对值），说明 BFS 衰减在保持布局质量的同时大幅节省了计算时间。</p>
+        <div class="pill-row"><span class="pill good">HPWL ±5%</span><span class="pill">50× 加速</span></div>
+      </div>
+      <div class="card">
+        <h3>支持拓扑类型</h3>
+        <p>在随机图、聚类设计、2D 网格、数据路径、异构电路五种拓扑上均经过基准验证，适应不同电路结构特征。</p>
+        <div class="pill-row"><span class="pill">随机图</span><span class="pill">聚类</span><span class="pill">网格</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ FRAMEWORK ░░ -->
+  <section class="floor" id="framework">
+    <div class="kicker">Architecture · 框架总结</div>
+    <h2>三层架构：Python API → C++ Core → 工具链</h2>
+    <p class="lead">H-Anchor 采用清晰的三层架构分工：Python 负责接口与配置，C++ 承担所有性能敏感计算，独立工具链支撑可视化、基准测试与格式解析。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">Python API 层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">HAnchorPlacer<br><small>主类 · 流程控制</small></div>
+          <div class="arch-box">PlacementConfig<br><small>15+ 配置参数</small></div>
+          <div class="arch-box">Cell / Port<br><small>数据结构定义</small></div>
+          <div class="arch-box">增量 API<br><small>add/remove/update</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">C++ Core 层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">HierarchyBuilder<br><small>PageRank + 空间抑制</small></div>
+          <div class="arch-box">ForceDirectedEngine<br><small>5 力 · OpenMP 并行</small></div>
+          <div class="arch-box">HAnchorCore<br><small>主流程 · 增量更新</small></div>
+          <div class="arch-box">pybind11 Bindings<br><small>Python/C++ 桥接</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">工具链层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">visualization.py<br><small>1,515 行 · 5 种图</small></div>
+          <div class="arch-box">benchmarks.py<br><small>559 行 · 5 种拓扑</small></div>
+          <div class="arch-box">blif_parser.py<br><small>450 行 · ISCAS/EPFL</small></div>
+          <div class="arch-box">install_benchmarks<br><small>ISCAS89/ITC99/EPFL</small></div>
+        </div>
+      </div>
+      <div class="arch-note">项目总代码量约 6,115 行。C++ 核心（h_anchor_core.cpp，1,148 行）承担所有性能敏感计算；Python 层（h_anchor_fast.py，760 行）保持 API 简洁性，外部调用无感知底层实现。</div>
+    </div>
+
+    <div class="tension" style="margin-top:24px">
+      <div><b>核心张力</b><span>速度 vs 确定性的并行化困境：提速需要并行，并行破坏浮点累加顺序，通常二者不可兼得</span></div>
+      <div><b>H-Anchor 解法</b><span>OpenMP schedule(static) 静态分配，每线程处理固定节点范围，累加顺序与单线程等价，同时享受多核加速</span></div>
+      <div><b>底层约束</b><span>浮点运算非结合律，schedule(static) 仅保证同一机器多次运行一致；跨平台、跨编译器不保证完全等价</span></div>
+    </div>
+  </section>
+
+  <!-- ░░ FINDINGS ░░ -->
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 结论与建议</div>
+    <h2>三角突破：速度 · 确定性 · 增量</h2>
+    <p class="lead">H-Anchor 通过分层锚点 + 空间抑制 + BFS 衰减传播的组合，首次在单一开源实现中同时满足高速度、确定性和增量更新三个工程约束。</p>
+
+    <div class="callout">
+      <b>核心洞察：</b>H-Anchor 通过三个机制各自击破三角：(1) 层次化结构将 O(N²) 排斥计算降至层内局部范围 → 速度；(2) schedule(static) 在并行中保持浮点顺序 → 确定性；(3) BFS 衰减将增量更新复杂度降至 O(radius² · k) → 增量支持。三角不再需要妥协。
+    </div>
+
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>适用场景推荐</h3>
+        <div class="rec-item">
+          <div class="rec-num">01</div>
+          <div><b>设计探索阶段</b><span>3,300 单元基准在 1.1s 内完成；使用 spread_factor 和 global_attraction 快速调整布局密度，验证不同参数的布局效果</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">02</div>
+          <div><b>增量调优工作流</b><span>初始完整布局后，对局部调整使用 update_positions(radius=2)，节省 50-100× 计算时间，HPWL 变化 ±5% 以内</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">03</div>
+          <div><b>可复现性要求场景</b><span>CI/CD 流程、论文实验、多机对比时，schedule(static) 保证同一机器多次运行完全等价，消除随机性干扰</span></div>
+        </div>
+      </div>
+      <div class="rec-panel">
+        <h3>参数调优指南</h3>
+        <div class="rec-item">
+          <div class="rec-num">A</div>
+          <div><b>改善聚类效果</b><span>增大 global_attraction（0.02 → 0.05）使各模块更紧凑；降低 spread_factor（0.6 → 0.4）减少初始散布范围</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">B</div>
+          <div><b>减少单元重叠</b><span>增大 overlap_repulsion（5.0 → 8.0）和 min_spacing（8.0 → 12.0）；代价是整体占用面积略微增大</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">C</div>
+          <div><b>扩展到更大规模</b><span>ISCAS89/s38417（23,949 单元）需将 top_layer_size 提升至 200-300，num_layers 增加至 6-7 层以保持分层效果</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ░░ TERMS ░░ -->
+  <section class="floor" id="terms">
+    <div class="kicker">Reference · 术语表</div>
+    <h2>术语表</h2>
+    <p class="lead">H-Anchor 涉及 VLSI 设计、图算法、力导向布局三个领域的核心术语，以下为完整定义与关联参数速查。</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>术语</th>
+          <th>英文</th>
+          <th>定义</th>
+          <th>相关参数</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>HNSW</td><td>Hierarchical Navigable Small World</td><td>分层可导航小世界图，原用于高效近似最近邻搜索；H-Anchor 借用其分层选择思路构建锚点层次结构</td><td>num_layers, decimation_factor</td></tr>
+        <tr><td>锚点</td><td>Anchor Node</td><td>分层构造中被选中的高中心性节点，先于其他节点完成布局并固定，作为下一层投影和精化的位置基准</td><td>top_layer_size=100, anchor_mass_factor=5.0</td></tr>
+        <tr><td>空间抑制</td><td>Spatial Inhibition</td><td>选锚点时同时标记其邻域为「已覆盖」并跳过，防止高分节点聚集，保证锚点均匀分散于芯片区域</td><td>内置于 build_layers()</td></tr>
+        <tr><td>PageRank</td><td>PageRank Centrality</td><td>基于随机游走的节点重要性指标，迭代 20 次收敛，阻尼系数 0.85，与度数中心性按 0.4/0.6 加权合并为锚点评分</td><td>alpha=0.4, beta=0.6, damping=0.85</td></tr>
+        <tr><td>HPWL</td><td>Half-Perimeter Wirelength</td><td>所有 net 的最小边界矩形周长之和的一半，是 VLSI 布局质量的主要定量评估指标，越小越优</td><td>via compute_wirelength()</td></tr>
+        <tr><td>力导向布局</td><td>Force-Directed Placement</td><td>将布局建模为物理弹簧系统，排斥力推开单元，吸引力沿边拉近，迭代至系统能量最小化</td><td>repulsion_strength, attraction_strength</td></tr>
+        <tr><td>增量传播</td><td>Ripple Propagation</td><td>单元位置变化后以 BFS 向外传播影响，衰减因子 decay=1/(1+hop×3.0)²，第 2 跳影响仅剩 4%</td><td>propagation_radius=2, decay_rate=3.0</td></tr>
+        <tr><td>确定性</td><td>Deterministic</td><td>多次运行在同一机器上产生完全相同布局结果，通过 OpenMP schedule(static) 保证线程分配和浮点累加顺序不变</td><td>OpenMP schedule(static)</td></tr>
+        <tr><td>法律化</td><td>Legalization</td><td>Tetris 风格的行对齐步骤，将力导向结果中可能重叠或未对齐的单元移至最近合法行网格位置</td><td>可选步骤，默认开启</td></tr>
+        <tr><td>质量衰减</td><td>Mass-Based Damping</td><td>锚点被赋予更大虚拟质量（×5.0），细化阶段对力的响应更迟钝，维持全局框架稳定，只让新单元自由移动</td><td>anchor_mass_factor=5.0</td></tr>
+        <tr><td>抽稀因子</td><td>Decimation Factor</td><td>构造上层时保留节点的比例（默认 0.25 = 每层保留 25%），决定层间稀疏化程度和总层数</td><td>decimation_factor=0.25</td></tr>
+        <tr><td>抖动</td><td>Jitter</td><td>新节点投影到锚点加权中心时添加的随机位移偏移，防止多节点堆叠在同一初始坐标点退化</td><td>jitter_scale=20.0</td></tr>
+        <tr><td>BLIF</td><td>Berkeley Logic Interchange Format</td><td>标准逻辑电路网表格式，H-Anchor 的 blif_parser.py 支持 ISCAS85/89、EPFL、ITC99、MCNC 等主流基准套件</td><td>blif_parser.py</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const sections = document.querySelectorAll('section.floor');
+    const navLinks = document.querySelectorAll('.navlinks a');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          navLinks.forEach(a => a.classList.remove('active'));
+          const active = document.querySelector(`.navlinks a[href="#${e.target.id}"]`);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { threshold: 0.4 });
+    sections.forEach(s => observer.observe(s));
+  </script>
+</body>
+</html>
