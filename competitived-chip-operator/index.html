@@ -192,7 +192,7 @@ pdb before GPU run</div></div><div class="evidence-caption">Triton 的 CPU/Pytho
     <div class="journey-map">
       <div class="jm-head">阶段</div><div class="jm-head">1 环境</div><div class="jm-head">2 心智</div><div class="jm-head">3 编写</div><div class="jm-head">4 调试</div><div class="jm-head">5 调优</div><div class="jm-head">6 集成</div>
       <div class="jm-label">用户行为</div><div class="jm-cell low">装驱动、SDK、容器、框架 wheel，确认 GPU/架构支持。</div><div class="jm-cell">读 programming guide，理解线程/内存/编译模型。</div><div class="jm-cell hot">选择 CUDA/HIP/Triton，写起步模板、参考实现和启动代码。</div><div class="jm-cell low">处理非法访问、数值偏差、异步错误、shape 边界。</div><div class="jm-cell hot">做性能分析、保存基线结果、尝试 tile/配置、记录实验。</div><div class="jm-cell low">接 PyTorch/CI/容器，处理 ABI、升级和性能回归。</div>
-      <div class="jm-label">关键触点</div><div class="jm-cell"><a href="./tp-ecosystem.html#direction">Stack Doctor</a><br>检查 GPU、驱动、runtime、框架包、容器镜像和自定义算子 ABI 是否匹配。</div><div class="jm-cell"><a href="./tp-architecture.html">架构理解</a><br>解释 kernel launch、数据分块、线程/程序抽象、内存层级和硬件执行之间的对应关系。</div><div class="jm-cell"><a href="./tp-operator.html">Operator Lab</a><br>从参考实现、shape/stride、边界测试、自动调参到基准测试的完整算子工作流。</div><div class="jm-cell"><a href="./tp-debug.html">Error Explainer</a><br>把非法访问或数值偏差映射到源码行、program/thread 坐标、可复现输入和下一条排查命令。</div><div class="jm-cell"><a href="./tp-profiler.html">Profile Notebook</a><br>把性能指标关联到源码行和实验基线，并把每条建议写清证据、原因、改动和预期收益。</div><div class="jm-cell"><a href="./tp-ecosystem.html">Production Gate</a><br>把正确性、边界 shape、latency p95、ABI 漂移和升级风险放入 CI 与发布门禁。</div>
+      <div class="jm-label">关键触点</div><div class="jm-cell"><a href="#detail-ecosystem">Stack Doctor</a><br>检查 GPU、驱动、runtime、框架包、容器镜像和自定义算子 ABI 是否匹配。</div><div class="jm-cell"><a href="#detail-architecture">架构理解</a><br>解释 kernel launch、数据分块、线程/程序抽象、内存层级和硬件执行之间的对应关系。</div><div class="jm-cell"><a href="#detail-operator">Operator Lab</a><br>从参考实现、shape/stride、边界测试、自动调参到基准测试的完整算子工作流。</div><div class="jm-cell"><a href="#detail-debug">Error Explainer</a><br>把非法访问或数值偏差映射到源码行、program/thread 坐标、可复现输入和下一条排查命令。</div><div class="jm-cell"><a href="#detail-profiler">Profile Notebook</a><br>把性能指标关联到源码行和实验基线，并把每条建议写清证据、原因、改动和预期收益。</div><div class="jm-cell"><a href="#detail-ecosystem">Production Gate</a><br>把正确性、边界 shape、latency p95、ABI 漂移和升级风险放入 CI 与发布门禁。</div>
       <div class="jm-label">摩擦</div><div class="jm-cell low">“我装对了吗？”<br>版本组合过多，失败延迟到运行期。</div><div class="jm-cell">“这张总图和我的代码有什么关系？”</div><div class="jm-cell">“写对了，但不知道是否高效。”</div><div class="jm-cell low">“报错是后果，不是原因。”</div><div class="jm-cell low">“指标很多，但下一步不知道改哪行。”</div><div class="jm-cell">“本地能跑，CI/生产升级后失效。”</div>
       <div class="jm-label">机会</div><div class="jm-cell hot">可执行版本矩阵 + 修复命令。</div><div class="jm-cell hot">execution story + 迁移术语表。</div><div class="jm-cell hot">任务模板 + layout 可视化。</div><div class="jm-cell hot">错误解释树 + 最短排查命令。</div><div class="jm-cell hot">建议五字段 + 实验记录。</div><div class="jm-cell hot">性能门禁 + ABI 预检。</div>
     </div>
@@ -216,13 +216,13 @@ pdb before GPU run</div></div><div class="evidence-caption">Triton 的 CPU/Pytho
     <table>
       <thead><tr><th>触点类</th><th>开发者问题</th><th>细分比较点</th><th>竞品差异要点</th><th>建议沉淀的能力</th></tr></thead>
       <tbody>
-        <tr><td><a href="./tp-architecture.html">01 架构理解</a></td><td>这段代码如何落到硬件？</td><td>文档如何解释线程/内存/编译模型；一个 kernel 的 launch 参数、数据分块、内存访问和硬件执行如何对应；CUDA 术语迁移到 HIP/Triton 时哪些概念可复用、哪些容易误导；示例是否能从 toy code 展开到真实算子</td><td>CUDA 解释链最完整；ROCm 需要显性化 AMD 差异；Triton 降低线程级心智负担。</td><td>Execution Story</td></tr>
-        <tr><td><a href="./tp-memory.html">02 内存操作</a></td><td>数据在哪里、何时移动、为什么慢？</td><td>tensor 在 host、device、cache、临时 buffer 之间如何移动；地址表达式是否导致非连续访问；shared memory/LDS 如何影响复用、同步和 bank conflict；边界 mask 或 if 分支是否隐藏错误和性能损失</td><td>CUDA 控制最细；ROCm 迁移后需重建性能直觉；Triton 表达紧凑但后端行为需解释。</td><td>Memory Path Inspector</td></tr>
-        <tr><td><a href="./tp-debug.html">03 调试工具</a></td><td>错误报告如何回到可修改源码？</td><td>错误是否能定位到 kernel、源码行和 thread/program 坐标；是否能查看 lane、shared/LDS、局部变量；是否能与 torch/numpy reference 对齐数值误差；是否能给出下一条最短排查命令</td><td>CUDA 工具最完整；ROCm 命令行能力强但导览弱；Triton interpreter 降低前置排查成本。</td><td>Kernel Error Explainer</td></tr>
-        <tr><td><a href="./tp-profiler.html">04 性能分析</a></td><td>Profiler 指标下一步该改什么？</td><td>Profiler 首屏是否告诉用户先看哪类指标；指标能否回到源码行、IR 或指令；每次调优是否保存基线结果和失败实验；性能建议是否说明证据、原因、最小改动和预期收益</td><td>Nsight 是标杆；rocprof 数据开放但解释弱；Triton 实验快但依赖外部 profiler。</td><td>Profile Experiment Notebook</td></tr>
-        <tr><td><a href="./tp-compiler.html">05 编译器栈</a></td><td>编译器把我的代码改成了什么？</td><td>编译失败是否给出目标架构、参数和最小复现命令；源码能否跳到 IR、PTX/SASS/LLVM 或 MLIR；sm/gfx target 和 ABI 风险是否提前暴露；unroll、vectorize、layout、swizzle 等优化为何触发或未触发是否可解释</td><td>CUDA 有 PTX/SASS；ROCm 有 LLVM 开放性；Triton 有 MLIR/JIT 但透明度要补。</td><td>Compile Explanation View</td></tr>
-        <tr><td><a href="./tp-operator.html">06 算子实现</a></td><td>如何从 reference 到正确且足够快的 op？</td><td>从空文件到可运行算子需要多少样板；shape、stride、contiguous 假设是否显性；autotune 是否解释候选配置和选择原因；是否默认生成 reference、边界测试、benchmark 和框架导出</td><td>CUDA/HIP 控制强但样板重；Triton 高效但有抽象边界。</td><td>Operator Lab</td></tr>
-        <tr><td><a href="./tp-ecosystem.html">07 生态集成</a></td><td>本地跑通后如何进入生产？</td><td>算子如何接入 PyTorch/TensorFlow/JAX；driver、runtime、compiler、framework、GPU arch 版本是否可检查；correctness、latency p95、ABI drift 是否进入 CI；社区教程、问题解法和默认框架支持是否足够密集</td><td>CUDA 生态省心；ROCm 更依赖兼容矩阵；Triton 依赖框架和底层 backend。</td><td>Stack Doctor + Production Gate</td></tr>
+        <tr><td><a href="#detail-architecture">01 架构理解</a></td><td>这段代码如何落到硬件？</td><td>文档如何解释线程/内存/编译模型；一个 kernel 的 launch 参数、数据分块、内存访问和硬件执行如何对应；CUDA 术语迁移到 HIP/Triton 时哪些概念可复用、哪些容易误导；示例是否能从 toy code 展开到真实算子</td><td>CUDA 解释链最完整；ROCm 需要显性化 AMD 差异；Triton 降低线程级心智负担。</td><td>Execution Story</td></tr>
+        <tr><td><a href="#detail-memory">02 内存操作</a></td><td>数据在哪里、何时移动、为什么慢？</td><td>tensor 在 host、device、cache、临时 buffer 之间如何移动；地址表达式是否导致非连续访问；shared memory/LDS 如何影响复用、同步和 bank conflict；边界 mask 或 if 分支是否隐藏错误和性能损失</td><td>CUDA 控制最细；ROCm 迁移后需重建性能直觉；Triton 表达紧凑但后端行为需解释。</td><td>Memory Path Inspector</td></tr>
+        <tr><td><a href="#detail-debug">03 调试工具</a></td><td>错误报告如何回到可修改源码？</td><td>错误是否能定位到 kernel、源码行和 thread/program 坐标；是否能查看 lane、shared/LDS、局部变量；是否能与 torch/numpy reference 对齐数值误差；是否能给出下一条最短排查命令</td><td>CUDA 工具最完整；ROCm 命令行能力强但导览弱；Triton interpreter 降低前置排查成本。</td><td>Kernel Error Explainer</td></tr>
+        <tr><td><a href="#detail-profiler">04 性能分析</a></td><td>Profiler 指标下一步该改什么？</td><td>Profiler 首屏是否告诉用户先看哪类指标；指标能否回到源码行、IR 或指令；每次调优是否保存基线结果和失败实验；性能建议是否说明证据、原因、最小改动和预期收益</td><td>Nsight 是标杆；rocprof 数据开放但解释弱；Triton 实验快但依赖外部 profiler。</td><td>Profile Experiment Notebook</td></tr>
+        <tr><td><a href="#detail-compiler">05 编译器栈</a></td><td>编译器把我的代码改成了什么？</td><td>编译失败是否给出目标架构、参数和最小复现命令；源码能否跳到 IR、PTX/SASS/LLVM 或 MLIR；sm/gfx target 和 ABI 风险是否提前暴露；unroll、vectorize、layout、swizzle 等优化为何触发或未触发是否可解释</td><td>CUDA 有 PTX/SASS；ROCm 有 LLVM 开放性；Triton 有 MLIR/JIT 但透明度要补。</td><td>Compile Explanation View</td></tr>
+        <tr><td><a href="#detail-operator">06 算子实现</a></td><td>如何从 reference 到正确且足够快的 op？</td><td>从空文件到可运行算子需要多少样板；shape、stride、contiguous 假设是否显性；autotune 是否解释候选配置和选择原因；是否默认生成 reference、边界测试、benchmark 和框架导出</td><td>CUDA/HIP 控制强但样板重；Triton 高效但有抽象边界。</td><td>Operator Lab</td></tr>
+        <tr><td><a href="#detail-ecosystem">07 生态集成</a></td><td>本地跑通后如何进入生产？</td><td>算子如何接入 PyTorch/TensorFlow/JAX；driver、runtime、compiler、framework、GPU arch 版本是否可检查；correctness、latency p95、ABI drift 是否进入 CI；社区教程、问题解法和默认框架支持是否足够密集</td><td>CUDA 生态省心；ROCm 更依赖兼容矩阵；Triton 依赖框架和底层 backend。</td><td>Stack Doctor + Production Gate</td></tr>
       </tbody>
     </table>
     <div class="callout">读法：左侧是旅程中暴露的开发者问题，中间是可以拿三个竞品横向比较的维度，右侧是这些比较最终指向的自研平台建设方向。下方 7 个章节会把每一类触点完整展开。</div>
@@ -670,6 +670,8 @@ torch integration
       </tbody>
     </table>
   </section>
+
+  
 
   <section class="floor" id="sources">
     <h2>资料来源</h2>
