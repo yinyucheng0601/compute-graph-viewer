@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HNSW 白皮书：分层导航小世界图与向量检索工程</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">HNSW Whitepaper</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">概览</a>
+      <a href="#bg">背景</a>
+      <a href="#interactive">交互图</a>
+      <a href="#model">模型</a>
+      <a href="#build">构建</a>
+      <a href="#search">查询</a>
+      <a href="#tuning">调参</a>
+      <a href="#ecosystem">生态</a>
+      <a href="#ops">更新</a>
+      <a href="#transfer">迁移</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026</div>
+    <h1>HNSW</h1>
+    <p class="lead">Hierarchical Navigable Small World 是现代向量检索系统中最重要的图索引之一。它把海量高维向量组织成“上层稀疏、底层密集”的多层小世界图，让查询先用长边快速接近目标区域，再在底层做精细搜索。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>O(log N)</strong><span>理想化搜索跳数随数据规模近似对数增长</span></div>
+      <div class="card metric"><strong>M</strong><span>控制每个节点的最大连接数，决定内存与召回上限</span></div>
+      <div class="card metric"><strong>ef</strong><span>控制查询时候选集宽度，决定速度与召回折中</span></div>
+      <div class="card metric"><strong>ANN</strong><span>面向近似最近邻搜索，而非保证精确穷举</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="overview">
+    <div class="kicker">Structure · 全局地图</div>
+    <h2>读完这份白皮书应建立的心智模型</h2>
+    <p class="lead">HNSW 不是一个“参数魔法”，而是一套可解释的图导航机制：跳表提供层级直觉，小世界图提供短路径，启发式连边提供跨簇桥梁，ef 候选集提供召回保险。</p>
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 背景</div>
+      <div class="jm-head">02 模型</div>
+      <div class="jm-head">03 构建</div>
+      <div class="jm-head">04 查询</div>
+      <div class="jm-head">05 工程</div>
+      <div class="jm-head">06 迁移</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell">为什么不能全量扫描？</div>
+      <div class="jm-cell">为什么要分层？</div>
+      <div class="jm-cell">边是怎么来的？</div>
+      <div class="jm-cell">查询如何避免局部最优？</div>
+      <div class="jm-cell">如何落到系统里？</div>
+      <div class="jm-cell">还能迁移到哪里？</div>
+
+      <div class="jm-label">关键机制</div>
+      <div class="jm-cell">高维向量 + TopK + 近似搜索</div>
+      <div class="jm-cell">Skip List + NSW + 指数层级</div>
+      <div class="jm-cell">随机层级、候选搜索、启发式剪枝</div>
+      <div class="jm-cell">顶层贪婪下降、底层 ef 精排</div>
+      <div class="jm-cell">Milvus / Faiss / hnswlib / IVF-PQ</div>
+      <div class="jm-cell">分层锚点、多尺度图优化</div>
+
+      <div class="jm-label">输出结论</div>
+      <div class="jm-cell">HNSW 用内存换低延迟和高召回</div>
+      <div class="jm-cell">高层负责导航，底层负责准确</div>
+      <div class="jm-cell">索引质量决定查询上限</div>
+      <div class="jm-cell">ef 是线上召回阀门</div>
+      <div class="jm-cell">适合中高召回、低延迟、可增量场景</div>
+      <div class="jm-cell">可借思想，不应照搬实现</div>
+    </div>
+  </section>
+
+  <section class="floor" id="bg">
+    <div class="kicker">Background · 相似性搜索</div>
+    <h2>从“找相同”到“找相似”</h2>
+    <p class="lead">在 NLP、推荐、图像检索、RAG 和代码搜索里，系统面对的不是精确匹配，而是高维空间里的相似性匹配：给定 query embedding，找距离最近的 TopK 向量。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>精确搜索的代价</h3>
+        <p>全量扫描需要对每条向量计算距离。数据量达到百万、千万级后，即使单次距离计算很快，总延迟也难以支撑在线服务。</p>
+        <div class="pill-row"><span class="pill hot">O(N)</span><span class="pill">高召回</span><span class="pill">高延迟</span></div>
+      </div>
+      <div class="card">
+        <h3>近似搜索的目标</h3>
+        <p>ANN 接受少量召回损失，换取数量级的查询加速。工程上通常追求 recall、latency、memory、build time 四者平衡。</p>
+        <div class="pill-row"><span class="pill good">低延迟</span><span class="pill">可调召回</span><span class="pill">资源折中</span></div>
+      </div>
+      <div class="card">
+        <h3>HNSW 的位置</h3>
+        <p>HNSW 是图索引路线的代表：不先把空间切成固定桶，而是构建一张可导航的近邻图，让查询沿图边快速靠近答案。</p>
+        <div class="pill-row"><span class="pill blue">Graph-based ANN</span><span class="pill">动态插入友好</span></div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>核心判断：</b>HNSW 最适合“内存相对充足、延迟要求高、召回要求中高、数据需要持续追加”的在线向量检索场景。
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>资料图 · Skip List 的层级跳转直觉</div>
+      <div class="shotbody flush compact-figure">
+        <img class="real-shot compact-shot" src="https://pic4.zhimg.com/v2-140a2191575fbcecc15c4e1a73fff741_1440w.jpg" alt="Skip List search example">
+      </div>
+      <div class="evidence-caption">跳表让查询先在稀疏高层跨大步，再下降到底层精确定位。HNSW 把这个思路从一维链表迁移到高维近邻图。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="interactive">
+    <div class="kicker">Interactive Canvas · 从资料图抽象出的核心机制</div>
+    <h2>五步看懂 HNSW 为什么能导航</h2>
+    <p class="lead">下面这张交互 SVG 不是原图截图，而是把资料中的 Skip List、NSW 搜索、Early Stopping、HNSW 分层和启发式连边重绘到同一个坐标系里。每一步只保留当前要解释的结构，避免图片裁剪和元素拥挤。</p>
+
+    <div class="interactive-canvas" data-hnsw-canvas>
+      <div class="step-tabs" role="tablist" aria-label="HNSW 机制步骤">
+        <button class="step-tab active" type="button" data-step-target="0">1 跳表</button>
+        <button class="step-tab" type="button" data-step-target="1">2 NSW</button>
+        <button class="step-tab" type="button" data-step-target="2">3 局部最优</button>
+        <button class="step-tab" type="button" data-step-target="3">4 HNSW</button>
+        <button class="step-tab" type="button" data-step-target="4">5 选边</button>
+      </div>
+
+      <div class="canvas-grid">
+        <div class="canvas-stage">
+          <svg class="hnsw-svg" viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" aria-labelledby="hnswCanvasTitle hnswCanvasDesc">
+            <title id="hnswCanvasTitle">HNSW interactive explanation</title>
+            <desc id="hnswCanvasDesc">Step-by-step SVG explanation of skip list, NSW, early stopping, HNSW hierarchy, and heuristic neighbor selection.</desc>
+            <defs>
+              <marker id="hnswArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+              </marker>
+              <marker id="hnswWarnArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/>
+              </marker>
+            </defs>
+
+            <g class="svg-step active" data-step="0">
+              <text class="canvas-title" x="70" y="96">Skip List：一维结构里的“先粗后细”</text>
+              <text class="canvas-note" x="70" y="126">高层节点少，跨距大；底层节点全，负责精确定位。</text>
+              <line class="level-line" x1="170" y1="190" x2="840" y2="190"/>
+              <line class="level-line" x1="170" y1="285" x2="840" y2="285"/>
+              <line class="level-line" x1="170" y1="380" x2="840" y2="380"/>
+              <text class="level-label" x="85" y="196">Layer 2</text>
+              <text class="level-label" x="85" y="291">Layer 1</text>
+              <text class="level-label" x="85" y="386">Layer 0</text>
+              <path class="nav-path" d="M205 190 H485 V285 H615 V380 H710" marker-end="url(#hnswArrow)"/>
+              <g class="skip-nodes">
+                <circle class="node hot" cx="205" cy="190" r="14"/><circle class="node" cx="485" cy="190" r="14"/><circle class="node" cx="790" cy="190" r="14"/>
+                <circle class="node" cx="205" cy="285" r="13"/><circle class="node" cx="350" cy="285" r="13"/><circle class="node hot" cx="485" cy="285" r="13"/><circle class="node" cx="615" cy="285" r="13"/><circle class="node" cx="790" cy="285" r="13"/>
+                <circle class="node" cx="205" cy="380" r="12"/><circle class="node" cx="278" cy="380" r="12"/><circle class="node" cx="350" cy="380" r="12"/><circle class="node" cx="420" cy="380" r="12"/><circle class="node" cx="485" cy="380" r="12"/><circle class="node" cx="550" cy="380" r="12"/><circle class="node" cx="615" cy="380" r="12"/><circle class="node hot" cx="710" cy="380" r="12"/><circle class="node" cx="790" cy="380" r="12"/>
+              </g>
+              <rect class="callout-box" x="690" y="112" width="210" height="78" rx="10"/>
+              <text class="callout-title" x="708" y="144">迁移到 HNSW</text>
+              <text class="callout-text" x="708" y="170">链表层级 → 图层级</text>
+            </g>
+
+            <g class="svg-step" data-step="1">
+              <text class="canvas-title" x="70" y="96">NSW：用近邻图做贪婪路由</text>
+              <text class="canvas-note" x="70" y="126">查询从入口点出发，只比较当前节点邻居，沿距离 query 更近的边前进。</text>
+              <path class="edge" d="M180 330 L295 245 L430 285 L560 205 L705 260 L825 170"/>
+              <path class="edge soft" d="M180 330 L360 365 L430 285"/>
+              <path class="edge soft" d="M295 245 L380 150 L560 205"/>
+              <path class="edge soft" d="M560 205 L650 135 L825 170"/>
+              <path class="nav-path" d="M180 330 L295 245 L430 285 L560 205 L705 260" marker-end="url(#hnswArrow)"/>
+              <circle class="query" cx="770" cy="310" r="18"/><text class="node-text" x="798" y="317">query</text>
+              <circle class="node hot" cx="180" cy="330" r="16"/><text class="node-text" x="142" y="362">入口</text>
+              <circle class="node hot" cx="295" cy="245" r="16"/>
+              <circle class="node hot" cx="430" cy="285" r="16"/>
+              <circle class="node hot" cx="560" cy="205" r="16"/>
+              <circle class="node hot" cx="705" cy="260" r="16"/>
+              <circle class="node" cx="825" cy="170" r="15"/>
+              <circle class="node" cx="360" cy="365" r="14"/>
+              <circle class="node" cx="380" cy="150" r="14"/>
+              <circle class="node" cx="650" cy="135" r="14"/>
+              <rect class="callout-box" x="92" y="146" width="245" height="76" rx="10"/>
+              <text class="callout-title" x="110" y="176">优点</text>
+              <text class="callout-text" x="110" y="202">不扫全量，只访问路径邻域</text>
+            </g>
+
+            <g class="svg-step" data-step="2">
+              <text class="canvas-title" x="70" y="96">Early Stopping：局部信息会让搜索提前停下</text>
+              <text class="canvas-note" x="70" y="126">如果入口附近所有邻居都更远，贪婪搜索会认为“没有更好路径”。</text>
+              <path class="edge soft" d="M190 310 L330 230"/>
+              <path class="edge soft" d="M190 310 L330 390"/>
+              <path class="edge soft" d="M330 230 L470 310"/>
+              <path class="edge soft" d="M330 390 L470 310"/>
+              <path class="edge dashed" d="M470 310 C610 250 705 228 820 230"/>
+              <path class="edge dashed" d="M470 310 C610 345 705 365 815 346"/>
+              <circle class="node hot" cx="190" cy="310" r="17"/><text class="node-text" x="150" y="345">入口 P</text>
+              <circle class="node warn" cx="330" cy="230" r="15"/><text class="node-text" x="300" y="205">邻居 A</text>
+              <circle class="node warn" cx="330" cy="390" r="15"/><text class="node-text" x="300" y="425">邻居 B</text>
+              <circle class="node" cx="470" cy="310" r="15"/><text class="node-text" x="488" y="316">隐藏通路</text>
+              <circle class="node target" cx="820" cy="230" r="18"/><text class="node-text" x="848" y="237">真实近邻</text>
+              <circle class="query" cx="830" cy="345" r="18"/><text class="node-text" x="860" y="352">query</text>
+              <circle class="distance-ring" cx="830" cy="345" r="188"/>
+              <path class="warn-path" d="M190 310 C235 270 282 244 330 230" marker-end="url(#hnswWarnArrow)"/>
+              <path class="warn-path" d="M190 310 C235 350 282 376 330 390" marker-end="url(#hnswWarnArrow)"/>
+              <line class="measure-line" x1="190" y1="310" x2="830" y2="345"/>
+              <line class="measure-line bad" x1="330" y1="230" x2="830" y2="345"/>
+              <line class="measure-line bad" x1="330" y1="390" x2="830" y2="345"/>
+              <rect class="callout-box warn-box" x="112" y="150" width="300" height="82" rx="10"/>
+              <text class="callout-title" x="130" y="180">为什么会停？</text>
+              <text class="callout-text" x="130" y="205">A/B 到 query 都比 P 更远</text>
+              <rect class="callout-box" x="602" y="398" width="300" height="62" rx="10"/>
+              <text class="callout-text" x="620" y="428">真实近邻存在，但当前局部邻域看不到</text>
+            </g>
+
+            <g class="svg-step" data-step="3">
+              <text class="canvas-title" x="70" y="96">HNSW：显式分层，把远距离导航交给高层</text>
+              <text class="canvas-note" x="70" y="126">高层稀疏但有长边；到底层后再扩大 ef 做精细搜索。</text>
+              <rect class="layer-band" x="125" y="158" width="760" height="56" rx="12"/><text class="level-label" x="78" y="193">L2</text>
+              <rect class="layer-band" x="125" y="258" width="760" height="56" rx="12"/><text class="level-label" x="78" y="293">L1</text>
+              <rect class="layer-band" x="125" y="358" width="760" height="56" rx="12"/><text class="level-label" x="78" y="393">L0</text>
+              <path class="edge" d="M210 186 H770"/>
+              <path class="edge" d="M210 286 C350 246 500 326 640 286 C705 268 760 272 820 286"/>
+              <path class="edge soft" d="M180 386 H270 H360 H450 H540 H630 H720 H810"/>
+              <path class="nav-path" d="M210 186 L640 286 L720 386" marker-end="url(#hnswArrow)"/>
+              <circle class="node hot" cx="210" cy="186" r="14"/><circle class="node" cx="770" cy="186" r="14"/>
+              <circle class="node" cx="210" cy="286" r="13"/><circle class="node hot" cx="640" cy="286" r="14"/><circle class="node" cx="820" cy="286" r="13"/>
+              <circle class="node" cx="180" cy="386" r="12"/><circle class="node" cx="270" cy="386" r="12"/><circle class="node" cx="360" cy="386" r="12"/><circle class="node" cx="450" cy="386" r="12"/><circle class="node" cx="540" cy="386" r="12"/><circle class="node" cx="630" cy="386" r="12"/><circle class="node hot" cx="720" cy="386" r="13"/><circle class="node" cx="810" cy="386" r="12"/>
+              <circle class="query" cx="760" cy="430" r="16"/>
+              <rect class="callout-box" x="640" y="132" width="250" height="70" rx="10"/>
+              <text class="callout-title" x="658" y="162">关键变化</text>
+              <text class="callout-text" x="658" y="188">长边不靠偶然插入，而由层级承担</text>
+            </g>
+
+            <g class="svg-step" data-step="4">
+              <text class="canvas-title" x="70" y="96">启发式连边：最近不等于最好</text>
+              <text class="canvas-note" x="70" y="126">新节点 X 需要连接 M=2 个邻居。只选最近点会冗余；保留跨簇边能改善全图连通性。</text>
+              <ellipse class="cluster" cx="270" cy="290" rx="145" ry="95"/><text class="level-label" x="190" y="196">簇 A</text>
+              <ellipse class="cluster" cx="710" cy="290" rx="145" ry="95"/><text class="level-label" x="630" y="196">簇 B</text>
+              <circle class="node" cx="230" cy="270" r="15"/><text class="node-text" x="220" y="246">B</text>
+              <circle class="node" cx="305" cy="305" r="15"/><text class="node-text" x="300" y="338">C</text>
+              <circle class="node" cx="690" cy="260" r="15"/><text class="node-text" x="682" y="236">A</text>
+              <circle class="node" cx="750" cy="330" r="15"/>
+              <circle class="node hot" cx="480" cy="290" r="18"/><text class="node-text" x="470" y="260">X</text>
+              <path class="edge chosen" d="M480 290 L230 270"/>
+              <path class="edge rejected" d="M480 290 L305 305"/>
+              <path class="edge chosen" d="M480 290 L690 260"/>
+              <path class="edge soft" d="M230 270 L305 305"/>
+              <rect class="callout-box" x="112" y="374" width="300" height="62" rx="10"/>
+              <text class="callout-text" x="130" y="402">C 离 X 近，但和 B 太近：边信息冗余</text>
+              <rect class="callout-box" x="586" y="374" width="300" height="62" rx="10"/>
+              <text class="callout-text" x="604" y="402">A 稍远，但提供跨簇桥梁：导航价值更高</text>
+            </g>
+          </svg>
+        </div>
+
+        <aside class="step-explain" aria-live="polite">
+          <div class="step-kicker" data-step-kicker>Step 1 / 5</div>
+          <h3 data-step-title>Skip List：层级跳转的原型</h3>
+          <p data-step-body>跳表展示了“从高层快速跳跃，再到底层细查”的基本策略。HNSW 不是链表，但继承了这种粗到细的搜索节奏。</p>
+          <ul class="step-points" data-step-points>
+            <li>高层节点少，跨距大。</li>
+            <li>底层节点全，负责精确定位。</li>
+            <li>HNSW 把层级从一维链表推广到近邻图。</li>
+          </ul>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="model">
+    <div class="kicker">Model · 分层小世界图</div>
+    <h2>HNSW 的分层结构</h2>
+    <p class="lead">前面的交互图已经把 Skip List、NSW 和启发式连边这三个来源合并解释。落到 HNSW 本身，关键结构是：少量高层节点负责快速导航，完整底层图负责最终候选扩展。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>HNSW · 多层导航结构</div>
+      <div class="shotbody flush" style="padding:22px;background:#fff">
+        <svg viewBox="0 0 1200 560" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+            </marker>
+            <style>
+              .layer{fill:#f8fafc;stroke:#d8e0ec;stroke-width:2}
+              .node{fill:#fff;stroke:#2563eb;stroke-width:3}
+              .hot{fill:#dbeafe;stroke:#1d4ed8;stroke-width:4}
+              .edge{stroke:#94a3b8;stroke-width:2;fill:none}
+              .path{stroke:#2563eb;stroke-width:5;fill:none;marker-end:url(#arrow)}
+              .label{font:700 24px system-ui;fill:#182033}
+              .small{font:500 18px system-ui;fill:#677085}
+            </style>
+          </defs>
+          <rect class="layer" x="90" y="48" width="1020" height="100" rx="16"/>
+          <rect class="layer" x="90" y="218" width="1020" height="100" rx="16"/>
+          <rect class="layer" x="90" y="388" width="1020" height="100" rx="16"/>
+          <text class="label" x="115" y="88">Layer 2</text>
+          <text class="small" x="115" y="118">稀疏长边：快速跨区域导航</text>
+          <text class="label" x="115" y="258">Layer 1</text>
+          <text class="small" x="115" y="288">中等密度：缩小搜索区域</text>
+          <text class="label" x="115" y="428">Layer 0</text>
+          <text class="small" x="115" y="458">包含全部向量：最终 TopK 候选</text>
+          <path class="edge" d="M360 98 C520 52 710 52 870 98"/>
+          <path class="edge" d="M315 268 C455 218 560 218 700 268"/>
+          <path class="edge" d="M700 268 C780 215 900 220 990 268"/>
+          <path class="edge" d="M290 438 C380 390 500 390 590 438"/>
+          <path class="edge" d="M590 438 C670 392 790 392 880 438"/>
+          <path class="edge" d="M880 438 C930 405 1005 408 1040 438"/>
+          <path class="path" d="M360 98 L700 268 L880 438"/>
+          <circle class="hot" cx="360" cy="98" r="18"/>
+          <circle class="node" cx="870" cy="98" r="16"/>
+          <circle class="node" cx="315" cy="268" r="16"/>
+          <circle class="hot" cx="700" cy="268" r="18"/>
+          <circle class="node" cx="990" cy="268" r="16"/>
+          <circle class="node" cx="290" cy="438" r="15"/>
+          <circle class="node" cx="590" cy="438" r="15"/>
+          <circle class="hot" cx="880" cy="438" r="18"/>
+          <circle class="node" cx="1040" cy="438" r="15"/>
+          <text class="small" x="760" y="95">entry point</text>
+          <text class="small" x="920" y="438">query 近邻区域</text>
+        </svg>
+      </div>
+    </div>
+    <div class="callout">
+      <b>结构结论：</b>HNSW 的“层”不是为了展示，而是为了控制搜索半径。高层减少远距离探索成本，底层用 ef 候选集补足准确性。
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · NSW 贪婪搜索</div>
+        <div class="shotbody flush fit-figure">
+          <img class="real-shot fit-shot" src="https://pic3.zhimg.com/v2-edb9bb723c4890db96b655a6cb15b010_1440w.jpg" alt="NSW greedy search">
+        </div>
+        <div class="evidence-caption">NSW 只依赖当前节点邻居做局部决策，路径短但可能被入口点和局部结构影响。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · Early Stopping 风险</div>
+        <div class="shotbody flush fit-figure">
+          <img class="real-shot fit-shot" src="https://pic3.zhimg.com/v2-d1d19c25d155e9b00fdeb03c279e00de_1440w.jpg" alt="Early stopping in NSW">
+        </div>
+        <div class="evidence-caption">如果入口点附近没有更接近 query 的邻居，贪婪搜索会提前停止。HNSW 用多层入口和 ef 候选集缓解这个问题。</div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>为什么 HNSW 比 NSW 稳定：</b>NSW 的长边主要依赖插入早期形成，结构有偶然性；HNSW 显式引入层级，强制高层承担远距离导航，底层承担局部精排。
+    </div>
+  </section>
+
+  <section class="floor" id="build">
+    <div class="kicker">Construction · 建图机制</div>
+    <h2>索引构建质量决定查询上限</h2>
+    <p class="lead">HNSW 以增量方式插入向量。每个新节点先随机决定最高层级，再从全局入口点向下搜索，在相关层中选候选、连边、剪枝。</p>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">Step 1 · 层级分配</div>
+        <div class="arch-boxes">
+          <div class="arch-box">随机采样 level<br><small>指数衰减分布</small></div>
+          <div class="arch-box">大多数节点只在 L0<br><small>少数节点进入高层</small></div>
+          <div class="arch-box">高层形成导航骨架<br><small>类似地图缩放级别</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Step 2 · 寻找候选</div>
+        <div class="arch-boxes">
+          <div class="arch-box">从 entry point 开始<br><small>顶层贪婪搜索</small></div>
+          <div class="arch-box">逐层下降<br><small>上层结果作为下层入口</small></div>
+          <div class="arch-box">efConstruction 候选集<br><small>构建时搜索宽度</small></div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Step 3 · 连边与剪枝</div>
+        <div class="arch-boxes">
+          <div class="arch-box">选择最多 M 个邻居<br><small>第 0 层通常更宽</small></div>
+          <div class="arch-box">建立双向连接<br><small>维护可导航图</small></div>
+          <div class="arch-box">启发式保留多样性<br><small>避免边集中在同一小簇</small></div>
+        </div>
+      </div>
+      <div class="arch-note">构建时多花一点计算，能换来更稳定的在线查询。efConstruction 越大，越可能找到高质量连边，但构建时间和临时内存也会上升。</div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · NSW 构建中的早期长边</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://pic1.zhimg.com/v2-cf9013713eb2e716a3a4c31bd0d44d24_1440w.jpg" alt="NSW graph construction">
+        </div>
+        <div class="evidence-caption">早期插入节点之间形成的长边，后来会成为跨区域导航桥梁。HNSW 将这种桥梁机制层级化。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · HNSW 插入节点</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://pic2.zhimg.com/v2-20e4cfd5231d0d48569eecc2b95fbcd1_1440w.jpg" alt="HNSW node insertion">
+        </div>
+        <div class="evidence-caption">新节点随机获得最高层级后，只会插入到 0..level 层；每一层先搜索候选，再选择最多 M 个邻居连边。</div>
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · 层级指数衰减</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://pica.zhimg.com/v2-410b50a9c483dfb9bc0500a6ea6b73ee_1440w.jpg" alt="HNSW level distribution">
+        </div>
+        <div class="evidence-caption">大部分节点只出现在第 0 层，少量节点进入高层，形成指数递减的导航骨架。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · mL 对层级分布的影响</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://pica.zhimg.com/v2-72a82c7e88f6058acf35b307b4a65554_1440w.jpg" alt="HNSW level multiplier">
+        </div>
+        <div class="evidence-caption">mL 控制节点进入高层的概率。高层太稀会导航不足，太密会层间重叠过多，削弱层级收益。</div>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">insert(node) · 简化伪代码</span></div>
+      <div class="mb">level = sample_exponential_level()
+ep = global_entry_point
+
+for layer from maxLayer down to level + 1:
+    ep = greedy_search(query=node.vector, entry=ep, ef=1, layer)
+
+for layer from min(level, maxLayer) down to 0:
+    candidates = search_layer(query=node.vector, entry=ep, ef=efConstruction, layer)
+    neighbors = select_diverse_neighbors(candidates, M)
+    connect_bidirectionally(node, neighbors, layer)
+    prune_if_degree_exceeds_M(neighbors)</div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · 朴素选边的问题</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://picx.zhimg.com/v2-cbf8c0a96030015f6035664dd4c09d1f_1440w.jpg" alt="Naive neighbor selection problem">
+        </div>
+        <div class="evidence-caption">如果只连最近点，新节点可能只强化局部簇，无法修复簇间连通性。</div>
+      </div>
+      <div class="screenshot">
+        <div class="shotbar"><span class="dots"></span>资料图 · 启发式选边保留桥梁</div>
+        <div class="shotbody flush">
+          <img class="real-shot" src="https://picx.zhimg.com/v2-5391286d7d93ce7614ae213c1d4f1451_1440w.jpg" alt="Heuristic neighbor selection">
+        </div>
+        <div class="evidence-caption">启发式选边会跳过与已选邻居过近的候选，保留更分散的边，从而提升跨区域导航能力。</div>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">selectBestConnections · 工程实现要点</span></div>
+      <div class="mb">distanceScore  = 1 / (1 + distance(candidate, newNode))
+diversityScore = min distance(candidate, alreadySelected)
+score          = distanceScore * diversityScore
+
+含义：
+1. 距离仍然重要：候选点不能离新节点太远
+2. 多样性也重要：候选点之间不能都挤在同一小簇
+3. 超限要剪枝：双向连边后，如果旧节点度数超过 M，需要重新选择保留边</div>
+    </div>
+  </section>
+
+  <section class="floor" id="search">
+    <div class="kicker">Search · 查询机制</div>
+    <h2>查询不是遍历全图，而是沿图导航</h2>
+    <p class="lead">HNSW 查询从最高层入口点开始。高层通常只保留一个当前最优点，快速下降；到底层后扩大候选集 ef，在更密集的图中做最后细化。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>1. 顶层定位</h3>
+        <p>从 entry point 开始，比较当前节点和邻居到 query 的距离，只要邻居更近就移动过去。</p>
+        <div class="pill-row"><span class="pill blue">greedy routing</span></div>
+      </div>
+      <div class="card">
+        <h3>2. 层层下降</h3>
+        <p>当前层到达局部最优后，把该点作为下一层入口。层级越低，候选区域越精细。</p>
+        <div class="pill-row"><span class="pill">coarse → fine</span></div>
+      </div>
+      <div class="card">
+        <h3>3. 底层扩展</h3>
+        <p>在 L0 使用 ef 维护候选队列。ef 越大，越不容易错过真实近邻，但访问节点更多。</p>
+        <div class="pill-row"><span class="pill good">recall ↑</span><span class="pill hot">latency ↑</span></div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>线上调参入口：</b>在索引已经构建好的情况下，通常优先调 search 参数 ef。它能在不重建索引的前提下，在“更快”和“更准”之间切换。
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>资料图 · HNSW 查询从上到下收敛</div>
+      <div class="shotbody flush">
+        <img class="real-shot" src="https://pic3.zhimg.com/v2-940f8d9112dacfac42e34c70862f2204_1440w.jpg" alt="HNSW search process">
+      </div>
+      <div class="evidence-caption">高层搜索通常保留 1 个最佳入口，降低成本；底层使用 ef 维护动态候选集，以提高最终 TopK 召回。</div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">searchLayerEf · 两个优先队列</span></div>
+      <div class="mb">candidates  : 小顶堆，保存还要扩展的近候选
+dynamicList : 大顶堆，保存当前 ef 个最好结果
+
+while candidates not empty:
+    current = candidates.pop_nearest()
+    if dynamicList is full and current is worse than worst(dynamicList):
+        break
+    for neighbor in current.neighbors:
+        if neighbor is not visited and neighbor better than worst(dynamicList):
+            candidates.add(neighbor)
+            dynamicList.add(neighbor)
+            keep only ef best results</div>
+    </div>
+  </section>
+
+  <section class="floor" id="tuning">
+    <div class="kicker">Tuning · 参数与取舍</div>
+    <h2>M、efConstruction、ef 是三只旋钮</h2>
+    <p class="lead">HNSW 的工程效果主要由图密度、构建搜索宽度、查询搜索宽度决定。不要孤立看单个参数，应围绕数据维度、召回目标、内存预算和写入模式联合调参。</p>
+    <table>
+      <thead>
+        <tr><th>参数</th><th>作用</th><th>调大后的收益</th><th>调大后的代价</th><th>实践建议</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>M</td><td>每层最大连接数 / 图密度</td><td>路径更多，召回更稳定，较少陷入局部最小</td><td>内存增加，构建更慢，维护成本更高</td><td>低维或低召回可小；高维、高召回、数据复杂时增大</td></tr>
+        <tr><td>efConstruction</td><td>构建时候选集大小</td><td>连边质量更高，图结构更可靠</td><td>建索引时间和构建期内存上升</td><td>离线构建可适当提高；频繁写入场景谨慎</td></tr>
+        <tr><td>ef / efSearch</td><td>查询时底层候选集大小</td><td>召回率提高，TopK 更稳定</td><td>查询延迟增加，CPU 消耗上升</td><td>通常设为不小于 TopK，再按 SLA 调整</td></tr>
+        <tr><td>level multiplier</td><td>节点进入高层的概率分布</td><td>改变层间稀疏程度和导航骨架</td><td>过高会层间重叠过多，过低会高层导航不足</td><td>多数系统使用默认值，只有深度优化时才动</td></tr>
+      </tbody>
+    </table>
+    <div class="grid cols-3" style="margin-top:18px">
+      <div class="card"><h3>追求低延迟</h3><p>先降低 ef；若召回仍够，再考虑较小 M。适合推荐召回、粗排候选、交互式搜索。</p></div>
+      <div class="card"><h3>追求高召回</h3><p>提高 ef 和 efConstruction；内存允许时提高 M。适合 RAG、风控、法律/医疗文档检索。</p></div>
+      <div class="card"><h3>追求低内存</h3><p>控制 M，考虑 HNSW_PQ / HNSW_SQ 或 IVF+PQ 组合。注意压缩会引入距离误差。</p></div>
+    </div>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="card">
+        <h3>常见误区：只调 ef</h3>
+        <p>ef 只能扩大查询时探索范围。如果构建阶段 M 太小或 efConstruction 太低，图上本来就缺少通往真实近邻的边，单纯提高 ef 会很快遇到收益递减。</p>
+        <div class="pill-row"><span class="pill hot">图质量瓶颈</span><span class="pill">召回上限</span></div>
+      </div>
+      <div class="card">
+        <h3>常见误区：盲目调大 M</h3>
+        <p>M 过大不一定线性提升召回。它会增加内存、构建时间和 cache miss，也可能让底层扩展成本上升。高维数据更需要 M，低维数据未必。</p>
+        <div class="pill-row"><span class="pill warn">内存上升</span><span class="pill warn">构建变慢</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="ecosystem">
+    <div class="kicker">Ecosystem · 工程实现与组合索引</div>
+    <h2>HNSW 已成为向量数据库的基础能力</h2>
+    <p class="lead">Milvus、Faiss、hnswlib、Qdrant、OpenSearch 等系统都支持或借鉴 HNSW。工程实践中常把 HNSW 与压缩、倒排文件、标量量化、产品量化结合。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Flat HNSW</h3>
+        <p>图结构上存原始向量，查询准确、实现直观，但内存占用最高。Faiss 的 IndexHNSWFlat 属于这一类。</p>
+        <div class="pill-row"><span class="pill good">精度高</span><span class="pill hot">内存高</span></div>
+      </div>
+      <div class="card">
+        <h3>HNSW + Quantization</h3>
+        <p>使用 SQ/PQ 压缩底层向量，降低内存和带宽压力。代价是距离估计会变粗，需要 refine 或重排。</p>
+        <div class="pill-row"><span class="pill good">内存低</span><span class="pill warn">有误差</span></div>
+      </div>
+      <div class="card">
+        <h3>HNSW + IVF</h3>
+        <p>HNSW 可作为 coarse quantizer，先快速找到最近 Voronoi 分区，再在分区内扫描或 PQ 检索。</p>
+        <div class="pill-row"><span class="pill blue">大规模</span><span class="pill">两阶段召回</span></div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>组合索引原则：</b>当数据规模继续变大，单纯 HNSW 的内存成本会变重；这时常把 HNSW 用作“导航器”，把压缩或倒排结构用作“容量层”。
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>资料图 · HNSW 作为 IVF 粗量化器</div>
+      <div class="shotbody flush">
+        <img class="real-shot" src="https://pic3.zhimg.com/v2-830a19793d09ab76a6327f103b2d11f2_1440w.jpg" alt="HNSW IVF coarse quantizer">
+      </div>
+      <div class="evidence-caption">当 IVF 的 Voronoi 质心数量很大时，HNSW 可以替代穷举质心搜索，快速定位最近分区，再进入分区内扫描或 PQ 检索。</div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">Faiss · HNSW 与 IVFPQ 组合</span></div>
+      <div class="mb">d = 256
+M = 64
+nlist = 8192
+nsubspaces = 32
+nbits = 8
+
+quantizer = faiss.IndexHNSWFlat(d, M)
+index = faiss.IndexIVFPQ(quantizer, d, nlist, nsubspaces, nbits)
+
+index.train(data)
+index.add(data)
+index.nprobe = 10
+D, I = index.search(query, k)</div>
+    </div>
+  </section>
+
+  <section class="floor" id="ops">
+    <div class="kicker">Operations · 动态更新与系统实现</div>
+    <h2>HNSW 适合追加，但删除和并发需要工程约束</h2>
+    <p class="lead">HNSW 的一个重要优势是可以增量插入，不必像部分聚类索引那样频繁全量重训。但在真实系统中，删除、入口点更新、连接修复、并发读写和内存访问都会影响稳定性。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>插入</h3>
+        <p>新向量按当前图搜索候选，然后建立双向连接。插入成本约等于多层搜索加连边剪枝，主要受 efConstruction 和 M 影响。</p>
+        <div class="pill-row"><span class="pill good">增量友好</span><span class="pill">构建成本可控</span></div>
+      </div>
+      <div class="card">
+        <h3>删除</h3>
+        <p>删除不仅要移除节点，还要移除所有反向连接。如果删除的是 entry point，需要重新选择最高层节点作为入口。</p>
+        <div class="pill-row"><span class="pill warn">入口点维护</span><span class="pill warn">连通性风险</span></div>
+      </div>
+      <div class="card">
+        <h3>并发</h3>
+        <p>查询可以读锁并发，插入和删除通常需要写锁保护图结构。高写入系统要考虑分片、批量构建或后台合并。</p>
+        <div class="pill-row"><span class="pill">read-heavy</span><span class="pill hot">write contention</span></div>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">remove(id) · 删除操作关键路径</span></div>
+      <div class="mb">1. 找到待删除节点 nodeToRemove
+2. 遍历 nodeToRemove 的所有层和连接
+3. 从邻居节点中移除反向边
+4. 从 nodes 映射中删除该节点
+5. 如果删除的是 entry point，扫描最高层节点并更新入口点
+
+工程注意：
+- 简单删除会降低局部连通性，长期大量删除可能需要重建或修复
+- 生产系统常用 tombstone / lazy deletion 降低在线写放大
+- 读写锁要避免长时间阻塞查询路径</div>
+    </div>
+    <div class="callout">
+      <b>动态更新边界：</b>HNSW 支持增量并不等于“无限在线变更无代价”。当删除比例高、向量分布漂移明显或写入峰值很大时，应规划周期性重建、分片轮换或冷热索引合并。
+    </div>
+  </section>
+
+  <section class="floor" id="transfer">
+    <div class="kicker">Transfer · 从检索到图优化</div>
+    <h2>对芯片布局的启发：从分层检索到分层 Placement</h2>
+    <p class="lead">HNSW 的直接应用是向量近邻搜索；迁移到芯片设计时，真正有价值的不是“最近邻检索 API”，而是它背后的分层导航思想：先用少量高层节点建立全局骨架，再把细节逐层投影到底层，最后在局部区域做增量修正。</p>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>直接使用 HNSW</h3>
+        <p>RAG 检索、语义搜索、图片相似搜索、推荐召回、代码搜索、去重、聚类候选生成、异常检测。</p>
+        <div class="pill-row"><span class="pill">embedding</span><span class="pill">TopK</span><span class="pill">ANN</span></div>
+      </div>
+      <div class="card">
+        <h3>借用 HNSW 思想：不是做 ANN</h3>
+        <p>像 PycPlacer / H-Anchor 这类 placement 原型并不是把 cell 当成 embedding 去建 HNSW 索引，而是借鉴“高层稀疏锚点 + 底层细化”的组织方式，用来降低大规模布局优化的搜索空间。</p>
+        <div class="pill-row"><span class="pill">coarse-to-fine</span><span class="pill blue">anchor graph</span><span class="pill">incremental update</span></div>
+      </div>
+    </div>
+
+    <div class="screenshot" style="margin-top:18px">
+      <div class="shotbar"><span class="dots"></span>芯片布局中的 HNSW 式迁移路径</div>
+      <div class="shotbody flush" style="padding:18px;background:#fff">
+        <svg viewBox="0 0 1200 430" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <defs>
+            <marker id="transferArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+            </marker>
+          </defs>
+          <style>
+            .tbox{fill:#fff;stroke:#d8e0ec;stroke-width:2}
+            .tboxHot{fill:#eff6ff;stroke:#bfdbfe;stroke-width:2}
+            .ttitle{font:800 18px system-ui;fill:#182033}
+            .ttext{font:600 13px system-ui;fill:#667085}
+            .tarrow{stroke:#2563eb;stroke-width:3;fill:none;marker-end:url(#transferArrow)}
+            .tnode{fill:#fff;stroke:#2563eb;stroke-width:3}
+            .tnodeHot{fill:#dbeafe;stroke:#1d4ed8;stroke-width:4}
+            .tedge{stroke:#94a3b8;stroke-width:2;fill:none}
+          </style>
+          <rect class="tbox" x="40" y="60" width="210" height="120" rx="12"/>
+          <text class="ttitle" x="65" y="96">Weighted Netlist</text>
+          <text class="ttext" x="65" y="126">cell / macro / net</text>
+          <text class="ttext" x="65" y="150">timing · traffic · power</text>
+
+          <path class="tarrow" d="M260 120 H340"/>
+          <rect class="tboxHot" x="360" y="42" width="260" height="156" rx="12"/>
+          <text class="ttitle" x="390" y="80">Anchor Graph</text>
+          <text class="ttext" x="390" y="110">PageRank / degree / traffic 选锚点</text>
+          <text class="ttext" x="390" y="134">高层节点少，代表全局骨架</text>
+          <circle class="tnodeHot" cx="420" cy="164" r="10"/>
+          <circle class="tnode" cx="470" cy="154" r="8"/>
+          <circle class="tnodeHot" cx="530" cy="168" r="10"/>
+          <path class="tedge" d="M420 164 L470 154 L530 168"/>
+
+          <path class="tarrow" d="M635 120 H720"/>
+          <rect class="tbox" x="740" y="60" width="210" height="120" rx="12"/>
+          <text class="ttitle" x="765" y="96">Top-down Place</text>
+          <text class="ttext" x="765" y="126">先放全局锚点</text>
+          <text class="ttext" x="765" y="150">再逐层投影和细化</text>
+
+          <path class="tarrow" d="M960 120 H1038"/>
+          <rect class="tbox" x="1050" y="60" width="110" height="120" rx="12"/>
+          <text class="ttitle" x="1074" y="96">QoR</text>
+          <text class="ttext" x="1072" y="126">HPWL</text>
+          <text class="ttext" x="1072" y="150">拥塞 / 时序</text>
+
+          <rect class="tbox" x="110" y="252" width="250" height="105" rx="12"/>
+          <text class="ttitle" x="135" y="288">HNSW 给出的启发</text>
+          <text class="ttext" x="135" y="318">不要一开始优化所有节点</text>
+          <text class="ttext" x="135" y="342">先建立可导航的稀疏骨架</text>
+
+          <rect class="tbox" x="475" y="252" width="270" height="105" rx="12"/>
+          <text class="ttitle" x="500" y="288">Placement 中的对应物</text>
+          <text class="ttext" x="500" y="318">anchor = 高连接度 / 高流量 / 关键路径 cell</text>
+          <text class="ttext" x="500" y="342">layer = 模块级 → cluster 级 → cell 级</text>
+
+          <rect class="tbox" x="860" y="252" width="240" height="105" rx="12"/>
+          <text class="ttitle" x="885" y="288">增量 ECO</text>
+          <text class="ttext" x="885" y="318">局部移动后只传播影响半径</text>
+          <text class="ttext" x="885" y="342">避免每次完整 re-placement</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:18px">
+      <div class="card">
+        <h3>1. Netlist 先变成带权图</h3>
+        <p>芯片 placement 的输入不是简单点集，而是 netlist graph / hypergraph。节点可以是 standard cell、macro、SRAM、NoC router；边或超边来自 net、bus、clock、control path。HNSW 的启发在于：图上的边不应该只有“是否连接”，还应带 timing criticality、traffic、bandwidth、switching activity、power domain 等权重。</p>
+        <div class="pill-row"><span class="pill">weighted netlist</span><span class="pill">timing</span><span class="pill">traffic</span></div>
+      </div>
+      <div class="card">
+        <h3>2. Anchor 不是随机高层点</h3>
+        <p>原始 HNSW 通过概率分布决定节点是否进入高层；芯片布局不能完全随机。更合理的做法是把“高层节点”解释为 anchor：高扇出、高 PageRank、高 traffic、关键路径、跨模块接口、macro 边界点。这些 anchor 先确定全局形状，避免底层 cell 一开始陷入局部拥挤。</p>
+        <div class="pill-row"><span class="pill blue">anchor graph</span><span class="pill">PageRank</span><span class="pill">critical path</span></div>
+      </div>
+      <div class="card">
+        <h3>3. 从粗布局到细布局</h3>
+        <p>HNSW 查询是从高层到低层；placement 可以对应为从模块级到 cell 级。先用 anchor graph 做全局 floorplan-like 布局，再把 cluster、cell 逐层投影到锚点附近，最后用 force-directed / legalization 修正重叠、行对齐和局部线长。</p>
+        <div class="pill-row"><span class="pill">coarse-to-fine</span><span class="pill">legalization</span><span class="pill">HPWL</span></div>
+      </div>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:18px">
+      <div class="card">
+        <h3>4. 对 AI 芯片尤其有价值</h3>
+        <p>AI 芯片的物理局部性很强：AI Core、local memory、DMA、NoC、HBM controller 之间的数据流模式会直接影响延迟和功耗。HNSW 式分层能把 CANN / compiler profiling 里的 traffic matrix 转成 placement affinity：高流量模块更早进入 anchor 层，优先被摆近。</p>
+        <div class="pill-row"><span class="pill">CANN</span><span class="pill">traffic matrix</span><span class="pill">locality</span></div>
+      </div>
+      <div class="card">
+        <h3>5. 增量更新对应 ECO 场景</h3>
+        <p>芯片设计后期常见 ECO：移动少量 cell、插入 buffer、调整某条 critical path、替换部分门级结构。完整重新 placement 成本很高。HNSW 的“局部邻域传播”思想可以迁移为 incremental placement：以变更点为中心，只更新若干 hop 或物理半径内的节点，保持全局骨架稳定。</p>
+        <div class="pill-row"><span class="pill">incremental update</span><span class="pill">ECO</span><span class="pill">local refinement</span></div>
+      </div>
+      <div class="card">
+        <h3>6. 但不能替代真实 P&R</h3>
+        <p>真实芯片布局还要处理 row site、macro blockage、pin access、clock tree、power grid、DRC、routing congestion、timing closure。HNSW 思想适合做早期探索、语义化权重验证、局部增量优化原型；不能直接替代 Innovus、ICC2、OpenROAD 或 FPGA placer。</p>
+        <div class="pill-row"><span class="pill hot">not a full P&R</span><span class="pill">early exploration</span></div>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">从 HNSW 到 H-Anchor Placement 的映射</span></div>
+      <div class="mb">HNSW layer           -> placement hierarchy
+high-level node      -> anchor cell / macro / traffic hub
+neighbor diversity   -> spatially diverse anchors, avoid all anchors in one module
+greedy descent       -> top-down placement refinement
+ef candidate set     -> local candidate region / affected neighborhood
+incremental insert   -> ECO-style local update
+
+迁移后的目标不再是 TopK recall，而是：
+HPWL ↓, overlap ↓, congestion risk ↓, timing/traffic locality ↑, update time ↓</div>
+    </div>
+
+    <div class="callout">
+      <b>芯片设计启发：</b>HNSW 提醒我们，大规模图问题不要急着在底层全量优化。先选出能代表全局结构的少量锚点，用它们建立稳定骨架，再逐层细化和局部修正，往往比“一上来优化所有 cell”更适合交互式设计探索和后期 ECO。
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Reference · 术语与来源</div>
+    <h2>术语表与参考资料</h2>
+    <p class="lead">以下术语覆盖 HNSW 的理论、构建、查询和工程落地。参考资料包括本地收集文档，以及原论文、Milvus 和 Faiss 文档。</p>
+    <table>
+      <thead><tr><th>术语</th><th>英文</th><th>解释</th><th>工程含义</th></tr></thead>
+      <tbody>
+        <tr><td>近似最近邻</td><td>ANN</td><td>用近似结果换取搜索速度</td><td>关注 recall/latency trade-off</td></tr>
+        <tr><td>小世界图</td><td>Small World Graph</td><td>局部聚集强，但平均路径短</td><td>少量长边让搜索快速跨区域</td></tr>
+        <tr><td>入口点</td><td>Entry Point</td><td>搜索起始节点，通常在最高层</td><td>影响查询导航起点</td></tr>
+        <tr><td>候选集宽度</td><td>ef</td><td>查询时保留的候选节点数量</td><td>线上最常用调参旋钮</td></tr>
+        <tr><td>构建候选宽度</td><td>efConstruction</td><td>插入节点时探索的候选数量</td><td>决定图质量和构建成本</td></tr>
+        <tr><td>最大连接数</td><td>M</td><td>节点每层最多连接多少邻居</td><td>决定内存、连通性和召回上限</td></tr>
+        <tr><td>启发式选边</td><td>Heuristic Neighbor Selection</td><td>不只选最近，还保留空间多样性</td><td>减少局部最小和簇内过密</td></tr>
+        <tr><td>产品量化</td><td>PQ</td><td>把向量分段压缩编码</td><td>降低内存，常与 HNSW/IVF 组合</td></tr>
+      </tbody>
+    </table>
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="card">
+        <h3>本地资料</h3>
+        <p>使用了 `/Users/yin/work/HNSW/HNSW.md`、`相似性搜索.md`、`第五章：HNSW 算法原理与核心实现.md` 中关于 HNSW 概览、Skip List、NSW、构建流程、参数和代码结构的内容。</p>
+      </div>
+      <div class="card">
+        <h3>外部来源</h3>
+        <p><a href="https://arxiv.org/abs/1603.09320">Malkov & Yashunin HNSW 原论文</a>、<a href="https://milvus.io/docs/zh/hnsw.md">Milvus HNSW 文档</a>、<a href="https://github.com/facebookresearch/faiss/wiki/Faiss-indexes">Faiss IndexHNSW 文档</a>、<a href="https://github.com/nmslib/hnswlib">hnswlib 项目</a>。</p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const hnswSteps = [
+      {
+        kicker: 'Step 1 / 5',
+        title: 'Skip List：层级跳转的原型',
+        body: '跳表展示了“从高层快速跳跃，再到底层细查”的基本策略。HNSW 不是链表，但继承了这种粗到细的搜索节奏。',
+        points: ['高层节点少，跨距大。', '底层节点全，负责精确定位。', 'HNSW 把层级从一维链表推广到近邻图。']
+      },
+      {
+        kicker: 'Step 2 / 5',
+        title: 'NSW：近邻图上的贪婪路由',
+        body: 'NSW 把数据点连成近邻图，查询沿着“离 query 更近”的邻居移动。它避免全量扫描，但仍依赖入口点和局部连接质量。',
+        points: ['每一步只看当前节点的邻居。', '长边能帮助跨区域跳转。', '路径短，但不保证一定找到真实最近邻。']
+      },
+      {
+        kicker: 'Step 3 / 5',
+        title: 'Early Stopping：局部最优的风险',
+        body: '当入口附近的邻居都比当前点更差，贪婪搜索会提前停止，即使远处存在真正的近邻。这是 NSW 需要被改进的关键原因。',
+        points: ['局部判断不能代表全局结构。', '入口点质量会显著影响结果。', '需要更多入口或更宽候选集缓解。']
+      },
+      {
+        kicker: 'Step 4 / 5',
+        title: 'HNSW：显式高层导航骨架',
+        body: 'HNSW 引入概率层级，让少量节点进入高层。查询先在高层用长边接近目标区域，再到底层扩大候选集做精细搜索。',
+        points: ['高层负责远距离导航。', '底层包含全部数据点。', 'ef 在底层提供召回保险。']
+      },
+      {
+        kicker: 'Step 5 / 5',
+        title: '启发式连边：保留多样性',
+        body: '插入新节点时，直接选择最近的 M 个候选会让边集中在同一小簇。HNSW 的启发式连边会保留更分散的连接，改善全图可导航性。',
+        points: ['最近边可能是冗余边。', '跨簇边能降低平均路径长度。', '构建质量决定后续查询上限。']
+      }
+    ];
+
+    document.querySelectorAll('[data-hnsw-canvas]').forEach((canvas) => {
+      const tabs = canvas.querySelectorAll('[data-step-target]');
+      const svgSteps = canvas.querySelectorAll('.svg-step');
+      const kicker = canvas.querySelector('[data-step-kicker]');
+      const title = canvas.querySelector('[data-step-title]');
+      const body = canvas.querySelector('[data-step-body]');
+      const points = canvas.querySelector('[data-step-points]');
+
+      const setStep = (index) => {
+        tabs.forEach((tab) => tab.classList.toggle('active', Number(tab.dataset.stepTarget) === index));
+        svgSteps.forEach((step) => step.classList.toggle('active', Number(step.dataset.step) === index));
+        const data = hnswSteps[index];
+        kicker.textContent = data.kicker;
+        title.textContent = data.title;
+        body.textContent = data.body;
+        points.innerHTML = data.points.map((point) => `<li>${point}</li>`).join('');
+      };
+
+      tabs.forEach((tab) => {
+        tab.addEventListener('click', () => setStep(Number(tab.dataset.stepTarget)));
+      });
+    });
+
+    const sections = document.querySelectorAll('section.floor');
+    const navLinks = document.querySelectorAll('.navlinks a');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          navLinks.forEach((a) => a.classList.remove('active'));
+          const active = document.querySelector(`.navlinks a[href="#${entry.target.id}"]`);
+          if (active) active.classList.add('active');
+        }
+      });
+    }, { threshold: 0.42 });
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>
