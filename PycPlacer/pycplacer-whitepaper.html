@@ -12,6 +12,7 @@
     <div class="navlinks">
       <a href="#cover">封面</a>
       <a href="#overview">概览</a>
+      <a href="#positioning">定位</a>
       <a href="#bg">背景</a>
       <a href="#hierarchy">分层锚点</a>
       <a href="#engine">力导向引擎</a>
@@ -28,6 +29,10 @@
     <div class="kicker">Whitepaper · 2024</div>
     <h1>H-Anchor</h1>
     <p class="lead">受 HNSW 图启发的分层锚点式 VLSI 布局算法——通过 C++ OpenMP 多核并行与空间抑制选择机制，在保持完全确定性的前提下实现 <strong>38 倍加速</strong>，并支持 <strong>50–100 倍</strong>更快的增量局部更新。</p>
+    <div class="source-card">
+      <b>GitHub 来源</b>
+      <span>本报告基于 <a href="https://github.com/yinyucheng0601/compute-graph-viewer" target="_blank" rel="noopener">yinyucheng0601/compute-graph-viewer</a> 仓库中的 <code>/pto/PycPlacer</code> 研究原型整理。</span>
+    </div>
     <div class="grid cols-4">
       <div class="card metric"><strong>38×</strong><span>C++ 多核 vs 纯 Python 加速比</span></div>
       <div class="card metric"><strong>50–100×</strong><span>增量更新 vs 完整重布局加速比</span></div>
@@ -69,6 +74,35 @@
       <div class="jm-cell">HPWL 最小化，无单元物理重叠</div>
       <div class="jm-cell hot">±5% HPWL 变化，50x 时间节省</div>
       <div class="jm-cell">完整基准数据与增量性能实测验证</div>
+    </div>
+  </section>
+
+  <!-- ░░ POSITIONING ░░ -->
+  <section class="floor" id="positioning">
+    <div class="kicker">Positioning · 在 netlist 白皮书中的位置</div>
+    <h2>从约束方法论到布局算法原型</h2>
+    <p class="lead"><code>netlist</code> 文件夹中的 AI 芯片网表白皮书讨论的是完整约束体系：软件工作负载、CANN / 编译器语义、网表对象、边权重、布局区域、布线优先级和 QoR 反馈如何形成闭环。PycPlacer 则落在其中更窄但关键的一环：当网表已经被转换成可计算的 weighted graph 后，如何快速、确定、可增量地完成 placement。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>上游：语义化网表</h3>
+        <p>来自 <code>netlist</code> 研究的输入不是普通连线清单，而是带有 timing、traffic、bandwidth、power、placement affinity 等语义的图模型。</p>
+        <div class="pill-row"><span class="pill">Netlist → Graph</span><span class="pill">Edge Weight</span></div>
+      </div>
+      <div class="card">
+        <h3>本层：H-Anchor Placer</h3>
+        <p>PycPlacer 消费 graph / cells，把高权重连接拉近，并通过分层锚点、力导向和法律化步骤输出二维布局坐标。</p>
+        <div class="pill-row"><span class="pill hot">Placement</span><span class="pill">HPWL</span></div>
+      </div>
+      <div class="card">
+        <h3>下游：P&R 反馈</h3>
+        <p>布局结果可以进一步用于拥塞估计、routing priority 调整、QoR 对比和约束回写，支撑白皮书中的闭环优化。</p>
+        <div class="pill-row"><span class="pill">QoR Feedback</span><span class="pill">Constraint Update</span></div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>定位结论：</b>PycPlacer 不是完整 EDA 工具，也不替代 <code>netlist</code> 白皮书中的 CANN/Ascend 约束建模；它是该体系中「Weighted Netlist → Placement」这一段的开源算法验证层，用来证明语义化边权和增量布局可以被工程化实现。
     </div>
   </section>
 
