@@ -21,6 +21,8 @@
       <a href="#ecosystem">生态</a>
       <a href="#ops">更新</a>
       <a href="#transfer">迁移</a>
+      <a href="#pypto-memory">PyPTO 记忆</a>
+      <a href="#pypto-placement">PyPTO 调度</a>
       <a href="#terms">术语</a>
     </div>
   </nav>
@@ -748,6 +750,141 @@ HPWL ↓, overlap ↓, congestion risk ↓, timing/traffic locality ↑, update 
 
     <div class="callout">
       <b>芯片设计启发：</b>HNSW 提醒我们，大规模图问题不要急着在底层全量优化。先选出能代表全局结构的少量锚点，用它们建立稳定骨架，再逐层细化和局部修正，往往比“一上来优化所有 cell”更适合交互式设计探索和后期 ECO。
+    </div>
+  </section>
+
+  <section class="floor pypto-floor" id="pypto-memory">
+    <div class="kicker">PyPTO Product · 01</div>
+    <h2>Optimization Memory：把 HNSW 用作编译优化经验库</h2>
+    <p class="lead">Kernel variant、auto-tuning、pass recommendation、performance debug 本质上都不是新的编译范式，而是同一类产品能力：把历史优化案例向量化，用 HNSW 快速召回相似经验，再由规则、模型或专家确认是否迁移到当前 kernel。</p>
+
+    <div class="product-floor-grid memory-grid">
+      <div class="product-copy">
+        <h3>为什么合并成一个方向</h3>
+        <p>这几类想法的共同点都是“相似性检索”：相似 kernel、相似配置、相似 IR、相似性能症状。它们适合作为 PyPTO Studio 的辅助能力，而不是拆成四个产品主方向。核心价值是降低冷启动成本，让历史项目中的调优经验可以被复用。</p>
+        <h3>HNSW 具体负责什么</h3>
+        <p>HNSW 只负责高效召回候选案例，不负责最终决策。案例向量可以包含 op type、shape bucket、IR 子图、tile/fusion 配置、硬件计数器、timeline pattern、最终性能和失败原因。召回之后，还需要约束检查、性能重测和人工确认。</p>
+        <h3>适合落成一个产品模块</h3>
+        <p>产品上可以叫“Optimization Memory”：用户选中一个 kernel 或 profiling 片段，系统返回相似案例、可迁移配置、推荐 pass、已知风险和验证命令。它是编译器经验库，不是新的调度算法。</p>
+        <div class="pill-row"><span class="pill blue">case retrieval</span><span class="pill">kernel memory</span><span class="pill">pass memory</span><span class="pill good">cold-start helper</span></div>
+      </div>
+      <div class="prototype-card">
+        <div class="prototype-bar">Low-fi prototype · Optimization Memory</div>
+        <svg class="lofi-svg" viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" aria-label="PyPTO optimization memory prototype">
+          <style>
+            .om-bg{fill:#fff}.om-panel{fill:#f8fafc;stroke:#d8e0ec;stroke-width:2}.om-card{fill:#fff;stroke:#d8e0ec;stroke-width:2}.om-hot{fill:#eff6ff;stroke:#93c5fd;stroke-width:2}.om-good{fill:#ecfdf3;stroke:#86efac;stroke-width:2}.om-warn{fill:#fff7ed;stroke:#fed7aa;stroke-width:2}.om-title{font:800 16px system-ui;fill:#182033}.om-text{font:600 12px system-ui;fill:#667085}.om-mini{font:800 11px system-ui;fill:#2563eb}.om-line{stroke:#94a3b8;stroke-width:2;fill:none}.om-node{fill:#fff;stroke:#2563eb;stroke-width:2}.om-node.hot{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}
+          </style>
+          <rect class="om-bg" width="760" height="470" rx="14"/>
+
+          <rect class="om-panel" x="24" y="24" width="200" height="422" rx="10"/>
+          <text class="om-title" x="44" y="58">Current Context</text>
+          <rect class="om-card" x="44" y="86" width="160" height="74" rx="8"/>
+          <text class="om-mini" x="62" y="114">selected kernel</text>
+          <text class="om-text" x="62" y="138">softmax / attention</text>
+          <rect class="om-card" x="44" y="182" width="160" height="74" rx="8"/>
+          <text class="om-mini" x="62" y="210">IR + shape</text>
+          <text class="om-text" x="62" y="234">rank · dtype · target</text>
+          <rect class="om-warn" x="44" y="278" width="160" height="88" rx="8"/>
+          <text class="om-mini" x="62" y="306">profile signature</text>
+          <text class="om-text" x="62" y="330">memory-bound</text>
+          <text class="om-text" x="62" y="352">sync-heavy</text>
+
+          <rect class="om-panel" x="262" y="24" width="230" height="422" rx="10"/>
+          <text class="om-title" x="282" y="58">HNSW Case Index</text>
+          <path class="om-line" d="M324 142 L390 96 L448 152 L418 238 L338 226 Z"/>
+          <path class="om-line" d="M390 96 L418 238 L448 152"/>
+          <circle class="om-node hot" cx="324" cy="142" r="13"/>
+          <circle class="om-node" cx="390" cy="96" r="11"/>
+          <circle class="om-node hot" cx="448" cy="152" r="13"/>
+          <circle class="om-node" cx="418" cy="238" r="11"/>
+          <circle class="om-node hot" cx="338" cy="226" r="13"/>
+          <rect class="om-hot" x="292" y="306" width="170" height="72" rx="8"/>
+          <text class="om-mini" x="310" y="334">retrieve similar cases</text>
+          <text class="om-text" x="310" y="358">then rerank by constraints</text>
+
+          <rect class="om-panel" x="530" y="24" width="206" height="422" rx="10"/>
+          <text class="om-title" x="550" y="58">Returned Advice</text>
+          <rect class="om-good" x="550" y="86" width="166" height="62" rx="8"/>
+          <text class="om-mini" x="568" y="114">variant</text>
+          <text class="om-text" x="568" y="136">tile 64 x 128</text>
+          <rect class="om-card" x="550" y="168" width="166" height="62" rx="8"/>
+          <text class="om-mini" x="568" y="196">pass</text>
+          <text class="om-text" x="568" y="218">fuse epilogue first</text>
+          <rect class="om-card" x="550" y="250" width="166" height="62" rx="8"/>
+          <text class="om-mini" x="568" y="278">debug hint</text>
+          <text class="om-text" x="568" y="300">check bank conflict</text>
+          <rect class="om-warn" x="550" y="332" width="166" height="62" rx="8"/>
+          <text class="om-mini" x="568" y="360">must verify</text>
+          <text class="om-text" x="568" y="382">benchmark on target</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="grid cols-4" style="margin-top:18px">
+      <div class="card"><h3>相似 Kernel</h3><p>召回历史 kernel variant，给出可迁移的 tile、fusion、buffer 方案。</p></div>
+      <div class="card"><h3>相似配置</h3><p>从历史好配置附近开始调优，减少盲目网格搜索。</p></div>
+      <div class="card"><h3>相似 IR</h3><p>推荐曾经有效的 pass pipeline，同时提示失败案例。</p></div>
+      <div class="card"><h3>相似症状</h3><p>把 profiler pattern 映射到历史根因和修复动作。</p></div>
+    </div>
+  </section>
+
+  <section class="floor pypto-floor" id="pypto-placement">
+    <div class="kicker">PyPTO Product · 02</div>
+    <h2>Graph Placement / Scheduling：用高层锚点降低大图调度复杂度</h2>
+    <p class="lead">这条方向更研究型，但和 PyPTO 的 Execution Graph 很贴近。HNSW 的分层思想可以迁移为“先放少量关键 anchor，再逐层细化普通节点”的编译调度策略，用在 block placement、跨 core 调度、buffer 生命周期和通信局部性优化里。</p>
+
+    <div class="product-floor-grid">
+      <div class="product-copy">
+        <h3>用户问题</h3>
+        <p>模型网络变大后，Execution Graph 的 placement / scheduling 会遇到组合爆炸：算子之间有依赖、buffer 复用、core 亲和、通信路径和同步约束，直接全局优化很难交互式完成。</p>
+        <h3>HNSW 结合点</h3>
+        <p>高层节点对应 anchor block：高流量、高复用、高同步成本、关键路径上的 block。先对 anchor graph 做全局布局，再把普通 block 投影到附近，最后做局部修正。</p>
+        <h3>产品形态</h3>
+        <p>在 Execution Graph 视图中提供“Hierarchical Placement”预览：用户能看到 anchor 如何被选择、哪些 block 被归到同一局部区域、调整后通信热度如何变化。</p>
+        <div class="pill-row"><span class="pill blue">anchor graph</span><span class="pill">coarse-to-fine</span><span class="pill">MPMD scheduling</span></div>
+      </div>
+      <div class="prototype-card">
+        <div class="prototype-bar">Low-fi prototype · Hierarchical Execution Placement</div>
+        <svg class="lofi-svg" viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" aria-label="Hierarchical placement prototype">
+          <style>
+            .pl-bg{fill:#fff}.pl-panel{fill:#f8fafc;stroke:#d8e0ec;stroke-width:2}.pl-chip{fill:#fff;stroke:#cbd5e1;stroke-width:2}.pl-core{fill:#f8fafc;stroke:#d8e0ec;stroke-width:1.5}.pl-hot{fill:#eff6ff;stroke:#2563eb;stroke-width:2}.pl-node{fill:#fff;stroke:#2563eb;stroke-width:2}.pl-anchor{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}.pl-line{stroke:#94a3b8;stroke-width:2;fill:none}.pl-comm{stroke:#dc2626;stroke-width:3;fill:none;stroke-dasharray:7 7}.pl-title{font:800 16px system-ui;fill:#182033}.pl-text{font:600 12px system-ui;fill:#667085}.pl-mini{font:800 11px system-ui;fill:#2563eb}
+          </style>
+          <rect class="pl-bg" width="760" height="470" rx="14"/>
+          <rect class="pl-panel" x="24" y="24" width="230" height="422" rx="10"/>
+          <text class="pl-title" x="44" y="58">Execution Graph</text>
+          <path class="pl-line" d="M92 132 L154 96 L202 152 L164 222 L82 214 Z"/>
+          <path class="pl-line" d="M154 96 L164 222 L202 152"/>
+          <circle class="pl-anchor" cx="154" cy="96" r="13"/>
+          <circle class="pl-node" cx="92" cy="132" r="10"/>
+          <circle class="pl-anchor" cx="202" cy="152" r="13"/>
+          <circle class="pl-node" cx="164" cy="222" r="10"/>
+          <circle class="pl-node" cx="82" cy="214" r="10"/>
+          <text class="pl-mini" x="54" y="292">anchor score</text>
+          <text class="pl-text" x="54" y="320">traffic · reuse · critical path</text>
+          <text class="pl-text" x="54" y="344">sync cost · memory pressure</text>
+
+          <rect class="pl-panel" x="288" y="24" width="448" height="422" rx="10"/>
+          <text class="pl-title" x="312" y="58">Device Placement Preview</text>
+          <rect class="pl-chip" x="318" y="84" width="388" height="300" rx="12"/>
+          <rect class="pl-core" x="342" y="114" width="88" height="78" rx="8"/>
+          <rect class="pl-core" x="452" y="114" width="88" height="78" rx="8"/>
+          <rect class="pl-core" x="562" y="114" width="88" height="78" rx="8"/>
+          <rect class="pl-core" x="342" y="222" width="88" height="78" rx="8"/>
+          <rect class="pl-core" x="452" y="222" width="88" height="78" rx="8"/>
+          <rect class="pl-core" x="562" y="222" width="88" height="78" rx="8"/>
+          <rect class="pl-hot" x="356" y="132" width="60" height="26" rx="5"/>
+          <text class="pl-text" x="368" y="150">A0</text>
+          <rect class="pl-hot" x="466" y="132" width="60" height="26" rx="5"/>
+          <text class="pl-text" x="478" y="150">A1</text>
+          <rect class="pl-chip" x="466" y="242" width="60" height="26" rx="5"/>
+          <text class="pl-text" x="478" y="260">B4</text>
+          <rect class="pl-chip" x="576" y="242" width="60" height="26" rx="5"/>
+          <text class="pl-text" x="588" y="260">B7</text>
+          <path class="pl-comm" d="M416 145 C438 112 454 112 466 145"/>
+          <path class="pl-line" d="M496 158 V242"/>
+          <text class="pl-mini" x="342" y="350">goal: fewer cross-core hot edges</text>
+        </svg>
+      </div>
     </div>
   </section>
 
