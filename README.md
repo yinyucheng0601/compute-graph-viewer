@@ -14,6 +14,7 @@
 | HNSW 白皮书：分层导航小世界图与向量检索工程 | https://yinyucheng0601.github.io/compute-graph-viewer/HNSW/HNSW-whitepaper.html |
 | H-Anchor：分层锚点 VLSI 布局算法白皮书 | https://yinyucheng0601.github.io/compute-graph-viewer/PycPlacer/pycplacer-whitepaper.html |
 | AI 芯片网表白皮书：从结构约束到可视化推理 | https://yinyucheng0601.github.io/compute-graph-viewer/netlist/ai-chip-netlist-whitepaper-report.html |
+| PTO / PyPTO Hardware-Native Operator Toolchain：总论白皮书 | https://yinyucheng0601.github.io/compute-graph-viewer/pypto-toolchain-whitepaper/ |
 | VLSI Placement 白皮书：布局算法如何实现芯片“核舟记” | https://yinyucheng0601.github.io/compute-graph-viewer/vlsi-placement-whitepaper/ |
 
 ---
