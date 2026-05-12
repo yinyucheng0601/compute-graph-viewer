@@ -21,6 +21,7 @@
       <a href="#ecosystem">生态</a>
       <a href="#ops">更新</a>
       <a href="#transfer">迁移</a>
+      <a href="#eda-placement">EDA布局</a>
       <a href="#pypto-memory">PyPTO 记忆</a>
       <a href="#pypto-placement">PyPTO 调度</a>
       <a href="#terms">术语</a>
@@ -750,6 +751,123 @@ HPWL ↓, overlap ↓, congestion risk ↓, timing/traffic locality ↑, update 
 
     <div class="callout">
       <b>芯片设计启发：</b>HNSW 提醒我们，大规模图问题不要急着在底层全量优化。先选出能代表全局结构的少量锚点，用它们建立稳定骨架，再逐层细化和局部修正，往往比“一上来优化所有 cell”更适合交互式设计探索和后期 ECO。
+    </div>
+  </section>
+
+  <section class="floor" id="eda-placement">
+    <div class="kicker">EDA Placement · 为什么这块难</div>
+    <h2>布局不是唯一最难，但它是从“逻辑正确”到“物理可实现”的核心瓶颈</h2>
+    <p class="lead">芯片设计里的难点分布在架构、验证、物理实现和签核多个阶段。Placement / routing 之所以特别难，是因为它把 netlist 变成真实二维物理位置时，要同时满足时序、线长、拥塞、功耗、面积、宏单元、供电、时钟和制造规则；任何一个局部移动都可能通过连线和时序路径影响全局。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>架构决定上限</h3>
+        <p>架构阶段决定性能、功耗、面积和系统可扩展性。这个阶段错了，后面靠 placement 很难补回来。</p>
+        <div class="pill-row"><span class="pill">PPA 上限</span><span class="pill">系统约束</span></div>
+      </div>
+      <div class="card">
+        <h3>验证消耗最大</h3>
+        <p>功能验证、形式验证、回归和覆盖率通常消耗大量人力。它回答“逻辑是否正确”。</p>
+        <div class="pill-row"><span class="pill">correctness</span><span class="pill">coverage</span></div>
+      </div>
+      <div class="card">
+        <h3>物理实现最耦合</h3>
+        <p>Placement 回答“能否放得下、连得通、跑得快、功耗可接受”。它是多目标、多约束、强耦合优化。</p>
+        <div class="pill-row"><span class="pill hot">timing closure</span><span class="pill">routing</span><span class="pill">DRC</span></div>
+      </div>
+    </div>
+
+    <div class="screenshot" style="margin-top:18px">
+      <div class="shotbar"><span class="dots"></span>低保真图 · Placement 的 N-body 直觉</div>
+      <div class="shotbody flush svg-figure">
+        <svg class="static-svg wide" viewBox="0 0 1180 430" xmlns="http://www.w3.org/2000/svg" aria-label="EDA placement N-body force model">
+          <defs>
+            <marker id="edaArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/>
+            </marker>
+            <marker id="edaWarnArrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 Z" fill="#dc2626"/>
+            </marker>
+          </defs>
+          <style>
+            .ebox{fill:#fff;stroke:#d8e0ec;stroke-width:2}.eband{fill:#f8fafc;stroke:#d8e0ec;stroke-width:2}.etitle{font:800 18px system-ui;fill:#182033}.etext{font:600 13px system-ui;fill:#667085}.enode{fill:#fff;stroke:#2563eb;stroke-width:3}.enodeHot{fill:#dbeafe;stroke:#1d4ed8;stroke-width:4}.emacro{fill:#eff6ff;stroke:#93c5fd;stroke-width:2}.enet{stroke:#94a3b8;stroke-width:2;fill:none}.eforce{stroke:#2563eb;stroke-width:3;fill:none;marker-end:url(#edaArrow)}.erepel{stroke:#dc2626;stroke-width:3;fill:none;stroke-dasharray:7 7;marker-end:url(#edaWarnArrow)}
+          </style>
+          <rect class="eband" x="34" y="34" width="1112" height="362" rx="16"/>
+          <text class="etitle" x="64" y="76">N-body / Force-directed Placement</text>
+          <text class="etext" x="64" y="104">把 cell 看成粒子，把 net / timing / congestion 转成力，再迭代移动到低能量状态。</text>
+
+          <rect class="emacro" x="840" y="110" width="160" height="110" rx="12"/>
+          <text class="etext" x="884" y="170">Macro</text>
+          <rect class="emacro" x="880" y="274" width="190" height="70" rx="12"/>
+          <text class="etext" x="928" y="316">SRAM / HBM IF</text>
+
+          <circle class="enodeHot" cx="260" cy="185" r="18"/>
+          <circle class="enode" cx="360" cy="130" r="14"/>
+          <circle class="enode" cx="410" cy="238" r="14"/>
+          <circle class="enodeHot" cx="540" cy="170" r="18"/>
+          <circle class="enode" cx="635" cy="250" r="14"/>
+          <circle class="enode" cx="690" cy="145" r="14"/>
+          <path class="enet" d="M260 185 L360 130 L540 170 L690 145"/>
+          <path class="enet" d="M260 185 L410 238 L635 250 L540 170"/>
+          <path class="eforce" d="M260 185 C322 160 398 154 540 170"/>
+          <path class="eforce" d="M635 250 C710 230 760 196 840 165"/>
+          <path class="erepel" d="M540 170 C602 188 640 205 690 145"/>
+
+          <rect class="ebox" x="92" y="286" width="260" height="72" rx="10"/>
+          <text class="etitle" x="116" y="316">吸引力</text>
+          <text class="etext" x="116" y="340">强连接、关键路径、高流量节点被拉近</text>
+
+          <rect class="ebox" x="430" y="286" width="270" height="72" rx="10"/>
+          <text class="etitle" x="454" y="316">排斥力 / 密度力</text>
+          <text class="etext" x="454" y="340">避免重叠，控制拥塞和局部过密</text>
+
+          <rect class="ebox" x="756" y="286" width="260" height="72" rx="10"/>
+          <text class="etitle" x="780" y="316">固定障碍与约束</text>
+          <text class="etext" x="780" y="340">macro、blockage、row site、pin access</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">N-body 只是直觉模型：真实 EDA placer 会混合解析优化、二次规划、密度约束、时序权重、宏单元约束和 legalization。它难在每一步移动都同时改变线长、拥塞、时序和可布线性。</div>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:18px">
+      <div class="card">
+        <h3>1. 用势能函数表达多目标</h3>
+        <p>N-body / force-directed placement 把 cell 当成粒子，把 net 转成弹簧或吸引力：连接越强、时序越关键、数据流越重，吸引越强。同时用密度力、排斥力或电势场避免 cell 重叠和局部拥塞。</p>
+        <div class="pill-row"><span class="pill">wirelength</span><span class="pill">timing</span><span class="pill">density</span></div>
+      </div>
+      <div class="card">
+        <h3>2. N-body 的直接计算太贵</h3>
+        <p>如果每个 cell 都和所有其它 cell 互相作用，复杂度接近 O(N²)。百万级 cell 不能直接算全量相互作用，因此工程上会用网格密度场、分区、多层粗化、Barnes-Hut / FMM 类近似或局部邻域更新。</p>
+        <div class="pill-row"><span class="pill hot">O(N²) risk</span><span class="pill blue">hierarchy</span><span class="pill">approximation</span></div>
+      </div>
+      <div class="card">
+        <h3>3. 粗到细是实际可行路径</h3>
+        <p>先在 coarse level 放 macro、cluster、anchor，再逐层展开到 standard cell。全局阶段优化线长和密度，局部阶段做 legalization、buffer insertion、timing repair 和 congestion repair。</p>
+        <div class="pill-row"><span class="pill">coarse-to-fine</span><span class="pill">legalization</span><span class="pill">repair</span></div>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">N-body Placement 的工程化伪代码</span></div>
+      <div class="mb">input: weighted netlist, macro constraints, timing weights, density grid
+
+1. coarsen graph into clusters / anchors
+2. initialize macro and anchor placement
+3. repeat until global objective stabilizes:
+   - compute attractive force from weighted nets
+   - compute density / repulsive force from placement grid
+   - add timing, congestion, blockage and boundary penalties
+   - move cells or clusters with step-size damping
+4. uncoarsen to finer level and repeat local refinement
+5. legalize cells to rows and remove overlaps
+6. run timing / congestion repair; update weights if needed
+
+objective is not nearest-neighbor recall:
+HPWL ↓, timing slack ↑, overflow ↓, congestion ↓, power/locality better, DRC clean</div>
+    </div>
+
+    <div class="callout">
+      <b>和 HNSW / H-Anchor 的连接：</b>N-body 方法解释了 placement 为什么像“大规模物理系统优化”；HNSW 的启发在于不要让所有粒子一开始全量互相作用，而是先抽出高层 anchor 建立稀疏骨架，再在底层用局部力场细化。这样可以把全局导航、局部修正和增量 ECO 分开处理。
     </div>
   </section>
 
