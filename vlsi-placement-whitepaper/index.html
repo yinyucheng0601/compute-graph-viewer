@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VLSI Placement 白皮书：布局算法如何实现芯片核舟记</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">VLSI Placement Whitepaper</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#map">全局地图</a>
+      <a href="#definition">定义</a>
+      <a href="#metrics">评估</a>
+      <a href="#floorplanning">初始规划</a>
+      <a href="#global">全局布局</a>
+      <a href="#spreading">扩散修正</a>
+      <a href="#legalization">合法化</a>
+      <a href="#insight">启发</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · VLSI EDA</div>
+    <h1>布局算法如何实现芯片“核舟记”</h1>
+    <p class="lead">VLSI placement 的任务，是把逻辑综合后的门级网表、宏单元和 FPGA 资源实例，放进有限芯片区域里，并同时压住线长、时序、拥塞、功耗、合法位置和后续布线可行性。它不是简单排版，而是一个带物理约束、离散约束和多目标反馈的大规模优化问题。</p>
+
+    <div class="source-card">
+      <b>内容来源：</b>
+      基于 Obsidian 笔记《设计VLSI EDA(7)布局算法怎么实现芯片“核舟记”》重组整理，并结合 PTO 既有 H-Anchor / HNSW 白皮书中关于 N-body、coarse-to-fine、anchor graph 与 incremental update 的讨论。
+    </div>
+
+    <div class="grid cols-4">
+      <div class="card metric"><strong>千万级</strong><span>现代布局对象可以达到千万级器件和线网规模，运行效率本身就是核心约束。</span></div>
+      <div class="card metric"><strong>HPWL</strong><span>半周线长是布局阶段最常用的快速线长估计，但需要可导近似才能进入解析优化。</span></div>
+      <div class="card metric"><strong>Timing</strong><span>关键路径 slack 会改变边权，让时序紧张的实例更强地互相靠近。</span></div>
+      <div class="card metric"><strong>Legal</strong><span>FPGA 还要满足离散资源位置、LUT/FF 打包和资源兼容性约束。</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="map">
+    <div class="kicker">Structure · 从网表到坐标</div>
+    <h2>Placement 是一条连续优化流水线</h2>
+    <p class="lead">布局不是单个算法，而是一个“估计、规划、优化、扩散、合法化、微调”的闭环。每一步都在降低后续步骤的搜索压力：前面给出较好的全局形状，后面处理局部合法性和关键路径毛刺。</p>
+
+    <div class="timeline">
+      <div class="step"><b>1 评估模型</b><span>用 HPWL、RSMT、星形线、timing graph 估计线长与延迟。</span></div>
+      <div class="step"><b>2 Floorplan</b><span>切分网表，把大块电路先摆到合理区域，避免后面陷入坏局部最优。</span></div>
+      <div class="step"><b>3 Global</b><span>用解析模型、模拟退火或 min-cut，得到连续坐标上的全局布局。</span></div>
+      <div class="step"><b>4 Spreading</b><span>把过密区域中的实例向资源充足区域扩散，降低 density overflow。</span></div>
+      <div class="step"><b>5 Adjustment</b><span>根据打包兼容性和布线拥塞动态调整实例面积或区域供应。</span></div>
+      <div class="step"><b>6 Legalize</b><span>把连续坐标映射到合法 site，FPGA 中还要完成 packing。</span></div>
+      <div class="step"><b>7 Detailed</b><span>局部交换、关键路径重定位和候选窗口搜索，修掉最后的局部问题。</span></div>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-bar">低保真图 · Placement 流水线</div>
+      <div class="diagram-body">
+        <svg viewBox="0 0 980 300" role="img" aria-label="Placement pipeline">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c8db8"/>
+            </marker>
+          </defs>
+          <rect x="20" y="36" width="940" height="220" rx="16" fill="#1c1c1c" stroke="#343434"/>
+          <g font-family="Inter, sans-serif" font-size="13" fill="#e6e6e6" text-anchor="middle">
+            <g>
+              <rect x="54" y="112" width="112" height="68" rx="10" fill="#262626" stroke="#4369ef"/>
+              <text x="110" y="140">Netlist</text><text x="110" y="160" fill="#9ca3af">graph / cells</text>
+            </g>
+            <g>
+              <rect x="208" y="92" width="112" height="108" rx="10" fill="#262626" stroke="#7c8db8"/>
+              <text x="264" y="122">Models</text><text x="264" y="146" fill="#9ca3af">wirelength</text><text x="264" y="166" fill="#9ca3af">timing</text>
+            </g>
+            <g>
+              <rect x="362" y="92" width="112" height="108" rx="10" fill="#262626" stroke="#ffaa3b"/>
+              <text x="418" y="122">Floorplan</text><text x="418" y="146" fill="#9ca3af">partition</text><text x="418" y="166" fill="#9ca3af">clusters</text>
+            </g>
+            <g>
+              <rect x="516" y="92" width="112" height="108" rx="10" fill="#262626" stroke="#04d793"/>
+              <text x="572" y="122">Global</text><text x="572" y="146" fill="#9ca3af">analytical</text><text x="572" y="166" fill="#9ca3af">N-body</text>
+            </g>
+            <g>
+              <rect x="670" y="92" width="112" height="108" rx="10" fill="#262626" stroke="#ffaa3b"/>
+              <text x="726" y="122">Legalize</text><text x="726" y="146" fill="#9ca3af">site map</text><text x="726" y="166" fill="#9ca3af">packing</text>
+            </g>
+            <g>
+              <rect x="824" y="112" width="112" height="68" rx="10" fill="#262626" stroke="#4369ef"/>
+              <text x="880" y="140">Detailed</text><text x="880" y="160" fill="#9ca3af">QoR fix</text>
+            </g>
+          </g>
+          <g stroke="#7c8db8" stroke-width="2" marker-end="url(#arrow)">
+            <path d="M166 146 H204"/><path d="M320 146 H358"/><path d="M474 146 H512"/><path d="M628 146 H666"/><path d="M782 146 H820"/>
+          </g>
+          <path d="M880 205 C720 268 390 270 264 208" fill="none" stroke="#4369ef" stroke-width="2" stroke-dasharray="8 8" marker-end="url(#arrow)"/>
+          <text x="570" y="258" fill="#9ca3af" font-family="Inter, sans-serif" font-size="12" text-anchor="middle">QoR / congestion / timing feedback</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="definition">
+    <div class="kicker">Definition · 布局到底在放什么</div>
+    <h2>ASIC 与 FPGA 的共同点是“图到几何”，差异在物理约束</h2>
+    <p class="lead">布局输入通常是逻辑综合后的网表：实例是点，net 是连接。输出是芯片平面上的位置。ASIC 更像连续区域上的标准单元排列；FPGA 则必须映射到预先存在的 LUT、FF、BRAM、DSP、时钟和互连资源上，因此离散性和 packing 约束更强。</p>
+
+    <div class="two-panel">
+      <div class="diagram">
+        <div class="diagram-bar">低保真图 · 从逻辑图到芯片平面</div>
+        <div class="diagram-body">
+          <svg viewBox="0 0 760 420" role="img" aria-label="Graph to layout">
+            <defs>
+              <marker id="arrowGraph" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c8db8"/>
+              </marker>
+            </defs>
+            <rect x="20" y="26" width="300" height="360" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <rect x="440" y="26" width="300" height="360" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <text x="170" y="58" fill="#e6e6e6" font-size="15" font-family="Inter" text-anchor="middle">Netlist Graph</text>
+            <text x="590" y="58" fill="#e6e6e6" font-size="15" font-family="Inter" text-anchor="middle">Placed Layout</text>
+            <g stroke="#7c8db8" stroke-width="2">
+              <path d="M108 160 L170 112 L236 166 L190 246 L105 240 Z"/>
+              <path d="M170 112 L190 246"/><path d="M108 160 L236 166"/>
+            </g>
+            <g fill="#4369ef" stroke="#b1caff" stroke-width="3">
+              <circle cx="108" cy="160" r="16"/><circle cx="170" cy="112" r="16"/><circle cx="236" cy="166" r="16"/><circle cx="190" cy="246" r="16"/><circle cx="105" cy="240" r="16"/>
+            </g>
+            <g stroke="#343434">
+              <path d="M470 102 H710 M470 154 H710 M470 206 H710 M470 258 H710 M470 310 H710"/>
+              <path d="M512 80 V336 M564 80 V336 M616 80 V336 M668 80 V336"/>
+            </g>
+            <g stroke="#7c8db8" stroke-width="2">
+              <path d="M512 154 H668 V258 H564"/>
+              <path d="M512 154 V258 H616"/>
+            </g>
+            <g fill="#04d793" stroke="#d1fae5" stroke-width="3">
+              <rect x="498" y="140" width="28" height="28" rx="6"/><rect x="654" y="244" width="28" height="28" rx="6"/><rect x="550" y="244" width="28" height="28" rx="6"/><rect x="602" y="244" width="28" height="28" rx="6"/>
+            </g>
+            <path d="M332 206 H424" stroke="#7c8db8" stroke-width="2" marker-end="url(#arrowGraph)"/>
+          </svg>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <h3>ASIC：连续排布 + 行对齐</h3>
+          <p>标准单元在行里摆放，目标是密集、短线、低功耗、时序闭合。宏单元和电源网络会显著影响可用空间。</p>
+          <div class="pill-row"><span class="pill">Standard Cell</span><span class="pill">Macro</span><span class="pill">Row</span></div>
+        </div>
+        <div class="card">
+          <h3>FPGA：离散资源 + 打包约束</h3>
+          <p>实例不能任意落点，必须映射到已有资源。一个 CLB 可能容纳多个 LUT/FF，但是否能打包取决于共享信号和架构规则。</p>
+          <div class="pill-row"><span class="pill hot">Discrete Site</span><span class="pill">LUT / FF</span><span class="pill">BRAM / DSP</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="metrics">
+    <div class="kicker">Models · 线长和时序怎么被估计</div>
+    <h2>布局阶段不能等布线完成，必须用可快速更新的代理指标</h2>
+    <p class="lead">布局算法每轮都会移动大量实例，如果每移动一次都调用完整 routing，成本不可接受。因此 EDA 工具会使用线长和时序的近似模型，在精度、速度和可导性之间取平衡。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>HPWL</h3>
+        <p>半周线长只看一个 net 的最左、最右、最上、最下引脚，计算快，常作为全局布局的主代理。</p>
+        <div class="formula">HPWL = (max x - min x) + (max y - min y)</div>
+      </div>
+      <div class="card">
+        <h3>Star / RSMT</h3>
+        <p>星形线对 timing 更友好；RSMT 更接近真实布线，但需要专门算法，通常比 HPWL 慢。</p>
+        <div class="pill-row"><span class="pill">Star Model</span><span class="pill">Steiner Tree</span></div>
+      </div>
+      <div class="card">
+        <h3>Timing Graph</h3>
+        <p>时序分析把电路转成 DAG，通过正向 arrival 和反向 required 计算 slack，进而改变关键边权。</p>
+        <div class="pill-row"><span class="pill hot">Slack</span><span class="pill">Critical Path</span></div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-bar">低保真图 · 三种线长估计与时序权重</div>
+      <div class="diagram-body">
+        <svg viewBox="0 0 960 430" role="img" aria-label="Wirelength models and timing weight">
+          <g font-family="Inter, sans-serif">
+            <rect x="28" y="38" width="280" height="330" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <rect x="340" y="38" width="280" height="330" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <rect x="652" y="38" width="280" height="330" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <text x="168" y="72" fill="#e6e6e6" font-size="15" text-anchor="middle">HPWL box</text>
+            <text x="480" y="72" fill="#e6e6e6" font-size="15" text-anchor="middle">Star / Steiner intuition</text>
+            <text x="792" y="72" fill="#e6e6e6" font-size="15" text-anchor="middle">Timing-driven weight</text>
+            <g fill="#4369ef" stroke="#b1caff" stroke-width="3">
+              <circle cx="92" cy="244" r="13"/><circle cx="162" cy="142" r="13"/><circle cx="248" cy="224" r="13"/>
+            </g>
+            <rect x="92" y="142" width="156" height="102" fill="none" stroke="#ffaa3b" stroke-width="3" stroke-dasharray="7 7"/>
+            <text x="170" y="286" fill="#9ca3af" font-size="12" text-anchor="middle">只看边界框周长的一半</text>
+            <g stroke="#7c8db8" stroke-width="2">
+              <path d="M410 246 L480 156 L558 230"/><path d="M480 156 V230 H558"/><path d="M480 230 H410 V246"/>
+            </g>
+            <g fill="#04d793" stroke="#d1fae5" stroke-width="3">
+              <circle cx="410" cy="246" r="13"/><circle cx="480" cy="156" r="13"/><circle cx="558" cy="230" r="13"/>
+            </g>
+            <circle cx="480" cy="230" r="6" fill="#ffaa3b"/>
+            <text x="480" y="286" fill="#9ca3af" font-size="12" text-anchor="middle">更像真实 routing，但计算更重</text>
+            <g stroke="#7c8db8" stroke-width="2">
+              <path d="M710 116 H858"/><path d="M710 180 H858"/><path d="M710 244 H858"/>
+            </g>
+            <g fill="#262626" stroke="#4369ef" stroke-width="3">
+              <circle cx="710" cy="116" r="13"/><circle cx="858" cy="116" r="13"/>
+              <circle cx="710" cy="180" r="13"/><circle cx="858" cy="180" r="13"/>
+              <circle cx="710" cy="244" r="13"/><circle cx="858" cy="244" r="13"/>
+            </g>
+            <path d="M710 180 H858" stroke="#ff4b7b" stroke-width="6"/>
+            <text x="784" y="286" fill="#9ca3af" font-size="12" text-anchor="middle">slack 越小，边权越高</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="floorplanning">
+    <div class="kicker">Floorplanning · 先决定大方向</div>
+    <h2>好的初始版图，是让后续优化少翻山越岭</h2>
+    <p class="lead">FPGA 资源分布不均，ASIC 也会受宏单元、电源网和 IO 约束影响。若初始布局把强相关模块放到不合适的远端区域，后续力导向或解析优化很容易陷入局部最优，或者用大量迭代才能修正。</p>
+
+    <div class="two-panel">
+      <div class="stack">
+        <div class="card">
+          <h3>Netlist Partitioning</h3>
+          <p>把网表分成若干子图，目标是减少跨分区连接、控制每个分区资源需求、保持分区规模均衡。传统方法包括 KL、FM，工程里也会使用 PaToH、KaHyPar 等 hypergraph partitioner。</p>
+        </div>
+        <div class="card">
+          <h3>Cluster Placement</h3>
+          <p>分区之后决定 cluster 的相对位置。小规模 cluster 可以用 simulated annealing；层次化场景也可以用 slicing tree 或递归切分。</p>
+        </div>
+      </div>
+      <div class="diagram">
+        <div class="diagram-bar">低保真图 · 资源地形与 cluster 粗摆放</div>
+        <div class="diagram-body">
+          <svg viewBox="0 0 720 420" role="img" aria-label="Floorplanning resource terrain">
+            <rect x="42" y="42" width="636" height="314" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <g opacity="0.9">
+              <rect x="82" y="82" width="120" height="230" rx="10" fill="#262626" stroke="#4369ef"/>
+              <rect x="224" y="82" width="72" height="230" rx="10" fill="#262626" stroke="#ffaa3b"/>
+              <rect x="318" y="82" width="168" height="230" rx="10" fill="#262626" stroke="#04d793"/>
+              <rect x="508" y="82" width="90" height="230" rx="10" fill="#262626" stroke="#ff4b7b"/>
+            </g>
+            <g fill="#4369ef" opacity="0.9">
+              <circle cx="140" cy="150" r="28"/><circle cx="390" cy="188" r="34"/><circle cx="542" cy="238" r="26"/><circle cx="260" cy="260" r="22"/>
+            </g>
+            <g stroke="#7c8db8" stroke-width="3" opacity="0.75">
+              <path d="M140 150 C210 110 320 128 390 188"/><path d="M390 188 C438 220 492 236 542 238"/><path d="M260 260 C320 246 356 226 390 188"/>
+            </g>
+            <text x="360" y="382" fill="#9ca3af" font-family="Inter" font-size="13" text-anchor="middle">先把大块放进合理资源带，再交给全局布局细化</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="global">
+    <div class="kicker">Global Placement · 解析模型和 N-body</div>
+    <h2>全局布局把“拉近连接”与“避免堆叠”写进同一个优化问题</h2>
+    <p class="lead">现代全局布局常用解析法：把每个实例位置视作变量，把线长、时序、密度、锚点约束等写成可求导或可迭代近似的目标函数，然后用数值求解器不断更新坐标。直觉上，net 像吸引力，密度和重叠像排斥力，资源地形像外部势场。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Quadratic / Bound2Bound</h3>
+        <p>把不可导的绝对值线长近似成二次项，通过动态更新权重逼近 HPWL，适合线性代数求解器。</p>
+      </div>
+      <div class="card">
+        <h3>Timing-driven Pseudo Net</h3>
+        <p>对 slack 紧张的路径插入或加重伪连边，把关键路径局部推成更短、更快的几何形状。</p>
+      </div>
+      <div class="card">
+        <h3>Anchor / Preconditioning</h3>
+        <p>锚点防止所有节点被吸到一起；预条件让梯度地形更均匀，减少求解器在狭长峡谷中来回摆动。</p>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-bar">低保真图 · N-body placement 直觉</div>
+      <div class="diagram-body">
+        <svg viewBox="0 0 920 420" role="img" aria-label="N-body placement intuition">
+          <defs>
+            <marker id="redArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff4b7b"/>
+            </marker>
+            <marker id="greenArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#04d793"/>
+            </marker>
+          </defs>
+          <rect x="38" y="36" width="844" height="326" rx="16" fill="#1c1c1c" stroke="#343434"/>
+          <g stroke="#7c8db8" stroke-width="2">
+            <path d="M230 178 L380 118 L560 210 L450 292 Z"/>
+            <path d="M230 178 L450 292"/>
+          </g>
+          <g fill="#262626" stroke="#4369ef" stroke-width="4">
+            <circle cx="230" cy="178" r="24"/><circle cx="380" cy="118" r="24"/><circle cx="560" cy="210" r="24"/><circle cx="450" cy="292" r="24"/>
+          </g>
+          <rect x="620" y="86" width="150" height="82" rx="12" fill="#262626" stroke="#ffaa3b" stroke-width="3"/>
+          <text x="695" y="132" fill="#e6e6e6" font-family="Inter" font-size="13" text-anchor="middle">Macro / Block</text>
+          <g stroke="#04d793" stroke-width="4" marker-end="url(#greenArrow)">
+            <path d="M252 168 C292 132 330 120 356 118"/>
+            <path d="M472 278 C510 256 532 232 544 220"/>
+          </g>
+          <g stroke="#ff4b7b" stroke-width="4" marker-end="url(#redArrow)">
+            <path d="M400 122 C440 96 500 90 548 112"/>
+            <path d="M450 292 C410 330 352 338 300 316"/>
+          </g>
+          <text x="330" y="78" fill="#04d793" font-family="Inter" font-size="13">连接吸引力：缩短线长 / 延迟</text>
+          <text x="538" y="338" fill="#ff4b7b" font-family="Inter" font-size="13">密度排斥力：避免堆叠 / 拥塞</text>
+          <text x="460" y="386" fill="#9ca3af" font-family="Inter" font-size="12" text-anchor="middle">工程实现不会真的全量计算所有成对力，而会通过网格、层次、近似和并行化降低成本。</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="spreading">
+    <div class="kicker">Density · 扩散和面积修正</div>
+    <h2>布局质量不只看线短，还要给布线和打包留下空间</h2>
+    <p class="lead">如果只优化线长，所有互连强的实例都倾向于挤在一起。器件扩散、兼容性面积修正和拥塞面积修正，就是把“放得下、能打包、走得通线”这些后续约束提前反馈到布局阶段。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>Cell Spreading</h3>
+        <p>从 overflow 区域找一个资源足够的窗口，把实例在窗口中重新摊开。它比排斥力更直接，但移动也更硬。</p>
+      </div>
+      <div class="card">
+        <h3>Packing-aware Area</h3>
+        <p>不兼容的 LUT/FF 不能随便塞进同一个 CLB，因此实际资源需求会变大，并随邻居关系动态变化。</p>
+      </div>
+      <div class="card">
+        <h3>Congestion-aware Area</h3>
+        <p>高连接密度区域需要更多 routing 通道，布局器会把这些区域的单元“变大”，为布线预留空间。</p>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-bar">低保真图 · 从过密格子到可布线空间</div>
+        <div class="diagram-body">
+          <svg viewBox="0 0 920 360" role="img" aria-label="Cell spreading and congestion area adjustment">
+          <defs>
+            <marker id="arrowSpread" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c8db8"/>
+            </marker>
+          </defs>
+          <g font-family="Inter, sans-serif">
+            <rect x="52" y="48" width="320" height="240" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <rect x="548" y="48" width="320" height="240" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <text x="212" y="330" fill="#9ca3af" font-size="13" text-anchor="middle">Before：局部 overflow</text>
+            <text x="708" y="330" fill="#9ca3af" font-size="13" text-anchor="middle">After：扩散后留出 routing channel</text>
+            <g stroke="#343434">
+              <path d="M132 48 V288 M212 48 V288 M292 48 V288 M52 128 H372 M52 208 H372"/>
+              <path d="M628 48 V288 M708 48 V288 M788 48 V288 M548 128 H868 M548 208 H868"/>
+            </g>
+            <rect x="132" y="128" width="80" height="80" fill="#ff4b7b" opacity="0.22"/>
+            <g fill="#4369ef">
+              <circle cx="152" cy="150" r="10"/><circle cx="178" cy="156" r="10"/><circle cx="196" cy="180" r="10"/><circle cx="158" cy="188" r="10"/><circle cx="184" cy="198" r="10"/>
+            </g>
+            <g fill="#04d793">
+              <circle cx="590" cy="90" r="10"/><circle cx="674" cy="112" r="10"/><circle cx="726" cy="170" r="10"/><circle cx="618" cy="224" r="10"/><circle cx="808" cy="246" r="10"/>
+            </g>
+            <g stroke="#ffaa3b" stroke-width="4" stroke-dasharray="8 8">
+              <path d="M548 168 H868"/><path d="M708 48 V288"/>
+            </g>
+            <path d="M402 168 H512" stroke="#7c8db8" stroke-width="3" marker-end="url(#arrowSpread)"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="legalization">
+    <div class="kicker">Legalization · 从连续坐标回到物理位置</div>
+    <h2>全局布局给方向，合法化负责落地</h2>
+    <p class="lead">解析布局中的坐标通常是连续的，但芯片上的可放置位置是离散的，FPGA 尤其明显。合法化需要把实例映射到合法 site，同时尽量不破坏全局布局已经获得的线长和时序优势。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>一对一匹配</h3>
+        <p>简化场景可以抽象成二分图匹配：左边是实例，右边是 site，边权是移动距离或 QoR 代价。</p>
+      </div>
+      <div class="card">
+        <h3>一对多与 packing</h3>
+        <p>FPGA 中某些实例占用多个位置，或者多个 LUT/FF 共享一个 CLB，需要动态规划或更复杂的组合优化。</p>
+      </div>
+      <div class="card">
+        <h3>Detailed Placement</h3>
+        <p>最后扫描关键路径和局部毛刺，通过 swap、候选窗口、最短路径模型改善 WNS/TNS 等指标。</p>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <div class="diagram-bar">低保真图 · 合法化与关键路径微调</div>
+      <div class="diagram-body">
+        <svg viewBox="0 0 960 420" role="img" aria-label="Legalization and detailed placement">
+          <g font-family="Inter, sans-serif">
+            <rect x="36" y="44" width="390" height="300" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <rect x="534" y="44" width="390" height="300" rx="14" fill="#1c1c1c" stroke="#343434"/>
+            <text x="231" y="78" fill="#e6e6e6" font-size="15" text-anchor="middle">Legalization as matching</text>
+            <text x="729" y="78" fill="#e6e6e6" font-size="15" text-anchor="middle">Detailed placement for critical path</text>
+            <g fill="#4369ef" stroke="#b1caff" stroke-width="3">
+              <circle cx="112" cy="140" r="14"/><circle cx="112" cy="202" r="14"/><circle cx="112" cy="264" r="14"/>
+            </g>
+            <g fill="#262626" stroke="#04d793" stroke-width="3">
+              <rect x="318" y="126" width="28" height="28" rx="6"/><rect x="318" y="188" width="28" height="28" rx="6"/><rect x="318" y="250" width="28" height="28" rx="6"/>
+            </g>
+            <g stroke="#7c8db8" stroke-width="2">
+              <path d="M126 140 H318"/><path d="M126 202 H318"/><path d="M126 264 H318"/>
+              <path d="M126 140 L318 202"/><path d="M126 202 L318 250"/>
+            </g>
+            <text x="112" y="310" fill="#9ca3af" font-size="12" text-anchor="middle">instances</text>
+            <text x="332" y="310" fill="#9ca3af" font-size="12" text-anchor="middle">sites</text>
+            <g stroke="#343434">
+              <path d="M588 130 H872 M588 190 H872 M588 250 H872"/>
+              <path d="M640 106 V278 M700 106 V278 M760 106 V278 M820 106 V278"/>
+            </g>
+            <path d="M620 250 C660 118 742 252 838 130" fill="none" stroke="#ff4b7b" stroke-width="5"/>
+            <g fill="#262626" stroke="#4369ef" stroke-width="3">
+              <circle cx="620" cy="250" r="13"/><circle cx="700" cy="130" r="13"/><circle cx="760" cy="250" r="13"/><circle cx="838" cy="130" r="13"/>
+            </g>
+            <path d="M620 250 C690 205 746 176 838 130" fill="none" stroke="#04d793" stroke-width="3" stroke-dasharray="8 8"/>
+            <text x="730" y="310" fill="#9ca3af" font-size="12" text-anchor="middle">用候选位置把关键路径拉直</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="insight">
+    <div class="kicker">Product / Research Insight · 对 PTO 与 H-Anchor 的启发</div>
+    <h2>Placement 的难点在于“全局导航”和“局部修正”必须同时成立</h2>
+    <p class="lead">这篇笔记给 PTO / H-Anchor 的核心启发是：布局问题天然像大规模 N-body 系统，但工程上不能真的全量互相作用。可行路径是用层次化结构先建立稀疏全局骨架，再在局部进行高精度修正。</p>
+
+    <table class="table">
+      <thead>
+        <tr><th>布局环节</th><th>算法含义</th><th>对 PTO / H-Anchor 的启发</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Netlist partitioning</td>
+          <td>先切分强相关子图，减少跨区域优化压力。</td>
+          <td>大图执行、算子调度和 placement 原型都应先抽取 cluster / anchor。</td>
+        </tr>
+        <tr>
+          <td>Analytical placement</td>
+          <td>把线长、时序、密度写成统一可优化目标。</td>
+          <td>性能、通信、内存局部性可以变成边权和势能项，而不是只做静态检索。</td>
+        </tr>
+        <tr>
+          <td>Cell spreading</td>
+          <td>解决全局优化后局部过密的问题。</td>
+          <td>调度也需要处理执行资源热点，不只是把相关节点放近。</td>
+        </tr>
+        <tr>
+          <td>Legalization / packing</td>
+          <td>把连续理想解映射到真实硬件资源。</td>
+          <td>任何 HNSW-like / H-Anchor 方法最后都要回到 Ascend / FPGA / runtime 的真实资源约束。</td>
+        </tr>
+        <tr>
+          <td>Detailed placement</td>
+          <td>扫描关键路径并做局部重定位。</td>
+          <td>增量 ECO、性能回归定位和关键链路修复，是产品层最容易落地的能力。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <b>结论：</b>VLSI placement 不是“把点画漂亮”，而是在不完整物理信息下，用代理模型持续逼近可布线、可时序闭合、可制造的真实版图。它对 HNSW / H-Anchor 的启发不是“拿 HNSW 做向量索引”，而是借用高层稀疏导航、底层局部细化和增量更新的工程结构，把全局复杂度拆成可控的多层优化流程。
+    </div>
+  </section>
+</body>
+</html>

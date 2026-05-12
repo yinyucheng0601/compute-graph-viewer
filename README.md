@@ -13,6 +13,7 @@
 | Hardware-Native Systems：面向 Ascend NPU 的 AI 编译运行时栈白皮书 | https://yinyucheng0601.github.io/compute-graph-viewer/hw-native-sys/ |
 | HNSW 白皮书：分层导航小世界图与向量检索工程 | https://yinyucheng0601.github.io/compute-graph-viewer/HNSW/HNSW-whitepaper.html |
 | H-Anchor：分层锚点 VLSI 布局算法白皮书 | https://yinyucheng0601.github.io/compute-graph-viewer/PycPlacer/pycplacer-whitepaper.html |
+| VLSI Placement 白皮书：布局算法如何实现芯片“核舟记” | https://yinyucheng0601.github.io/compute-graph-viewer/vlsi-placement-whitepaper/ |
 
 ---
 
