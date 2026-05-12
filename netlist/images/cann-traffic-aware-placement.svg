@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="620" viewBox="0 96 1280 620" role="img" aria-labelledby="title desc">
+  <title id="title">CANN / Ascend Traffic-aware Placement 设计图</title>
+  <desc id="desc">展示 CANN 图编译、算子融合和通信模式如何转化为 traffic matrix、weighted netlist 和物理布局布线约束。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#253044"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.13"/>
+    </filter>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font: 700 34px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+      .subtitle { font: 400 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #526070; }
+      .card { fill: #ffffff; stroke: #d8e0ec; stroke-width: 1.4; rx: 12; filter: url(#shadow); }
+      .stage { font: 700 20px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #172033; }
+      .label { font: 600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #1f2937; }
+      .small { font: 400 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #526070; }
+      .code { font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #334155; }
+      .arrow { stroke: #253044; stroke-width: 2.3; fill: none; marker-end: url(#arrow); }
+      .chip { fill: #0f766e; stroke: #ffffff; stroke-width: 3; rx: 8; }
+      .mem { fill: #2563eb; stroke: #ffffff; stroke-width: 3; rx: 8; }
+      .noc { fill: #f97316; stroke: #ffffff; stroke-width: 3; rx: 8; }
+      .ctrl { fill: #7c3aed; stroke: #ffffff; stroke-width: 3; rx: 8; }
+      .heat1 { fill: #fee2e2; }
+      .heat2 { fill: #fb923c; opacity: 0.78; }
+      .heat3 { fill: #ef4444; opacity: 0.82; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1280" height="760"/>
+  <rect class="card" x="64" y="150" width="250" height="500"/>
+  <text class="stage" x="92" y="192">CANN Workload</text>
+  <text class="label" x="92" y="238">Graph Engine</text>
+  <text class="small" x="92" y="264">算子图、融合、shape 推导</text>
+  <text class="label" x="92" y="316">Operator Library</text>
+  <text class="small" x="92" y="342">MatMul、Attention、FFN、MoE</text>
+  <text class="label" x="92" y="394">Communication Lib</text>
+  <text class="small" x="92" y="420">AllReduce、broadcast、dispatch</text>
+  <text class="label" x="92" y="472">Profiling</text>
+  <text class="small" x="92" y="498">带宽、频率、复用、热点路径</text>
+  <text class="code" x="92" y="560">workload = graph</text>
+  <text class="code" x="92" y="582">+ traffic</text>
+
+  <path class="arrow" d="M320 400 C360 400 372 400 410 400"/>
+
+  <rect class="card" x="416" y="150" width="250" height="500"/>
+  <text class="stage" x="444" y="192">Traffic Matrix</text>
+  <rect class="heat1" x="456" y="236" width="46" height="46" rx="6"/>
+  <rect class="heat2" x="510" y="236" width="46" height="46" rx="6"/>
+  <rect class="heat1" x="564" y="236" width="46" height="46" rx="6"/>
+  <rect class="heat3" x="456" y="290" width="46" height="46" rx="6"/>
+  <rect class="heat1" x="510" y="290" width="46" height="46" rx="6"/>
+  <rect class="heat2" x="564" y="290" width="46" height="46" rx="6"/>
+  <rect class="heat2" x="456" y="344" width="46" height="46" rx="6"/>
+  <rect class="heat3" x="510" y="344" width="46" height="46" rx="6"/>
+  <rect class="heat1" x="564" y="344" width="46" height="46" rx="6"/>
+  <text class="small" x="456" y="438">T[i,j] = bandwidth demand</text>
+  <text class="small" x="456" y="468">reuse_frequency</text>
+  <text class="small" x="456" y="498">latency_budget</text>
+  <text class="small" x="456" y="528">operator affinity</text>
+  <text class="code" x="456" y="560">net_weight = timing</text>
+  <text class="code" x="456" y="582">+ traffic</text>
+
+  <path class="arrow" d="M672 400 C712 400 724 400 762 400"/>
+
+  <rect class="card" x="768" y="150" width="250" height="500"/>
+  <text class="stage" x="796" y="192">Weighted Netlist</text>
+  <text class="label" x="796" y="238">High-weight nets</text>
+  <text class="small" x="796" y="264">HBM、NoC、cache、AI Core</text>
+  <text class="label" x="796" y="316">Placement affinity</text>
+  <text class="small" x="796" y="342">compute cluster</text>
+  <text class="small" x="796" y="362">靠近 memory</text>
+  <text class="label" x="796" y="394">Routing priority</text>
+  <text class="small" x="796" y="420">preferred layers / wide channel</text>
+  <text class="label" x="796" y="472">Congestion feedback</text>
+  <text class="small" x="796" y="498">global routing 提前回写</text>
+  <text class="code" x="796" y="560">constraints = graph</text>
+  <text class="code" x="796" y="582">semantics</text>
+
+  <path class="arrow" d="M1024 400 C1064 400 1076 400 1114 400"/>
+
+  <rect class="card" x="1120" y="150" width="110" height="500"/>
+  <text class="stage" x="1144" y="192">P&amp;R</text>
+  <rect class="chip" x="1144" y="230" width="62" height="54"/>
+  <rect class="chip" x="1144" y="300" width="62" height="54"/>
+  <rect class="noc" x="1144" y="370" width="62" height="54"/>
+  <rect class="mem" x="1144" y="440" width="62" height="54"/>
+  <rect class="ctrl" x="1144" y="510" width="62" height="54"/>
+  <text class="small" x="1138" y="605">Placement</text>
+  <text class="small" x="1148" y="628">Routing</text>
+
+  <path class="arrow" d="M1175 220 C1160 132 930 118 840 144"/>
+  <text class="small" x="882" y="124">QoR feedback: slack / congestion / IR / EM</text>
+
+  <text class="small" x="64" y="708">关键思路：CANN 图编译和通信 profile 不直接替代硬件 netlist，而是变成 traffic-aware net weight、placement affinity 与 routing priority。</text>
+</svg>

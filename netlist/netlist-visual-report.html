@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>网表可视化图报告</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 0;
+    }
+
+    .diagram-panel {
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+      cursor: zoom-in;
+      transition: transform 160ms ease;
+      min-height: 0;
+    }
+
+    .diagram-panel:hover {
+      transform: translateY(-1px);
+    }
+
+    .diagram-image {
+      display: block;
+      width: 100%;
+      height: min(82vh, 900px);
+      object-fit: contain;
+      object-position: left center;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .diagram-image.tall {
+      height: min(86vh, 980px);
+    }
+
+    .diagram-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.52fr) minmax(360px, 0.52fr);
+      gap: 18px;
+      align-items: start;
+      width: 100%;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    .diagram-caption {
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.55;
+      max-width: 100%;
+    }
+
+    .definition-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .definition-item {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .definition-item:last-child {
+      border-bottom: 0;
+    }
+
+    .definition-item b {
+      color: var(--ink);
+    }
+
+    .definition-item span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .flow-steps {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .flow-step b {
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      background: #e8f1ff;
+      color: #1d4ed8;
+      font-size: 14px;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .diagram-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      background: rgba(15, 23, 42, 0.88);
+      padding: 28px;
+    }
+
+    .diagram-modal.open {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 16px;
+    }
+
+    .modal-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+    }
+
+    .modal-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 760;
+    }
+
+    .modal-close {
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .modal-frame {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .modal-frame img {
+      display: block;
+      max-width: none;
+      width: auto;
+      height: auto;
+      min-width: min(100%, 960px);
+    }
+
+    .modal-hint {
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 15px;
+      white-space: nowrap;
+    }
+
+    .source-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .floor.report-floor {
+      justify-content: flex-start;
+      padding-top: 104px;
+      padding-bottom: 34px;
+    }
+
+    .report-floor h2 {
+      font-size: 51px;
+      line-height: 1.05;
+      margin-bottom: 14px;
+      max-width: 1120px;
+    }
+
+    .floor-intro {
+      max-width: 1160px;
+      margin: 0 0 18px;
+      color: #344054;
+      font-size: 18px;
+      line-height: 1.68;
+    }
+
+    .floor-intro b {
+      color: var(--ink);
+    }
+
+    @media (max-width: 980px) {
+      .diagram-row,
+      .source-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .definition-item {
+        grid-template-columns: 1fr;
+        gap: 3px;
+      }
+
+      h1 {
+        font-size: 42px;
+      }
+    }
+
+    section.floor:has(.diagram-row) {
+      padding-left: 4vw;
+      padding-right: 4vw;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">网表可视化研究报告</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">目录</a>
+      <a href="#graph">图抽象</a>
+      <a href="#traffic">Traffic</a>
+      <a href="#constraints">约束映射</a>
+      <a href="#concept">概念网表</a>
+      <a href="#real">真实生成</a>
+      <a href="#sources">文件</a>
+    </div>
+  </nav>
+
+  <section id="cover" class="floor">
+    <div class="kicker">Netlist Visual Report · CANN / Yosys / netlistsvg</div>
+    <h1>从连接清单到可计算图的网页报告</h1>
+    <p class="lead">
+      本报告面向网表生成、网表可视化和芯片物理布局布线研究，系统化梳理从 PCB/RTL 网表到 computational graph、traffic-aware placement 和 Yosys/netlistsvg 可视化链路的关键概念。报告包含五张 SVG 图表：三张方法论框架图、一张概念性 Ascend/CANN JSON 网表图，以及一张由 `yosys + netlistsvg` 真实生成的 RTL 级网表图。
+    </p>
+    <div class="report-meta">
+      <span class="pill blue">5 张 SVG 配图</span>
+      <span class="pill good">可点击全屏查看</span>
+      <span class="pill">复用 shared.css</span>
+      <span class="pill warn">公开资料推导，非真实 Ascend 内部网表</span>
+    </div>
+    <div class="grid cols-4" style="margin-top: 28px;">
+      <div class="card metric">
+        <strong>5</strong>
+        <span>SVG 图：覆盖图抽象、traffic、约束映射、概念网表、真实生成。</span>
+      </div>
+      <div class="card metric">
+        <strong>2</strong>
+        <span>网表文件：概念 JSON 与真实 Yosys JSON。</span>
+      </div>
+      <div class="card metric">
+        <strong>1</strong>
+        <span>Verilog 示例：Ascend tile control path。</span>
+      </div>
+      <div class="card metric">
+        <strong>1</strong>
+        <span>交互报告：所有 SVG 可点击进入全屏查看。</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="overview" class="floor">
+    <h2>目录</h2>
+    <p class="lead">报告的阅读路径遵循“抽象模型 -> 工作负载语义 -> 物理约束 -> 可视化验证”的顺序。前半部分定义网表如何转化为图模型和加权约束，后半部分用概念 JSON 与真实 Yosys 输出证明这些结构可以落到可检查、可复用的 cell/wire 图。</p>
+    <div class="journey-map">
+      <div class="jm-head">位置</div><div class="jm-head">01 图抽象</div><div class="jm-head">02 Traffic</div><div class="jm-head">03 约束映射</div><div class="jm-head">04 概念网表</div><div class="jm-head">05 真实生成</div><div class="jm-head">06 文件</div>
+      <div class="jm-label">回答问题</div><div class="jm-cell">网表如何变成 graph / hypergraph？</div><div class="jm-cell">CANN workload 如何变成 net weight？</div><div class="jm-cell">公开软件栈如何推导物理设计约束？</div><div class="jm-cell">Ascend/CANN 风格 tile 如何表达成 JSON 网表？</div><div class="jm-cell">如何用 Yosys + netlistsvg 生成真实逻辑图？</div><div class="jm-cell">报告产物在哪里？</div>
+      <div class="jm-label">本页内容</div><div class="jm-cell hot">Instance、Net、Hyperedge、Weight、Attribute 的映射。</div><div class="jm-cell hot">Graph Engine、Operator、Communication、Profiling 到 Traffic Matrix。</div><div class="jm-cell">CANN Stack、Workload Semantics、Netlist Constraints、P&R。</div><div class="jm-cell">ports、cells、wires、attributes 和 computational graph 注释。</div><div class="jm-cell low">Verilog、Yosys JSON、netlistsvg SVG 的真实链路。</div><div class="jm-cell">Markdown、JSON、Verilog、SVG 文件入口。</div>
+      <div class="jm-label">输出结果</div><div class="jm-cell">把连接清单转成可优化图模型。</div><div class="jm-cell">把软件行为加入布局布线权重。</div><div class="jm-cell">形成可反馈的物理设计约束闭环。</div><div class="jm-cell">解释廖博研究中的层次 JSON 与计算图关系。</div><div class="jm-cell">得到接近参考图的真实网表图。</div><div class="jm-cell">方便继续迭代和复用。</div>
+    </div>
+  </section>
+
+  <section id="graph" class="floor report-floor">
+    <div class="kicker">Diagram 1</div>
+    <h2>网表到图算法的抽象</h2>
+    <p class="floor-intro">
+      本页建立后续讨论的基础模型：在芯片物理设计中，网表不是静态连接清单，而是可被算法处理的结构化图。图中将 instance、cell、macro 映射为节点，将 net、bus、clock 映射为超边，并把时序、流量、拥塞、功耗等信息转化为权重和属性。该抽象参考了开源 P&R 工具链中常见的 netlist-to-graph 建模方式，用于解释 placement、routing 和拥塞预测的输入结构。
+    </p>
+    <div class="diagram-row">
+      <figure class="diagram-panel" data-fullscreen="images/netlist-graph-abstraction.svg" data-title="网表到图算法的抽象图">
+        <img class="diagram-image" src="images/netlist-graph-abstraction.svg" alt="网表到图算法的抽象图">
+        <figcaption class="diagram-caption">点击图片进入全屏查看。图中展示 instance、cell、macro、net、bus、clock 如何映射成图模型。</figcaption>
+      </figure>
+      <div class="card">
+        <h3>元素定义</h3>
+        <div class="definition-list">
+          <div class="definition-item"><b>Node</b><span>instance、cell、macro、register 等对象。</span></div>
+          <div class="definition-item"><b>Hyperedge</b><span>一个 net 连接多个 pins / cells 时形成的超边。</span></div>
+          <div class="definition-item"><b>Edge Weight</b><span>由 timing、traffic、congestion、power 共同决定的综合代价。</span></div>
+          <div class="definition-item"><b>Node Attribute</b><span>area、clock domain、power domain、fixed、halo、affinity 等属性。</span></div>
+        </div>
+        <div class="mt">
+          <div class="mtbar"><span class="mdt"></span>核心映射</div>
+          <div class="mb">Instance / Cell / Macro -> Node
+Net / Bus / Clock       -> Hyperedge
+Timing / Traffic        -> Edge Weight
+Power / Clock Domain    -> Node Attribute</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="traffic" class="floor report-floor">
+    <div class="kicker">Diagram 2</div>
+    <h2>CANN / Ascend Traffic-aware Placement</h2>
+    <p class="floor-intro">
+      本页描述软件栈信息如何进入物理设计约束。CANN Graph Engine、算子库、通信库和 profiling 数据可以形成 workload semantics；这些语义不替代硬件网表，而是补充为 traffic matrix、net weight、placement affinity 和 routing priority。图表的重点是把 AI workload 中的高频通信和高带宽数据流前移到布局阶段，避免仅以线长或局部时序作为优化目标。
+    </p>
+    <div class="diagram-row">
+      <figure class="diagram-panel" data-fullscreen="images/cann-traffic-aware-placement.svg" data-title="CANN / Ascend Traffic-aware Placement">
+        <img class="diagram-image" src="images/cann-traffic-aware-placement.svg" alt="CANN / Ascend Traffic-aware Placement 设计图">
+        <figcaption class="diagram-caption">从 CANN workload 到 traffic matrix，再到 weighted netlist 和 P&R 的闭环；QoR 结果会继续反馈到权重与约束。</figcaption>
+      </figure>
+      <div class="card">
+        <h3>白皮书解读</h3>
+        <div class="flow-steps">
+          <div class="flow-step"><b>1</b><span>软件执行图、算子融合和集合通信模式形成 workload semantics。</span></div>
+          <div class="flow-step"><b>2</b><span>Profiling 将带宽、复用频率和热点路径量化为 traffic matrix。</span></div>
+          <div class="flow-step"><b>3</b><span>Traffic matrix 叠加到 netlist，形成可驱动布局的 weighted nets。</span></div>
+          <div class="flow-step"><b>4</b><span>Placement/routing 产生 timing、congestion、IR/EM 等 QoR，再回写约束。</span></div>
+        </div>
+        <div class="callout">关键点：CANN profiling 不替代硬件 netlist，而是为 netlist 增加 workload-aware 权重。</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="constraints" class="floor report-floor">
+    <div class="kicker">Diagram 3</div>
+    <h2>Ascend / CANN 约束映射</h2>
+    <p class="floor-intro">
+      本页将公开资料中的 CANN 软件栈能力映射到芯片物理设计语言。由于公开资料没有披露 Ascend 910B/950 的真实版图级网表、PDK 或 floorplan，图表采用方法论表达：从 Graph Engine、Ascend C、通信库和 runtime 出发，抽取 workload semantics，再沉淀为 netlist constraints，最终进入 floorplan、placement、CTS、routing 和 signoff 的闭环。
+    </p>
+    <div class="diagram-row">
+      <figure class="diagram-panel" data-fullscreen="images/ascend-cann-constraint-mapping.svg" data-title="Ascend / CANN 约束映射图">
+        <img class="diagram-image" src="images/ascend-cann-constraint-mapping.svg" alt="Ascend / CANN 约束映射图">
+        <figcaption class="diagram-caption">公开 CANN 软件栈信息如何转成 Net Weights、Bandwidth Classes、Placement Regions 和 Routing Priority。</figcaption>
+      </figure>
+      <div class="card">
+        <h3>约束层级</h3>
+        <table>
+          <thead>
+            <tr><th>层级</th><th>作用</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>CANN Stack</td><td>Graph Engine、Ascend C、Operator Library、Communication Library。</td></tr>
+            <tr><td>Workload Semantics</td><td>算子融合、traffic matrix、memory locality、AllReduce pattern。</td></tr>
+            <tr><td>Netlist Constraints</td><td>net weight、带宽类别、布局区域、布线优先级、电源/时钟域。</td></tr>
+            <tr><td>P&R</td><td>floorplan、placement、CTS、routing、check，并把 QoR 反馈回来。</td></tr>
+          </tbody>
+        </table>
+        <p class="small">边界：公开资料不包含 Ascend 910B/950 的真实版图级 netlist、PDK 或 floorplan；图表达的是设计约束映射方法。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="concept" class="floor report-floor">
+    <div class="kicker">Diagram 4</div>
+    <h2>Ascend / CANN 典型网表图</h2>
+    <p class="floor-intro">
+      本页给出一个概念性 Ascend/CANN tile 网表表达，视觉上接近 netlistsvg 的 port、cell、wire 语言。它不是由真实芯片网表生成，而是用于说明“层次 JSON netlist”如何承载 module、ports、cells、connections 和 attributes。图中额外加入 graph_node、traffic_class、role 等语义字段，用于连接廖博相关研究中“层次 JSON 网表到 computational graph”的思路。
+    </p>
+    <div class="diagram-row">
+      <figure class="diagram-panel" data-fullscreen="images/ascend-cann-netlistsvg-style.svg" data-title="Ascend / CANN 典型网表图">
+        <img class="diagram-image tall" src="images/ascend-cann-netlistsvg-style.svg" alt="Ascend / CANN 典型网表图">
+        <figcaption class="diagram-caption">手工绘制的 netlistsvg 风格概念图，配套 JSON：ascend_cann_typical_netlist.json。</figcaption>
+      </figure>
+      <div class="card">
+        <h3>与廖博研究的对应关系</h3>
+        <table>
+          <thead>
+            <tr><th>论文思想</th><th>图中对应</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Hierarchical JSON netlist</td><td>module、ports、cells、connections。</td></tr>
+            <tr><td>Computational graph</td><td>cell + wire 连接结构。</td></tr>
+            <tr><td>Equation system constructor</td><td>u_graph_engine 的 graph_node 属性。</td></tr>
+            <tr><td>Device equation block</td><td>u_ai_core 的 DeviceEquationBlock 属性。</td></tr>
+            <tr><td>Data dependency</td><td>local_tensor、matmul_result、fusion_result、reduce_payload。</td></tr>
+          </tbody>
+        </table>
+        <div class="report-meta">
+          <a class="badge" href="ascend_cann_typical_netlist.json">打开 JSON</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="real" class="floor report-floor">
+    <div class="kicker">Diagram 5</div>
+    <h2>真实 Yosys + netlistsvg 生成图</h2>
+    <p class="floor-intro">
+      本页展示真实工具链输出：先用 Verilog 描述一个 Ascend tile control path，再通过 Yosys 综合为 JSON 网表，最后由 netlistsvg 自动绘制成数字逻辑网表图。该图包含 mux、comparator、adder、xor、async reset DFF、bus slice 和常量等标准结构，证明“可综合 RTL -> JSON netlist -> schematic visualization”的链路已经跑通。
+    </p>
+    <div class="diagram-row">
+      <figure class="diagram-panel" data-fullscreen="images/ascend-tile-control-netlistsvg.svg" data-title="真实 Yosys + netlistsvg 生成的 Ascend tile control 网表图">
+        <img class="diagram-image tall" src="images/ascend-tile-control-netlistsvg.svg" alt="真实 Yosys + netlistsvg 生成图">
+        <figcaption class="diagram-caption">由可综合 Verilog 经 Yosys 输出 JSON，再由 netlistsvg 自动生成。点击可全屏查看细节。</figcaption>
+      </figure>
+      <div class="card">
+        <h3>生成流程</h3>
+        <div class="mt">
+          <div class="mtbar"><span class="mdt"></span>commands</div>
+          <div class="mb">yosys -p 'read_verilog ascend_tile_control.v; proc; opt; memory; opt; write_json ascend_tile_control_yosys.json'
+./node_modules/.bin/netlistsvg ascend_tile_control_yosys.json -o images/ascend-tile-control-netlistsvg.svg</div>
+        </div>
+        <div class="product-facts">
+          <div class="fact"><b>Verilog</b><br><a href="ascend_tile_control.v">ascend_tile_control.v</a></div>
+          <div class="fact"><b>Yosys JSON</b><br><a href="ascend_tile_control_yosys.json">ascend_tile_control_yosys.json</a></div>
+        </div>
+        <p class="small">这张图解决的是“像参考图那样真实画出网表”的问题。下一步可在 JSON 后处理阶段给 Yosys cell 添加 computational graph 注释。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="sources" class="floor">
+    <div class="kicker">Artifacts</div>
+    <h2>文件与报告入口</h2>
+    <p class="lead">这些文件构成完整研究产物：Markdown 是说明源，HTML 是演示入口，Verilog/Yosys JSON/SVG 是真实 netlistsvg 链路，概念 JSON 和手工 SVG 用于承接廖博相关研究中的层次 JSON 网表思想。</p>
+    <div class="grid source-grid">
+      <a class="card" href="netlist-visual-diagrams-guide.md">
+        <h3>Markdown 说明文档</h3>
+        <p class="small">原始说明，包含五张图的元素定义、关系和研究语义。</p>
+      </a>
+      <a class="card" href="ascend_tile_control_yosys.json">
+        <h3>Yosys JSON 网表</h3>
+        <p class="small">由真实 Yosys 从 Verilog 综合得到，可作为后续 computational graph 后处理输入。</p>
+      </a>
+      <a class="card" href="images/ascend-tile-control-netlistsvg.svg">
+        <h3>真实 netlistsvg 图</h3>
+        <p class="small">由 netlistsvg 生成，接近参考图中的 gate / mux / register 视觉表达。</p>
+      </a>
+    </div>
+  </section>
+
+  <div class="diagram-modal" id="diagramModal" aria-hidden="true">
+    <div class="modal-bar">
+      <div class="modal-title" id="modalTitle">Diagram</div>
+      <div class="modal-hint">滚动查看大图，按 Esc 或点击关闭</div>
+      <button class="modal-close" type="button" id="modalClose">关闭</button>
+    </div>
+    <div class="modal-frame" id="modalFrame">
+      <img id="modalImage" src="" alt="">
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('diagramModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalClose = document.getElementById('modalClose');
+
+    function openDiagram(src, title) {
+      modalImage.src = src;
+      modalImage.alt = title;
+      modalTitle.textContent = title;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeDiagram() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalImage.src = '';
+      document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-fullscreen]').forEach((node) => {
+      node.addEventListener('click', () => {
+        openDiagram(node.dataset.fullscreen, node.dataset.title || 'Diagram');
+      });
+    });
+
+    modalClose.addEventListener('click', closeDiagram);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal || event.target === document.getElementById('modalFrame')) {
+        closeDiagram();
+      }
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('open')) {
+        closeDiagram();
+      }
+    });
+  </script>
+</body>
+</html>

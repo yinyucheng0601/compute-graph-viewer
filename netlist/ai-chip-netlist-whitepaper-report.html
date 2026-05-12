@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 芯片网表设计约束体系白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    :root {
+      --paper-ink: #101828;
+      --paper-muted: #667085;
+      --paper-line: #d0d7e2;
+      --paper-soft: #f4f7fb;
+      --paper-blue: #4369ef;
+      --paper-green: #14866d;
+      --paper-orange: #b65f00;
+    }
+
+    body { background: #f3f6fb; color: var(--paper-ink); }
+    .topnav { backdrop-filter: blur(16px); }
+
+    .whitepaper-floor {
+      position: relative;
+      min-height: 100vh;
+      padding: 96px 4.5vw 56px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .whitepaper-floor h1 { max-width: 1120px; font-size: 64px; line-height: 1.02; letter-spacing: 0; margin: 0; }
+    .whitepaper-floor h2 { max-width: 1160px; font-size: 48px; line-height: 1.05; letter-spacing: 0; margin: 0 0 16px; }
+
+    .floor-lead {
+      max-width: 860px;
+      color: #344054;
+      font-size: 18px;
+      line-height: 1.78;
+      margin: 0 0 32px;
+    }
+
+    .floor-kicker {
+      color: var(--paper-blue);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    /* Grid helpers */
+    .paper-grid { display: grid; gap: 18px; width: 100%; }
+    .cols-2-paper { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+    .cols-3-paper { grid-template-columns: repeat(3,minmax(0,1fr)); }
+    .cols-4-paper { grid-template-columns: repeat(4,minmax(0,1fr)); }
+    .cols-main-side { grid-template-columns: minmax(0,1.55fr) minmax(380px,0.45fr); }
+    .cols-side-main { grid-template-columns: minmax(340px,0.42fr) minmax(0,1.58fr); }
+
+    /* Card */
+    .paper-card {
+      background: #fff;
+      border: 1px solid var(--paper-line);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 18px 44px rgba(15,23,42,.06);
+      overflow: hidden;
+    }
+    .paper-card h3 { margin: 0 0 12px; color: var(--paper-ink); font-size: 21px; line-height: 1.25; }
+    .paper-card h4 { margin: 16px 0 8px; color: var(--paper-ink); font-size: 16px; }
+    .paper-card p, .paper-card li { color: var(--paper-muted); font-size: 15px; line-height: 1.68; }
+    .paper-card ul { padding-left: 18px; margin: 10px 0 0; }
+    .paper-card p + p { margin-top: 10px; }
+
+    /* Tags & pills */
+    .tag {
+      display: inline-flex; align-items: center;
+      min-height: 22px; padding: 2px 8px;
+      border-radius: 999px; background: #eef4ff;
+      color: #2454d6; border: 1px solid #c7d7fe;
+      font-size: 12px; font-weight: 750; white-space: nowrap;
+    }
+    .tag.green { background: #edfcf3; color: #0e6b46; border-color: #a7f3d0; }
+    .tag.orange { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+    .tag.gray { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+
+    /* Callout */
+    .callout-block {
+      border-left: 4px solid var(--paper-blue);
+      padding: 14px 18px;
+      background: #f0f5ff;
+      border-radius: 0 10px 10px 0;
+      margin: 18px 0 0;
+    }
+    .callout-block.warn { border-color: #d97706; background: #fffbeb; }
+    .callout-block.green { border-color: #059669; background: #ecfdf5; }
+    .callout-block p { margin: 0; font-size: 15px; color: #1e3a6e; }
+    .callout-block.warn p { color: #7c2d12; }
+    .callout-block.green p { color: #065f46; }
+
+    /* Pipeline flow */
+    .pipeline-flow {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin: 24px 0;
+      overflow-x: auto;
+    }
+    .pipe-stage {
+      flex: 1 1 0;
+      min-width: 120px;
+      background: #fff;
+      border: 1px solid var(--paper-line);
+      border-right: 0;
+      padding: 16px 14px;
+      position: relative;
+    }
+    .pipe-stage:first-child { border-radius: 12px 0 0 12px; }
+    .pipe-stage:last-child { border-right: 1px solid var(--paper-line); border-radius: 0 12px 12px 0; }
+    .pipe-stage::after {
+      content: "›";
+      position: absolute;
+      right: -11px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      font-size: 20px;
+      color: var(--paper-muted);
+      background: #f3f6fb;
+      width: 22px;
+      text-align: center;
+      line-height: 1;
+    }
+    .pipe-stage:last-child::after { display: none; }
+    .pipe-stage b { display: block; font-size: 13px; color: var(--paper-ink); margin-bottom: 6px; }
+    .pipe-stage span { display: block; font-size: 13px; color: var(--paper-muted); line-height: 1.45; }
+    .pipe-stage.hl { background: #eff6ff; border-color: #93c5fd; }
+    .pipe-stage.hl b { color: #1d4ed8; }
+
+    /* Five-layer chain */
+    .logic-chain {
+      display: grid;
+      grid-template-columns: repeat(5,minmax(0,1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+    .chain-node {
+      position: relative;
+      min-height: 180px;
+      background: #fff;
+      border: 1px solid var(--paper-line);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .chain-node:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 50%; right: -12px;
+      width: 12px; height: 2px;
+      background: #94a3b8;
+    }
+    .chain-node .cn-num {
+      font-size: 11px; font-weight: 800; letter-spacing: .06em;
+      color: var(--paper-blue); margin-bottom: 8px;
+    }
+    .chain-node h3 { font-size: 17px; margin: 0 0 8px; }
+    .chain-node p { color: var(--paper-muted); font-size: 14px; line-height: 1.55; margin: 0; }
+    .chain-node .cn-fail {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #fff1f2;
+      color: #9f1239;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .chain-node .cn-fail::before { content: "违反后 → "; font-weight: 700; }
+
+    /* Diagram panel */
+    .diagram-panel {
+      margin: 0; border: 0; background: transparent; padding: 0;
+      cursor: zoom-in; min-width: 0; align-self: stretch;
+    }
+    .diagram-image {
+      display: block; width: 100%;
+      height: min(72vh,800px);
+      object-fit: contain; object-position: left center;
+      background: #fff;
+      border: 1px solid var(--paper-line);
+      border-radius: 10px;
+    }
+    .diagram-image.tall { height: min(80vh,900px); }
+    .caption { margin-top: 10px; color: var(--paper-muted); font-size: 14px; line-height: 1.5; }
+
+    /* Competitor header */
+    .vendor-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 18px;
+      border: 1px solid var(--paper-line);
+      border-radius: 10px;
+      background: #fff;
+      margin-bottom: 20px;
+    }
+    .vendor-logo {
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-weight: 850; font-size: 15px; color: #fff;
+      flex: 0 0 auto;
+    }
+    .vl-nvidia { background: #76b900; }
+    .vl-google { background: #4285f4; }
+    .vl-intel  { background: #0068b5; }
+    .vl-huawei { background: #cf0a2c; }
+    .vendor-badge b { font-size: 18px; color: var(--paper-ink); }
+    .vendor-badge span { font-size: 14px; color: var(--paper-muted); }
+
+    /* SW stack */
+    .sw-stack { display: grid; gap: 7px; margin: 14px 0 0; }
+    .sw-layer {
+      display: grid; grid-template-columns: 100px 1fr;
+      gap: 8px; align-items: center;
+    }
+    .sw-label {
+      padding: 6px 8px; border-radius: 6px;
+      font-size: 13px; font-weight: 700;
+      background: #eef4ff; color: #1d4ed8;
+      text-align: center;
+    }
+    .sw-label.green { background: #ecfdf5; color: #065f46; }
+    .sw-label.orange { background: #fff7ed; color: #9a3412; }
+    .sw-label.gray { background: #f1f5f9; color: #334155; }
+    .sw-boxes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sw-box {
+      flex: 1 1 90px; padding: 6px 10px;
+      border-radius: 6px; border: 1px solid #d9e1ec;
+      background: #f8fafc; font-size: 14px; line-height: 1.35;
+      text-align: center; color: #344054;
+    }
+
+    /* Strength / weakness */
+    .sw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .sw-col h4 { font-size: 14px; font-weight: 800; margin: 0 0 8px; }
+    .sw-col.pos h4 { color: #065f46; }
+    .sw-col.neg h4 { color: #9f1239; }
+    .sw-col ul { margin: 0; padding-left: 16px; }
+    .sw-col li { font-size: 14px; line-height: 1.6; color: var(--paper-muted); }
+
+    /* Case study timeline */
+    .case-flow { display: grid; gap: 0; margin: 18px 0; }
+    .case-step {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 12px;
+      padding-bottom: 18px;
+      position: relative;
+    }
+    .case-step:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: 21px; top: 38px;
+      width: 2px;
+      bottom: 0;
+      background: var(--paper-line);
+    }
+    .step-num {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--paper-blue);
+      color: #fff; font-size: 15px; font-weight: 800;
+      display: grid; place-items: center;
+      flex: 0 0 auto; z-index: 1;
+    }
+    .step-body h4 { margin: 6px 0 6px; font-size: 16px; }
+    .step-body p { margin: 0; font-size: 15px; color: var(--paper-muted); line-height: 1.62; }
+    .step-body .mini-tag {
+      display: inline-flex; margin-top: 8px; gap: 5px; flex-wrap: wrap;
+    }
+
+    /* Insight cards */
+    .insight-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-top: 24px; }
+    .insight-card {
+      background: #fff;
+      border: 1px solid var(--paper-line);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 14px 36px rgba(15,23,42,.05);
+    }
+    .insight-num { font-size: 42px; font-weight: 850; color: #dde5f4; line-height: 1; margin-bottom: 14px; }
+    .insight-card h3 { font-size: 18px; margin: 0 0 10px; }
+    .insight-card p { font-size: 15px; color: var(--paper-muted); line-height: 1.65; margin: 0; }
+
+    /* Matrix/table */
+    .cmp-matrix {
+      border: 1px solid var(--paper-line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      width: 100%;
+    }
+    .cmp-matrix table { border: 0; border-radius: 0; font-size: 14px; }
+    .cmp-matrix th { background: #f8fafc; padding: 12px 14px; }
+    .cmp-matrix td { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid var(--paper-line); }
+    .cmp-matrix tr:last-child td { border-bottom: 0; }
+
+    /* Detail expand (accordion stub) */
+    .detail-card {
+      border: 1px solid var(--paper-line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+      margin-top: 12px;
+    }
+    .detail-head {
+      padding: 14px 18px;
+      font-weight: 750;
+      font-size: 15px;
+      color: var(--paper-ink);
+      background: #f8fafc;
+      border-bottom: 1px solid var(--paper-line);
+    }
+    .detail-body { padding: 16px 18px; }
+    .detail-body p { font-size: 15px; color: var(--paper-muted); line-height: 1.65; margin: 0 0 10px; }
+    .detail-body p:last-child { margin-bottom: 0; }
+
+    /* Terms table */
+    .terms-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--paper-line);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 14px;
+      background: #fff;
+      box-shadow: 0 18px 44px rgba(15,23,42,.06);
+    }
+    .terms-table th {
+      background: #f8fafc;
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--paper-ink);
+      border-bottom: 2px solid var(--paper-line);
+    }
+    .terms-table td {
+      padding: 10px 14px;
+      vertical-align: top;
+      border-bottom: 1px solid #edf0f5;
+      color: var(--paper-muted);
+      line-height: 1.55;
+    }
+    .terms-table td:first-child { color: var(--paper-ink); font-weight: 700; white-space: nowrap; min-width: 140px; }
+    .terms-table tr:last-child td { border-bottom: 0; }
+    .terms-table tr.cat-header td {
+      background: #eff4ff;
+      color: var(--paper-blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      padding: 7px 14px;
+      border-bottom: 1px solid #c7d7fe;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; background: rgba(15,23,42,.92); padding: 24px;
+    }
+    .modal.open { display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+    .modal-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; color: #fff; font-weight: 800;
+    }
+    .modal-close {
+      height: 36px; padding: 0 14px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.12);
+      color: #fff; cursor: pointer; font: inherit;
+    }
+    .modal-frame {
+      overflow: auto; background: #fff;
+      border-radius: 10px; display: grid; place-items: center;
+    }
+    .modal-frame img {
+      display: block; max-width: none;
+      min-width: min(100%,980px); width: auto; height: auto;
+    }
+
+    @media (max-width: 1100px) {
+      .cols-2-paper,.cols-3-paper,.cols-4-paper,
+      .cols-main-side,.cols-side-main,.term-grid,.logic-chain,
+      .insight-grid,.sw-grid { grid-template-columns: 1fr; }
+      .whitepaper-floor h1 { font-size: 44px; }
+      .whitepaper-floor h2 { font-size: 36px; }
+      .pipeline-flow { flex-direction: column; }
+      .pipe-stage { border-right: 1px solid var(--paper-line); border-bottom: 0; border-radius: 0; }
+      .pipe-stage:first-child { border-radius: 12px 12px 0 0; }
+      .pipe-stage:last-child { border-radius: 0 0 12px 12px; border-bottom: 1px solid var(--paper-line); }
+      .pipe-stage::after { right: auto; left: 50%; top: auto; bottom: -13px; transform: translateX(-50%) rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="brand">AI 芯片网表白皮书</div>
+  <div class="navlinks">
+    <a href="#cover">封面</a>
+    <a href="#bg">背景</a>
+    <a href="#netlist">网表</a>
+    <a href="#why">为何特殊</a>
+    <a href="#framework">框架</a>
+    <a href="#visuals">图解</a>
+    <a href="#nvidia">NVIDIA</a>
+    <a href="#google">Google</a>
+    <a href="#intel">Intel</a>
+    <a href="#case1">案例·训练</a>
+    <a href="#case2">案例·推理</a>
+    <a href="#insights">启示</a>
+    <a href="#terms">术语表</a>
+  </div>
+</nav>
+
+<!-- ═══════════════ 01 封面 ═══════════════ -->
+<section id="cover" class="whitepaper-floor">
+  <div class="floor-kicker">White Paper · AI Chip Netlist Constraint System</div>
+  <h1>AI 芯片网表设计约束体系</h1>
+  <p class="floor-lead">
+    从一份连接清单，到可以驱动芯片物理布局的可计算约束图——这中间发生了什么？
+    本白皮书面向没有 EDA 背景的产品经理，用可视化和类比解释 AI 芯片网表设计的核心逻辑、行业现状与产品洞察。
+  </p>
+  <div class="paper-grid cols-3-paper">
+    <div class="paper-card">
+      <div class="floor-kicker" style="margin-bottom:8px">规模问题</div>
+      <h3>从几万条变成几十亿条</h3>
+      <p>普通手机 SoC 的信号网络（Net）数量在百万级。AI 训练芯片仅一个计算阵列内部的连线就能达到十亿级以上。传统 EDA 工具的约束方式在这个规模下效率极低。</p>
+    </div>
+    <div class="paper-card">
+      <div class="floor-kicker" style="margin-bottom:8px">语义问题</div>
+      <h3>布线工具看不见软件在算什么</h3>
+      <p>AI 芯片的物理布局工具在布线时，不知道某条线正在传输矩阵乘法的激活值，还是注意力机制的 Key。但这个信息决定了这条线应该有多粗、被安排在哪个区域。</p>
+    </div>
+    <div class="paper-card">
+      <div class="floor-kicker" style="margin-bottom:8px">反馈问题</div>
+      <h3>约束违反只能在设计后期发现</h3>
+      <p>网表约束如果定义不准确，往往要到静态时序分析（STA）甚至流片后才暴露。AI 芯片研发周期 2–3 年，每次重新迭代代价极高。</p>
+    </div>
+  </div>
+  <div class="callout-block" style="margin-top:28px">
+    <p>本白皮书基于华为 CANN/Ascend 公开文档、Yosys/netlistsvg 开源工具链和 OpenROAD 流程研究整理。不包含任何厂商内部网表或 PDK 信息。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 02 背景 ═══════════════ -->
+<section id="bg" class="whitepaper-floor">
+  <div class="floor-kicker">01 · Background</div>
+  <h2>从模型到芯片：中间发生了什么</h2>
+  <p class="floor-lead">
+    一个 PyTorch 模型变成可以生产的芯片，要经过七个层次的转换。每一层都在丢弃上层的信息、添加物理世界的约束。理解这条链路，是理解网表设计的前提。
+  </p>
+
+  <div class="pipeline-flow">
+    <div class="pipe-stage">
+      <b>① 模型代码</b>
+      <span>PyTorch / JAX / TensorFlow 编写的算法逻辑</span>
+    </div>
+    <div class="pipe-stage">
+      <b>② 算子图</b>
+      <span>编译器将代码转成计算图（Graph），每个节点是一个算子</span>
+    </div>
+    <div class="pipe-stage">
+      <b>③ RTL</b>
+      <span>硬件工程师用 Verilog/VHDL 描述每个模块的寄存器级行为</span>
+    </div>
+    <div class="pipe-stage hl">
+      <b>④ 网表</b>
+      <span>综合工具将 RTL 转成由门级单元和连线构成的平面连接列表</span>
+    </div>
+    <div class="pipe-stage hl">
+      <b>⑤ 约束注入</b>
+      <span>时序约束（SDC）、物理规则（LEF/DEF）和 AI 工作负载语义在这一步合并</span>
+    </div>
+    <div class="pipe-stage">
+      <b>⑥ P&R</b>
+      <span>布局布线工具按约束把器件摆到芯片版图上，画出实际金属走线</span>
+    </div>
+    <div class="pipe-stage">
+      <b>⑦ GDSII</b>
+      <span>最终光刻文件，送往代工厂生产</span>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:8px">
+    <div class="paper-card">
+      <h3>为什么 AI 芯片这条链路更难</h3>
+      <p><b>数据流主导：</b>AI 芯片的计算是高度规则的矩阵运算流，数据在固定路径上反复搬运。与通用处理器的"控制流"不同，这种模式要求布线工具感知数据的流量方向和带宽量级。</p>
+      <p><b>计算存储协同：</b>AI Core 内部的 Local Memory 和计算单元必须物理上靠近——否则数据搬运（DMA）的延迟会直接影响算子执行效率。这是一个布局决策，而不只是时序问题。</p>
+      <p><b>极端功耗密度：</b>AI 训练芯片的计算阵列区域功耗密度是普通逻辑区域的数十倍。不合理的布局会导致局部温度过高，触发限频保护，直接降低芯片性能。</p>
+    </div>
+    <div class="paper-card">
+      <h3>传统 EDA 工具的局限</h3>
+      <p>传统 P&R 工具（如 Cadence Innovus、Synopsys IC Compiler）的约束语言——SDC（时序）、DEF（物理区域）——都是在描述硬件结构，不描述软件行为。</p>
+      <p>当一条总线连接着矩阵乘法单元和激活函数单元，工具只知道"这条线有时序要求"，不知道"这条线每秒要搬运 4TB 的数据"。带宽敏感的布线决策无法自动推导。</p>
+      <div class="callout-block warn" style="margin-top:14px">
+        <p>这个"语义鸿沟"是 AI 芯片约束体系研究的核心动机：如何把软件执行语义下沉到物理设计层。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout-block" style="margin-top:18px">
+    <p><b>2025 年行业转折点：</b>大模型推理调用量同比增长超 300%，AI Agent 将单用户日均请求从 10 次推高至 50+ 次。AI 芯片设计重心正从"训练吞吐量最大化"转向"推理延迟最小化 + 能效最优化"。两种目标对网表约束的侧重截然不同——训练芯片优先收紧矩阵计算的时序关键路径；推理芯片更关注 KV Cache 随机访存延迟和动态批处理下的功耗控制。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 03 网表是什么 ═══════════════ -->
+<section id="netlist" class="whitepaper-floor">
+  <div class="floor-kicker">02 · What is a Netlist</div>
+  <h2>网表是什么：给产品经理的版本</h2>
+  <p class="floor-lead">
+    网表（Netlist）是芯片设计中的"施工图"。建筑设计图告诉你房间布局，施工图告诉你每根水管、电线、承重柱的精确位置和规格。网表告诉芯片工厂：这个设计由哪些逻辑单元组成，它们之间怎么连接。
+  </p>
+
+  <div class="paper-grid cols-3-paper">
+    <div class="paper-card">
+      <div class="tag" style="margin-bottom:12px">Cell（器件）</div>
+      <h3>逻辑单元</h3>
+      <p>芯片中的基本功能模块。可以是一个与门（AND gate）、一个触发器（Flip-Flop），也可以是一整个乘加运算单元（MAC）。AI 芯片中还包括 DMA 控制器、向量运算单元、本地内存接口等专用 Cell。</p>
+      <p>类比：建筑里的"房间功能模块"，厨房、卧室、配电箱。</p>
+    </div>
+    <div class="paper-card">
+      <div class="tag" style="margin-bottom:12px">Wire / Net（连线）</div>
+      <h3>信号网络</h3>
+      <p>连接 Cell 之间的物理走线。一个"Net"可以同时连接多个 Cell（多播）。AI 芯片中的 Net 有三类：时钟网络（全芯片同步）、数据总线（高带宽矩阵传输）、控制信号（低带宽但时序严格）。</p>
+      <p>类比：建筑里的"管线系统"，电路、水管、暖通各自有不同的流量和走向要求。</p>
+    </div>
+    <div class="paper-card">
+      <div class="tag" style="margin-bottom:12px">Attribute（属性）</div>
+      <h3>约束标注</h3>
+      <p>附加在 Cell 或 Wire 上的设计要求，告诉布线工具这个元件有什么特殊需求：时钟域、功耗域、布局区域限制、优先级别等。AI 芯片需要在此基础上新增"工作负载语义"属性，例如 traffic_class、tile_id、bandwidth_demand。</p>
+      <p>类比：施工图上的"备注"，这根梁需要用 C40 混凝土，这段管道需要保温层。</p>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:18px">
+    <div class="paper-card">
+      <h3>规模：为什么 AI 芯片的网表特别难处理</h3>
+      <div style="margin-top:14px">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--paper-line)">
+          <span style="font-size:15px;color:var(--paper-muted)">高端手机 SoC（骁龙 8 系）</span>
+          <span class="tag gray">~50M nets</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--paper-line)">
+          <span style="font-size:15px;color:var(--paper-muted)">服务器 CPU（EPYC 9004）</span>
+          <span class="tag gray">~200M nets</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--paper-line)">
+          <span style="font-size:15px;color:var(--paper-muted)">AI 训练芯片（单 Die）</span>
+          <span class="tag">~800M–2B nets</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 0">
+          <span style="font-size:15px;color:var(--paper-muted)">AI 芯片 Chiplet 封装</span>
+          <span class="tag orange">多 Die，约束更复杂</span>
+        </div>
+      </div>
+      <div class="callout-block" style="margin-top:12px">
+        <p>数量级差异意味着：传统工程师手工调整约束的方式不再可行，必须有系统化的自动推导机制。</p>
+      </div>
+    </div>
+    <div class="paper-card">
+      <h3>从网表到图：算法处理的起点</h3>
+      <p>网表本身是一份"清单"，但布局布线算法需要的是"图"——每个 Cell 是节点，每个 Net 是超边（Hyperedge，可连接多个节点），每条连线有权重（Weight）。</p>
+      <p>权重决定了布线优先级：权重高的线会优先获得更短的路径、更低的信号延迟。</p>
+      <p>AI 芯片约束体系的核心任务，就是给这些权重赋予合理的值——不仅考虑时序，还要考虑带宽、热点、通信模式。</p>
+      <div class="callout-block green" style="margin-top:12px">
+        <p><b>关键公式：</b><code>net_weight = 时序关键度 + 流量需求 + 拥塞风险 + 功耗活跃度 + 拓扑优先级</code></p>
+      </div>
+      <div class="callout-block" style="margin-top:10px">
+        <p><b>功耗基础 P = α·C·V²·f：</b>动态功耗正比于负载电容 C——而 C 的大小直接取决于连线长度。布线优化缩短走线 = 减小 C = 降低功耗。这是网表约束要求高频算子物理靠近本地内存的根本原因。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 04 为何特殊 ═══════════════ -->
+<section id="why" class="whitepaper-floor">
+  <div class="floor-kicker">03 · Why AI Chips Need Special Constraints</div>
+  <h2>AI 芯片为什么需要特殊约束</h2>
+  <p class="floor-lead">
+    不是因为 AI 芯片"更复杂"，而是因为 AI 工作负载有三个根本性的特征，使得传统约束体系无法表达关键的设计需求。
+  </p>
+
+  <div class="paper-grid cols-2-paper" style="margin-bottom:20px">
+    <div class="paper-card">
+      <div class="tag" style="margin-bottom:10px">GPU 架构基础</div>
+      <h3>SM → CUDA Core + Tensor Core</h3>
+      <p>GPU 由大量 Streaming Multiprocessor（SM）并行组成，每个 SM 内含 CUDA Core（通用并行计算）和专门的 Tensor Core（硬件加速矩阵运算）。NVIDIA Blackwell Ultra 有 160 个 SM，每 SM 含 128 个 CUDA Core 和 4 个第五代 Tensor Core，总计算峰值达 40 PFLOPS。</p>
+      <p>GPU 约束重点：多时钟域同步（计算核心 ~2.2GHz / 内存控制器 ~1.8GHz）、HBM 接口的物理距离（决定带宽利用率上限）、计算阵列区域的局部热密度（是周边逻辑区域的数十倍）。</p>
+    </div>
+    <div class="paper-card">
+      <div class="tag orange" style="margin-bottom:10px">NPU 架构基础</div>
+      <h3>脉动阵列（Systolic Array）</h3>
+      <p>NPU 的核心是脉动阵列：数据在规则网格中边流动边计算，N×N 阵列仅需 2N 次内存访问即可完成 N² 次乘加——比 GPU 的访存次数少 N 倍，因此推理能效高出 5–10 倍。华为 Ascend 的"存算一体 + 数据流驱动并行"正是基于此原理。</p>
+      <p>NPU 约束重点：Tiling 切块是否与阵列尺寸对齐（错位会浪费大量空泡时间）、DMA 搬运路径与计算单元的物理亲和性（决定数据局部性）。</p>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-3-paper">
+    <div class="paper-card">
+      <div class="tag orange" style="margin-bottom:12px">特征 01</div>
+      <h3>工作负载极度规则，带宽要求极端</h3>
+      <p>Transformer 的矩阵乘法（MatMul）是有规律的循环嵌套，数据在固定路径上高频流动。这与 CPU 执行的控制流程序完全不同——CPU 每条指令去哪里是不确定的，AI 芯片的数据路径是可预测的。</p>
+      <p>可预测意味着：可以在设计阶段就知道哪条线最繁忙，提前分配更宽的物理走线和更短的路径。但传统 EDA 工具不读软件代码，无法自动推导这些信息。</p>
+    </div>
+    <div class="paper-card">
+      <div class="tag orange" style="margin-bottom:12px">特征 02</div>
+      <h3>计算与存储协同——Tiling 决定布局</h3>
+      <p>AI Core 内部的 Local Memory 空间有限（通常几百 KB），无法装下整个张量。算子必须把数据切成小块（Tiling），反复从片外搬入、计算、搬出。</p>
+      <p>切分策略直接影响物理布局：如果 DMA 传输路径和计算单元在版图上相距较远，每次 tiling 循环都会引入额外的信号延迟，累积成性能损耗。因此，tiling 参数是布局约束的隐性来源。</p>
+    </div>
+    <div class="paper-card">
+      <div class="tag orange" style="margin-bottom:12px">特征 03</div>
+      <h3>多芯片通信模式决定互连布线</h3>
+      <p>AI 训练通常需要几百到几千个芯片协同工作，通过 AllReduce、AllGather 等集合通信同步梯度。每种通信模式对芯片内部 NoC（片上网络）和芯片间互连都有不同的拓扑要求。</p>
+      <p>环形 AllReduce 需要相邻节点的双向高带宽链路；树形 AllReduce 需要集中式路由节点有足够的出口带宽。这些模式在网表层面要求不同的路由优先级配置。</p>
+    </div>
+  </div>
+
+  <div class="paper-card" style="margin-top:18px">
+    <h3>传统约束 vs AI 约束：一个具体对比</h3>
+    <div class="cmp-matrix" style="margin-top:14px">
+      <table>
+        <thead><tr><th>约束维度</th><th>传统 SoC（EDA 标准描述）</th><th>AI 芯片（需要新增的语义）</th></tr></thead>
+        <tbody>
+          <tr><td>时序</td><td>SDC 文件定义建立/保持时间</td><td>同上 + 带宽延迟乘积（BDP）感知</td></tr>
+          <tr><td>布局区域</td><td>DEF floorplan region/group</td><td>同上 + 按算子融合组和 tile 亲和性分区</td></tr>
+          <tr><td>线网权重</td><td>时序关键度（Timing Criticality）</td><td>时序 + 流量需求 + 通信模式优先级</td></tr>
+          <tr><td>功耗</td><td>UPF 功耗域定义</td><td>同上 + 热点预测（按 profiling 频率图）</td></tr>
+          <tr><td>多芯片</td><td>不在单芯片设计范围内</td><td>AllReduce 拓扑 → NoC 路由权重</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 05 框架 ═══════════════ -->
+<section id="framework" class="whitepaper-floor">
+  <div class="floor-kicker">04 · Constraint Framework</div>
+  <h2>五层约束闭环</h2>
+  <p class="floor-lead">
+    AI 芯片网表约束体系可以组织为五个层次，从业务目标出发，逐层向下传递，最终形成可被 P&amp;R 工具消费的物理约束，再通过实测结果反向校准。
+  </p>
+
+  <div class="logic-chain">
+    <div class="chain-node">
+      <div class="cn-num">LAYER 01</div>
+      <h3>目标层</h3>
+      <p>定义所有约束的优化方向：性能（PPA）、吞吐量、端到端延迟、能效比、可制造性、可测试性。</p>
+      <div class="cn-fail">目标层缺失 → 各层约束之间互相矛盾，工程师陷入局部优化陷阱</div>
+    </div>
+    <div class="chain-node">
+      <div class="cn-num">LAYER 02</div>
+      <h3>图语义层</h3>
+      <p>从编译器（CANN GE / XLA / TVM）提取算子融合模式、通信库调用、profiling 热点和 tiling 策略，形成工作负载语义。</p>
+      <div class="cn-fail">语义层缺失 → 布线工具不知道哪条线最繁忙，权重分配靠猜</div>
+    </div>
+    <div class="chain-node">
+      <div class="cn-num">LAYER 03</div>
+      <h3>网表层</h3>
+      <p>RTL / 门级 Cells、Wires、Ports、Bus、Clock 树、Reset 网络，以及注入的 traffic_class、bandwidth_demand、affinity_group 等 AI 属性。</p>
+      <div class="cn-fail">网表层缺失语义 → 进入 P&R 后的布线决策与实际负载脱节</div>
+    </div>
+    <div class="chain-node">
+      <div class="cn-num">LAYER 04</div>
+      <h3>物理层</h3>
+      <p>Floorplan 区域划分、Placement Region、Halo/Channel 隔离、CTS 时钟树综合、多层路由规则、IR Drop / EM / 热约束。</p>
+      <div class="cn-fail">物理层违规 → DRC 错误、时序不收敛、芯片良率下降</div>
+    </div>
+    <div class="chain-node">
+      <div class="cn-num">LAYER 05</div>
+      <h3>反馈层</h3>
+      <p>STA Slack 报告、拥塞地图、功耗分析、IR Drop 热图、EM 分析结果回写为上层约束的校准输入，驱动下一轮迭代。</p>
+      <div class="cn-fail">反馈层缺失 → 约束永远停留在猜测阶段，无法收敛</div>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:18px">
+    <div class="paper-card">
+      <h3>闭环的关键：反向校准</h3>
+      <p>五层约束不是单向瀑布。物理层的真实 QoR（Quality of Results，设计质量指标）——比如某个区域的拥塞报告——必须能反向更新第二层的工作负载权重。</p>
+      <p>类比：城市路网规划时，交通部门会根据实际拥堵数据重新调整路权分配和信号灯配时。芯片设计也需要同样的反馈机制。</p>
+    </div>
+    <div class="paper-card">
+      <h3>权重公式的工程含义</h3>
+      <p><code style="font-size:14px">net_weight = α·timing + β·traffic + γ·congestion + δ·power + ε·topology</code></p>
+      <p>五个系数（α～ε）不是固定值，而是按设计阶段动态调整的。早期 floorplan 阶段 β（流量）权重高；后期 sign-off 阶段 α（时序）权重高。</p>
+      <p>这个公式本质上是"如何在布线资源有限的情况下分配优先级"的决策框架。</p>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:18px">
+    <div class="paper-card">
+      <h3>功耗三要素：P = α·C·V²·f</h3>
+      <p>AI 芯片动态功耗由四个变量决定：<b>α</b>（开关活动因子，当前周期有多少晶体管在翻转）、<b>C</b>（负载电容，连线越长 C 越大）、<b>V²</b>（工作电压的平方，降压效果最显著）、<b>f</b>（工作频率）。</p>
+      <p>对约束体系的意义：缩短布线长度 → 降低 C → 直接降低功耗；这正是约束框架要求高频算子物理靠近本地内存的根本原因。DVFS 在推理空闲期同步降低 V 和 f，可实现二次方级别的功耗节省。时钟门控（Clock Gating）对空闲模块关断时钟，可节省 30–50% 动态功耗；多阈值电压（MVTH）在非关键路径换用高阈值器件，可节省 15–30% 静态漏电。</p>
+    </div>
+    <div class="paper-card">
+      <h3>工艺演进与 Chiplet：约束的新来源</h3>
+      <p><b>FinFET → GAA：</b>7nm 以下工艺从鳍式晶体管（FinFET）演进到全环绕栅极（GAA）纳米线结构，栅极宽度控制精度要求达 0.5nm。7nm 芯片的设计规则超过 10 万条，DRC 验证一次耗时数小时；一次约束违规引发的重新迭代代价可达数周工期。这也是 AI 驱动 EDA（如 Synopsys AgentEngineer、Cadence ChipStack）成为必需品的根本原因。</p>
+      <p><b>Chiplet 异构集成：</b>将计算、存储、I/O 芯粒分别制造后封装集成，各模块可选最优工艺节点（如计算用 3nm、SRAM 用 5nm、I/O 用 12nm）。Die 间的硅通孔（TSV）互连引入了跨 Die 时序约束和信号完整性（SI）验证这两个在单片设计时不存在的新维度。</p>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:18px">
+    <div class="paper-card">
+      <h3>DFT：把可测试性设计进芯片</h3>
+      <p>Design for Testability（可测试性设计）的核心原则：在设计阶段就内置测试通路，让片外测试设备能够"看进"芯片内部的节点状态。常见手段包括：扫描链（Scan Chain，将触发器串联以便逐位读出状态）、BIST（Built-In Self-Test，内置自检电路）和 MBIST（针对 SRAM 的 March 算法测试）。</p>
+      <p>AI 芯片的 DFT 挑战：Chiplet 封装中的 TSV 测试、3D 叠层结构的覆盖率验证，以及避免 DFT 插入破坏原有的时序收敛——这些都是网表层需要提前预留空间的约束来源。</p>
+    </div>
+    <div class="paper-card">
+      <h3>Cell 利用率：面积约束的量化指标</h3>
+      <p>Cell 利用率（CellUrate）= 有效器件面积 / 芯片总面积，是衡量版图紧凑程度的核心指标。利用率过低浪费面积（成本上升）；过高则布线资源紧张，导致拥塞和时序违规。</p>
+      <p>AI 芯片的面积约束特殊性：计算阵列区域（Tensor Core / 脉动阵列）的 Cell 密度可高达 70–80%，而控制逻辑区域需保留 30–50% 的布线余量用于时序修复。不同功能区域需要差异化的利用率约束，而不是一个全局数字。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 06 图解：5张SVG ═══════════════ -->
+<section id="visuals" class="whitepaper-floor">
+  <div class="floor-kicker">05 · Visual Evidence</div>
+  <h2>五张图解：从抽象到实证</h2>
+  <p class="floor-lead">
+    以下五张图由 Yosys、netlistsvg 实验和方法论推导生成，覆盖从图模型抽象到真实 RTL 网表可视化的完整链路。每张图附有面向产品经理的文字解读。
+  </p>
+
+  <!-- 图1 -->
+  <div style="margin-bottom:48px">
+    <div class="floor-kicker" style="margin-bottom:8px">图 01 · Graph Abstraction</div>
+    <div class="paper-grid cols-main-side">
+      <figure class="diagram-panel" data-fullscreen="images/netlist-graph-abstraction.svg" data-title="图1：网表到图算法的抽象">
+        <img class="diagram-image" src="images/netlist-graph-abstraction.svg" alt="网表到图算法的抽象">
+        <figcaption class="caption">点击图像可全屏查看 · 图1：网表到图算法的抽象</figcaption>
+      </figure>
+      <div class="paper-card">
+        <h3>网表如何变成算法可处理的图</h3>
+        <p>这张图展示了网表到图模型的映射关系。对布局布线算法来说，网表不是一份静态清单，而是一个可以被分区、优化、遍历的数据结构。</p>
+        <p><b>Node（节点）：</b>每个逻辑单元（Cell、Macro、寄存器）变成图的一个节点，携带面积、时钟域、功耗域等属性。</p>
+        <p><b>Hyperedge（超边）：</b>一个 Net 可以连接多个 Cell，因此用"超边"而不是普通的两点之间的边来表示。</p>
+        <p><b>Edge Weight（边权重）：</b>综合考虑时序关键度、流量需求、拥塞风险和功耗活跃度，决定这条线的布线优先级。</p>
+        <div class="callout-block" style="margin-top:12px">
+          <p>这是整个约束体系的算法底座。后续所有优化都在这个图结构上进行。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图2 -->
+  <div style="margin-bottom:48px">
+    <div class="floor-kicker" style="margin-bottom:8px">图 02 · Traffic-aware Placement</div>
+    <div class="paper-grid cols-side-main">
+      <div class="paper-card">
+        <h3>软件层的"流量预报"如何进入硬件</h3>
+        <p>这张图回答了一个核心问题：编译器（CANN / XLA）里的执行信息，怎么变成 P&amp;R 工具能用的约束？</p>
+        <p><b>第一步：</b>编译器在执行算子图时，记录每条数据路径的带宽使用量、复用频率和热点算子——这就是 Profiling 数据。</p>
+        <p><b>第二步：</b>Profiling 数据汇聚成 Traffic Matrix（流量矩阵）——哪个模块和哪个模块之间流量最大。</p>
+        <p><b>第三步：</b>Traffic Matrix 叠加到网表的边权重上，形成"Traffic-aware Netlist"。</p>
+        <p><b>第四步：</b>P&amp;R 工具用这个带权重的网表做布局，流量大的模块会被自动摆放得更近，减少线长和延迟。</p>
+        <div class="callout-block green" style="margin-top:12px">
+          <p>关键认知：Profiling 数据不替代硬件网表，而是为网表增加工作负载感知的权重层。</p>
+        </div>
+      </div>
+      <figure class="diagram-panel" data-fullscreen="images/cann-traffic-aware-placement.svg" data-title="图2：CANN Traffic-aware Placement">
+        <img class="diagram-image" src="images/cann-traffic-aware-placement.svg" alt="CANN Traffic-aware Placement">
+        <figcaption class="caption">点击图像可全屏查看 · 图2：CANN / Ascend Traffic-aware Placement</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 图3 -->
+  <div style="margin-bottom:48px">
+    <div class="floor-kicker" style="margin-bottom:8px">图 03 · Constraint Mapping</div>
+    <div class="paper-grid cols-main-side">
+      <figure class="diagram-panel" data-fullscreen="images/ascend-cann-constraint-mapping.svg" data-title="图3：Ascend/CANN 约束映射">
+        <img class="diagram-image" src="images/ascend-cann-constraint-mapping.svg" alt="Ascend CANN 约束映射">
+        <figcaption class="caption">点击图像可全屏查看 · 图3：Ascend / CANN 约束映射</figcaption>
+      </figure>
+      <div class="paper-card">
+        <h3>CANN 软件栈如何一步步变成布线规则</h3>
+        <p>这张图展示了昇腾软件栈（CANN）到物理设计约束的完整映射路径。注意这是方法论图——基于公开资料推导，不代表真实芯片内部实现。</p>
+        <p><b>Graph Engine：</b>算子图、融合规则 → 计算簇亲和性约束（相邻算子摆放在同一区域）</p>
+        <p><b>算子库 / Ascend C：</b>MatMul、向量计算、tiling 参数 → AI Core 内部数据通路的布线权重</p>
+        <p><b>通信库：</b>AllReduce、AllGather 模式 → NoC 和片间互连的带宽类别与路由优先级</p>
+        <p><b>Runtime / Profiling：</b>执行频率、带宽热点 → 流量矩阵、P&amp;R 反馈调参</p>
+        <p>最终这些约束在 P&amp;R 层生成 QoR 报告，反馈回软件层调整权重，形成闭环。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图4 -->
+  <div style="margin-bottom:48px">
+    <div class="floor-kicker" style="margin-bottom:8px">图 04 · Concept Netlist</div>
+    <div class="paper-grid cols-side-main">
+      <div class="paper-card">
+        <h3>一个 Tile 内部"长什么样"</h3>
+        <p>这张概念图展示了 Ascend/CANN 风格的 tile 网表结构——用 netlistsvg 的视觉语言手绘，不是真实芯片内部图，而是说明"层次 JSON 网表"如何承载模块结构和 AI 语义属性。</p>
+        <p>图中每个方框是一个逻辑 Cell：有的是矩阵乘法单元（u_ai_core），有的是 DMA 控制器（u_dma_ctrl），有的是 Graph Engine 接口（u_graph_engine）。Cell 之间的连线代表数据总线或控制信号。</p>
+        <p>与标准网表的区别在于：每个 Cell 额外携带 <code>graph_node</code>、<code>traffic_class</code>、<code>role</code> 等 AI 语义字段——这些字段在标准 EDA 格式中不存在，是研究中提出的扩展属性。</p>
+        <div class="callout-block" style="margin-top:12px">
+          <p>这张图连接了"层次 JSON 网表"和"计算图"两个研究视角：网表的 cell+wire 结构对应计算图的节点+依赖关系。</p>
+        </div>
+      </div>
+      <figure class="diagram-panel" data-fullscreen="images/ascend-cann-netlistsvg-style.svg" data-title="图4：Ascend/CANN 概念网表">
+        <img class="diagram-image" src="images/ascend-cann-netlistsvg-style.svg" alt="Ascend CANN 概念网表">
+        <figcaption class="caption">点击图像可全屏查看 · 图4：Ascend / CANN 概念网表（手绘 netlistsvg 风格）</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <!-- 图5 -->
+  <div style="margin-bottom:24px">
+    <div class="floor-kicker" style="margin-bottom:8px">图 05 · Real Generation</div>
+    <div class="paper-grid cols-main-side">
+      <figure class="diagram-panel" data-fullscreen="images/ascend-tile-control-netlistsvg.svg" data-title="图5：真实 Yosys + netlistsvg 生成图">
+        <img class="diagram-image tall" src="images/ascend-tile-control-netlistsvg.svg" alt="真实 Yosys netlistsvg 生成图">
+        <figcaption class="caption">点击图像可全屏查看 · 图5：由 Verilog → Yosys 综合 → netlistsvg 自动生成的真实数字逻辑图</figcaption>
+      </figure>
+      <div class="paper-card">
+        <h3>从代码到"电路照片"：真实工具链验证</h3>
+        <p>前四张图都是方法论图（手绘或示意图）。这张是<b>真实工具链生成的</b>——先写了一段描述 Ascend tile 控制路径的 Verilog 代码，交给 Yosys 综合成 JSON 网表，再由 netlistsvg 自动布局绘制成逻辑图。</p>
+        <p>图中可以看到真实的数字逻辑元素：mux（多路选择器）、comparator（比较器）、adder（加法器）、xor（异或门）、带异步复位的 DFF（触发器）、bus slice（总线切片）。</p>
+        <p><b>这张图的意义：</b>验证了"从 Verilog 到可视化网表图"的工具链是可行的，为后续研究提供了真实基线。它证明了方法论不是空谈，而是有具体工具实现路径的。</p>
+        <div class="detail-card" style="margin-top:12px">
+          <div class="detail-head">生成命令</div>
+          <div class="detail-body">
+            <p><code style="font-size:13px">yosys -p 'read_verilog ascend_tile_control.v; proc; opt; memory; opt; write_json out.json'</code></p>
+            <p><code style="font-size:13px">netlistsvg out.json -o images/ascend-tile-control-netlistsvg.svg</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 07 NVIDIA ═══════════════ -->
+<section id="nvidia" class="whitepaper-floor">
+  <div class="floor-kicker">06 · Competitor Analysis · NVIDIA</div>
+  <div class="vendor-badge">
+    <div class="vendor-logo vl-nvidia">N</div>
+    <div><b>NVIDIA H100 / H200</b><br><span>Hopper 架构 · 2022–2024</span></div>
+  </div>
+  <h2>NVIDIA：生态最广的行业标准</h2>
+  <p class="floor-lead">
+    NVIDIA H100 是目前 AI 训练市场的事实标准。其技术领先性很大程度上来自于软硬件的深度协同——CUDA 生态积累了二十年，工具链成熟度远超竞争对手。但这也意味着，H100 的物理设计细节极少公开，约束体系的内部运作对外界而言是黑箱。
+  </p>
+
+  <div class="paper-grid cols-main-side">
+    <div>
+      <div class="paper-card">
+        <h3>软件栈架构</h3>
+        <div class="sw-stack">
+          <div class="sw-layer">
+            <div class="sw-label">框架层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">PyTorch</div>
+              <div class="sw-box">TensorFlow</div>
+              <div class="sw-box">JAX</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label">编译层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">torch.compile</div>
+              <div class="sw-box">XLA on CUDA</div>
+              <div class="sw-box">Triton</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label green">运行时</div>
+            <div class="sw-boxes">
+              <div class="sw-box">CUDA Runtime</div>
+              <div class="sw-box">cuDNN</div>
+              <div class="sw-box">NCCL</div>
+              <div class="sw-box">TensorRT</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label orange">硬件</div>
+            <div class="sw-boxes">
+              <div class="sw-box">Tensor Core</div>
+              <div class="sw-box">HBM3</div>
+              <div class="sw-box">NVLink 4.0</div>
+              <div class="sw-box">NVSwitch</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>H100 的核心技术特点</h3>
+        <p><b>Tensor Core：</b>第四代，支持 FP8 格式，单芯片 FP8 峰值算力约 3,958 TFLOPS。Tensor Core 的矩阵运算是高度流水线化的，对 SRAM 带宽需求极高——这直接影响了 L2 Cache 到计算单元的布线优先级。</p>
+        <p><b>NVLink 4.0 / NVSwitch：</b>单卡双向带宽 900 GB/s，通过 NVSwitch 可连接 8 卡形成 NVLink 域。这套互连拓扑在物理设计层面有专用的 SerDes 电路和受保护的布线通道，是 H100 版图的关键约束区域之一。</p>
+        <p><b>HBM3 内存：</b>80 GB，带宽 3.35 TB/s。HBM 以 2.5D 封装（CoWoS）方式与 GPU Die 并排，HBM 控制器到计算阵列之间的数据通路宽度直接决定了内存带宽能否被充分利用。</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="paper-card">
+        <h3>网表约束方式：封闭但成熟</h3>
+        <p>NVIDIA 的物理设计流程完全内部化。外部研究者能看到的最接近"约束描述"的文件是：</p>
+        <ul>
+          <li><b>PTX / SASS：</b>GPU 汇编层，说明了寄存器分配和指令调度逻辑，可间接推断关键路径</li>
+          <li><b>Nsight 工具：</b>能输出 SM 占用率、内存带宽利用率、热点函数——但这是运行时 profiling，不是设计时约束</li>
+          <li><b>NVCC 优化报告：</b>编译器会输出寄存器溢出、循环展开等信息，但对应的物理设计约束不对外</li>
+        </ul>
+        <div class="callout-block warn" style="margin-top:12px">
+          <p>NVIDIA 的竞争壁垒很大程度上在于：它们知道如何把 CUDA 程序的执行行为映射到 H100 版图上，这套 know-how 从未公开。</p>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>产品层面的关键洞察</h3>
+        <div class="sw-grid">
+          <div class="sw-col pos">
+            <h4>优势</h4>
+            <ul>
+              <li>CUDA 生态覆盖 90% 以上的 AI 模型</li>
+              <li>工具链（Nsight、TRT）成熟度最高</li>
+              <li>多机互连（NVLink + InfiniBand）完善</li>
+              <li>供应链和软件支持体系最完整</li>
+            </ul>
+          </div>
+          <div class="sw-col neg">
+            <h4>局限</h4>
+            <ul>
+              <li>物理设计完全封闭，不开放约束信息</li>
+              <li>定制化空间极小（不能改芯片架构）</li>
+              <li>国产替代受出口管制影响</li>
+              <li>能耗偏高（H100 SXM5 TDP 700W）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="paper-card" style="margin-top:18px">
+    <h3>与昇腾约束方式的对比</h3>
+    <p>NVIDIA 路线：CUDA 统一编程模型，通过成熟工具链隐藏底层约束复杂度，用户感知不到网表层的存在。</p>
+    <p>昇腾路线：CANN 软件栈提供较多的约束可视性（Graph Engine 执行语义相对开放），但工具链成熟度和生态广度仍在追赶。两者都面临同一个根本挑战：如何让编译器"知道"硬件版图，从而做出更好的编译决策。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 08 Google ═══════════════ -->
+<section id="google" class="whitepaper-floor">
+  <div class="floor-kicker">07 · Competitor Analysis · Google</div>
+  <div class="vendor-badge">
+    <div class="vendor-logo vl-google">G</div>
+    <div><b>Google TPU v5p / v5e</b><br><span>第五代 TPU · 2023–2024</span></div>
+  </div>
+  <h2>Google TPU：垂直整合最深的方案</h2>
+  <p class="floor-lead">
+    Google TPU 是"编译器和芯片协同设计"理念的最极致实践。XLA 编译器与 TPU 硬件是同一个团队设计的，编译器知道芯片内部的每一个寄存器、每一个计算单元的位置——这在理论上代表了"语义感知物理设计"的最高水平。代价是：这套系统几乎完全封闭，只能通过 Google Cloud 使用。
+  </p>
+
+  <div class="paper-grid cols-main-side">
+    <div>
+      <div class="paper-card">
+        <h3>软件栈架构</h3>
+        <div class="sw-stack">
+          <div class="sw-layer">
+            <div class="sw-label">框架层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">JAX</div>
+              <div class="sw-box">TF/Keras</div>
+              <div class="sw-box">PyTorch/XLA</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label">编译层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">XLA</div>
+              <div class="sw-box">StableHLO</div>
+              <div class="sw-box">MLIR</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label green">调度层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">Pathways</div>
+              <div class="sw-box">GSPMD</div>
+              <div class="sw-box">Megascale</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label orange">硬件</div>
+            <div class="sw-boxes">
+              <div class="sw-box">MXU（矩阵单元）</div>
+              <div class="sw-box">HBM</div>
+              <div class="sw-box">ICI 互连</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>TPU 的核心技术特点</h3>
+        <p><b>MXU（矩阵乘法单元）：</b>TPU v5p 的 MXU 是专门为矩阵运算设计的脉动阵列（Systolic Array）。与 NVIDIA 的 Tensor Core 不同，MXU 的数据流方向是固定的——数据"流过"阵列，不需要反复从 SRAM 读取。这简化了内存控制器的约束，但限制了算子多样性。</p>
+        <p><b>ICI（Inter-Chip Interconnect）：</b>TPU v5p 的片间互连带宽极高（单个 Pod 达 460 Tbps），采用直接 Die-to-Die 连接的拓扑，延迟极低。这与 NVIDIA 通过交换机组网的方式不同，代价是拓扑固定、扩展灵活性较低。</p>
+        <p><b>编译器感知布局：</b>XLA 在编译时可以感知 TPU 的内存层次结构（HBM、VMEM、RF），并直接生成针对当前芯片版图优化的内存访问模式——这是约束语义化最深的体现。</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="paper-card">
+        <h3>网表约束方式：编译器即约束</h3>
+        <p>TPU 的设计哲学与 NVIDIA/昇腾有根本不同：它不是"把软件语义下沉到网表"，而是直接"让编译器知道硬件的每一个角落"，跳过了传统的网表约束层。</p>
+        <p><b>GSPMD（General and Scalable Parallelism for ML Computation）：</b>Google 内部的自动并行化系统，可以根据 TPU 的物理拓扑自动切分模型，分配到对应的 MXU 区域——这本质上是"编译器做了 P&amp;R 工具的事情"。</p>
+        <p><b>代价：</b>编译器和芯片的深度绑定意味着，每一代 TPU 都需要重新调整编译器，且无法直接运行 CUDA 代码。</p>
+        <div class="callout-block" style="margin-top:12px">
+          <p>TPU 路线的本质是：用封闭换取极致效率。它代表了"语义感知物理设计"的理论上限，但对开放生态的价值有限。</p>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>产品层面的关键洞察</h3>
+        <div class="sw-grid">
+          <div class="sw-col pos">
+            <h4>优势</h4>
+            <ul>
+              <li>能效比业界最高（尤其是 JAX 工作负载）</li>
+              <li>大规模训练（Gemini 规模）性价比好</li>
+              <li>ICI 互连延迟极低，AllReduce 效率高</li>
+              <li>编译器自动处理大部分优化</li>
+            </ul>
+          </div>
+          <div class="sw-col neg">
+            <h4>局限</h4>
+            <ul>
+              <li>只能通过 GCP 使用，无法私有化部署</li>
+              <li>算子支持不如 CUDA 全面</li>
+              <li>自定义算子开发门槛高</li>
+              <li>拓扑固定，扩展方式受限</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="paper-card" style="margin-top:18px">
+    <h3>对约束体系研究的启发</h3>
+    <p>TPU 的成功证明了一个核心论点：<b>编译器和硬件的语义对齐是提升 AI 芯片效率的关键路径</b>。当编译器知道 MXU 的脉动阵列数据流方向，它就能生成最优的数据布局，减少不必要的转置操作——这个优化是在布局布线阶段之前完成的。</p>
+    <p>对开放生态的 AI 芯片（NVIDIA、昇腾、Intel Gaudi）而言，TPU 的方法论提供了一个参考方向：即使不能做到 TPU 那样的全封闭协同，也应该尽量把更多的工作负载语义提前传递给物理设计阶段。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 09 Intel ═══════════════ -->
+<section id="intel" class="whitepaper-floor">
+  <div class="floor-kicker">08 · Competitor Analysis · Intel</div>
+  <div class="vendor-badge">
+    <div class="vendor-logo vl-intel">I</div>
+    <div><b>Intel Gaudi 3</b><br><span>原 Habana Labs · 2024</span></div>
+  </div>
+  <h2>Intel Gaudi 3：开放生态的性价比路线</h2>
+  <p class="floor-lead">
+    Intel Gaudi 3（前身是 Habana Labs 的 Gaudi 系列）是 AI 训练领域中开放程度最高的选手之一。它原生支持 PyTorch，使用标准以太网（RoCE）做多机互连，物理设计层面也比 NVIDIA 更透明。对于需要了解"国内外 AI 芯片约束体系差异"的产品经理，Gaudi 3 是一个重要的参照系。
+  </p>
+
+  <div class="paper-grid cols-main-side">
+    <div>
+      <div class="paper-card">
+        <h3>软件栈架构</h3>
+        <div class="sw-stack">
+          <div class="sw-layer">
+            <div class="sw-label">框架层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">PyTorch（原生）</div>
+              <div class="sw-box">TensorFlow</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label">编译层</div>
+            <div class="sw-boxes">
+              <div class="sw-box">SynapseAI</div>
+              <div class="sw-box">TPC Compiler</div>
+              <div class="sw-box">Graph Compiler</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label green">运行时</div>
+            <div class="sw-boxes">
+              <div class="sw-box">HAL</div>
+              <div class="sw-box">HCL（通信）</div>
+              <div class="sw-box">FP8 Engine</div>
+            </div>
+          </div>
+          <div class="sw-layer">
+            <div class="sw-label orange">硬件</div>
+            <div class="sw-boxes">
+              <div class="sw-box">TPC Core × 64</div>
+              <div class="sw-box">HBMe2</div>
+              <div class="sw-box">RoCEv2 × 24</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>Gaudi 3 的核心技术特点</h3>
+        <p><b>TPC（Tensor Processor Core）：</b>Gaudi 3 有 64 个 TPC，每个 TPC 是可编程的 VLIW 处理器，支持用户自定义算子。与 NVIDIA 的 CUDA Core 类似，但更偏向张量运算优化。这种"可编程核心"的设计让约束体系更灵活——可以根据具体算子的访存模式动态调整布线权重。</p>
+        <p><b>RoCE（RDMA over Converged Ethernet）：</b>Gaudi 3 使用 24 个 100GbE 端口做多机互连，而不是专有互连协议。好处是互操作性强，可以接入标准以太网交换机；代价是延迟比 NVLink 高约 3–5 倍。互连拓扑决定了 AllReduce 的通信模式，进而影响芯片内部 NoC 的路由优先级设置。</p>
+        <p><b>FP8 支持：</b>Gaudi 3 是较早支持 FP8 训练的 AI 芯片之一。FP8 的精度管理（缩放因子）需要专门的数据格式转换单元，这在版图上需要分配专用区域，是额外的布局约束来源。</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="paper-card">
+        <h3>网表约束方式：SynapseAI 主导</h3>
+        <p>Gaudi 3 的约束体系由 SynapseAI 编译器承载，与昇腾 CANN 的路线最为接近：图编译器负责算子融合和调度，再把语义传递给底层硬件抽象层。</p>
+        <p><b>Graph Compiler：</b>SynapseAI 的核心，负责将模型图编译为 TPC 可执行的操作序列。它会分析算子之间的数据依赖，生成内存分配方案，并指导 HBM 控制器的访问模式。这个信息理论上可以转化为网表层的流量约束。</p>
+        <p><b>HCL（Habana Collective Library）：</b>负责管理多卡通信，类似于 NCCL。AllReduce 等集合操作的拓扑选择会影响 NoC 端口的负载分布，是互连约束的来源。</p>
+        <div class="callout-block" style="margin-top:12px">
+          <p>Gaudi 3 相比昇腾更透明的地方在于：Intel 公开了较多的 SynapseAI 技术文档和 SDK，允许外部开发者更深入地了解算子调度和内存管理逻辑。</p>
+        </div>
+      </div>
+
+      <div class="paper-card" style="margin-top:14px">
+        <h3>产品层面的关键洞察</h3>
+        <div class="sw-grid">
+          <div class="sw-col pos">
+            <h4>优势</h4>
+            <ul>
+              <li>PyTorch 原生支持，迁移成本低</li>
+              <li>RoCE 互连降低组网成本</li>
+              <li>开放文档较多，生态可见性好</li>
+              <li>Intel 供应链和服务体系成熟</li>
+            </ul>
+          </div>
+          <div class="sw-col neg">
+            <h4>局限</h4>
+            <ul>
+              <li>绝对性能落后于 H100 约 30–50%</li>
+              <li>RoCE 延迟影响超大规模训练效率</li>
+              <li>算子库覆盖度不如 CUDA 完整</li>
+              <li>市场份额和社区活跃度偏低</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="paper-card" style="margin-top:18px">
+    <h3>三家对比总结</h3>
+    <div class="cmp-matrix" style="margin-top:14px">
+      <table>
+        <thead>
+          <tr><th>维度</th><th>NVIDIA H100</th><th>Google TPU v5</th><th>Intel Gaudi 3</th><th>华为昇腾 910B</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>编译栈</td>
+            <td>CUDA / cuDNN / TensorRT</td>
+            <td>XLA / MLIR（全封闭）</td>
+            <td>SynapseAI（半开放）</td>
+            <td>CANN / GE（半开放）</td>
+          </tr>
+          <tr>
+            <td>语义感知物理设计</td>
+            <td>封闭，内部实现</td>
+            <td>最深，编译器即约束</td>
+            <td>中等，Graph Compiler 主导</td>
+            <td>中等，GE 语义可提取</td>
+          </tr>
+          <tr>
+            <td>多芯片互连</td>
+            <td>NVLink 900GB/s（专有）</td>
+            <td>ICI 直连（封闭）</td>
+            <td>RoCE 100GbE（标准）</td>
+            <td>HCCS（专有）</td>
+          </tr>
+          <tr>
+            <td>约束可编程性</td>
+            <td>低（用户不可见）</td>
+            <td>极低（全封闭）</td>
+            <td>高（TPC 可自定义算子）</td>
+            <td>中（Ascend C 暴露部分）</td>
+          </tr>
+          <tr>
+            <td>开放程度</td>
+            <td>中（CUDA 开放，版图封闭）</td>
+            <td>最低</td>
+            <td>最高</td>
+            <td>中低</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 10 案例1：训练 ═══════════════ -->
+<section id="case1" class="whitepaper-floor">
+  <div class="floor-kicker">09 · Case Study · LLM Training</div>
+  <h2>案例一：大模型训练的约束链路</h2>
+  <p class="floor-lead">
+    场景：训练一个 70B 参数的 Transformer 模型，使用 4096 个 AI Core，采用 Tensor Parallel + Pipeline Parallel 混合并行策略。从软件执行语义到物理约束，完整走一遍五层约束闭环。
+  </p>
+
+  <div class="paper-grid cols-2-paper" style="margin-bottom:28px">
+    <div class="paper-card">
+      <h3>训练场景的工作负载特征</h3>
+      <p><b>注意力机制（Attention）：</b>70B 模型通常有 96 个注意力头，每个头需要独立计算 Q、K、V 矩阵乘法。这些计算可以并行，但每个头的输出需要在 concat 后再做一次大矩阵乘法。这意味着"多对一"的数据汇聚模式，是典型的高流量收敛点。</p>
+      <p><b>前向 + 反向：</b>训练需要保存每层的激活值用于反向传播。70B 模型一次前向传播的激活值约 40–100 GB（取决于序列长度），存储压力极大，对 HBM 到计算阵列的带宽路径有严格要求。</p>
+      <p><b>梯度同步：</b>数据并行时，每个节点训练完一个 batch 后需要 AllReduce 梯度。4096 卡规模的 AllReduce 通信量约几十 GB，延迟直接影响单步训练耗时。</p>
+    </div>
+    <div class="paper-card">
+      <h3>并行策略与约束的关系</h3>
+      <p><b>Tensor Parallel（TP）：</b>把同一层的权重矩阵切分到多个 AI Core 上。TP 内的 Core 之间需要高频通信（AllReduce），约束要求：TP 组内的 Core 物理距离近，互连路径专用、低延迟。</p>
+      <p><b>Pipeline Parallel（PP）：</b>把不同层切分到不同的 Core 组（stage）。Stage 之间的通信是单向的（前向激活值传递），约束要求：相邻 stage 的互连带宽要均匀，避免流水线气泡。</p>
+      <p><b>Data Parallel（DP）：</b>每个 DP 副本独立训练，最后 AllReduce 梯度。DP 对芯片内部约束影响较小，主要体现在片间互连的拓扑设计上。</p>
+    </div>
+  </div>
+
+  <div class="case-flow">
+    <div class="case-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>编译器提取工作负载语义</h4>
+        <p>CANN GE 将 Transformer 模型的计算图展开，识别注意力头的并行结构和矩阵乘法的 tiling 策略。输出：每个算子的执行频率、数据流量和亲和性分组（TP 组内的算子标记为 affinity_group=0）。</p>
+        <div class="mini-tag">
+          <span class="tag">Graph Engine</span>
+          <span class="tag gray">算子融合</span>
+          <span class="tag gray">tiling 参数</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Profiling 生成 Traffic Matrix</h4>
+        <p>运行 profiling 模式（小 batch 实测），记录每对 Core 之间的实际数据传输量。注意力 concat 节点附近的流量矩阵呈现"扇入"形态——多个 Head 输出汇聚到同一个 Core。这个 Core 的 NoC 端口需要更高的路由优先级。</p>
+        <div class="mini-tag">
+          <span class="tag">Traffic Matrix</span>
+          <span class="tag green">带宽热点识别</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>注入网表约束</h4>
+        <p>Traffic Matrix 转化为边权重，注入到网表的 Net 属性中：注意力 concat 路径的 net_weight 设置为最高优先级（traffic_class=CRITICAL）；梯度同步路径标记为 SYNC_PATH，路由时避让关键计算路径。激活值存储路径标记为 HIGH_BW，要求 HBM 控制器侧的 Net 走宽金属层。</p>
+        <div class="mini-tag">
+          <span class="tag">net_weight 注入</span>
+          <span class="tag orange">traffic_class</span>
+          <span class="tag gray">bandwidth_class</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>P&R 工具执行约束布线</h4>
+        <p>布局阶段：TP 组内的 AI Core 被摆放在相邻区域，共享同一个 Local Tile 的存储区。Pipeline Stage 之间用 DMA 通道分隔，避免相互干扰。布线阶段：CRITICAL 类 Net 走最短路径，SYNC_PATH 类 Net 走预留的专用布线通道（Routing Guide）。</p>
+        <div class="mini-tag">
+          <span class="tag">Placement Region</span>
+          <span class="tag green">Routing Guide</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h4>QoR 反馈与校准</h4>
+        <p>STA 报告显示：注意力路径的关键路径 Slack 为 +0.3ns（满足要求）；但某个 Pipeline Stage 边界附近出现拥塞（Congestion Score 超阈值）。反馈：调整该 Stage 的 Placement Region 边界向外扩展 20 μm，并降低相邻非关键 Net 的路由优先级，释放布线资源。</p>
+        <div class="mini-tag">
+          <span class="tag">STA Slack</span>
+          <span class="tag orange">拥塞校准</span>
+          <span class="tag green">迭代收敛</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 11 案例2：推理 ═══════════════ -->
+<section id="case2" class="whitepaper-floor">
+  <div class="floor-kicker">10 · Case Study · LLM Inference</div>
+  <h2>案例二：大模型推理的约束链路</h2>
+  <p class="floor-lead">
+    场景：部署一个 7B 参数的 LLM 进行实时对话推理，目标延迟 &lt;100ms / token，批处理大小 32。推理场景与训练场景有根本不同的约束需求——从"吞吐量优先"变为"延迟优先"，物理设计的优化方向也随之改变。
+  </p>
+
+  <div class="paper-grid cols-2-paper" style="margin-bottom:28px">
+    <div class="paper-card">
+      <h3>推理场景的工作负载特征</h3>
+      <p><b>KV Cache（键值缓存）：</b>LLM 推理时，每个 token 生成都需要访问之前所有 token 的 Key 和 Value。对话越长，KV Cache 越大（7B 模型，上下文 2048 token，KV Cache 约 500 MB）。KV Cache 的访问是高频、随机地址的读操作——与训练的顺序大块传输完全不同。</p>
+      <p><b>Autoregressive 生成：</b>推理是串行的，每个 token 依赖前一个 token 的输出。这限制了批内并行度，Core 的利用率通常低于训练时。约束重点从"最大化带宽"变为"最小化延迟"。</p>
+      <p><b>投机解码（Speculative Decoding）：</b>用小模型（draft model）先生成多个候选 token，再用大模型（target model）验证。两个模型的计算必须在同一颗芯片上协调调度，对 Core 分配和内存隔离有特殊要求。</p>
+    </div>
+    <div class="paper-card">
+      <h3>推理 vs 训练：约束重点的差异</h3>
+      <div style="margin-top:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;border:1px solid var(--paper-line);border-radius:8px;overflow:hidden">
+          <div style="padding:10px 12px;background:#f8fafc;font-weight:700;font-size:14px">训练约束重点</div>
+          <div style="padding:10px 12px;background:#f8fafc;font-weight:700;font-size:14px">推理约束重点</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">吞吐量（TFLOPS）</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">首 token 延迟（TTFT）</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">大块顺序内存传输</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">随机小块 KV Cache 读取</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">AllReduce 梯度同步</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">KV Cache 传输与计算并行</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">高 Core 利用率</div>
+          <div style="padding:10px 12px;border-top:1px solid var(--paper-line);font-size:14px;color:var(--paper-muted)">低延迟关键路径优先</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="case-flow">
+    <div class="case-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>KV Cache 决定内存布局约束</h4>
+        <p>7B 模型推理时，KV Cache 需要常驻 HBM，且访问模式是"按 head 索引随机读取"。编译器分析出：KV Cache 的访问热度分布不均——最近几层的 KV 访问频率远高于早期层（注意力有局部性）。约束推导：近层 KV Cache 分配到物理距离计算单元更近的 HBM bank，对应的 HBM 控制器路径权重提高。</p>
+        <div class="mini-tag">
+          <span class="tag">KV Cache 布局</span>
+          <span class="tag gray">HBM bank 分配</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>投机解码的双模型隔离约束</h4>
+        <p>Speculative Decoding 中，draft model（约 1B 参数）和 target model（7B）同时运行在一颗芯片上。两者不能共享 AI Core，否则调度冲突会引入不确定延迟。约束推导：在 Floorplan 阶段划定独立的 Region——draft 区域和 target 区域用 Halo 物理隔离，有专用的内存接口和 DMA 通道。两个区域通过一条专用"验证总线"连接，路由优先级最高。</p>
+        <div class="mini-tag">
+          <span class="tag">Floorplan Region</span>
+          <span class="tag orange">Halo 隔离</span>
+          <span class="tag green">验证总线专用路由</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>批处理动态调度的约束弹性</h4>
+        <p>推理服务的 batch size 是动态的（1–32 不等）。当 batch size 为 1 时，Core 利用率极低，功耗可以降低；当 batch size 为 32 时，需要最大带宽。这要求约束体系支持"动态权重模式"：在低负载时，降低非关键路径的布线优先级，允许功耗门控；在高负载时，切换到高优先级模式。这个功能依赖 Runtime 的 feedback 信号实时更新权重。</p>
+        <div class="mini-tag">
+          <span class="tag">动态 net_weight</span>
+          <span class="tag gray">功耗门控</span>
+          <span class="tag green">Runtime feedback</span>
+        </div>
+      </div>
+    </div>
+    <div class="case-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>延迟预算分解与时序约束绑定</h4>
+        <p>目标延迟 100ms / token 需要分解到每个计算阶段：Prefill（首次处理 prompt）约 40ms，Decode（每个 token 生成）约 60ms。Decode 阶段是关键路径，直接映射为最严格的时序约束（SDC clock period）。KV Cache 读取路径的时序违规是最常见的 sign-off 问题，对应 HBM 控制器到 AI Core 之间的 Net 时序分析必须满足 100ps 以内的 Slack 要求。</p>
+        <div class="mini-tag">
+          <span class="tag">SDC 时序约束</span>
+          <span class="tag orange">关键路径 Slack</span>
+          <span class="tag green">sign-off 收敛</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout-block" style="margin-top:24px">
+    <p><b>两个案例的对比结论：</b>训练场景约束以"带宽最大化 + AllReduce 拓扑"为核心；推理场景约束以"延迟最小化 + KV Cache 访问模式"为核心。同一颗芯片如果需要同时支持两种场景，约束体系必须支持模式切换——这是当前 AI 芯片设计中最有挑战性的问题之一。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 12 启示 ═══════════════ -->
+<section id="insights" class="whitepaper-floor">
+  <div class="floor-kicker">11 · Product Insights</div>
+  <h2>对产品决策的启示</h2>
+  <p class="floor-lead">
+    网表约束体系不是纯工程问题。它的成熟度直接影响芯片研发的可预测性、性能上限和迭代速度——这些都是产品经理需要关注的维度。
+  </p>
+
+  <div class="insight-grid">
+    <div class="insight-card">
+      <div class="insight-num">01</div>
+      <h3>约束成熟度 = 研发可预测性</h3>
+      <p>约束体系不完善的芯片项目，通常在 P&amp;R 阶段才发现性能不达标，必须回溯修改架构。AI 芯片研发周期 2–3 年，一次重大回溯意味着 6–12 个月的延期。投资约束体系的前期研究，本质上是在降低研发风险。</p>
+      <p style="margin-top:10px"><b>PM 可以问：</b>我们有没有系统化的网表约束工具链？还是在靠工程师经验手动调？</p>
+    </div>
+    <div class="insight-card">
+      <div class="insight-num">02</div>
+      <h3>软件栈开放度决定生态潜力</h3>
+      <p>NVIDIA 的市场地位很大程度上来自于 CUDA 的开放——开发者可以看到优化效果，形成正向生态循环。TPU 和部分国产芯片的封闭策略有利于短期性能，但限制了开发者社区的壮大。</p>
+      <p style="margin-top:10px"><b>PM 可以问：</b>我们的编译器有没有对外的约束可视化工具？开发者能不能看到自己的算子为什么慢？</p>
+    </div>
+    <div class="insight-card">
+      <div class="insight-num">03</div>
+      <h3>下一代 EDA 工具的方向：语义化约束</h3>
+      <p>传统 EDA 工具商（Cadence、Synopsys）正在积极整合 AI 工作负载语义。下一代 P&amp;R 工具可能原生支持"算子图 → 布局约束"的自动转换。先建立约束语义化方法论的芯片团队，会更容易利用这些新工具。</p>
+      <p style="margin-top:10px"><b>PM 可以问：</b>我们有没有跟 EDA 工具商沟通 AI 特化约束的需求？路线图上有没有规划？</p>
+    </div>
+  </div>
+
+  <div class="paper-grid cols-2-paper" style="margin-top:24px">
+    <div class="paper-card">
+      <h3>判断约束体系成熟度的信号</h3>
+      <ul>
+        <li>P&amp;R 工具能不能读取算子图的 profiling 数据（不用手动输入权重）</li>
+        <li>约束违反（timing violation、congestion）能不能在早期 floorplan 阶段预警，而不是在最终 sign-off 才发现</li>
+        <li>工程师有没有系统化的约束版本管理，能对比不同约束配置的 QoR 差异</li>
+        <li>反馈闭环有没有自动化——真实 profiling 数据能自动更新网表权重，不需要人工干预</li>
+      </ul>
+    </div>
+    <div class="paper-card">
+      <h3>行业趋势：三个值得关注的方向</h3>
+      <ul>
+        <li><b>Chiplet 时代的约束复杂度：</b>多 Die 封装把网表约束扩展到封装互连层（UCIe / TSMC CoWoS），约束体系需要跨 Die 协同</li>
+        <li><b>存算一体（PIM）的约束重构：</b>当计算单元嵌入内存阵列，传统"计算区 + 存储区 + 互连区"的 floorplan 逻辑会被颠覆</li>
+        <li><b>AI for EDA（用 AI 优化芯片设计）：</b>Google、Synopsys 已有 AI 驱动的 floorplan 工具，约束体系的形式化描述是"喂给 AI 的训练数据"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 13 术语表 ═══════════════ -->
+<section id="terms" class="whitepaper-floor">
+  <div class="floor-kicker">附录 · Terminology</div>
+  <h2>术语速查</h2>
+  <p class="floor-lead">按类别整理，收录本白皮书涉及的核心术语。</p>
+
+  <table class="terms-table">
+    <thead>
+      <tr>
+        <th style="width:140px">术语</th>
+        <th>是什么</th>
+        <th>AI 芯片含义</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="cat-header"><td colspan="3">EDA 基础</td></tr>
+      <tr>
+        <td>RTL</td>
+        <td>Register Transfer Level，用 Verilog/VHDL 描述的寄存器级硬件行为，是芯片逻辑设计的源码</td>
+        <td>工程师用 RTL 定义 AI 算子（矩阵乘法、激活函数）的逻辑；RTL 经综合工具转成网表</td>
+      </tr>
+      <tr>
+        <td>Netlist</td>
+        <td>网表，描述芯片由哪些逻辑单元（Cell）组成及其连接关系（Wire/Net）的清单文件</td>
+        <td>需在标准格式上扩展 traffic_class、bandwidth_demand 等 AI 工作负载语义属性</td>
+      </tr>
+      <tr>
+        <td>GDSII</td>
+        <td>最终光刻版图格式，包含所有金属层几何图形，送代工厂进行光刻生产</td>
+        <td>所有约束最终物化为 GDSII 的几何图形；AI 芯片的 GDSII 文件体积可达 TB 级</td>
+      </tr>
+      <tr>
+        <td>LEF / DEF</td>
+        <td>库单元物理描述（LEF）和设计版图定义（DEF），定义单元尺寸、引脚位置与区域边界</td>
+        <td>DEF Floorplan 定义 AI Core、Memory Controller、NoC 的物理区域边界，是约束落地的起点</td>
+      </tr>
+
+      <tr class="cat-header"><td colspan="3">物理设计</td></tr>
+      <tr>
+        <td>P&amp;R</td>
+        <td>Placement &amp; Routing，布局布线：把网表逻辑单元摆到版图上，并画出实际金属走线</td>
+        <td>需感知工作负载流量矩阵，才能做出带宽敏感的最优摆放决策</td>
+      </tr>
+      <tr>
+        <td>Floorplan</td>
+        <td>芯片版图的区域划分规划，决定各功能模块（AI Core、Memory、NoC、I/O）的物理位置和大小</td>
+        <td>计算阵列、本地内存（L1/L2）、NoC 的物理边界在此确定，影响所有后续约束</td>
+      </tr>
+      <tr>
+        <td>CellUrate</td>
+        <td>Cell 利用率 = 有效器件面积 / 芯片总面积，衡量版图紧凑程度的核心指标</td>
+        <td>计算阵列区域密度可达 70–80%，控制逻辑区域需保留 30–50% 布线余量；两者需分区约束</td>
+      </tr>
+      <tr>
+        <td>DRC / LVS</td>
+        <td>设计规则检查（DRC）/ 版图与原理图一致性验证（LVS），物理设计的最终合规关卡</td>
+        <td>7nm+ 每次迭代可能触发 10 万+ 规则项；AI 芯片高密度布局使违规率更高，修复代价更大</td>
+      </tr>
+      <tr>
+        <td>DFT</td>
+        <td>Design for Testability，可测试性设计：内置扫描链（Scan Chain）、BIST、MBIST 等测试通路</td>
+        <td>Chiplet 封装中的 TSV 测试和 3D 叠层结构覆盖率验证是 DFT 的新难点；需在网表层预留空间</td>
+      </tr>
+
+      <tr class="cat-header"><td colspan="3">时序与功耗</td></tr>
+      <tr>
+        <td>STA / Slack</td>
+        <td>Static Timing Analysis，分析所有时序路径；Slack = 允许延迟 − 实际延迟，正值才合格</td>
+        <td>矩阵乘法单元的关键路径 Slack 最紧；负 Slack 意味着芯片无法在目标频率下稳定工作</td>
+      </tr>
+      <tr>
+        <td>SDC</td>
+        <td>Synopsys Design Constraints，基于 TCL 的时序约束文件，定义时钟、I/O 延迟、多周期路径</td>
+        <td>AI 芯片多时钟域（计算/存储/IO）需精细配置；关键路径约束需与 profiling 热点数据对齐</td>
+      </tr>
+      <tr>
+        <td>P = α·C·V²·f</td>
+        <td>动态功耗公式：α 活动因子 × C 负载电容 × V² 电压平方 × f 频率</td>
+        <td>连线越长 C 越大 → 功耗越高；DVFS 通过降 V/f 实现二次方级功耗节省；是布局优化的物理动机</td>
+      </tr>
+      <tr>
+        <td>Clock Gating</td>
+        <td>时钟门控：对空闲模块关闭时钟信号，消除无效翻转的动态功耗</td>
+        <td>可节省 30–50% 动态功耗；AI 芯片大量使用，需在网表层标注门控使能逻辑条件</td>
+      </tr>
+      <tr>
+        <td>MVTH / DVFS</td>
+        <td>多阈值电压（LVT 速度快但漏电多 / HVT 省电但慢）；动态电压频率调整</td>
+        <td>关键路径用 LVT、非关键路径用 HVT 可节省 15–30% 静态功耗；DVFS 在推理空闲期降压</td>
+      </tr>
+
+      <tr class="cat-header"><td colspan="3">芯片架构</td></tr>
+      <tr>
+        <td>SM（GPU）</td>
+        <td>Streaming Multiprocessor，GPU 的基本执行单元，含 CUDA Core（通用）+ Tensor Core（矩阵加速）</td>
+        <td>多 SM 并行是 GPU 算力来源；SM 间时钟同步和 HBM 物理距离是主要约束维度</td>
+      </tr>
+      <tr>
+        <td>Systolic Array</td>
+        <td>脉动阵列，NPU 核心：数据在规则网格中边流动边计算，N×N 阵列仅需 2N 次访存完成 N² 次乘加</td>
+        <td>比 GPU CUDA Core 能效高 5–10×；Tiling 对齐和 DMA 路径亲和性是关键布局约束</td>
+      </tr>
+      <tr>
+        <td>HBM</td>
+        <td>High Bandwidth Memory，通过硅通孔（TSV）与芯片封装在一起的高带宽内存</td>
+        <td>HBM3 带宽达 1.6 Tbps；KV Cache 随机访问 vs 训练顺序访问需要不同的控制器调度策略</td>
+      </tr>
+      <tr>
+        <td>Chiplet</td>
+        <td>将芯片拆分为多个芯粒分别制造再封装集成，各模块可选最优工艺节点（计算 3nm / I/O 12nm）</td>
+        <td>降成本提良率；Die 间 TSV 互连引入信号完整性（SI）和跨 Die 时序这两个新约束维度</td>
+      </tr>
+      <tr>
+        <td>NoC</td>
+        <td>Network-on-Chip，片上网络：芯片内部的数据路由和仲裁架构</td>
+        <td>AllReduce 拓扑决定 NoC 路由优先级；NoC 拥塞是网表约束体系的主要攻克目标之一</td>
+      </tr>
+      <tr>
+        <td>FinFET / GAA</td>
+        <td>鳍式晶体管（7nm 主流）→ 全环绕栅极纳米线（2nm）；GAA 栅极宽度控制精度要求达 0.5nm</td>
+        <td>工艺越先进设计规则越多（7nm 超 10 万条）；约束违规修复代价随工艺节点线性增长</td>
+      </tr>
+      <tr>
+        <td>Hypergraph</td>
+        <td>超图：边（超边）可连接多于两个节点；网表中的 Net（一对多信号）即超边</td>
+        <td>网表超图分割（Partitioning）算法决定多核 AI 芯片的任务分配和 Chiplet Die 切分方式</td>
+      </tr>
+
+      <tr class="cat-header"><td colspan="3">AI 工作负载</td></tr>
+      <tr>
+        <td>Tiling</td>
+        <td>将大尺寸张量切成小块，分批送入片上内存（Local Memory）计算后搬出</td>
+        <td>切分策略决定 DMA 搬运频率和功耗热点分布；Tiling 参数是布局约束的隐性来源</td>
+      </tr>
+      <tr>
+        <td>AllReduce</td>
+        <td>分布式训练集合通信原语：将所有节点的梯度求和并广播回每个节点</td>
+        <td>环形 / 树形 AllReduce 对 NoC 和片间互连的拓扑要求不同，影响路由优先级配置</td>
+      </tr>
+      <tr>
+        <td>KV Cache</td>
+        <td>推理时缓存注意力机制的 Key/Value 矩阵，避免对历史 token 的重复计算</td>
+        <td>随机访问模式与训练顺序访问截然不同，需要专门的 HBM 控制器访问调度优化</td>
+      </tr>
+      <tr>
+        <td>Tensor Parallel</td>
+        <td>将模型权重矩阵沿某维度切分到多卡，各卡并行计算部分结果后 AllReduce 合并</td>
+        <td>切分比例直接决定片间带宽需求；每次 AllReduce 都是一次 NoC / 片间链路的高峰负载</td>
+      </tr>
+      <tr>
+        <td>Pipeline Parallel</td>
+        <td>将模型的层切分为多段，不同设备处理不同层，以 micro-batch 流水执行</td>
+        <td>引入 micro-batch bubble（空泡）；各阶段的计算/通信时序隔离是网表约束的难点</td>
+      </tr>
+
+      <tr class="cat-header"><td colspan="3">编译器 / 软件栈</td></tr>
+      <tr>
+        <td>CANN / GE</td>
+        <td>华为 AI 框架开发套件；Graph Engine（GE）负责计算图编译、算子融合和执行调度</td>
+        <td>GE 的 profiling 数据和算子融合结果是流量权重注入网表的关键数据源</td>
+      </tr>
+      <tr>
+        <td>XLA / MLIR</td>
+        <td>Google 加速线性代数编译器（XLA）/ 多层次 IR 框架（MLIR），将模型图编译为硬件指令</td>
+        <td>芯片间互连（ICI）的带宽约束由 XLA 编译分区决定，需向下传递到网表权重</td>
+      </tr>
+      <tr>
+        <td>TensorRT</td>
+        <td>NVIDIA 推理优化库，对量化、算子融合、层融合做专项加速</td>
+        <td>TensorRT 的融合决策改变算子图结构，直接影响网表层的 Cell 组合和 Net 数量</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="paper-card" style="margin-top:24px">
+    <h3>参考资料</h3>
+    <p style="margin-bottom:14px">以下资料用于本白皮书的术语校准与方法论推导，均为公开信息。</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:15px">
+      <a href="https://www.hiascend.com/document/detail/zh/canncommercial/80RC1/quickstart/quickstart/quickstart_18_0003.html" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">Huawei CANN：CANN 是什么</a>
+      <a href="https://www.hiascend.com/document/detail/zh/canncommercial/82RC1/opdevg/Ascendcopdevg/atlas_ascendc_10_0015.html" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">Huawei CANN：Ascend C 抽象硬件架构</a>
+      <a href="https://github.com/nturley/netlistsvg" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">netlistsvg GitHub</a>
+      <a href="https://yosyshq.readthedocs.io/projects/yosys/en/latest/yosys_internals/formats/rtlil_rep.html" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">Yosys：RTLIL Cell / Wire / Netlist</a>
+      <a href="https://openroad-flow-scripts.readthedocs.io/en/latest/mainREADME.html" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">OpenROAD Flow：RTL 到 GDSII</a>
+      <a href="netlist-visual-report.html" style="color:#2454d6;text-decoration:none;padding:6px 0;border-bottom:1px solid var(--paper-line)">前序可视化研究报告</a>
+      <a href="ascend_tile_control.v" style="color:#2454d6;text-decoration:none;padding:6px 0">Verilog 示例：ascend_tile_control.v</a>
+      <a href="ascend_tile_control_yosys.json" style="color:#2454d6;text-decoration:none;padding:6px 0">Yosys JSON 网表（真实综合产物）</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Modal ═══════════════ -->
+<div class="modal" id="diagramModal" aria-hidden="true">
+  <div class="modal-bar">
+    <div id="modalTitle">Diagram</div>
+    <button class="modal-close" type="button" id="modalClose">关闭 · ESC</button>
+  </div>
+  <div class="modal-frame" id="modalFrame">
+    <img id="modalImage" src="" alt="">
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById('diagramModal');
+  const modalImage = document.getElementById('modalImage');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalClose = document.getElementById('modalClose');
+
+  function openDiagram(src, title) {
+    modalImage.src = src;
+    modalImage.alt = title;
+    modalTitle.textContent = title;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeDiagram() {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    modalImage.src = '';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('[data-fullscreen]').forEach((node) => {
+    node.addEventListener('click', () => openDiagram(node.dataset.fullscreen, node.dataset.title || 'Diagram'));
+  });
+  modalClose.addEventListener('click', closeDiagram);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeDiagram();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) closeDiagram();
+  });
+
+  // Active nav highlight
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.navlinks a');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = document.querySelector(`.navlinks a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3 });
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
