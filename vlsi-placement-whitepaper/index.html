@@ -11,7 +11,7 @@
     <div class="brand">VLSI Placement Whitepaper</div>
     <div class="navlinks">
       <a href="#cover">封面</a>
-      <a href="#map">全局地图</a>
+      <a href="#overview">概览</a>
       <a href="#definition">定义</a>
       <a href="#metrics">评估</a>
       <a href="#floorplanning">初始规划</a>
@@ -19,6 +19,9 @@
       <a href="#spreading">扩散修正</a>
       <a href="#legalization">合法化</a>
       <a href="#insight">启发</a>
+      <a href="#framework">框架</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语表</a>
     </div>
   </nav>
 
@@ -40,10 +43,40 @@
     </div>
   </section>
 
-  <section class="floor" id="map">
+  <section class="floor" id="overview">
     <div class="kicker">Structure · 从网表到坐标</div>
     <h2>Placement 是一条连续优化流水线</h2>
     <p class="lead">布局不是单个算法，而是一个“估计、规划、优化、扩散、合法化、微调”的闭环。每一步都在降低后续步骤的搜索压力：前面给出较好的全局形状，后面处理局部合法性和关键路径毛刺。</p>
+
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 定义</div>
+      <div class="jm-head">02 评估</div>
+      <div class="jm-head">03 规划</div>
+      <div class="jm-head">04 优化</div>
+      <div class="jm-head">05 落地</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell">布局到底在放什么？</div>
+      <div class="jm-cell">没布线前如何估计质量？</div>
+      <div class="jm-cell">为什么初始位置重要？</div>
+      <div class="jm-cell">N-body 直觉如何工程化？</div>
+      <div class="jm-cell">连续坐标如何变成合法版图？</div>
+
+      <div class="jm-label">本页内容</div>
+      <div class="jm-cell">ASIC / FPGA 差异、资源离散性</div>
+      <div class="jm-cell">HPWL、Timing Graph、Slack 权重</div>
+      <div class="jm-cell">Partition、Cluster、Floorplan</div>
+      <div class="jm-cell">Analytical、Spreading、Adjustment</div>
+      <div class="jm-cell">Legalization、Packing、Detailed Placement</div>
+
+      <div class="jm-label">输出结果</div>
+      <div class="jm-cell">从网表图到芯片几何的心智模型</div>
+      <div class="jm-cell">可快速更新的代理目标函数</div>
+      <div class="jm-cell">减少局部最优风险的粗布局</div>
+      <div class="jm-cell">多目标耦合的全局坐标</div>
+      <div class="jm-cell">可布线、可打包、可时序收敛的物理位置</div>
+    </div>
 
     <div class="timeline">
       <div class="step"><b>1 评估模型</b><span>用 HPWL、RSMT、星形线、timing graph 估计线长与延迟。</span></div>
@@ -471,6 +504,91 @@
     <div class="callout">
       <b>结论：</b>VLSI placement 不是“把点画漂亮”，而是在不完整物理信息下，用代理模型持续逼近可布线、可时序闭合、可制造的真实版图。它对 HNSW / H-Anchor 的启发不是“拿 HNSW 做向量索引”，而是借用高层稀疏导航、底层局部细化和增量更新的工程结构，把全局复杂度拆成可控的多层优化流程。
     </div>
+  </section>
+
+  <section class="floor" id="framework">
+    <div class="kicker">Framework · 核心模型</div>
+    <h2>把 placement 看成“代理模型 + 层次优化 + 物理落地”的框架</h2>
+    <p class="lead">这篇笔记最适合沉淀成一个三层框架：上层把真实物理问题压缩成可快速评估的代理指标，中层用层次化和解析优化搜索全局结构，底层再把理想坐标投影回真实硬件约束。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">目标层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">线长最小</div>
+          <div class="arch-box">时序闭合</div>
+          <div class="arch-box">拥塞可控</div>
+          <div class="arch-box">功耗 / 面积</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">算法层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Netlist Partition</div>
+          <div class="arch-box">Analytical Placement</div>
+          <div class="arch-box">Cell Spreading</div>
+          <div class="arch-box">Numerical Solver</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">物理层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">ASIC Row / Macro</div>
+          <div class="arch-box">FPGA LUT / FF</div>
+          <div class="arch-box">BRAM / DSP</div>
+          <div class="arch-box">Routing Channel</div>
+        </div>
+      </div>
+      <div class="arch-note">框架重点不是某一个求解器，而是让每一层都保留反馈通道：线长、时序、拥塞、packing 和 legalization 会反复影响上一层的权重与移动方向。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 必须记住的结论</div>
+    <h2>布局难在多目标互相拉扯，而不是坐标计算本身</h2>
+    <p class="lead">从产品和研究角度看，placement 的价值在于把复杂物理约束前置到可优化的图模型中，让系统能在还没布线、还没完全合法化之前，就持续做出接近最终 QoR 的判断。</p>
+
+    <div class="tension">
+      <div><b>核心张力</b><span>线长越短不一定越好；过度靠近会带来 density overflow、routing congestion 和 packing 失败。</span></div>
+      <div><b>优化方向</b><span>用 timing slack、density、resource demand 和 congestion feedback 动态调权，而不是固定一套边权。</span></div>
+      <div><b>局限性</b><span>代理模型永远不等于最终 routing，placement 必须接受后端反馈并保留增量修正能力。</span></div>
+    </div>
+
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>短期建议</h3>
+        <div class="rec-item"><div class="rec-num">01</div><div><b>保留代理指标解释</b><span>每个布局决策都能追溯到 HPWL、slack、density 或 congestion 中的一个原因。</span></div></div>
+        <div class="rec-item"><div class="rec-num">02</div><div><b>把关键路径单独可视化</b><span>全局指标变好不代表最差路径变好，必须让 WNS/TNS 风险可见。</span></div></div>
+      </div>
+      <div class="rec-panel">
+        <h3>长期方向</h3>
+        <div class="rec-item"><div class="rec-num">03</div><div><b>引入层次化 anchor</b><span>先用高层稀疏骨架导航，再在底层做局部 N-body / detailed placement。</span></div></div>
+        <div class="rec-item"><div class="rec-num">04</div><div><b>做增量 ECO 闭环</b><span>支持小范围网表变化、约束变化或时序反馈后的局部重布局。</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Terms · 术语表</div>
+    <h2>阅读这篇白皮书需要记住的术语</h2>
+    <p class="lead">这些词构成 placement 的基本语言：它们分别描述输入对象、代理目标、优化算法和物理落地约束。</p>
+
+    <table class="table">
+      <thead>
+        <tr><th>术语</th><th>含义</th><th>在布局中的作用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Netlist</td><td>逻辑综合后的实例与连接关系。</td><td>placement 的输入图。</td></tr>
+        <tr><td>HPWL</td><td>Half-Perimeter Wirelength，半周线长。</td><td>快速估计 net 线长的常用代理指标。</td></tr>
+        <tr><td>Timing Slack</td><td>信号到达时间与要求时间之间的裕量。</td><td>slack 越小，相关路径越需要优先优化。</td></tr>
+        <tr><td>Floorplanning</td><td>大块电路或宏单元的初始规划。</td><td>决定全局搜索起点，影响局部最优风险。</td></tr>
+        <tr><td>Analytical Placement</td><td>把布局写成可求解的数学优化问题。</td><td>现代全局布局的主流路径之一。</td></tr>
+        <tr><td>Cell Spreading</td><td>把过密区域中的实例向外扩散。</td><td>降低 density overflow，为布线和合法化留空间。</td></tr>
+        <tr><td>Legalization</td><td>把连续坐标映射到合法物理位置。</td><td>确保布局满足 site、row、资源和重叠约束。</td></tr>
+        <tr><td>Packing</td><td>把多个兼容实例组合进一个 FPGA 资源块。</td><td>FPGA placement 中影响面积、合法化和性能的关键约束。</td></tr>
+        <tr><td>Detailed Placement</td><td>在合法布局基础上做局部微调。</td><td>修复关键路径、局部线长和最后的 QoR 毛刺。</td></tr>
+      </tbody>
+    </table>
   </section>
 </body>
 </html>
