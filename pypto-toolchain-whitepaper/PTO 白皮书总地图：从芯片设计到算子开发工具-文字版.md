@@ -1,0 +1,288 @@
+# PTO 白皮书总地图：从芯片设计到算子开发工具
+
+- 这份导图回答什么
+  - 这 5 篇白皮书不是 5 个彼此独立的主题，而是一条完整链路上的不同层面。
+  - 这条链路从芯片设计的物理边界出发，经过约束建模、EDA 物理实现、运行时调度与编译，最后回到算子开发者的体验与效率。
+  - 它们共同回答一个核心问题：`算子开发工具为什么不能只从软件 API 出发，而必须带着硬件和物理实现视角设计。`
+
+- 可靠性说明
+  - `（官方）` 指华为 Ascend / CANN 官方文档，或 OpenROAD / OpenLane / Yosys 官方资料。
+  - `（本地白皮书）` 指 PTO 仓库中现有 5 篇白皮书的整理内容。
+  - `（研究推导）` 指基于公开链路做出的架构判断，用于解释整体关系，不等同于厂商内部实现说明。
+  - `（未公开）` 指公开资料未披露的内部实现细节，不在本文中作为事实使用。
+
+- 两个边界先讲清楚
+  - `已量产芯片的运行期链路`
+    - 算子运行时面对的是既有硬件。
+    - 输入对象是模型图、`shape`、`tiling`、调度策略、数据路径和运行时资源，而不是芯片物理 `netlist`。`（官方）`
+  - `下一代芯片的设计期链路`
+    - 工作负载特征可以在设计期被抽象为约束、权重和优化目标，影响 `netlist`、`placement`、`routing` 及最终 `QoR`。`（官方 + 研究推导）`
+  - 因此，本地图讨论的是两条链路之间的关系，而不是把运行期算子直接等同为物理设计输入。
+
+- 一、总图：一眼看懂整体 scope
+  - 1. 芯片设计回答“硬件最终长成什么样”
+    - 关注的是硬件结构、连接关系、时序、功耗、热和可制造性。
+    - 代表对象包括：`RTL`、`netlist`、`SDC`、`LEF/DEF`、`Liberty`、`floorplan`、`placement`、`routing`、`signoff`。`（官方）`
+  - 2. 设计约束回答“什么样的工作负载更值得被优先优化”
+    - 这里不是直接讨论某个算子源码，而是把工作负载的流量、依赖和关键路径特征，翻译成设计期可消费的约束。
+    - 代表对象包括：`traffic class`、`bandwidth demand`、`timing criticality`、`placement affinity`、`power domain`。`（研究推导）`
+  - 3. EDA 物理实现回答“这些约束怎样真正落到硅片上”
+    - 这是把逻辑结构变成物理坐标的过程。
+    - 代表流程包括：`global placement`、`legalization`、`detailed placement`、`CTS`、`routing`。`（官方）`
+  - 4. 运行时与编译器回答“现有芯片上，任务具体怎么跑”
+    - 它们处理的是软件到硬件的映射，而不是再去改造芯片物理结构。
+    - 代表对象包括：`Tensor Graph`、`Tile Graph`、`Block Graph`、`Execution Graph`、`runtime`、`worker`、`Lingqu L0-L7`。`（本地白皮书 + 官方）`
+  - 5. 算子开发工具回答“开发者怎样看见、理解并改进自己的性能问题”
+    - 它不是单纯的代码编辑器，也不是单纯的 `profiler`。
+    - 它应当把代码、图、调度、机器层级、数据路径和性能反馈放到同一视图中。`（本地白皮书 + 研究推导）`
+  - 6. HNSW / H-Anchor 回答“复杂图问题怎样用分层方式降低复杂度”
+    - 它们不是主流程本身，而是为“大图导航、增量修复、层级锚点”提供方法来源。`（本地白皮书）`
+
+- 二、为什么要从芯片设计出发
+  - 对管理层最重要的判断
+    - 算子性能并不只由算法正确性决定，更由它与硬件结构是否匹配决定。
+    - 如果工具只提供软件层可见性，就只能告诉开发者“哪里慢”；如果把硬件和物理实现纳入视图，工具才能进一步解释“为什么慢、慢在哪一层、如何更接近机器结构”。`（官方 + 研究推导）`
+  - 这件事在技术上为什么成立
+    - `Ascend C` 面向的是在 `AI Core` 上运行的算子开发。`（官方）`
+    - `AI Core` 内部同时包含：
+      - 计算资源：`Cube`、`Vector`、`Scalar`
+      - 存储资源：`Local Memory`、`Global Memory`、`L0/L1/UB`
+      - 搬运资源：`DMA`、`MTE`、`FixPipe`
+    - 因此，算子调优从一开始就不是纯软件问题，而是计算、存储、搬运三类资源的联合匹配问题。`（官方）`
+  - 这对产品意味着什么
+    - 开发者需要看到的不只是函数名和耗时。
+    - 更关键的是看到：
+      - 它落在哪一级机器层级。
+      - 它使用了哪些计算单元和内存层次。
+      - 数据走了哪些路径。
+      - 瓶颈来自计算、搬运、同步、带宽还是布局亲和性。`（研究推导）`
+
+- 三、五篇白皮书各自解决什么问题
+  - 1. `hw-native-sys`
+    - 定位
+      - 这是总架构白皮书，解释从 `PyPTO DSL` 到 `PTO ISA`、`runtime`、`Lingqu` 的软件栈。`（本地白皮书）`
+    - 它解决的问题
+      - 开发者写下的算子，如何被逐层翻译成机器可执行任务。
+      - 任务最终跑在 `L0-L7` 哪一级，以及由谁调度。
+    - 关键输入
+      - `PyPTO DSL`
+      - `PTO ISA`
+      - `simpler runtime`
+      - `Lingqu` 机器层级
+    - 关键输出
+      - 从代码到执行层级的统一解释链。
+    - 难点
+      - 把开发者视角、编译器视角、运行时视角和机器层级视角放进同一套坐标系。
+  - 2. `netlist`
+    - 定位
+      - 这是“软件语义到物理约束”的桥梁白皮书。`（本地白皮书 + 研究推导）`
+    - 它解决的问题
+      - 工作负载的哪些特征值得在芯片设计期被显式建模。
+      - 这些特征如何转成物理设计可消费的约束与权重。
+    - 关键输入
+      - `RTL`
+      - `gate-level netlist`
+      - `SDC`
+      - `LEF/DEF`
+      - `Liberty`
+      - 工作负载分析、`profiling`、流量特征。`（官方 + 研究推导）`
+    - 关键输出
+      - 面向物理设计的结构连接表示与约束解释层。
+    - 难点
+      - 既要保持对高层工作负载的敏感度，又不能把运行期链路误写成设计期 `netlist` 输入链路。
+  - 3. `VLSI Placement`
+    - 定位
+      - 这是 EDA 背景白皮书，解释约束如何变成物理位置。`（本地白皮书 + 官方）`
+    - 它解决的问题
+      - 为什么 `placement` 不是简单的坐标摆放，而是线长、时序、拥塞、功耗、合法性共同作用的大规模优化问题。
+    - 关键输入
+      - `weighted netlist`
+      - `hypergraph`
+      - `floorplan`
+      - `timing / congestion / power proxies`
+    - 关键输出
+      - `global placement`
+      - `legalization`
+      - `detailed placement`
+      - `routing-ready layout`
+    - 难点
+      - 同时满足性能目标和制造约束。
+  - 4. `PycPlacer / H-Anchor`
+    - 定位
+      - 这是分层布局算法原型白皮书。`（本地白皮书）`
+    - 它解决的问题
+      - 布局问题能否先建高层锚点，再做底层细化与局部更新，从而加快探索速度。
+    - 关键输入
+      - `weighted graph`
+      - `cells`
+      - `anchors`
+      - `PageRank`
+      - `spatial suppression`
+      - `force-directed placement`
+    - 关键输出
+      - 早期 `placement` 原型
+      - `anchor hierarchy`
+      - `incremental local update`
+    - 难点
+      - 在速度、稳定性和局部修复能力之间取得平衡。
+  - 5. `HNSW`
+    - 定位
+      - 这是可迁移的方法论白皮书。`（本地白皮书）`
+    - 它解决的问题
+      - 大规模图问题怎样避免全量搜索，而通过分层导航获得可接受的效率和效果。
+    - 关键输入
+      - `vector`
+      - `distance function`
+      - `M`
+      - `efConstruction`
+      - `ef`
+      - `Skip List / NSW / HNSW`
+    - 关键输出
+      - `coarse-to-fine`
+      - `navigation layer`
+      - `candidate expansion`
+      - `incremental insert/update`
+    - 难点
+      - 控制 `early stopping` 风险，并在召回质量与计算成本之间取平衡。
+
+- 四、五篇白皮书之间的上下游关系
+  - 最简洁的阅读顺序
+    - `hw-native-sys`
+      - 建立软件栈和机器层级坐标。
+    - `netlist`
+      - 建立工作负载语义与设计期物理约束之间的桥。
+    - `VLSI Placement`
+      - 建立约束如何进入版图优化的认识。
+    - `PycPlacer / H-Anchor`
+      - 展示分层锚点方法如何服务布局探索。
+    - `HNSW`
+      - 解释这类分层思想背后的通用方法来源。
+  - 如果把它们画成一张链路图
+    - `hw-native-sys`
+      - 回答“软件如何组织任务”
+    - `netlist`
+      - 回答“设计期如何表达物理代价”
+    - `VLSI Placement`
+      - 回答“代价如何转成物理布局”
+    - `H-Anchor`
+      - 回答“复杂布局怎样做分层求解”
+    - `HNSW`
+      - 回答“分层导航思想为何有效”
+
+- 五、Netlist 控制的是算子计算的哪些维度
+  - 一个容易误解、但必须讲清楚的结论
+    - `netlist` 不是运行时算子的输入对象。
+    - 但 `netlist` 所定义的结构与连接，会间接决定未来算子在该硬件上的性能边界。`（官方 + 研究推导）`
+  - 1. 结构维度
+    - 关键对象：`cell`、`module`、`macro`
+    - 对算子的影响
+      - 决定硬件里有哪些执行单元、缓冲单元、搬运单元和互连模块。
+  - 2. 数据路径维度
+    - 关键对象：`wire`、`net`、`bus`、`port`
+    - 对算子的影响
+      - 决定数据从哪里到哪里、路径有多宽、扇出有多大。
+  - 3. 时序维度
+    - 关键对象：`clock`、`critical path`、`slack`、`clock domain`
+    - 对算子的影响
+      - 决定哪些路径必须优先优化，目标频率能否收敛。
+  - 4. 带宽与流量维度
+    - 关键对象：`traffic class`、`bandwidth demand`、`edge weight`、`reuse frequency`
+    - 对算子的影响
+      - 决定高频 `tensor path`、通信链路和访存模式是否得到足够重视。
+  - 5. 空间亲和维度
+    - 关键对象：`placement region`、`affinity group`、`halo`、`blockage`
+    - 对算子的影响
+      - 决定哪些模块更适合放近，哪些区域需要隔离或保护。
+  - 6. 功耗与可靠性维度
+    - 关键对象：`switching activity`、`capacitance`、`clock gating`、`power domain`、`IR drop`、`EM`、`thermal`、`DFT`
+    - 对算子的影响
+      - 决定持续性能、功耗热点和长期稳定性边界。
+
+- 六、Lingqu 在这张总图里的位置
+  - 对非技术读者的直白解释
+    - `Lingqu` 不是一个单独的小模块，而是整张图里的“机器层级坐标系”。
+    - 它把“任务到底跑在单核、单芯片、单机还是集群”这件事，用统一语言表达出来。`（本地白皮书）`
+  - 为什么这很重要
+    - 同样是“慢”，发生在不同层级，治理方法完全不同。
+    - 可以把术语收敛成三类可读表达：
+      - `核内执行层`
+        - 对应 `L0-L1`
+        - 重点看：`Tile`、`buffer`、`DMA`、`pipeline`、`Cube / Vector / Scalar`
+      - `芯片内协同层`
+        - 对应 `L2-L3`
+        - 重点看：`Core Group`、`NoC`、`HBM`
+      - `系统部署层`
+        - 对应 `L4-L7`
+        - 重点看：`Host`、`Pod`、`Cluster`、`Global Coordinator`
+  - 这意味着什么
+    - `Lingqu` 让 `profiler`、`runtime`、`graph viewer` 和调度器可以围绕同一套层级坐标协同工作。
+    - 它把“问题发生在哪里”从口语描述变成系统化表达。
+
+- 七、HNSW / H-Anchor 在总图中的真实作用
+  - 一个需要避免的误读
+    - `HNSW` 不是把 EDA 直接改写成向量检索。
+    - `H-Anchor` 也不是完整的物理设计工具。
+    - 两者的价值，在于把“分层、锚点、局部修复”的思路引入复杂图优化。`（本地白皮书）`
+  - 这套思路为什么重要
+    - 当图足够大时，全量优化往往代价过高。
+    - 更可行的方法通常是：
+      - 先找少量高价值节点建立骨架。
+      - 再在局部邻域做细化。
+      - 最后只对热点区域做增量修复。
+  - 对 PTO 产品的启发
+    - 适用于：
+      - 大图调度
+      - 相似案例召回
+      - 局部 `replay`
+      - 局部修复
+      - 优化记忆库
+    - 关键术语保留如下：
+      - `coarse-to-fine`
+      - `anchor graph`
+      - `candidate expansion`
+      - `incremental update`
+      - `early stopping`
+
+- 八、对 PTO 产品方向的直接含义
+  - 1. 不是只做一个算子 IDE
+    - 因为问题不止发生在代码层，还发生在图层、调度层、机器层级和数据路径层。
+  - 2. 不是只做一个 `profiler`
+    - 因为单纯的时间统计无法解释硬件资源、数据搬运和物理代价。
+  - 3. 更合理的产品形态
+    - 一个面向算子开发的跨层可视化与分析工具：
+      - 上层看代码与图
+      - 中层看编译与运行时映射
+      - 下层看机器层级、流量路径和物理风险
+      - 旁路看历史优化案例与可迁移修复策略
+  - 4. 最终希望形成的工作流
+    - 写算子
+    - 看执行图
+    - 看机器层级
+    - 看流量与瓶颈
+    - 看物理风险
+    - 参考历史优化经验
+    - 做局部修复
+    - 再验证结果
+
+
+- 十、来源
+  - 官方资料
+    - 华为 Ascend / CANN 文档
+      - CANN 总览：https://www.hiascend.com/document/detail/zh/canncommercial/80RC1/quickstart/quickstart/quickstart_18_0003.html
+      - Ascend C 硬件架构抽象：https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC2alpha002/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0015.html
+      - Ascend C 基本架构：https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha002/opdevg/Ascendcopdevg/atlas_ascendc_10_0007.html
+    - OpenROAD / OpenLane / Yosys
+      - OpenROAD Flow Scripts：https://openroad-flow-scripts.readthedocs.io/en/latest/mainREADME.html
+      - OpenROAD Flow：https://openroad.ergodex.ai/pages/flow.html
+      - OpenLane：https://openlane.readthedocs.io/
+  - 本地白皮书
+    - `hw-native-sys`
+      - https://yinyucheng0601.github.io/compute-graph-viewer/hw-native-sys/
+    - `netlist`
+      - https://yinyucheng0601.github.io/compute-graph-viewer/netlist/ai-chip-netlist-whitepaper-report.html
+    - `VLSI Placement`
+      - https://yinyucheng0601.github.io/compute-graph-viewer/vlsi-placement-whitepaper/
+    - `PycPlacer / H-Anchor`
+      - https://yinyucheng0601.github.io/compute-graph-viewer/PycPlacer/pycplacer-whitepaper.html
+    - `HNSW`
+      - https://yinyucheng0601.github.io/compute-graph-viewer/HNSW/HNSW-whitepaper.html

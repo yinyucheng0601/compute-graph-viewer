@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PTO / PyPTO Hardware-Native Operator Toolchain 白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">PyPTO Toolchain Whitepaper</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#scope-map">导图</a>
+      <a href="#bg">芯片设计</a>
+      <a href="#netlist">设计约束</a>
+      <a href="#eda">物理实现</a>
+      <a href="#runtime">运行时</a>
+      <a href="#compiler">编译器</a>
+      <a href="#dev">开发者</a>
+      <a href="#feedback">反馈闭环</a>
+      <a href="#methods">方法迁移</a>
+      <a href="#framework">问题地图</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026</div>
+    <h1>PTO / PyPTO<br>Hardware-Native Operator Toolchain</h1>
+    <p class="lead">这篇总论白皮书把 PTO 现有五篇白皮书串成一张完整地图：从 PyPTO DSL、PTO ISA、runtime 和 Lingqu 机器层级出发，连接到设计期的 netlist 约束、VLSI placement、H-Anchor 原型和 HNSW 方法迁移，回答“算子开发工具为什么必须从硬件和物理实现反推”。</p>
+
+    <h3 style="margin-top:1.4rem">Framework · 一张总框架图</h3>
+    <p class="lead" style="margin-top:6px">五篇白皮书不是五个并列主题，而是从运行时软件栈向设计期物理实现和方法迁移展开的几条分支。首页先把总图和对应入口放在一起，后面的章节才不会串线。</p>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">总架构层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">hw-native-sys</div>
+          <div class="arch-box">PyPTO / PTO ISA / simpler / Lingqu</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">桥梁层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">netlist</div>
+          <div class="arch-box">软件语义 -> 设计期物理约束</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">EDA 背景层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">VLSI Placement</div>
+          <div class="arch-box">design-time layout optimization</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">算法原型层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">H-Anchor</div>
+          <div class="arch-box">weighted graph -> placement prototype</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">方法论层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">HNSW</div>
+          <div class="arch-box">coarse-to-fine / anchor / incremental update</div>
+        </div>
+      </div>
+      <div class="arch-note">阅读顺序应当是：先从芯片设计和物理实现链路建立边界，再看 netlist / VLSI placement / H-Anchor 这些设计期层，最后回到 hw-native-sys、runtime、编译器和开发者体验。HNSW 作为方法论层，放在最后理解它的迁移价值最清楚。</div>
+
+      <h3 style="margin:1.25rem 0 0.85rem">关联白皮书入口</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>白皮书</th>
+            <th>Pages</th>
+            <th>用途</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>hw-native-sys</b></td>
+            <td><a href="https://yinyucheng0601.github.io/compute-graph-viewer/hw-native-sys/" target="_blank" rel="noopener">https://yinyucheng0601.github.io/compute-graph-viewer/hw-native-sys/</a></td>
+            <td>整理 PyPTO / PTO ISA / runtime / Lingqu 的系统视角。</td>
+          </tr>
+          <tr>
+            <td><b>netlist</b></td>
+            <td><a href="https://yinyucheng0601.github.io/compute-graph-viewer/netlist/ai-chip-netlist-whitepaper-report.html" target="_blank" rel="noopener">https://yinyucheng0601.github.io/compute-graph-viewer/netlist/ai-chip-netlist-whitepaper-report.html</a></td>
+            <td>整理 AI 芯片约束体系的研究假设和产品视角。</td>
+          </tr>
+          <tr>
+            <td><b>VLSI Placement</b></td>
+            <td><a href="https://yinyucheng0601.github.io/compute-graph-viewer/vlsi-placement-whitepaper/" target="_blank" rel="noopener">https://yinyucheng0601.github.io/compute-graph-viewer/vlsi-placement-whitepaper/</a></td>
+            <td>整理 placement / legalization / detailed placement 的 EDA 算法背景。</td>
+          </tr>
+          <tr>
+            <td><b>PycPlacer / H-Anchor</b></td>
+            <td><a href="https://yinyucheng0601.github.io/compute-graph-viewer/PycPlacer/pycplacer-whitepaper.html" target="_blank" rel="noopener">https://yinyucheng0601.github.io/compute-graph-viewer/PycPlacer/pycplacer-whitepaper.html</a></td>
+            <td>整理分层锚点 placement 原型。</td>
+          </tr>
+          <tr>
+            <td><b>HNSW</b></td>
+            <td><a href="https://yinyucheng0601.github.io/compute-graph-viewer/HNSW/HNSW-whitepaper.html" target="_blank" rel="noopener">https://yinyucheng0601.github.io/compute-graph-viewer/HNSW/HNSW-whitepaper.html</a></td>
+            <td>整理分层导航、coarse-to-fine、anchor / incremental update 的方法论。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="floor map-floor" id="scope-map">
+    <div class="kicker">Map · 总图导览</div>
+    <h2>PTO 白皮书整体 scope</h2>
+    <p class="lead">这张图把五篇白皮书、两条链路和产品方向放到一张结构图里。这里直接展示原始 SVG，不加边框，不做裁切。</p>
+    <img
+      class="full-svg-map"
+      src="./PTO 白皮书总地图：从芯片设计到算子开发工具.svg"
+      alt="PTO 白皮书总地图：从芯片设计到算子开发工具"
+      loading="lazy"
+    >
+  </section>
+
+  <section class="floor" id="bg">
+    <div class="kicker">Question 01 · 为什么先从芯片设计讲起</div>
+    <h2>先看物理现实，再谈算子开发体验</h2>
+    <p class="lead">这篇总论如果从开发者 API 开始讲，会自然滑回“软件视角优先”。但 PTO 的主张正相反：先看芯片设计和物理实现链路，再回头理解 runtime、编译器和开发者为什么会暴露出今天这些问题。</p>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>运行时软件链路</h3>
+        <p>模型代码进入 PyPTO / 编译器 / runtime，最后在既有硬件上运行。这里的核心对象是 Tensor Graph、Tile Graph、Block Graph、Execution Graph、worker 和机器层级。</p>
+        <div class="pill-row"><span class="pill blue">compile-time</span><span class="pill blue">runtime</span><span class="pill">existing silicon</span></div>
+      </div>
+      <div class="card">
+        <h3>设计期物理实现链路</h3>
+        <p>RTL、网表、时序约束、floorplan、placement、routing 和 signoff 共同决定芯片最终如何被制造。这里的核心对象是 design-time netlist、site、wire、clock、congestion 和 QoR。</p>
+        <div class="pill-row"><span class="pill warn">design-time</span><span class="pill warn">physical implementation</span></div>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">两条链的正确关系</span></div>
+      <div class="mb">Python / model
+  -> PyPTO DSL
+  -> compiler IR / graphs
+  -> runtime / Lingqu
+  -> runs on existing chip
+
+workload / product target
+  -> architecture tradeoff
+  -> RTL / netlist / constraints
+  -> placement / routing / signoff
+  -> future chip implementation
+
+feedback bridge:
+  profiler / QoR / traffic / latency
+  -> informs next design iteration</div>
+    </div>
+
+    <div class="callout">
+      <b>核心判断：</b>PTO 的独特价值就在于敢把这两条链重新接起来看。它既不能把设计期问题伪装成 runtime 魔法，也不能把 runtime 体验和硬件代价割裂开。
+    </div>
+  </section>
+
+  <section class="floor" id="netlist">
+    <div class="kicker">Question 02 · 设计约束捕获什么物理代价</div>
+    <h2>netlist 不描述高层算子语义，但它决定物理代价边界</h2>
+    <p class="lead">netlist 白皮书最需要纠正的误解是：它讨论的不是“运行时算子如何输入 950 的物理 netlist”，而是设计期如何把工作负载语义翻译成硬件结构、连接、线网权重和物理约束，让未来的硬件更适合这类算子。</p>
+
+    <div class="matrix">
+      <div class="ok"><b>结构维度</b><br>cell / module / macro 定义未来硬件里有哪些执行和搬运单元。</div>
+      <div class="ok"><b>路径维度</b><br>wire / net / bus 决定数据实际要走多远、扇出多大。</div>
+      <div class="warn"><b>时序维度</b><br>critical path / slack 决定哪些路径必须在版图上被优先优化。</div>
+      <div class="warn"><b>流量维度</b><br>traffic class / bandwidth demand 决定高频数据路径是否被优先布线。</div>
+      <div class="bad"><b>功耗维度</b><br>switching activity、capacitance、clock gating 决定动态和静态代价。</div>
+      <div class="bad"><b>可靠性维度</b><br>IR drop、EM、thermal、DFT 决定可制造性和长期稳定性。</div>
+    </div>
+
+    <div class="callout">
+      <b>设计期桥梁：</b>运行时 profiler 提供的是现实世界里的流量和热点证据；netlist / 约束建模尝试把这些证据提炼成设计期可消费的权重层。这一步不是现有 950 的运行时逻辑，而是下一代芯片或研究原型的协同设计问题。
+    </div>
+  </section>
+
+  <section class="floor" id="eda">
+    <div class="kicker">Question 03 · EDA placement / routing 如何决定可达性能</div>
+    <h2>EDA 决定的是未来硬件的物理上限，不是运行时的表面数字</h2>
+    <p class="lead">VLSI Placement 白皮书和 H-Anchor 原型共同解释了一点：很多算子层面的性能问题，最终都能追溯到 design-time 的物理实现选择。线长、拥塞、clock tree、power grid 和合法化约束决定未来这颗芯片能不能把高流量路径摆近、把关键路径拉短、把热区分散。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>VLSI Placement</h3>
+        <p>解释标准设计期流程：floorplan、global placement、spreading、legalization、detailed placement。它给出的是“物理实现为什么难”的背景框架。</p>
+      </div>
+      <div class="card">
+        <h3>H-Anchor</h3>
+        <p>解释研究原型层：当 weighted graph 和 cell 已经准备好时，如何用 anchor hierarchy、force-directed placement 和 local update 做早期布局探索。</p>
+      </div>
+      <div class="card">
+        <h3>对 PTO 的意义</h3>
+        <p>它提醒工具设计者：tile、fusion、buffer 和 schedule 的好坏，并不是抽象判断，而是会落到未来硬件的线长、拥塞、功耗和可达频率上。</p>
+      </div>
+    </div>
+
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">EDA 对算子工具的真实启发</span></div>
+      <div class="mb">if runtime_problem == "same math, very different latency":
+  check tile / buffer / communication pattern
+  ask whether future hardware should place these paths closer
+
+if design_problem == "high-traffic modules far apart":
+  update constraint weights
+  rerun placement exploration
+  compare congestion / timing / power proxies</div>
+    </div>
+  </section>
+
+  <section class="floor" id="runtime">
+    <div class="kicker">Question 04 · runtime 调度到哪个 Lingqu 层级</div>
+    <h2>Lingqu 给“任务跑在哪里”提供统一坐标</h2>
+    <p class="lead">从芯片设计和物理实现往上走，第一层软件抽象就是 runtime。没有 Lingqu，runtime 只能给出一堆分散术语：core、chip、host、cluster、global。Lingqu 的价值，是把它们组织成 L0-L7 的递归层级，让同一套 Orchestrator-Scheduler-Worker 协议从核内一直延伸到万卡级部署。</p>
+
+    <div class="grid cols-4">
+      <div class="card"><h3>L0-L1</h3><p>Tile / Core 视角：AIC、AIV、AICPU、buffer、DMA、pipeline。</p></div>
+      <div class="card"><h3>L2-L3</h3><p>Core Group / Chip 视角：局部协同、NoC、HBM、核组内任务拆分。</p></div>
+      <div class="card"><h3>L4-L5</h3><p>Host / Pod 视角：单机多卡、节点内高带宽互连、部署边界。</p></div>
+      <div class="card"><h3>L6-L7</h3><p>Cluster / Global 视角：跨机调度、全局协调、任务编排。</p></div>
+    </div>
+
+    <div class="callout">
+      <b>为什么这层重要：</b>同一个性能问题，如果发生在 L0，通常是 tile、buffer、DMA 或 AIC/AIV 配合问题；如果发生在 L5-L7，往往是通信拓扑、批处理策略或跨节点调度问题。没有层级坐标，profiler 只会报“慢”，不会报“慢在哪一层”。
+    </div>
+  </section>
+
+  <section class="floor" id="compiler">
+    <div class="kicker">Question 05 · 编译器看到什么</div>
+    <h2>编译器看到的是一串逐级下沉的图，不是 Python 文本</h2>
+    <p class="lead">runtime 再往上，编译器真正消费的是多层对象：Tensor Graph 表达算法依赖，Tile Graph 表达局部数据流，Block Graph 表达并发与资源切分，Execution Graph 表达最终可调度任务。这里是 hw-native-sys 和 netlist 白皮书之间的第一座桥。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">应用层</div>
+        <div class="arch-boxes">
+          <div class="arch-box">模型代码</div>
+          <div class="arch-box">算子库</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">图层 1</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Tensor Graph</div>
+          <div class="arch-box">算法依赖</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">图层 2</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Tile Graph</div>
+          <div class="arch-box">局部数据流</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">图层 3</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Block Graph</div>
+          <div class="arch-box">并发 / 切分 / 角色</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">图层 4</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Execution Graph</div>
+          <div class="arch-box">可调度任务 DAG</div>
+        </div>
+      </div>
+      <div class="arch-note">编译器不是把 Python 直接映射到单条指令，而是不断丢弃高层细节、保留硬件相关语义，直到生成可被 runtime 消费的任务图。</div>
+    </div>
+
+    <div class="tension compact">
+      <div><b>难点</b><span>高层算法结构要保留 enough 语义，低层 IR 又要足够接近硬件。</span></div>
+      <div><b>输入</b><span>PyPTO DSL、shape、mask、role、level、target backend。</span></div>
+      <div><b>输出</b><span>多层 IR、PTO ISA 相关对象、Execution Graph、runtime 可调度任务。</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="dev">
+    <div class="kicker">Question 06 · 开发者最终看到什么</div>
+    <h2>开发者写的不是“抽象算子”，而是硬件占用意图</h2>
+    <p class="lead">顺着芯片设计、约束、EDA、runtime 和编译器一路往上走，最后才回到开发者视角。在 PyPTO 里，开发者写的函数并不只是“一个数学 kernel”，而是在声明 tile 切分、buffer 生命周期、pipeline 节奏、角色分工和层级边界。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>开发者可见对象</h3>
+        <p>Tensor、shape、mask、tiling、scope、pipeline、event、role、level。它们不是外围装饰，而是决定后续编译和调度路径的显式语义。</p>
+        <div class="pill-row"><span class="pill">shape</span><span class="pill">tile</span><span class="pill">scope</span></div>
+      </div>
+      <div class="card">
+        <h3>开发者真正控制的东西</h3>
+        <p>Local Memory 能否装下工作块、DMA 如何搬运、AIC / AIV 如何协同、任务在哪一级被拆分。这些决定的是资源占用和数据流，不只是 API 美观度。</p>
+        <div class="pill-row"><span class="pill blue">buffer lifetime</span><span class="pill blue">DMA path</span></div>
+      </div>
+      <div class="card">
+        <h3>为什么这很重要</h3>
+        <p>如果工具只把开发者当成“写 Python 的人”，它就解释不了为什么同一段数学逻辑换一种 tile 或 fusion 就会把性能拉开数量级。</p>
+        <div class="pill-row"><span class="pill hot">performance intent</span><span class="pill hot">not syntax only</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="feedback">
+    <div class="kicker">Question 07 · profiler / 可视化如何把 QoR 反馈回来</div>
+    <h2>profiler 不该只给数字，而要把数字翻译成跨层解释</h2>
+    <p class="lead">PTO 如果只做 timeline、counter 和 flame chart，它会停留在“观察工具”。要成为 operator toolchain，它必须把 profiler 结果翻译成：问题发生在哪一级 Lingqu、对应哪类数据路径、未来设计期约束能如何吸收、当前 runtime 能如何规避。</p>
+
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>运行期反馈</h3>
+        <div class="rec-item"><div class="rec-num">01</div><div><b>层级归因</b><span>判断问题发生在 tile、chip、host 还是 cluster 层。</span></div></div>
+        <div class="rec-item"><div class="rec-num">02</div><div><b>数据流归因</b><span>指出是 AIC 算力、DMA 搬运、HBM、NoC 还是跨机通信瓶颈。</span></div></div>
+        <div class="rec-item"><div class="rec-num">03</div><div><b>策略建议</b><span>给出 tiling、fusion、buffer、parallel strategy 的局部调整建议。</span></div></div>
+      </div>
+      <div class="rec-panel">
+        <h3>设计期反馈</h3>
+        <div class="rec-item"><div class="rec-num">04</div><div><b>约束回写</b><span>把高流量路径、热点区和关键时序路径回写成设计期 workload 证据。</span></div></div>
+        <div class="rec-item"><div class="rec-num">05</div><div><b>QoR 映射</b><span>把 runtime 现象映射成可能的 placement / routing 风险。</span></div></div>
+        <div class="rec-item"><div class="rec-num">06</div><div><b>版本对比</b><span>比较不同 tiling / schedule / architecture 假设下的 QoR 差异。</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="methods">
+    <div class="kicker">Method Transfer · HNSW / H-Anchor 如何服务大图调度和增量修复</div>
+    <h2>迁移的不是具体实现，而是分层导航结构</h2>
+    <p class="lead">HNSW 原生属于 ANN / 向量检索，H-Anchor 属于 placement 算法原型。它们对 PTO 的真正价值不是“直接塞进 runtime”，而是提供一套可迁移结构：先抽高层 anchor，先做粗导航，再做局部细化，最后支持增量修复。</p>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>HNSW 提供什么</h3>
+        <p>分层稀疏骨架、候选扩展、避免局部最优、追加式更新友好。这适合做相似 kernel 召回、相似 IR 症状召回和方法论迁移。</p>
+        <div class="pill-row"><span class="pill blue">ANN</span><span class="pill">coarse-to-fine</span></div>
+      </div>
+      <div class="card">
+        <h3>H-Anchor 提供什么</h3>
+        <p>把“高层骨架 + 底层细化”搬到 placement 原型上，验证 speed、determinism、incremental update 这组三角能否被同时逼近。</p>
+        <div class="pill-row"><span class="pill blue">anchor graph</span><span class="pill">local update</span></div>
+      </div>
+      <div class="card">
+        <h3>PyPTO 可以怎么用</h3>
+        <p>Execution Graph 的 anchor block 选择、Optimization Memory 的相似案例召回、局部 replay / 局部 schedule 修复，都可以借这套分层组织方式。</p>
+        <div class="pill-row"><span class="pill hot">graph scheduling</span><span class="pill hot">optimization memory</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="framework">
+    <div class="kicker">Framework · 七个问题地图</div>
+    <h2>这篇总论按哪七个问题展开</h2>
+    <p class="lead">首页已经给出总体框架图，这一页专门说明阅读顺序。七个问题现在按“芯片设计与物理现实优先”的顺序展开：先看 design-time 的边界，再往上走到 runtime、编译器和开发者视角，最后再回到反馈和方法迁移。</p>
+
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 芯片设计</div>
+      <div class="jm-head">02 设计约束</div>
+      <div class="jm-head">03 物理实现</div>
+      <div class="jm-head">04 运行时</div>
+      <div class="jm-head">05 编译器</div>
+      <div class="jm-head">06 开发者</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell">为什么必须先看物理现实和设计链路？</div>
+      <div class="jm-cell">工作负载语义怎样进入设计约束？</div>
+      <div class="jm-cell">EDA 怎样决定未来硬件的性能边界？</div>
+      <div class="jm-cell">任务最终调度到哪个 Lingqu 层级？</div>
+      <div class="jm-cell">编译器到底看见什么对象？</div>
+      <div class="jm-cell">开发者最终看到什么，以及工具该如何反馈？</div>
+
+      <div class="jm-label">对应章节</div>
+      <div class="jm-cell">芯片设计</div>
+      <div class="jm-cell">设计约束</div>
+      <div class="jm-cell">物理实现</div>
+      <div class="jm-cell">运行时</div>
+      <div class="jm-cell">编译器</div>
+      <div class="jm-cell">开发者 + 反馈闭环</div>
+
+      <div class="jm-label">输出结果</div>
+      <div class="jm-cell">先把 runtime 和 design-time 两条链拆开</div>
+      <div class="jm-cell">netlist 是设计期桥梁，不是运行时输入</div>
+      <div class="jm-cell">placement / routing 决定未来硬件边界</div>
+      <div class="jm-cell">Lingqu 给出统一机器层级坐标</div>
+      <div class="jm-cell">编译器消费的是多层图和 IR</div>
+      <div class="jm-cell">开发者看到的是可解释反馈，而不是黑盒性能数字</div>
+    </div>
+  </section>
+
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 最终判断</div>
+    <h2>PTO 的目标不是做单点工具，而是做硬件原生算子工作台</h2>
+    <p class="lead">如果只看五篇白皮书中的任意一篇，都容易误判 PTO 的方向。把它们合起来看，主线其实很清楚：让算子开发者看见自己的代码如何占用机器层级、数据路径和未来硬件边界，并用可解释反馈把运行时优化和设计期约束连接起来。</p>
+
+    <div class="tension">
+      <div><b>产品主线</b><span>写算子 -> 看层级 -> 看数据流 -> 看物理风险 -> 找历史经验 -> 做局部修复 -> 再验证。</span></div>
+      <div><b>短期价值</b><span>把 profiler、Execution Graph 和 Lingqu 做成解释工具，而不是只做观测面板。</span></div>
+      <div><b>长期价值</b><span>建立 runtime 证据到设计期约束的闭环，让 PTO 成为 operator toolchain，而不是零散白皮书集合。</span></div>
+    </div>
+
+    <div class="callout">
+      <b>一句话结论：</b>PyPTO 不是从“如何多写几个 kernel”出发，而是从“如何让算子、编译器、runtime 和未来硬件说同一种语言”出发。
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Appendix · 术语表</div>
+    <h2>读这篇总论需要记住的术语</h2>
+    <p class="lead">这些词覆盖运行时软件栈、设计期物理实现和方法迁移三条线，是理解 PTO 总地图的最小词汇集。</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>术语</th>
+          <th>定义</th>
+          <th>在总图中的位置</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>PyPTO</td><td>Python 友好的 tile 编程入口，用显式层级和角色描述算子。</td><td>总架构层 / 开发者入口</td></tr>
+        <tr><td>PTO ISA</td><td>tile 维度的虚拟 ISA，承担跨代硬件差异隔离。</td><td>总架构层 / 编译器与后端边界</td></tr>
+        <tr><td>simpler</td><td>运行时层，负责任务提交、异步执行和 OSW 协议实现。</td><td>运行时层</td></tr>
+        <tr><td>Lingqu</td><td>L0-L7 机器层级，把核内到全局部署放在同一坐标系。</td><td>运行时层 / 机器层级坐标</td></tr>
+        <tr><td>Execution Graph</td><td>可被 runtime 调度的任务 DAG。</td><td>编译器输出 / runtime 输入</td></tr>
+        <tr><td>netlist</td><td>芯片设计期的结构连接表示，描述 cell / module 与 wire / net 关系。</td><td>设计期桥梁层</td></tr>
+        <tr><td>placement</td><td>把设计对象摆进芯片平面并为 routing 做准备的优化过程。</td><td>EDA 背景层</td></tr>
+        <tr><td>H-Anchor</td><td>分层锚点 placement 原型，用于验证 speed / determinism / incremental update。</td><td>算法原型层</td></tr>
+        <tr><td>HNSW</td><td>分层导航小世界图，原生属于 ANN / 向量检索。</td><td>可迁移方法论层</td></tr>
+        <tr><td>QoR</td><td>Quality of Results，设计质量指标，覆盖 timing、congestion、power 等。</td><td>设计期反馈层</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>
