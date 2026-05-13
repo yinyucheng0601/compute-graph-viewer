@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ascend Hardware Map v3 · Data Movement Flow</title>
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/memory-architecture/pattern.css">
+  <script>
+    if (new URLSearchParams(location.search).get('preview') === '1') {
+      document.documentElement.classList.add('preview');
+    }
+  </script>
+  <style>
+    body.flow-body {
+      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+      display: block;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+      font-size: var(--font-size-body-sm);
+      line-height: var(--line-height-body);
+    }
+
+    .flow-app {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      grid-template-rows: var(--toolbar-height) minmax(0, 1fr);
+      grid-template-areas:
+        "side top"
+        "side main";
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--foreground) 3%, transparent), transparent 34%),
+        var(--background);
+    }
+
+    .topbar {
+      grid-area: top;
+      min-width: 0;
+      border: 1px solid var(--comp-toolbar-border);
+      border-radius: var(--radius-lg);
+    }
+
+    .topbar .layout-header-brand span:last-child,
+    .topbar .graph-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sidebar,
+    .detail-panel,
+    .main-stage {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--panel-shell-border);
+      border-radius: var(--panel-shell-radius);
+      background: var(--panel-shell-bg);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      grid-area: side;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      padding: 13px var(--space-4);
+      border-bottom: 1px solid var(--panel-shell-border);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .panel-kicker {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .panel-title {
+      color: var(--foreground);
+      font: var(--text-title-2);
+    }
+
+    .panel-sub {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .scenario-list {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-2);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      list-style: none;
+    }
+
+    .scenario-button {
+      width: 100%;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--foreground-secondary);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--space-2);
+      text-align: left;
+      cursor: pointer;
+      transition:
+        background var(--duration-fast) var(--easing-default),
+        border-color var(--duration-fast) var(--easing-default),
+        color var(--duration-fast) var(--easing-default);
+    }
+
+    .scenario-button:hover {
+      background: var(--state-hover);
+      color: var(--foreground);
+    }
+
+    .scenario-button.is-selected {
+      background: var(--state-selected);
+      border-color: var(--border-default);
+      color: var(--foreground);
+    }
+
+    .scenario-index {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-sm);
+      display: inline-grid;
+      place-items: center;
+      color: var(--foreground-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      font: var(--text-mono);
+    }
+
+    .scenario-button.is-selected .scenario-index {
+      color: var(--background);
+      background: var(--foreground);
+      border-color: transparent;
+    }
+
+    .scenario-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .scenario-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: inherit;
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .scenario-desc {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .flow-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--accent);
+    }
+
+    .flow-dot[data-tone="mte"] { background: var(--warning); }
+    .flow-dot[data-tone="compute"] { background: var(--success); }
+    .flow-dot[data-tone="async"] { background: var(--primary); }
+    .flow-dot[data-tone="collective"] { background: var(--danger); }
+    .flow-dot[data-tone="control"] { background: var(--accent); }
+
+    .legend-block {
+      border-top: 1px solid var(--panel-shell-border);
+      padding: 12px var(--space-4);
+      display: grid;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+
+    .legend-line {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .legend-stroke {
+      width: 24px;
+      height: 2px;
+      border-radius: var(--radius-pill);
+      background: var(--warning);
+    }
+
+    .legend-stroke.is-control {
+      background: repeating-linear-gradient(90deg, var(--accent) 0 4px, transparent 4px 7px);
+    }
+
+    .main-stage {
+      grid-area: main;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .stage-head {
+      padding: 12px var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      border-bottom: 1px solid var(--panel-shell-border);
+    }
+
+    .stage-title {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stage-title strong {
+      color: var(--foreground);
+      font: var(--text-title-2);
+    }
+
+    .stage-title span {
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+    }
+
+    .stage-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .architecture-scroll {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-4);
+      background:
+        radial-gradient(circle, color-mix(in srgb, var(--foreground) 14%, transparent) 1px, transparent 1.5px),
+        linear-gradient(180deg, color-mix(in srgb, var(--foreground) 4%, transparent), transparent 46%);
+      background-size: 26px 26px, auto;
+      background-position: 0 0, 0 0;
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .architecture-canvas {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      align-items: center;
+    }
+
+    .arch-frame {
+      width: 100%;
+      min-width: 0;
+      flex: 1 1 auto;
+      position: relative;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .pattern-iframe-shell {
+      width: 100%;
+      min-width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .pattern-iframe {
+      width: 133.333%;
+      min-width: 133.333%;
+      height: 133.333%;
+      min-height: 133.333%;
+      border: 0;
+      display: block;
+      flex: 0 0 auto;
+      transform: scale(0.75);
+      transform-origin: top center;
+      background: transparent;
+    }
+
+    .architecture-scroll[data-view-mode="architecture"] .engine-map {
+      display: none;
+    }
+
+    .architecture-scroll[data-view-mode="subsystem"] .arch-frame {
+      display: none;
+    }
+
+    .architecture-scroll[data-view-mode="subsystem"] .architecture-canvas {
+      justify-content: center;
+    }
+
+    .engine-map {
+      width: min(100%, 1280px);
+      min-width: 0;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--background-elevated) 92%, transparent);
+      padding: var(--space-3);
+      display: grid;
+      grid-template-columns: repeat(9, minmax(92px, 1fr));
+      gap: var(--space-2);
+      align-items: center;
+      position: relative;
+    }
+
+    .engine-node {
+      min-height: 58px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      color: var(--foreground-secondary);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      transition:
+        background var(--duration-base) var(--easing-default),
+        border-color var(--duration-base) var(--easing-default),
+        color var(--duration-base) var(--easing-default),
+        box-shadow var(--duration-base) var(--easing-default);
+    }
+
+    .engine-node b {
+      color: var(--foreground);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .engine-node span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .engine-node.flow-engine-active {
+      border-color: color-mix(in srgb, var(--primary) 68%, transparent);
+      background: color-mix(in srgb, var(--primary) 16%, var(--surface-1));
+      color: var(--foreground);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 24%, transparent);
+    }
+
+    .engine-arrow {
+      height: 2px;
+      align-self: center;
+      background: var(--border-strong);
+      border-radius: var(--radius-pill);
+      position: relative;
+    }
+
+    .engine-arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-top: 2px solid currentColor;
+      border-right: 2px solid currentColor;
+      color: var(--border-strong);
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .engine-arrow.flow-engine-active {
+      background: var(--primary);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 50%, transparent);
+    }
+
+    .engine-arrow.flow-engine-active::after {
+      color: var(--primary);
+    }
+
+    .detail-panel {
+      grid-area: detail;
+      display: none;
+      flex-direction: column;
+    }
+
+    .detail-body {
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .detail-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .detail-section h3 {
+      color: var(--foreground);
+      font: var(--text-title-2);
+    }
+
+    .detail-section p {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(82px, auto) minmax(0, 1fr);
+      gap: 7px var(--space-3);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .detail-grid dt {
+      color: var(--foreground-muted);
+    }
+
+    .detail-grid dd {
+      min-width: 0;
+      color: var(--foreground);
+    }
+
+    .badge-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .flow-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--tag-height);
+      padding: 0 var(--tag-padding-x);
+      border-radius: var(--tag-radius);
+      background: var(--comp-tag-bg);
+      border: 1px solid var(--comp-tag-border);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .flow-badge[data-confidence="verified"] { color: var(--success); }
+    .flow-badge[data-confidence="public"] { color: var(--warning); }
+    .flow-badge[data-confidence="inferred"] { color: var(--accent); }
+    .flow-badge[data-confidence="claim"] { color: var(--danger); }
+
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .step-item {
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: var(--space-2);
+      transition:
+        background var(--duration-base) var(--easing-default),
+        border-color var(--duration-base) var(--easing-default);
+    }
+
+    .step-item.is-active {
+      background: var(--state-selected);
+      border-color: var(--border-default);
+    }
+
+    .step-no {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-sm);
+      display: inline-grid;
+      place-items: center;
+      background: var(--surface-2);
+      border: 1px solid var(--border-subtle);
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+    }
+
+    .step-item.is-active .step-no {
+      background: var(--foreground);
+      border-color: transparent;
+      color: var(--background);
+    }
+
+    .step-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .step-copy b {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .step-copy span {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .note-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      padding-left: 16px;
+    }
+
+    .path-title {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .path-title strong {
+      color: var(--foreground);
+      font: var(--text-body);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .path-title span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .path-chain {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      overflow: hidden;
+    }
+
+    .path-chip {
+      max-width: 170px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 0 0 auto;
+    }
+
+    .path-chip.is-active {
+      background: var(--foreground);
+      border-color: transparent;
+      color: var(--background);
+    }
+
+    .path-arrow {
+      color: var(--foreground-muted);
+      flex: 0 0 auto;
+    }
+
+    .floating-bar {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      z-index: var(--z-dropdown);
+      pointer-events: none;
+      width: min(1180px, calc(100vw - 32px));
+    }
+
+    .floating-shell {
+      pointer-events: auto;
+      position: relative;
+      width: 100%;
+      min-height: 72px;
+      padding: 12px 18px;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-default);
+      background: color-mix(in srgb, var(--surface-3) 92%, var(--background));
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(22px) saturate(140%);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+      transition:
+        width var(--duration-base) var(--easing-default),
+        height var(--duration-base) var(--easing-default),
+        min-height var(--duration-base) var(--easing-default),
+        padding var(--duration-base) var(--easing-default),
+        border-radius var(--duration-base) var(--easing-default);
+    }
+
+    .floating-shell.is-collapsed {
+      width: 52px;
+      min-height: 52px;
+      height: 52px;
+      padding: 0;
+      border-radius: var(--radius-lg);
+      margin: 0 auto;
+      background: var(--surface-4);
+      border-color: var(--border-default);
+    }
+
+    .floating-toggle {
+      position: absolute;
+      top: 7px;
+      right: 9px;
+      width: 22px;
+      height: 22px;
+      border: 0;
+      background: transparent;
+      color: var(--foreground-muted);
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    .floating-toggle:hover {
+      color: var(--foreground);
+    }
+
+    .floating-collapsed-btn {
+      display: none;
+      position: absolute;
+      inset: 0;
+      width: 52px;
+      height: 52px;
+      border: 0;
+      border-radius: var(--radius-lg);
+      background: transparent;
+      color: var(--foreground);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-size: 15px;
+      line-height: 1;
+    }
+
+    .floating-shell.is-collapsed .floating-toggle,
+    .floating-shell.is-collapsed .floating-content {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .floating-shell.is-collapsed .floating-collapsed-btn {
+      display: inline-flex;
+    }
+
+    .floating-content {
+      display: grid;
+      grid-template-columns: auto 1px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+      transition: opacity var(--duration-fast) var(--easing-default);
+    }
+
+    .floating-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex: 0 0 auto;
+    }
+
+    .floating-sep {
+      width: 1px;
+      height: 30px;
+      background: var(--border-subtle);
+    }
+
+    .timeline-area {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .timeline-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .timeline-meta strong {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .timeline-path {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .timeline-path code {
+      display: block;
+      min-width: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .timeline-meta span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .play-step-btn {
+      min-width: 34px;
+      width: 34px;
+      padding: 0;
+    }
+
+    @media (max-width: 1240px) {
+      body.flow-body {
+        height: auto;
+        overflow: auto;
+      }
+
+      .flow-app {
+        height: auto;
+        min-height: 100vh;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto auto;
+        grid-template-areas:
+          "top"
+          "side"
+          "main"
+          "detail";
+      }
+
+      .sidebar {
+        max-height: 360px;
+      }
+
+      .detail-panel {
+        display: flex;
+        max-height: none;
+      }
+
+      .path-chain {
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+
+      .floating-content {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .floating-sep {
+        display: none;
+      }
+
+      .timeline-area {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    html.preview body.flow-body {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    html.preview .flow-app {
+      padding: 0;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "main";
+      gap: 0;
+    }
+
+    html.preview .topbar,
+    html.preview .sidebar,
+    html.preview .detail-panel,
+    html.preview .floating-bar,
+    html.preview .stage-head {
+      display: none;
+    }
+
+    html.preview .main-stage {
+      border: 0;
+      border-radius: 0;
+    }
+
+    html.preview .architecture-scroll {
+      padding: var(--space-2);
+    }
+  </style>
+</head>
+<body class="flow-body">
+  <div class="flow-app">
+    <header class="topbar layout-header layout-header-filled">
+      <div class="layout-header-left">
+        <a class="home-link" href="../launch.html" title="Back to Launcher" aria-label="Back to Launcher">⌂</a>
+        <div class="layout-header-brand">
+          <span class="layout-header-dot"></span>
+          <span>Ascend 950 数据搬运 Flow Map</span>
+        </div>
+        <span class="graph-title">shared memory-architecture pattern + PTO communication ISA notes</span>
+      </div>
+      <div class="layout-header-right">
+        <div class="segmented-control" aria-label="flow mode">
+          <button class="btn btn-sm is-selected" type="button" data-view-mode="architecture">架构底图</button>
+          <button class="btn btn-sm" type="button" data-view-mode="subsystem">通信子系统</button>
+        </div>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="panel-head">
+        <div class="panel-kicker">Flow Scenarios</div>
+        <div class="panel-title">数据搬运路径</div>
+        <p class="panel-sub">从 Markdown 的 PTO 语义抽取，映射到 950B AIC/AIV 底图和 IO/通信引擎。</p>
+      </div>
+      <ul class="scenario-list" id="scenarioList"></ul>
+      <div class="legend-block">
+        <div class="legend-line"><span class="legend-stroke"></span><span>payload 数据路径</span></div>
+        <div class="legend-line"><span class="legend-stroke is-control"></span><span>descriptor / signal 控制路径</span></div>
+        <div class="legend-line"><span class="flow-dot" data-tone="collective"></span><span>claim 表示 PTO 绑定或具体端口仍需硬件手册确认</span></div>
+      </div>
+    </aside>
+
+    <main class="main-stage">
+      <div class="stage-head">
+        <div class="stage-title">
+          <strong>Ascend 950B Memory Architecture Pattern</strong>
+          <span>1 AIC + 2 AIV；GM/L2 在 AI Core 外；L0C→UB 和 UB→L1 作为 950 直接 CV lanes。</span>
+        </div>
+        <div class="stage-meta">
+          <span class="stat-chip">pattern: memory-architecture-layout</span>
+          <span class="stat-chip">preset: ascend950b</span>
+          <span class="stat-chip">source: md + ascend-950-hardware-v1.html</span>
+        </div>
+      </div>
+      <section class="architecture-scroll" id="architectureScroll">
+        <div class="architecture-canvas">
+          <div class="arch-frame" id="architectureFrame">
+            <div class="pattern-iframe-shell">
+              <iframe
+                class="pattern-iframe"
+                id="architectureFrameEl"
+                title="Ascend 950B Memory Architecture Pattern"
+                src="./ascend-950b-hardware-frame.html"></iframe>
+            </div>
+          </div>
+          <section class="engine-map" aria-label="950 communication subsystem">
+            <div class="engine-node" data-engine="local-gm"><b>Local GM</b><span>payload source / sink</span></div>
+            <div class="engine-arrow" data-engine="link-gm-sdma"></div>
+            <div class="engine-node" data-engine="sdma"><b>SDMA</b><span>async GM↔GM DMA</span></div>
+            <div class="engine-arrow" data-engine="link-sdma-remote"></div>
+            <div class="engine-node" data-engine="unifiedbus"><b>UnifiedBus</b><span>950 IO interconnect</span></div>
+            <div class="engine-arrow" data-engine="link-bus-urma"></div>
+            <div class="engine-node" data-engine="urma"><b>URMA</b><span>remote memory path</span></div>
+            <div class="engine-arrow" data-engine="link-urma-remote"></div>
+            <div class="engine-node" data-engine="remote-gm"><b>Remote GM</b><span>target rank memory</span></div>
+            <div class="engine-node" data-engine="aiv-control"><b>AIV Control</b><span>session / wait / test</span></div>
+            <div class="engine-arrow" data-engine="link-aiv-ccu"></div>
+            <div class="engine-node" data-engine="ccu"><b>CCU</b><span>collective offload</span></div>
+            <div class="engine-arrow" data-engine="link-ccu-ms"></div>
+            <div class="engine-node" data-engine="memory-slice"><b>Memory Slice</b><span>CCU cache</span></div>
+            <div class="engine-arrow" data-engine="link-ms-reduce"></div>
+            <div class="engine-node" data-engine="reduce-engine"><b>Reduce Engine</b><span>sum / max / min</span></div>
+            <div class="engine-arrow" data-engine="link-reduce-remote"></div>
+            <div class="engine-node" data-engine="remote-result"><b>Result GM</b><span>writeback</span></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <aside class="detail-panel">
+      <div class="panel-head">
+        <div class="panel-kicker">Inspector</div>
+        <div class="panel-title" id="detailTitle">Flow Detail</div>
+        <p class="panel-sub" id="detailSub">选择左侧路径查看 payload、控制面和不确定性。</p>
+      </div>
+      <div class="detail-body">
+        <section class="detail-section">
+          <div class="badge-row" id="detailBadges"></div>
+          <p id="detailSummary"></p>
+        </section>
+        <section class="detail-section">
+          <h3>搬运拆解</h3>
+          <dl class="detail-grid" id="detailGrid"></dl>
+        </section>
+        <section class="detail-section">
+          <h3>Step Timeline</h3>
+          <div class="step-list" id="stepList"></div>
+        </section>
+        <section class="detail-section">
+          <h3>标注</h3>
+          <ul class="note-list" id="noteList"></ul>
+        </section>
+      </div>
+    </aside>
+
+    <div class="floating-bar">
+      <div class="floating-shell is-expanded" id="floatingShell">
+        <button class="floating-toggle" id="floatingToggle" type="button" aria-label="Collapse playback toolbar" aria-expanded="true">⌄</button>
+        <button class="floating-collapsed-btn" id="floatingCollapsedButton" type="button" aria-label="Expand playback toolbar">▶</button>
+        <div class="floating-content">
+          <div class="floating-controls">
+            <button class="btn btn-sm play-step-btn" type="button" id="stepBackButton" title="上一步">◀</button>
+            <button class="btn btn-sm btn-solid" type="button" id="playButton">播放 Flow</button>
+            <button class="btn btn-sm play-step-btn" type="button" id="stepForwardButton" title="下一步">▶</button>
+            <button class="btn btn-sm btn-ghost" type="button" id="replayButton">重播</button>
+          </div>
+          <div class="floating-sep"></div>
+          <div class="timeline-area">
+            <div class="timeline-meta">
+              <strong id="pathTitle"></strong>
+              <span id="pathSub"></span>
+            </div>
+            <div class="timeline-path">
+              <code id="flowSummaryPath"></code>
+              <div class="path-chain" id="pathChain"></div>
+            </div>
+            <div class="badge-row" id="flowSummaryBadges"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const NODE = {
+      l2: '[data-mem950-node="rail:L2"]',
+      gm: '[data-mem950-node="rail:GM"]',
+      aiv1Slot: '#mem950-aiv1',
+      aiv2Slot: '#mem950-aiv2',
+      aicSlot: '#mem950-aic',
+      aiv1UB: '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+      aiv2UB: '#mem950-aiv2 [data-aiv-node="buffer:UB"]',
+      aiv1DCache: '#mem950-aiv1 [data-aiv-node="cache:DCache"]',
+      aiv2DCache: '#mem950-aiv2 [data-aiv-node="cache:DCache"]',
+      aiv1Vector: '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+      aiv2Vector: '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
+      aiv1Scalar: '#mem950-aiv1 [data-aiv-node="scalar:Scalar"]',
+      aiv2Scalar: '#mem950-aiv2 [data-aiv-node="scalar:Scalar"]',
+      aicL1: '#mem950-aic [data-aic-node="buffer:L1"]',
+      aicL0A: '#mem950-aic [data-aic-node="buffer:L0A"]',
+      aicL0B: '#mem950-aic [data-aic-node="buffer:L0B"]',
+      aicL0C: '#mem950-aic [data-aic-node="buffer:L0C"]',
+      aicCube: '#mem950-aic [data-aic-node="cube:CUBE"]',
+      aicFP: '#mem950-aic [data-aic-node="buffer:FP"]',
+      aicDCache: '#mem950-aic [data-aic-node="cache:DCache"]',
+      aicScalar: '#mem950-aic [data-aic-node="scalar:Scalar"]',
+    };
+
+    const FLOWS = [
+      {
+        id: 'vector',
+        title: 'AIV Vector 计算',
+        short: 'GM / L2 → UB → Vector → UB → GM',
+        tone: 'compute',
+        confidence: 'verified',
+        routeKind: 'payload',
+        summary: '单核 Vector 路径。AIV 使用 MTE2 把 GM/L2 数据搬到 Unified Buffer，Vector/SIMD 计算后再由 MTE3 写回 GM/L2。',
+        path: 'GM / L2 -> MTE2 -> Unified Buffer -> Vector -> Unified Buffer -> MTE3 -> GM / L2',
+        selectors: [NODE.l2, NODE.aiv1UB, NODE.aiv1Vector],
+        routes: ['l2-to-aiv1', 'aiv1-to-l2'],
+        engines: ['local-gm'],
+        meta: {
+          'PTO 语义': '普通 AIV tile 计算路径',
+          'payload 是否经过 UB': '是',
+          '控制面': 'AIV Scalar 发射 MTE / Vector 指令',
+          '适用场景': 'elementwise / reduce / gather / cast / activation',
+        },
+        steps: [
+          { label: '读 GM/L2', text: '源 tile 位于 GM，全局访问默认经 L2 缓存层。', selectors: [NODE.l2], routes: [] },
+          { label: 'MTE2 入 UB', text: 'MTE2 将 GM/L2 tile 搬入 AIV Unified Buffer。', selectors: [NODE.l2, NODE.aiv1UB], routes: ['l2-to-aiv1'] },
+          { label: 'Vector 消费', text: 'Vector/SIMD 从 UB 读取，结果仍落在 UB。', selectors: [NODE.aiv1UB, NODE.aiv1Vector], routes: [] },
+          { label: 'MTE3 写回', text: 'MTE3 把 UB 结果写回 GM/L2。', selectors: [NODE.aiv1UB, NODE.l2], routes: ['aiv1-to-l2'] },
+        ],
+        notes: [
+          'UB 是 AIV 内部 scratchpad，不要和 IO 子系统的 UnifiedBus 混用。',
+          '这个路径是 PTO 同步通信路径的 staging 基础，但普通 Vector 计算只在本地 GM/L2 内闭环。',
+        ],
+      },
+      {
+        id: 'cube',
+        title: 'AIC Cube / GEMM 计算',
+        short: 'GM / L2 → L1 → L0A/L0B → Cube → L0C → FixPipe',
+        tone: 'compute',
+        confidence: 'verified',
+        routeKind: 'payload',
+        summary: 'AIC 的矩阵计算路径。GM/L2 数据进入 L1，再由 MTE1 喂到 L0A/L0B，Cube 产出到 L0C，FixPipe 负责写回或后处理。',
+        path: 'GM / L2 -> MTE2 -> L1 -> MTE1 -> L0A / L0B -> Cube -> L0C -> FixPipe -> GM / L1',
+        selectors: [NODE.l2, NODE.aicL1, NODE.aicL0A, NODE.aicL0B, NODE.aicCube, NODE.aicL0C, NODE.aicFP],
+        routes: ['l2-to-aic'],
+        engines: ['local-gm'],
+        meta: {
+          'PTO 语义': 'GEMM / Cube tile 生产者',
+          'payload 是否经过 UB': '否',
+          '控制面': 'AIC Scalar / Dispatch / Cube Queue / MTE Queue',
+          '适用场景': 'GEMM / convolution / matmul mainloop',
+        },
+        steps: [
+          { label: 'MTE2 入 L1', text: 'GM/L2 数据先搬到 AIC L1 Buffer。', selectors: [NODE.l2, NODE.aicL1], routes: ['l2-to-aic'] },
+          { label: 'MTE1 入 L0A/B', text: 'A、B tile 分别进入 L0A 和 L0B。', selectors: [NODE.aicL1, NODE.aicL0A, NODE.aicL0B], routes: [] },
+          { label: 'Cube 计算', text: 'Cube 消费 L0A/L0B，结果进入 L0C。', selectors: [NODE.aicL0A, NODE.aicL0B, NODE.aicCube, NODE.aicL0C], routes: [] },
+          { label: 'FixPipe 写回', text: 'L0C 结果经 FixPipe 做写回、格式转换或随路处理。', selectors: [NODE.aicL0C, NODE.aicFP, NODE.l2], routes: [] },
+        ],
+        notes: [
+          'Markdown 明确把 L1/L0A/L0B/L0C、BT、FP、FixPipe 放在 AIC/Cube 侧。',
+          '351x/950 类新架构需要注意 L0C→UB、UB↔L1 的直接 CV 通路，不应再画老式 GM→L0A/L0B 直达。',
+        ],
+      },
+      {
+        id: 'tput-sync',
+        title: 'TPUT / TGET 同步搬运',
+        short: 'GM → UB staging → remote GM',
+        tone: 'mte',
+        confidence: 'verified',
+        routeKind: 'payload + wait',
+        summary: 'PTO 同步点对点搬运把跨卡 GM↔GM 语义拆成 AIV 可控的 tile 搬运。数据经过本地 AIV UB staging tile，AIV 同步等待完成。',
+        path: 'AIV issues TPUT/TGET -> MTE2 GM->UB staging -> MTE3 / remote write path -> Remote GM -> AIV waits',
+        selectors: [NODE.l2, NODE.aiv1UB, NODE.aiv1Scalar],
+        routes: ['l2-to-aiv1', 'aiv1-to-l2'],
+        engines: ['local-gm', 'remote-gm'],
+        meta: {
+          'PTO API': 'TPUT / TGET',
+          'payload 是否经过 UB': '是，UB staging tile',
+          '后端': 'MTE2 + MTE3 / remote write path',
+          '适用场景': '小块、strided、低启动延迟、需要细粒度控制',
+        },
+        steps: [
+          { label: 'AIV 发起', text: 'AIV 解释 tile 语义，决定分批、双缓冲或 atomic 细节。', selectors: [NODE.aiv1Scalar], routes: [], engines: [] },
+          { label: 'MTE2 入 UB', text: '本地或远端 GM tile 进入本地 AIV UB staging。', selectors: [NODE.l2, NODE.aiv1UB], routes: ['l2-to-aiv1'], engines: ['local-gm'] },
+          { label: 'MTE3 / remote write', text: 'UB staging 数据写向目标 GM；TPUT 可带远端 AtomicAdd 语义。', selectors: [NODE.aiv1UB, NODE.l2], routes: ['aiv1-to-l2'], engines: ['remote-gm'] },
+          { label: 'AIV 等待', text: '同步 API 返回前，AIV 保持等待，不能把 payload 与后续计算重叠。', selectors: [NODE.aiv1Scalar], routes: [], engines: [] },
+        ],
+        notes: [
+          'Markdown 提醒：UB→远端 GM 不应画成普通本地 UB→GM；跨卡地址和 atomic 实现点仍需保守标注。',
+          '这是 910 到 950 全系列的保底路径。',
+        ],
+      },
+      {
+        id: 'sdma-async',
+        title: 'TPUT_ASYNC / TGET_ASYNC → SDMA',
+        short: 'descriptor in UB scratch；payload GM → SDMA → remote GM',
+        tone: 'async',
+        confidence: 'verified',
+        routeKind: 'payload + descriptor',
+        summary: '异步 SDMA 路径由 AIV 提交 descriptor/session，但 payload 不经过 UB。AIV 后续用 AsyncEvent wait/test 检查完成。',
+        path: 'AIV writes descriptor in UB scratch -> Local GM -> SDMA -> Remote GM -> AsyncEvent wait/test',
+        selectors: [NODE.aiv1UB, NODE.aiv1Scalar],
+        routes: [],
+        engines: ['local-gm', 'link-gm-sdma', 'sdma', 'link-sdma-remote', 'remote-gm', 'aiv-control'],
+        meta: {
+          'PTO API': 'TPUT_ASYNC / TGET_ASYNC',
+          'payload 是否经过 UB': '否',
+          '控制面': 'UB scratch 只保存 descriptor / queue tail / completion flag',
+          '适用场景': '大块连续数据，需要通信与 AIV 后续工作重叠',
+        },
+        steps: [
+          { label: '写 descriptor', text: 'AIV 在 UB scratch 写 SDMA 描述符和会话状态。', selectors: [NODE.aiv1UB, NODE.aiv1Scalar], routes: [], engines: ['aiv-control'] },
+          { label: '提交 SDMA', text: 'AIV 更新 queue tail 后继续执行，payload 不进 UB。', selectors: [NODE.aiv1Scalar], routes: [], engines: ['aiv-control', 'sdma'] },
+          { label: 'GM↔GM DMA', text: 'SDMA 在 AI Core 外做本地 GM 到远端 GM 的异步搬运。', selectors: [], routes: [], engines: ['local-gm', 'link-gm-sdma', 'sdma', 'link-sdma-remote', 'remote-gm'] },
+          { label: 'wait/test', text: 'AIV 稍后轮询或等待 AsyncEvent 完成。', selectors: [NODE.aiv1Scalar], routes: [], engines: ['aiv-control'] },
+        ],
+        notes: [
+          'scratch tile 是控制剪贴板，不是数据货物。',
+          'SDMA 是 AI Core 外独立 DMA 引擎，不应该画进 AIC/AIV 内部。',
+        ],
+      },
+      {
+        id: 'urma-async',
+        title: '950 URMA 异步远程内存',
+        short: 'GM → UnifiedBus / URMA → remote GM',
+        tone: 'async',
+        confidence: 'claim',
+        routeKind: 'payload + descriptor',
+        summary: '950 侧可把同一套异步 PTO 接口映射到 URMA / UnifiedBus 远程内存路径。公开资料确认 950 互连方向，但 URMA 微结构与具体端口仍需硬件手册确认。',
+        path: 'AIV session control -> Local GM -> UnifiedBus -> URMA -> Remote GM -> wait/test or Quiet semantics',
+        selectors: [NODE.aiv2Scalar, NODE.aiv2UB],
+        routes: [],
+        engines: ['local-gm', 'unifiedbus', 'link-bus-urma', 'urma', 'link-urma-remote', 'remote-gm', 'aiv-control'],
+        meta: {
+          'PTO API': 'TPUT_ASYNC / TGET_ASYNC',
+          'payload 是否经过 UB': '否，AIV 只做 session/descriptor 控制',
+          '后端': 'URMA / UnifiedBus remote memory path',
+          '适用场景': '950 平台高带宽远程内存访问',
+        },
+        steps: [
+          { label: 'AIV 建会话', text: 'PTO 层仍是 build session、submit、wait/test。', selectors: [NODE.aiv2Scalar], routes: [], engines: ['aiv-control'] },
+          { label: '进入 UnifiedBus', text: 'payload 从 GM/L2 进入 950 IO 互联面。', selectors: [NODE.l2], routes: [], engines: ['local-gm', 'unifiedbus'] },
+          { label: 'URMA 远程写读', text: 'URMA 承担用户态 RDMA / remote memory access 语义。', selectors: [], routes: [], engines: ['unifiedbus', 'link-bus-urma', 'urma', 'link-urma-remote', 'remote-gm'] },
+          { label: '完成语义', text: 'AIV wait/test 或 Quiet 语义收敛远端可见性。', selectors: [NODE.aiv2Scalar], routes: [], engines: ['aiv-control'] },
+        ],
+        notes: [
+          'Markdown 明确建议把 URMA 画在通信/互连子系统，靠近 UnifiedBus，不画入 AI Core。',
+          'URMA 与 PTO 异步路径的绑定按 claim 标注，避免把未公开端口画死。',
+        ],
+      },
+      {
+        id: 'ccu-collective',
+        title: '950 CCU 集合通信卸载',
+        short: 'AIV launch；CCU Memory Slice / Reduce Engine 完成搬运归约',
+        tone: 'collective',
+        confidence: 'claim',
+        routeKind: 'payload + control',
+        summary: 'CCU 路径把 AllReduce / ReduceScatter / Broadcast 等集合通信从 AIV 上卸载。AIV 负责握手，CCU 读取本地/远端数据、在 Memory Slice 中缓冲并由 Reduce Engine 完成归约。',
+        path: 'Host registers CcuDeviceSession -> AIV_LAUNCH -> CCU reads data -> Memory Slice -> Reduce Engine -> result GM -> CCU_DONE',
+        selectors: [NODE.aicCube, NODE.aicL0C, NODE.aiv1Scalar],
+        routes: [],
+        engines: ['aiv-control', 'link-aiv-ccu', 'ccu', 'link-ccu-ms', 'memory-slice', 'link-ms-reduce', 'reduce-engine', 'link-reduce-remote', 'remote-result'],
+        meta: {
+          'PTO API': 'TGATHER / TSCATTER / TBROADCAST / TREDUCE 可落到集合通信后端',
+          'payload 是否经过 UB': '否，AIV 只负责 handshake',
+          '后端': 'CCU + Memory Slice + Reduce Engine',
+          '适用场景': 'AllReduce / ReduceScatter / Broadcast / Reduce',
+        },
+        steps: [
+          { label: 'AIC 产出 tile', text: 'Cube 计算完成，结果通过 L0C / FixPipe 变成 CCU 可访问的数据。', selectors: [NODE.aicCube, NODE.aicL0C, NODE.aicFP], routes: [], engines: [] },
+          { label: 'AIV launch', text: 'AIV 持有 CcuDeviceSession，通知 CCU 开始集合通信任务。', selectors: [NODE.aiv1Scalar], routes: [], engines: ['aiv-control', 'link-aiv-ccu', 'ccu'] },
+          { label: 'CCU fetch + buffer', text: 'CCU 从本地/远端 GM 拉取数据，Memory Slice 承接中间结果。', selectors: [], routes: [], engines: ['ccu', 'link-ccu-ms', 'memory-slice'] },
+          { label: 'Reduce + writeback', text: 'Reduce Engine 执行 Sum/Max/Min 等操作，结果写回目标 GM。', selectors: [], routes: [], engines: ['memory-slice', 'link-ms-reduce', 'reduce-engine', 'link-reduce-remote', 'remote-result'] },
+          { label: 'CCU_DONE', text: '完成信号回到 AIV，AIV 继续后续 tile 或阶段。', selectors: [NODE.aiv1Scalar], routes: [], engines: ['aiv-control'] },
+        ],
+        notes: [
+          '这个 flow 应画成 AIC → AIV control → CCU data+reduce；不要画成 AIV 仍逐块执行真实 Reduce。',
+          'CCU 对 PTO 的真实硬件平台绑定按 claim 标注；Memory Slice 容量和端口数不在本页假设。',
+        ],
+      },
+      {
+        id: 'gemm-ar',
+        title: 'GEMM + AllReduce 流水线',
+        short: 'AIC 产 tile；AIV TTEST / TPUT AtomicAdd；TNOTIFY/TWAIT barrier',
+        tone: 'control',
+        confidence: 'inferred',
+        routeKind: 'payload + sync',
+        summary: 'Markdown 中 GEMM_AR 示例的关键是 tile 粒度生产和通信重叠：AIC 不等完整 GEMM 结束，AIV 看到 ready tile 后用 TPUT/AtomicAdd 送到 owner rank。',
+        path: 'AIC tile GEMM -> Ready Queue -> AIV TTEST -> TPUT AtomicAdd -> owner rank GM -> TNOTIFY / TWAIT barrier',
+        selectors: [NODE.aicCube, NODE.aicL0C, NODE.aiv2Scalar, NODE.aiv2UB],
+        routes: ['l2-to-aiv2', 'aiv2-to-l2'],
+        engines: ['local-gm', 'remote-gm', 'aiv-control'],
+        meta: {
+          'PTO API': 'TTEST / TPUT AtomicAdd / TNOTIFY / TWAIT',
+          'payload 是否经过 UB': '同步 ReduceScatter 分支经过 UB staging',
+          '并行关系': 'AIC 生产 tile，AIV 消费 ready tile',
+          '示例收益': '文档记录约 31% 通信被计算掩盖',
+        },
+        steps: [
+          { label: 'AIC 产 tile', text: 'AIC/Cube 完成一个 GEMM tile，写到可被 AIV/通信路径访问的位置。', selectors: [NODE.aicCube, NODE.aicL0C], routes: [], engines: ['local-gm'] },
+          { label: 'Ready Queue', text: 'AIV 用 TTEST 非阻塞检查 tile 是否 ready。', selectors: [NODE.aiv2Scalar], routes: [], engines: ['aiv-control'] },
+          { label: 'TPUT AtomicAdd', text: 'AIV 把 tile 通过 TPUT 送到 owner rank GM，可带远端 AtomicAdd。', selectors: [NODE.aiv2UB, NODE.l2], routes: ['l2-to-aiv2', 'aiv2-to-l2'], engines: ['local-gm', 'remote-gm'] },
+          { label: 'Barrier', text: 'TNOTIFY/TWAIT 形成 device-side barrier，收敛阶段依赖。', selectors: [NODE.aiv2Scalar], routes: [], engines: ['aiv-control'] },
+        ],
+        notes: [
+          '这里的 24 AIC + 24 AIV 是文章示例调度资源，不作为通用 910B/950 芯片物理数量定论。',
+          '若换成 950 + CCU，AIV 可从逐块搬运归约退化为 launch / wait 控制角色。',
+        ],
+      },
+    ];
+
+    const state = {
+      flowId: 'tput-sync',
+      activeStep: -1,
+      playTimer: null,
+      iframeReady: false,
+      viewMode: 'architecture',
+    };
+
+    function getFlow() {
+      return FLOWS.find((flow) => flow.id === state.flowId) || FLOWS[0];
+    }
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text || '';
+    }
+
+    function createEl(tagName, className, text) {
+      const el = document.createElement(tagName);
+      if (className) el.className = className;
+      if (text !== undefined) el.textContent = text;
+      return el;
+    }
+
+    function renderArchitecture() {
+      const frame = document.getElementById('architectureFrameEl');
+      if (!frame) return;
+
+      const onFrameReady = () => {
+        state.iframeReady = true;
+        applyHighlights();
+      };
+
+      frame.addEventListener('load', onFrameReady);
+      try {
+        if (frame.contentDocument?.readyState === 'complete') onFrameReady();
+      } catch (error) {
+        // The load/message path above is the source of truth; this is only a same-origin fast path.
+      }
+    }
+
+    function postArchitectureFocus(selectors = [], routes = []) {
+      const frame = document.getElementById('architectureFrameEl');
+      if (!state.iframeReady || !frame?.contentWindow) return;
+      frame.contentWindow.postMessage({
+        type: 'hardware-focus',
+        selectors,
+        routes,
+      }, '*');
+    }
+
+    function renderScenarioList() {
+      const list = document.getElementById('scenarioList');
+      list.innerHTML = '';
+
+      FLOWS.forEach((flow, index) => {
+        const li = createEl('li');
+        const button = createEl('button', 'scenario-button');
+        button.type = 'button';
+        button.dataset.flowId = flow.id;
+        button.classList.toggle('is-selected', flow.id === state.flowId);
+
+        const number = createEl('span', 'scenario-index', String(index + 1).padStart(2, '0'));
+        const main = createEl('span', 'scenario-main');
+        main.appendChild(createEl('span', 'scenario-name', flow.title));
+        main.appendChild(createEl('span', 'scenario-desc', flow.short));
+        const dot = createEl('span', 'flow-dot');
+        dot.dataset.tone = flow.tone;
+
+        button.appendChild(number);
+        button.appendChild(main);
+        button.appendChild(dot);
+        button.addEventListener('click', () => selectFlow(flow.id));
+        li.appendChild(button);
+        list.appendChild(li);
+      });
+    }
+
+    function renderBadges(parent, flow) {
+      parent.innerHTML = '';
+      const confidence = createEl('span', 'flow-badge', flow.confidence);
+      confidence.dataset.confidence = flow.confidence;
+      parent.appendChild(confidence);
+      parent.appendChild(createEl('span', 'flow-badge', flow.routeKind));
+      parent.appendChild(createEl('span', 'flow-badge', flow.tone));
+    }
+
+    function renderDetail() {
+      const flow = getFlow();
+      setText('detailTitle', flow.title);
+      setText('detailSub', flow.short);
+      setText('detailSummary', flow.summary);
+      setText('flowSummaryPath', flow.path);
+      setText('pathTitle', flow.title);
+      setText('pathSub', flow.short);
+
+      renderBadges(document.getElementById('detailBadges'), flow);
+      renderBadges(document.getElementById('flowSummaryBadges'), flow);
+
+      const grid = document.getElementById('detailGrid');
+      grid.innerHTML = '';
+      Object.entries(flow.meta || {}).forEach(([key, value]) => {
+        grid.appendChild(createEl('dt', '', key));
+        grid.appendChild(createEl('dd', '', value));
+      });
+
+      const steps = document.getElementById('stepList');
+      steps.innerHTML = '';
+      flow.steps.forEach((step, index) => {
+        const item = createEl('div', 'step-item');
+        item.classList.toggle('is-active', index === state.activeStep);
+        item.appendChild(createEl('span', 'step-no', String(index + 1).padStart(2, '0')));
+        const copy = createEl('span', 'step-copy');
+        copy.appendChild(createEl('b', '', step.label));
+        copy.appendChild(createEl('span', '', step.text));
+        item.appendChild(copy);
+        item.addEventListener('mouseenter', () => {
+          if (state.playTimer) return;
+          state.activeStep = index;
+          renderDetail();
+          applyHighlights();
+        });
+        item.addEventListener('mouseleave', () => {
+          if (state.playTimer) return;
+          state.activeStep = -1;
+          renderDetail();
+          applyHighlights();
+        });
+        steps.appendChild(item);
+      });
+
+      const notes = document.getElementById('noteList');
+      notes.innerHTML = '';
+      flow.notes.forEach((note) => notes.appendChild(createEl('li', '', note)));
+
+      renderPathChain(flow);
+    }
+
+    function renderPathChain(flow) {
+      const chain = document.getElementById('pathChain');
+      chain.innerHTML = '';
+      flow.steps.forEach((step, index) => {
+        if (index > 0) chain.appendChild(createEl('span', 'path-arrow', '->'));
+        const chip = createEl('span', 'path-chip', step.label);
+        chip.classList.toggle('is-active', index === state.activeStep);
+        chip.addEventListener('click', () => {
+          stopPlayback(false);
+          state.activeStep = index;
+          renderDetail();
+          applyHighlights();
+        });
+        chain.appendChild(chip);
+      });
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.flow-engine-active').forEach((el) => {
+        el.classList.remove('flow-engine-active');
+      });
+      document.getElementById('architectureFrame')?.classList.remove('is-filtering');
+    }
+
+    function uniqueList(items) {
+      return Array.from(new Set((items || []).filter(Boolean)));
+    }
+
+    function activePayload(flow) {
+      if (state.activeStep >= 0 && flow.steps[state.activeStep]) {
+        const step = flow.steps[state.activeStep];
+        return {
+          selectors: uniqueList(step.selectors),
+          routes: uniqueList(step.routes),
+          engines: uniqueList(step.engines),
+        };
+      }
+
+      return {
+        selectors: uniqueList(flow.selectors),
+        routes: uniqueList(flow.routes),
+        engines: uniqueList(flow.engines),
+      };
+    }
+
+    function applyHighlights() {
+      clearHighlights();
+      const flow = getFlow();
+      const payload = activePayload(flow);
+      const frame = document.getElementById('architectureFrame');
+      frame?.classList.add('is-filtering');
+      postArchitectureFocus(payload.selectors, payload.routes);
+
+      payload.engines.forEach((engineId) => {
+        document.querySelectorAll(`[data-engine="${engineId}"]`).forEach((el) => el.classList.add('flow-engine-active'));
+      });
+    }
+
+    function selectFlow(flowId) {
+      state.flowId = flowId;
+      state.activeStep = -1;
+      stopPlayback();
+      renderScenarioList();
+      renderDetail();
+      applyHighlights();
+    }
+
+    function playFlow() {
+      stopPlayback(false);
+      const flow = getFlow();
+      if (!flow.steps.length) return;
+      let index = state.activeStep >= 0 ? state.activeStep : 0;
+
+      const tick = () => {
+        state.activeStep = index % flow.steps.length;
+        renderDetail();
+        applyHighlights();
+        index += 1;
+      };
+
+      tick();
+      state.playTimer = window.setInterval(tick, 1150);
+      document.getElementById('playButton')?.classList.add('is-selected');
+      document.getElementById('playButton').textContent = '暂停';
+      syncFloatingCollapsedIcon();
+    }
+
+    function stopPlayback(resetStep = true) {
+      if (state.playTimer) {
+        window.clearInterval(state.playTimer);
+        state.playTimer = null;
+      }
+      document.getElementById('playButton')?.classList.remove('is-selected');
+      document.getElementById('playButton').textContent = '播放 Flow';
+      syncFloatingCollapsedIcon();
+      if (resetStep) {
+        state.activeStep = -1;
+        renderDetail();
+        applyHighlights();
+      }
+    }
+
+    function stepBy(delta) {
+      stopPlayback(false);
+      const flow = getFlow();
+      const stepCount = flow.steps.length;
+      if (!stepCount) return;
+      const current = state.activeStep < 0 ? 0 : state.activeStep;
+      state.activeStep = Math.max(0, Math.min(stepCount - 1, current + delta));
+      renderDetail();
+      applyHighlights();
+    }
+
+    function replayFlow() {
+      stopPlayback(false);
+      state.activeStep = 0;
+      renderDetail();
+      applyHighlights();
+      playFlow();
+    }
+
+    function syncFloatingCollapsedIcon() {
+      const button = document.getElementById('floatingCollapsedButton');
+      if (button) button.textContent = state.playTimer ? 'Ⅱ' : '▶';
+    }
+
+    function setFloatingExpanded(expanded) {
+      const shell = document.getElementById('floatingShell');
+      const toggle = document.getElementById('floatingToggle');
+      if (!shell || !toggle) return;
+      shell.classList.toggle('is-expanded', expanded);
+      shell.classList.toggle('is-collapsed', !expanded);
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      toggle.setAttribute('aria-label', expanded ? 'Collapse playback toolbar' : 'Expand playback toolbar');
+    }
+
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      document.querySelectorAll('[data-view-mode]').forEach((button) => {
+        button.classList.toggle('is-selected', button.dataset.viewMode === mode);
+      });
+      const scroll = document.getElementById('architectureScroll');
+      if (scroll) scroll.dataset.viewMode = mode;
+      const target = mode === 'subsystem'
+        ? document.querySelector('.engine-map')
+        : document.getElementById('architectureFrame');
+      target?.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' });
+    }
+
+    function handleArchitectureMessage(event) {
+      if (!event.data || event.data.type !== 'hardware-ready') return;
+      state.iframeReady = true;
+      applyHighlights();
+    }
+
+    function init() {
+      window.addEventListener('message', handleArchitectureMessage);
+      renderArchitecture();
+      renderScenarioList();
+      renderDetail();
+      setViewMode(state.viewMode);
+      window.setTimeout(applyHighlights, 80);
+      window.setTimeout(applyHighlights, 260);
+
+      document.getElementById('playButton')?.addEventListener('click', () => {
+        if (state.playTimer) stopPlayback(false);
+        else playFlow();
+      });
+      document.getElementById('stepBackButton')?.addEventListener('click', () => stepBy(-1));
+      document.getElementById('stepForwardButton')?.addEventListener('click', () => stepBy(1));
+      document.getElementById('replayButton')?.addEventListener('click', replayFlow);
+      document.getElementById('floatingToggle')?.addEventListener('click', () => {
+        const shell = document.getElementById('floatingShell');
+        setFloatingExpanded(!shell?.classList.contains('is-expanded'));
+      });
+      document.getElementById('floatingCollapsedButton')?.addEventListener('click', () => {
+        const shell = document.getElementById('floatingShell');
+        if (shell?.classList.contains('is-collapsed')) {
+          setFloatingExpanded(true);
+          return;
+        }
+        if (state.playTimer) {
+          stopPlayback(false);
+        } else {
+          playFlow();
+        }
+      });
+      document.querySelectorAll('[data-view-mode]').forEach((button) => {
+        button.addEventListener('click', () => setViewMode(button.dataset.viewMode));
+      });
+      window.addEventListener('resize', () => {
+        applyHighlights();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
