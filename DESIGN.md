@@ -61,7 +61,7 @@ Characteristics:
 
 Used by:
 
-- `button-preview.html`
+- `design-system-preview.html`
 - component previews
 - design system review pages
 

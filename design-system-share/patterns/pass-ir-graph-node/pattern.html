@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Pass-IR Graph Node</title>
+  <script>
+    window.PTO_PASS_IR_GRAPH_NODE_ASSET_PREFIX = '../../';
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-pass-ir-graph-node-pattern-page">
+  <main class="pto-pass-ir-graph-node-pattern-main">
+    <h1 class="pto-pass-ir-graph-node-pattern-title">Pass-IR Graph Node</h1>
+    <p class="pto-pass-ir-graph-node-pattern-subtitle">
+      Extracted from the real Pass-IR source contract in <code>css/style.css</code> and <code>js/renderer.js</code>.
+      This preview uses the shared node renderer JS, not the earlier static experiment file.
+    </p>
+    <div class="pto-pass-ir-graph-node-pattern-meta">
+      <span class="pto-pass-ir-graph-node-pattern-badge">pattern id: pass-ir-graph-node</span>
+      <span class="pto-pass-ir-graph-node-pattern-badge">type: hybrid-pattern</span>
+      <span class="pto-pass-ir-graph-node-pattern-badge">source: DOM shell + renderer JS</span>
+      <span class="pto-pass-ir-graph-node-pattern-badge">status: preview only</span>
+    </div>
+
+    <section class="pto-pass-ir-graph-node-pattern-section">
+      <h2 class="pto-pass-ir-graph-node-pattern-section-title">Standard Nodes</h2>
+      <p class="pto-pass-ir-graph-node-pattern-section-note">
+        Full-size op, tensor, incast, and outcast cards with the same chrome, glow, and metadata rows as Pass-IR.
+      </p>
+      <div class="pto-pass-ir-graph-node-pattern-stage">
+        <div class="pto-pass-ir-graph-node-pattern-surface">
+          <div class="pto-pass-ir-graph-node-grid" data-graph-node-demo="standard"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pto-pass-ir-graph-node-pattern-section">
+      <h2 class="pto-pass-ir-graph-node-pattern-section-title">Selected And Grouped</h2>
+      <p class="pto-pass-ir-graph-node-pattern-section-note">
+        Selection state and grouped cluster card. The group shell path and stack bars are generated in JS, so this part stays in the renderer contract.
+      </p>
+      <div class="pto-pass-ir-graph-node-pattern-stage">
+        <div class="pto-pass-ir-graph-node-pattern-surface">
+          <div class="pto-pass-ir-graph-node-grid" data-graph-node-demo="selected"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pto-pass-ir-graph-node-pattern-section">
+      <h2 class="pto-pass-ir-graph-node-pattern-section-title">Compact Mode</h2>
+      <p class="pto-pass-ir-graph-node-pattern-section-note">
+        Compact card variants used when Pass-IR compresses graph density without switching to a different visual language.
+      </p>
+      <div class="pto-pass-ir-graph-node-pattern-stage">
+        <div class="pto-pass-ir-graph-node-pattern-surface">
+          <div class="pto-pass-ir-graph-node-grid" data-graph-node-demo="compact"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderPassIrGraphNodePattern() {
+      const helper = window.PtoPassIrGraphNodePattern;
+      const mainNode = document.querySelector('.pto-pass-ir-graph-node-pattern-main');
+      if (!helper || !mainNode) return;
+
+      helper.renderDefaultPreview(mainNode);
+
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!isEmbedPreview || window.parent === window) return;
+
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        const nextHeight = Math.ceil(Math.max(
+          mainNode.scrollHeight,
+          mainNode.getBoundingClientRect().height
+        ));
+        if (nextHeight <= 0) return;
+        const resolvedHeight = nextHeight + 4;
+        if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+        lastReportedHeight = resolvedHeight;
+        if (window.frameElement) {
+          window.frameElement.style.height = `${resolvedHeight}px`;
+        }
+        window.parent.postMessage({
+          type: 'pto-pattern-preview-height',
+          pathname: window.location.pathname,
+          height: resolvedHeight,
+        }, '*');
+      };
+
+      if ('ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(mainNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>
