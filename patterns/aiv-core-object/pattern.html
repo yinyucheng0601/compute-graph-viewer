@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - AIV Core Object</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-aiv-core-pattern-page">
+  <main class="pto-aiv-core-pattern-main">
+    <h1 class="pto-aiv-core-pattern-title">AIV Core Object</h1>
+    <p class="pto-aiv-core-pattern-subtitle">
+      Design-driven AIV internal object pattern based on the supplied layout draft, with routes aligned to official
+      Ascend documentation for shared ICache, shared Vector execution, Unified Buffer data staging, and SIMT DCache flow.
+    </p>
+    <div class="pto-aiv-core-pattern-meta">
+      <span class="pto-aiv-core-pattern-badge">pattern id: aiv-core-object</span>
+      <span class="pto-aiv-core-pattern-badge">preset: aivOfficialV1</span>
+      <span class="pto-aiv-core-pattern-badge">contract: config-driven DOM + JS grid + SVG routes</span>
+    </div>
+    <section class="pto-aiv-core-pattern-stage">
+      <div id="pattern-aiv-core-stage"></div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderAivCorePattern() {
+      const helper = window.PtoAivCorePattern;
+      const mountNode = document.getElementById('pattern-aiv-core-stage');
+      if (!helper || !mountNode) return;
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+
+      const embedRootNode = document.querySelector('.pto-aiv-core') || document.querySelector('.pto-aiv-core-pattern-main') || document.body;
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(Math.max(
+          embedRootNode.scrollHeight,
+          embedRootNode.getBoundingClientRect().height
+        ));
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 4;
+          if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+          lastReportedHeight = resolvedHeight;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      helper.render(mountNode, 'aivOfficialV1');
+
+      if (isEmbedPreview && 'ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(embedRootNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>
