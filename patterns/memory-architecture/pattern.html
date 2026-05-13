@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - 950B Memory Architecture</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="../aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-pattern-memory-arch__page">
+  <main class="pto-pattern-memory-arch__main">
+    <h1 class="pto-pattern-memory-arch__title">950B Memory Architecture Pattern</h1>
+    <p class="pto-pattern-memory-arch__subtitle">
+      Full-stage PTO memory architecture preview built from the shared <code>aic-core-object</code> and
+      <code>aiv-core-object</code> renderers. The chip-level routes follow the official AIC/AIV split memory model,
+      and the 950-specific direct CV lanes are added from the local 950 slide extracts.
+    </p>
+    <div class="pto-pattern-memory-arch__meta">
+      <span class="pto-pattern-memory-arch__badge">pattern id: memory-architecture-layout</span>
+      <span class="pto-pattern-memory-arch__badge">default preset: ascend950b</span>
+      <span class="pto-pattern-memory-arch__badge">contract: full-stage DOM shell + shared AIC/AIV renderers + SVG route overlay</span>
+    </div>
+    <section class="pto-pattern-memory-arch__stage">
+      <div id="pattern-memory-arch-stage"></div>
+    </section>
+  </main>
+
+  <script src="../aiv-core-object/pattern.js"></script>
+  <script src="../aic-core-object/pattern.js"></script>
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderMemoryArchitecturePattern() {
+      const helper = window.PtoMemoryArchitecturePattern;
+      const stage = document.getElementById('pattern-memory-arch-stage');
+      if (!helper || !stage) return;
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const contentNode = document.querySelector('[data-pto-mem-arch="true"]') || document.querySelector('.pto-pattern-memory-arch__stage') || stage;
+        const nextHeight = Math.ceil(contentNode.getBoundingClientRect().height);
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 4;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      helper.renderArchitecture(stage, 'ascend950b');
+      const overlay = helper.createRouteOverlay(stage, 'ascend950b');
+      overlay?.render();
+
+      if (isEmbedPreview && 'ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(stage);
+        const contentNode = document.querySelector('[data-pto-mem-arch="true"]');
+        if (contentNode) resizeObserver.observe(contentNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>

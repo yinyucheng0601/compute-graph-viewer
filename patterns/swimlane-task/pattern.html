@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Swimlane Task Bar</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body>
+  <main class="pattern-stage">
+    <h1 class="pattern-title">Swimlane Task Pattern</h1>
+    <p class="pattern-subtitle">Canvas renderer sourced from `pypto-swimlane-perf-tool/js/swimlane.js` task-bar logic.</p>
+    <div class="pto-pattern-swimlane-task">
+      <div class="pto-pattern-swimlane-task__row">
+        <div class="pto-pattern-swimlane-task__label">event 01</div>
+        <canvas class="pto-pattern-swimlane-task__canvas" data-pattern-row="0"></canvas>
+      </div>
+      <div class="pto-pattern-swimlane-task__row">
+        <div class="pto-pattern-swimlane-task__label">event 02</div>
+        <canvas class="pto-pattern-swimlane-task__canvas" data-pattern-row="1"></canvas>
+      </div>
+      <div class="pto-pattern-swimlane-task__row">
+        <div class="pto-pattern-swimlane-task__label">event 03</div>
+        <canvas class="pto-pattern-swimlane-task__canvas" data-pattern-row="2"></canvas>
+      </div>
+      <div class="pto-pattern-swimlane-task__row">
+        <div class="pto-pattern-swimlane-task__label">event 04</div>
+        <canvas class="pto-pattern-swimlane-task__canvas" data-pattern-row="3"></canvas>
+      </div>
+    </div>
+  </main>
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderPatternPreview() {
+      const helper = window.PtoSwimlaneTaskPattern;
+      if (!helper) return;
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+
+      const rows = [
+        {
+          color: '#4d79d4',
+          task: { label: 'Query-Linear', inputRawMagic: [], outputRawMagic: [] },
+          state: {},
+        },
+        {
+          color: '#7b57bf',
+          task: { label: 'dispatch', inputRawMagic: new Array(6).fill(0), outputRawMagic: new Array(4).fill(0) },
+          state: { isSelected: true },
+        },
+        {
+          color: '#4da56d',
+          task: { label: 'attention matmul', inputRawMagic: new Array(3).fill(0), outputRawMagic: new Array(3).fill(0) },
+          state: { isRelated: true, isEmphasized: true },
+        },
+        {
+          color: '#d98f55',
+          task: { label: 'kernel', inputRawMagic: new Array(2).fill(0), outputRawMagic: [] },
+          state: {},
+        },
+      ];
+
+      const fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() || 'sans-serif';
+      const embedRootNode = document.querySelector('.pto-pattern-swimlane-task') || document.querySelector('.pattern-stage') || document.body;
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(Math.max(
+          embedRootNode.scrollHeight,
+          embedRootNode.getBoundingClientRect().height
+        ));
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 2;
+          if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+          lastReportedHeight = resolvedHeight;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      function render() {
+        document.querySelectorAll('.pto-pattern-swimlane-task__canvas').forEach((canvasNode, index) => {
+          const rect = canvasNode.getBoundingClientRect();
+          const width = Math.max(1, Math.round(rect.width));
+          const height = Math.max(1, Math.round(rect.height));
+          const dpr = window.devicePixelRatio || 1;
+          canvasNode.width = width * dpr;
+          canvasNode.height = height * dpr;
+          const ctx = canvasNode.getContext('2d');
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(dpr, dpr);
+          ctx.clearRect(0, 0, width, height);
+
+          helper.drawTaskBar(ctx, {
+            task: rows[index].task,
+            x: 0,
+            y: 0,
+            width,
+            height,
+            baseColor: rows[index].color,
+            isSelected: rows[index].state.isSelected,
+            isRelated: rows[index].state.isRelated,
+            isEmphasized: rows[index].state.isSelected || rows[index].state.isEmphasized,
+            radius: 2,
+            fontFamily,
+          });
+        });
+
+        syncFrameHeight();
+      }
+
+      render();
+      window.addEventListener('resize', render);
+
+      if (isEmbedPreview && 'ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(embedRootNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>

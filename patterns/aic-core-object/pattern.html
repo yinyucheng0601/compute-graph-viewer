@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - AIC Core Object</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-aic-core-pattern-page">
+  <main class="pto-aic-core-pattern-main">
+    <h1 class="pto-aic-core-pattern-title">AIC Core Object</h1>
+    <p class="pto-aic-core-pattern-subtitle">
+      Design-driven AIC internal object pattern reconstructed from the supplied draft. It is intentionally config-driven
+      so future 950B work can extend the stack members, card sizes, and grid densities without rewriting the object shell.
+    </p>
+    <div class="pto-aic-core-pattern-meta">
+      <span class="pto-aic-core-pattern-badge">pattern id: aic-core-object</span>
+      <span class="pto-aic-core-pattern-badge">preset: aicDraftV1</span>
+      <span class="pto-aic-core-pattern-badge">contract: config-driven DOM + JS grid generator</span>
+    </div>
+    <div class="pto-aic-core-pattern-legend" aria-label="Chip device color legend">
+      <span class="pto-aic-core-pattern-chip memory">Memory</span>
+      <span class="pto-aic-core-pattern-chip compute">Compute</span>
+      <span class="pto-aic-core-pattern-chip cache">Cache</span>
+      <span class="pto-aic-core-pattern-chip transport">Transport</span>
+    </div>
+    <section class="pto-aic-core-pattern-stage">
+      <div id="pattern-aic-core-stage"></div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderAicCorePattern() {
+      const helper = window.PtoAicCorePattern;
+      const mountNode = document.getElementById('pattern-aic-core-stage');
+      if (!helper || !mountNode) return;
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+
+      const embedRootNode = document.querySelector('.pto-aic-core') || document.querySelector('.pto-aic-core-pattern-main') || document.body;
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(Math.max(
+          embedRootNode.scrollHeight,
+          embedRootNode.getBoundingClientRect().height
+        ));
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 4;
+          if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+          lastReportedHeight = resolvedHeight;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      helper.render(mountNode, 'aicDraftV1');
+
+      if (isEmbedPreview && 'ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(embedRootNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>
