@@ -1,0 +1,1541 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ascend 950B 硬件路径工作台</title>
+  <link rel="stylesheet" href="../design-system-share/css/style.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/memory-architecture/pattern.css">
+  <style>
+    body {
+      min-width: 1360px;
+      background: var(--background);
+    }
+
+    .wb-page {
+      display: grid;
+      grid-template-rows: 58px minmax(0, 1fr);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .wb-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-width: 0;
+    }
+
+    .wb-brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, var(--surface-4), var(--surface-2));
+      border: 1px solid var(--border-default);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--success);
+      font: 700 13px / 1 var(--font-mono);
+    }
+
+    .wb-title-stack {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .wb-title {
+      font: var(--text-title-2);
+      color: var(--foreground);
+      white-space: nowrap;
+    }
+
+    .wb-subtitle {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .wb-context {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .wb-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: var(--tag-height);
+      padding: 0 var(--space-2);
+      border-radius: var(--tag-radius);
+      border: 1px solid var(--comp-tag-border);
+      background: var(--comp-tag-bg);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .wb-chip strong {
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .wb-chip.is-verdict {
+      color: var(--success);
+      border-color: color-mix(in srgb, var(--success) 24%, transparent);
+      background: color-mix(in srgb, var(--success) 10%, transparent);
+    }
+
+    .wb-workbench {
+      min-height: 0;
+      padding: var(--space-4);
+      display: grid;
+      grid-template-columns: minmax(440px, 34%) minmax(520px, 42%) minmax(320px, 24%);
+      grid-template-rows: minmax(0, 1fr);
+      gap: var(--space-4);
+    }
+
+    .wb-panel {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .wb-source-panel {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .wb-hardware-panel {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .wb-inspector-panel {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    .wb-source-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-3) 0;
+    }
+
+    .source-line {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      gap: var(--space-3);
+      padding: 1px 0;
+      position: relative;
+      align-items: baseline;
+    }
+
+    .source-line-tag {
+      align-self: center;
+      margin-right: var(--space-3);
+    }
+
+    .tk-comment { color: var(--foreground-muted); font-style: italic; }
+    .tk-keyword { color: #c792ea; }
+    .tk-type    { color: #82aaff; }
+    .tk-string  { color: #c3e88d; }
+    .tk-number  { color: #f78c6c; }
+    .tk-fn      { color: #82aaff; }
+
+    .source-line-no {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      text-align: right;
+      user-select: none;
+      padding-right: var(--space-2);
+      opacity: 0.55;
+    }
+
+    .source-line-code {
+      color: color-mix(in srgb, var(--foreground) 88%, transparent);
+      font: 500 12px / 1.5 var(--font-mono);
+      white-space: pre;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: var(--space-3);
+    }
+
+    .source-line.is-key {
+      cursor: pointer;
+    }
+
+    .source-line.is-key::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--surface-4);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .source-line.is-key:hover {
+      background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+    }
+
+    .source-line.is-key.is-compute::before { background: var(--success); }
+    .source-line.is-key.is-memory::before { background: var(--primary-hover); }
+    .source-line.is-key.is-control::before { background: var(--warning); }
+
+    .source-line.is-key .source-line-no {
+      opacity: 1;
+      color: var(--foreground-secondary);
+      font-weight: 600;
+    }
+
+    .source-line.is-key.is-selected {
+      background: color-mix(in srgb, var(--primary) 14%, transparent);
+    }
+
+    .source-line.is-key.is-selected .source-line-code {
+      color: var(--foreground);
+    }
+
+    .line-detail {
+      margin: 2px var(--space-3) var(--space-3) 56px;
+    }
+
+    .line-detail-card {
+      min-width: 0;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+      padding: var(--space-3);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-3);
+      cursor: pointer;
+      transition: background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
+    }
+
+    .line-detail-card:hover {
+      background: var(--surface-1);
+      border-color: var(--border-default);
+    }
+
+    .line-detail.is-open .line-detail-card {
+      background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--primary) 60%, var(--border-default));
+    }
+
+    .line-detail-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .line-detail-head {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .line-detail-title {
+      min-width: 0;
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      line-height: 1.45;
+    }
+
+    .line-detail-path {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.45;
+    }
+
+    .line-detail-expanded {
+      display: none;
+      gap: var(--space-2);
+    }
+
+    .line-detail.is-open .line-detail-expanded {
+      display: grid;
+    }
+
+    .line-detail-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(64px, 1fr));
+      gap: var(--space-2);
+      align-self: start;
+    }
+
+    .line-mini-metric {
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: var(--surface-1);
+      padding: var(--space-2);
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .line-mini-metric span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .line-mini-metric strong {
+      color: var(--foreground);
+      font: 700 12px / 1.1 var(--font-sans);
+      white-space: nowrap;
+    }
+
+    .wb-panel .panel-shell-header {
+      min-height: 50px;
+      flex: 0 0 auto;
+    }
+
+    .wb-header-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .wb-panel-kicker {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .wb-panel-subtitle {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mode-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 22px;
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-pill);
+      background: var(--surface-3);
+      border: 1px solid var(--border-default);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .mode-tag.is-compute {
+      color: var(--success);
+      border-color: color-mix(in srgb, var(--success) 30%, transparent);
+    }
+
+    .mode-tag.is-memory {
+      color: var(--primary-hover);
+      border-color: color-mix(in srgb, var(--primary-hover) 32%, transparent);
+    }
+
+    .mode-tag.is-control {
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+    }
+
+    .hardware-viewport {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 0 var(--space-2) var(--space-2);
+      position: relative;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hardware-scale {
+      width: max-content;
+      height: max-content;
+      transform-origin: top left;
+      position: relative;
+      place-self: center;
+    }
+
+    .hardware-frame {
+      display: block;
+      width: 1200px;
+      height: 820px;
+      border: 0;
+      background: transparent;
+      transform-origin: top left;
+    }
+
+    .hardware-frame-fallback {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .hardware-status {
+      position: sticky;
+      left: 0;
+      bottom: 0;
+      z-index: var(--z-raised);
+      width: max-content;
+      max-width: 100%;
+      margin-top: var(--space-3);
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      padding: var(--space-2);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--background-elevated) 92%, transparent);
+      backdrop-filter: blur(12px);
+    }
+
+    .path-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-pill);
+      background: var(--surface-3);
+      border: 1px solid var(--border-default);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .path-chip::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--foreground-muted);
+    }
+
+    .path-chip.is-active::before {
+      background: var(--warning);
+    }
+
+    .inspector-body {
+      min-height: 0;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-3);
+    }
+
+    .inspector-section {
+      min-width: 0;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      padding: var(--space-3);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .inspector-section-title {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .inspector-controls {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 2px;
+      padding: 3px;
+      background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      --tier-x: 3px;
+      --tier-w: 0px;
+    }
+
+    .inspector-controls::before {
+      content: "";
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 0;
+      width: var(--tier-w);
+      transform: translateX(var(--tier-x));
+      background: var(--background-elevated);
+      border-radius: calc(var(--radius-md) - 3px);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--border-default) 60%, transparent);
+      transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1), width 240ms cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .inspector-controls .btn {
+      position: relative;
+      z-index: 1;
+      background: transparent;
+      border: 0;
+      color: var(--foreground-muted);
+      transition: color 200ms ease;
+    }
+
+    .inspector-controls .btn:hover {
+      background: transparent;
+      color: var(--foreground-secondary);
+    }
+
+    .inspector-controls .btn.is-selected {
+      background: transparent;
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .evidence-body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .evidence-summary,
+    .evidence-explain,
+    .evidence-metrics {
+      min-width: 0;
+      border-radius: var(--radius-lg);
+      border: 1px solid transparent;
+      background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+      padding: var(--space-3);
+    }
+
+    .evidence-summary {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .summary-line {
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+
+    .summary-path {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.5;
+    }
+
+    .reason-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+
+    .reason-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-default);
+      background: var(--comp-tag-bg);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .evidence-explain {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-3);
+    }
+
+    .evidence-block {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .rewrite-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+
+    .rewrite-apply {
+      flex: 0 0 auto;
+    }
+
+    .evidence-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .evidence-text {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.55;
+    }
+
+    .rewrite-code {
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-2);
+      font: var(--text-mono);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      overflow: auto;
+    }
+
+    .evidence-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-2);
+    }
+
+    .metric-card {
+      min-width: 0;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: var(--surface-1);
+      padding: var(--space-2);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .slider-row {
+      display: grid;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .slider-row div {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .slider-row input {
+      width: 100%;
+    }
+
+    .analysis-list,
+    .hybrid-split,
+    .mode-signal-list {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .finding,
+    .hybrid-card,
+    .mode-signal {
+      min-width: 0;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+      padding: var(--space-3);
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .finding strong,
+    .hybrid-card strong,
+    .mode-signal strong {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+    }
+
+    .finding p,
+    .hybrid-card p,
+    .mode-signal p {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.5;
+    }
+
+    .reason-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-3);
+      align-items: center;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .reason-row:last-child {
+      border-bottom: 0;
+    }
+
+    .reason-row code {
+      color: var(--danger);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    #reasonList {
+      display: grid;
+      gap: 0;
+    }
+
+    .metric-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .metric-value {
+      color: var(--foreground);
+      font: 700 15px / 1.2 var(--font-sans);
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 1420px) {
+      body {
+        min-width: 1360px;
+      }
+
+      .wb-workbench {
+        grid-template-columns: minmax(420px, 34%) minmax(500px, 42%) minmax(300px, 24%);
+      }
+
+      .evidence-body {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wb-page">
+    <header class="layout-header layout-header-filled">
+      <div class="layout-header-left">
+        <a href="../launch.html" class="home-link" title="Back to Launcher">⌂</a>
+        <div class="wb-brand">
+          <span class="wb-brand-mark">950</span>
+          <div class="wb-title-stack">
+            <div class="wb-title">硬件路径工作台</div>
+            <div class="wb-subtitle">代码 ↔ 硬件 ↔ 决策同步审查</div>
+          </div>
+        </div>
+        <div class="wb-context" aria-label="Context">
+          <span class="wb-chip">内核 <strong>fp8_mmad_masked_reduce</strong></span>
+          <span class="wb-chip">目标 <strong>Ascend 950B</strong></span>
+          <span class="wb-chip">分析层级 <strong>T2 静态 + 画像</strong></span>
+          <span class="wb-chip is-verdict">结论 <strong>混合路径</strong></span>
+        </div>
+      </div>
+      <div class="layout-header-right">
+        <button class="btn btn-sm" type="button" id="analyzeBtn">分析</button>
+        <button class="btn btn-solid btn-sm" type="button">应用建议</button>
+      </div>
+    </header>
+
+    <main class="wb-workbench">
+      <section class="panel-shell panel-shell-quiet wb-panel wb-source-panel" aria-label="Kernel source">
+        <header class="panel-shell-header">
+          <div class="wb-header-copy">
+            <span class="wb-panel-kicker">内核源代码</span>
+            <h1 class="panel-shell-title">fp8_mmad_masked_reduce.tik</h1>
+          </div>
+          <div class="panel-shell-meta">
+            <span class="wb-chip">100 行</span>
+            <span class="wb-chip is-verdict">6 行已标注</span>
+          </div>
+        </header>
+        <div class="wb-source-body layout-surface-fill-strong" id="sourceBody" role="listbox" aria-label="Kernel source lines"></div>
+      </section>
+
+      <section class="panel-shell panel-shell-quiet wb-panel wb-hardware-panel" id="hardwarePanel" aria-label="950B hardware architecture map">
+        <header class="panel-shell-header">
+          <div class="wb-header-copy">
+            <span class="wb-panel-kicker">硬件架构图</span>
+            <h2 class="panel-shell-title">Ascend 950B 当前数据路径</h2>
+          </div>
+          <div class="panel-shell-meta">
+            <div class="segmented-control segmented-control-muted" aria-label="Path filter">
+              <button class="btn btn-sm is-selected" type="button" data-path-kind="compute">计算路径</button>
+              <button class="btn btn-sm" type="button" data-path-kind="memory">访存路径</button>
+              <button class="btn btn-sm" type="button" data-path-kind="control">控制路径</button>
+            </div>
+            <div class="toolbar-control">
+              <button class="btn btn-sm btn-ghost" type="button" id="fitBtn">适配</button>
+              <button class="btn btn-sm btn-ghost" type="button" id="actualBtn">1:1</button>
+              <span class="toolbar-readout" id="zoomReadout">100%</span>
+            </div>
+          </div>
+        </header>
+        <div class="hardware-viewport layout-surface-fill" id="hardwareViewport">
+          <div class="hardware-scale" id="hardwareScale">
+            <iframe class="hardware-frame" id="hardwareFrame" src="./hardware-frame.html" title="Ascend 950B architecture map"></iframe>
+          </div>
+          <div class="hardware-status" id="pathChips"></div>
+        </div>
+      </section>
+
+      <section class="panel-shell panel-shell-quiet wb-panel wb-inspector-panel" aria-label="Inspector">
+        <header class="panel-shell-header">
+          <div class="wb-header-copy">
+            <h2 class="panel-shell-title">Inspector</h2>
+          </div>
+          <div class="panel-shell-meta">
+            <span class="wb-chip" id="selectedLineChip">第 48 行</span>
+            <span class="wb-chip is-verdict" id="selectedVerdictChip">SIMD / Cube</span>
+          </div>
+        </header>
+        <div class="panel-shell-body inspector-body layout-surface-fill">
+          <section class="inspector-section" aria-label="Decision basis">
+            <span class="inspector-section-title">基本解释</span>
+            <div class="evidence-body" id="evidenceBody"></div>
+          </section>
+
+          <section class="inspector-section" aria-label="Analysis controls">
+            <div class="rewrite-head">
+              <span class="inspector-section-title">分析层级</span>
+              <span class="wb-chip" id="modeTag">COMPILED analysis</span>
+            </div>
+            <div class="inspector-controls" aria-label="Analysis tier">
+              <button class="btn btn-sm" type="button" data-tier="t1">T1 Static</button>
+              <button class="btn btn-sm is-selected" type="button" data-tier="t2">T2 Compiled</button>
+              <button class="btn btn-sm" type="button" data-tier="t3">T3 Simulated</button>
+            </div>
+            <div class="slider-row">
+              <div><span>K tile</span><strong id="kValue">128</strong></div>
+              <input id="kSlider" type="range" min="64" max="384" step="64" value="128" aria-label="K tile">
+            </div>
+            <div class="slider-row">
+              <div><span>tail length</span><strong id="tailValue">17</strong></div>
+              <input id="tailSlider" type="range" min="0" max="64" step="1" value="17" aria-label="Tail length">
+            </div>
+            <div class="analysis-list" id="analysisList"></div>
+          </section>
+
+          <section class="inspector-section" aria-label="Hybrid split">
+            <span class="inspector-section-title">Hybrid Split</span>
+            <div class="hybrid-split" id="hybridSplit"></div>
+          </section>
+
+          <section class="inspector-section" aria-label="Reason codes">
+            <span class="inspector-section-title">reason codes</span>
+            <div class="reason-list" id="reasonList"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const LINES = [
+      {
+        id: 'l42',
+        line: 42,
+        kind: 'memory',
+        tag: 'MTE2 预取',
+        code: 'DataCopy(aL1, aGM + tileOffset, BLOCK_K * BLOCK_M);',
+        short: 'Cube 计算开始前，先把 GM / L2 数据搬入 AIC L1。',
+        selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aic [data-aic-node="buffer:L1"]'],
+        routes: ['l2-to-aic'],
+        path: 'Global Memory → L2 → MTE2 → AIC L1',
+        verdict: '访存预取',
+        reasons: ['GM 连续读', 'L1 复用窗口', 'MTE2 可搬运'],
+        explanation: '这个 tile 会被多个 MMA 步骤复用。先通过 L2 / MTE2 搬入 L1，比重复从 GM 读取更稳定。',
+        rewrite: 'DataCopy(aL1, aGM + tileOffset, alignedBlockBytes);',
+        metrics: { confidence: '91%', cycles: '-18%', pressure: 'L2 中等' }
+      },
+      {
+        id: 'l48',
+        line: 48,
+        kind: 'compute',
+        tag: 'SIMD / Cube',
+        code: 'MmadFp8(cL0C, aL0A, bL0B, repeatM, repeatN, repeatK);',
+        short: '对齐后的 FP8 矩阵片段适合走 AIC Cube 路径。',
+        selectors: ['#mem950-aic [data-aic-node="buffer:L1"]', '#mem950-aic [data-aic-node="buffer:L0A"]', '#mem950-aic [data-aic-node="buffer:L0B"]', '#mem950-aic [data-aic-node="cube:CUBE"]', '#mem950-aic [data-aic-node="buffer:L0C"]'],
+        routes: ['l2-to-aic'],
+        path: 'L1 → MTE1 → L0A / L0B → Cube → L0C',
+        verdict: 'SIMD / Cube',
+        reasons: ['Cube 友好形状', 'stride 已对齐', '支持 FP8 MMAD'],
+        explanation: '矩阵片段形状匹配 Cube 执行，两个操作数都能放入 L0A / L0B，不需要额外的标量分支控制。',
+        rewrite: 'MmadFp8(cL0C, aL0A, bL0B, mmadShape.m, mmadShape.n, mmadShape.k);',
+        metrics: { confidence: '94%', cycles: '-31%', pressure: 'L0 较高' }
+      },
+      {
+        id: 'l57',
+        line: 57,
+        kind: 'control',
+        tag: 'FixPipe 同步',
+        code: 'PipeBarrier<PIPE_FIX>();',
+        short: '进入向量 epilogue 前，用 FixPipe 保护 L0C 结果顺序。',
+        selectors: ['#mem950-aic [data-aic-node="buffer:FP"]', '#mem950-aic [data-aic-node="scheduler:Dispatch"]', '#mem950-aic [data-aic-node="buffer:L0C"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'],
+        routes: ['aic-to-aiv1'],
+        path: 'L0C → FixPipe → 直连 CV 通道 → AIV UB',
+        verdict: '混合路径交接',
+        reasons: ['L0C 到 UB 交接', '需要顺序保护', '直连 CV 通道'],
+        explanation: '结果从 Cube 域进入向量 epilogue，需要明确的流水边界来保证 L0C 到 UB 的交接顺序。',
+        rewrite: 'SetFlag<PIPE_FIX, PIPE_V>();\nWaitFlag<PIPE_FIX, PIPE_V>();',
+        metrics: { confidence: '88%', cycles: '+2%', pressure: '同步压力低' }
+      },
+      {
+        id: 'l73',
+        line: 73,
+        kind: 'compute',
+        tag: 'SIMD / Vector',
+        code: 'Add(outUb, cUb, biasUb, VECTOR_ELEMS);',
+        short: 'MMA 后的 bias add 是 AIV 上的稠密向量操作。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'],
+        routes: ['aic-to-aiv1'],
+        path: 'AIC L0C → AIV UB → SIMD → Vector',
+        verdict: 'SIMD / Vector',
+        reasons: ['稠密向量通道', '无分支发散', '数据已在 UB'],
+        explanation: '直连通道交接后数据已经在 UB 中，逐元素加法可以稳定映射到 Vector 执行单元。',
+        rewrite: 'Add(outUb, cUb, biasUb, alignedVectorElems);',
+        metrics: { confidence: '96%', cycles: '-22%', pressure: 'UB 中等' }
+      },
+      {
+        id: 'l82',
+        line: 82,
+        kind: 'control',
+        tag: 'SIMT 条件分支',
+        code: 'if (mask[k]) { outUb[k] = relu(outUb[k]); }',
+        short: 'mask 控制的分支需要隔离为 SIMT 区域。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="scalar:Scalar"]', '#mem950-aiv1 [data-aiv-node="exec:SIMT"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'],
+        routes: [],
+        path: 'UB → Scalar 控制 → SIMT Warp Scheduler → Vector',
+        verdict: 'SIMT 区域',
+        reasons: ['线程分歧已测得', 'mask 密度变化', '标量守卫'],
+        explanation: '分支条件随元素变化，工作台会把它标为 SIMT 岛，而不是折叠进稠密 SIMD 向量路径。',
+        rewrite: 'Select(outUb, outUb, Zero, maskUb, VECTOR_ELEMS);',
+        metrics: { confidence: '83%', cycles: '-9%', pressure: '控制压力中等' }
+      },
+      {
+        id: 'l96',
+        line: 96,
+        kind: 'memory',
+        tag: 'MTE3 写回',
+        code: 'DataCopy(outGM + tileOffset, outUb, BLOCK_M * BLOCK_N);',
+        short: '向量结果从 UB 通过 MTE3 写回 L2 / GM。',
+        selectors: ['#mem950-aiv2 [data-aiv-node="buffer:UB"]', '[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'],
+        routes: ['aiv2-to-l2'],
+        path: 'AIV UB → MTE3 → L2 → Global Memory',
+        verdict: '访存写回',
+        reasons: ['写回连续', 'UB 排空', 'MTE3 可搬运'],
+        explanation: 'epilogue 后最终 tile 已经连续，可以从 AIV UB 经 MTE3 写回 L2 / GM。',
+        rewrite: 'DataCopy(outGM + tileOffset, outUb, alignedOutputBytes);',
+        metrics: { confidence: '90%', cycles: '-14%', pressure: 'GM 中等' }
+      }
+    ];
+
+    const SOURCE_LINES = [
+      '#include "tikicpulib.h"',
+      '#include "kernel_operator.h"',
+      '',
+      'using namespace AscendC;',
+      '',
+      'namespace {',
+      'constexpr int32_t BLOCK_M = 128;',
+      'constexpr int32_t BLOCK_N = 128;',
+      'constexpr int32_t BLOCK_K = 64;',
+      'constexpr int32_t VECTOR_ELEMS = 256;',
+      'constexpr int32_t kPrefetchStride = 8;',
+      'constexpr int32_t kPrefetchAhead  = 32;',
+      '}  // namespace',
+      '',
+      'template <typename DataT, typename AccT>',
+      'class FP8MmadMaskedReduce {',
+      ' public:',
+      '  __aicore__ inline FP8MmadMaskedReduce() = default;',
+      '',
+      '  __aicore__ inline void Init(GM_ADDR aGm, GM_ADDR bGm,',
+      '                              GM_ADDR biasGm, GM_ADDR maskGm,',
+      '                              GM_ADDR outGm) {',
+      '    aGM = aGm; bGM = bGm;',
+      '    biasGM = biasGm; maskGM = maskGm; outGM = outGm;',
+      '    pipe.InitBuffer(aL1Que, 1, BLOCK_K * BLOCK_M * sizeof(DataT));',
+      '    pipe.InitBuffer(bL1Que, 1, BLOCK_K * BLOCK_N * sizeof(DataT));',
+      '    pipe.InitBuffer(cL0CQue, 1, BLOCK_M * BLOCK_N * sizeof(AccT));',
+      '  }',
+      '',
+      '  __aicore__ inline void Process() {',
+      '    const int32_t tileCount = CeilDiv(M, BLOCK_M);',
+      '    for (int32_t tile = 0; tile < tileCount; ++tile) {',
+      '      const int32_t tileOffset = tile * BLOCK_M * K;',
+      '      LocalTensor<DataT> aL1 = aL1Que.AllocTensor<DataT>();',
+      '      LocalTensor<DataT> bL1 = bL1Que.AllocTensor<DataT>();',
+      '      const int32_t aBytes = BLOCK_K * BLOCK_M;',
+      '      const int32_t bBytes = BLOCK_K * BLOCK_N;',
+      '      WaitFlag<PIPE_MTE2, PIPE_M>();',
+      '      EnableMte2Prefetch(aL1Que);',
+      '',
+      '      // 把 tile A 从 GM/L2 装入 AIC L1，供后续 MMA 复用',
+      '      DataCopy(aL1, aGM + tileOffset, BLOCK_K * BLOCK_M);',
+      '      DataCopy(bL1, bGM + tileOffset, BLOCK_K * BLOCK_N);',
+      '      aL1Que.EnQue(aL1);',
+      '      bL1Que.EnQue(bL1);',
+      '      LocalTensor<DataT> aL0A = LoadL0A(aL1, mmadShape);',
+      '      LocalTensor<DataT> bL0B = LoadL0B(bL1, mmadShape);',
+      '      MmadFp8(cL0C, aL0A, bL0B, repeatM, repeatN, repeatK);',
+      '      cL0CQue.EnQue(cL0C);',
+      '      FreeL0A(aL0A);',
+      '      FreeL0B(bL0B);',
+      '',
+      '      // Cube 完成，准备交接到 Vector epilogue',
+      '      LocalTensor<AccT> cUb = TransferToVector(cL0C);',
+      '      ReleaseL0C(cL0C);',
+      '      SetFlag<PIPE_FIX, PIPE_V>();',
+      '      PipeBarrier<PIPE_FIX>();',
+      '      WaitFlag<PIPE_FIX, PIPE_V>();',
+      '',
+      '      LocalTensor<AccT> biasUb = biasQue.AllocTensor<AccT>();',
+      '      DataCopy(biasUb, biasGM + tile * BLOCK_N, BLOCK_N);',
+      '      biasQue.EnQue(biasUb);',
+      '',
+      '      LocalTensor<DataT> maskUb = maskQue.AllocTensor<DataT>();',
+      '      DataCopy(maskUb, maskGM + tile * BLOCK_N, BLOCK_N);',
+      '      maskQue.EnQue(maskUb);',
+      '',
+      '      LocalTensor<AccT> outUb = outQue.AllocTensor<AccT>();',
+      '',
+      '      // Bias add：稠密向量加法，AIV SIMD 通道',
+      '      const int32_t biasElems = AlignTo(VECTOR_ELEMS, 8);',
+      '      AlignVectorIo(outUb, cUb, biasElems);',
+      '      Add(outUb, cUb, biasUb, VECTOR_ELEMS);',
+      '      biasQue.FreeTensor(biasUb);',
+      '',
+      '      // mask 控制的逐元素分支，会被识别为 SIMT 区域',
+      '      const auto* mask = maskUb.GetPhyAddr();',
+      '      for (int32_t k = 0; k < VECTOR_ELEMS; ++k) {',
+      '        if (k % kPrefetchStride == 0) {',
+      '          PrefetchHint(maskUb, k + kPrefetchAhead);',
+      '        }',
+      '        if (mask[k]) { outUb[k] = relu(outUb[k]); }',
+      '      }',
+      '      maskQue.FreeTensor(maskUb);',
+      '',
+      '      const int32_t outOffset = tile * BLOCK_M * N;',
+      '      outQue.EnQue(outUb);',
+      '',
+      '      // 写回前对齐边界，避免非对齐 MTE3 拖慢',
+      '      AlignBoundary(outUb, BLOCK_M * BLOCK_N);',
+      '      WaitFlag<PIPE_V, PIPE_MTE3>();',
+      '',
+      '      // 经 MTE3 写回 L2 / GM，完成本 tile',
+      '      const int32_t writeBytes = AlignTo(BLOCK_M * BLOCK_N, 32);',
+      '      EnableMte3Drain(outQue);',
+      '      DataCopy(outGM + tileOffset, outUb, BLOCK_M * BLOCK_N);',
+      '      outQue.FreeTensor(outUb);',
+      '    }',
+      '  }',
+      '};'
+    ];
+
+    const TIER_TEXT = {
+      t1: ['T1 Static · ~1.2s', 'STATIC', '静态层只读取控制流、访存步长和 tile 形状，适合快速指出 SIMD/SIMT 倾向。'],
+      t2: ['T2 Compiled · ~18s', 'COMPILED', '编译层加入寄存器压力、FixPipe burst、C-V 直通路和编译期 cycle 估算。'],
+      t3: ['T3 Simulated · ~12min', 'SIMULATED', '仿真层追加 CANN SIM 画像，校准线程分歧、L2 sector 命中和模式切换开销。']
+    };
+
+    const REASON_CODE_MAP = {
+      'GM 连续读': 'contiguous_gm_load',
+      'L1 复用窗口': 'l1_reuse_window',
+      'MTE2 可搬运': 'mte2_prefetch_eligible',
+      'Cube 友好形状': 'cube_friendly_shape',
+      'stride 已对齐': 'aligned_stride',
+      '支持 FP8 MMAD': 'fp8_mmad_supported',
+      'L0C 到 UB 交接': 'loc_to_ub_handoff',
+      '需要顺序保护': 'fixpipe_order_guard',
+      '直连 CV 通道': 'cv_direct_path',
+      '稠密向量通道': 'dense_vector_lane',
+      '无分支发散': 'no_thread_divergence',
+      '数据已在 UB': 'ub_resident_operand',
+      '线程分歧已测得': 'thread_divergence_measured',
+      'mask 密度变化': 'mask_density_variance',
+      '标量守卫': 'scalar_guard_branch',
+      '写回连续': 'contiguous_store',
+      'UB 排空': 'ub_drain',
+      'MTE3 可搬运': 'mte3_store_eligible'
+    };
+
+    const state = {
+      selectedId: 'l42',
+      pathKind: 'memory',
+      tier: 't2',
+      kTile: 128,
+      tailLength: 17,
+      fitted: true,
+      frameReady: false,
+      frameSize: { width: 1200, height: 820 },
+      scale: 1
+    };
+
+    const qs = (selector, root = document) => root.querySelector(selector);
+    const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    function selectedLine() {
+      return LINES.find((line) => line.id === state.selectedId) || LINES[0];
+    }
+
+    function tagClass(kind) {
+      if (kind === 'compute') return 'is-compute';
+      if (kind === 'memory') return 'is-memory';
+      return 'is-control';
+    }
+
+    function renderLineDetail(line) {
+      return `
+        <div class="line-detail-card">
+          <div class="line-detail-main">
+            <div class="line-detail-head">
+              <span class="mode-tag ${tagClass(line.kind)}">${escapeHtml(line.tag)}</span>
+              <strong class="line-detail-title">${escapeHtml(line.short)}</strong>
+            </div>
+            <div class="line-detail-path">${escapeHtml(line.path)}</div>
+            <div class="line-detail-expanded">
+              <div class="reason-list">
+                ${line.reasons.map((reason) => `<span class="reason-pill">${escapeHtml(reason)}</span>`).join('')}
+              </div>
+              <pre class="rewrite-code">${highlightCpp(line.rewrite)}</pre>
+            </div>
+          </div>
+          <div class="line-detail-metrics">
+            <span class="line-mini-metric"><span>conf</span><strong>${escapeHtml(line.metrics.confidence)}</strong></span>
+            <span class="line-mini-metric"><span>cycles</span><strong>${escapeHtml(line.metrics.cycles)}</strong></span>
+            <span class="line-mini-metric"><span>pressure</span><strong>${escapeHtml(line.metrics.pressure)}</strong></span>
+          </div>
+        </div>
+      `;
+    }
+
+    const CPP_KEYWORDS = new Set([
+      'include','using','namespace','template','typename','class','struct','public','private','protected',
+      'inline','const','constexpr','static','auto','for','if','else','return','void','default','sizeof',
+      'new','delete','this','true','false','nullptr','__aicore__'
+    ]);
+    const CPP_TYPES = new Set([
+      'int','int32_t','int64_t','uint32_t','uint64_t','bool','float','double','char','size_t',
+      'LocalTensor','GM_ADDR','DataT','AccT',
+      'PIPE_FIX','PIPE_V','PIPE_M','PIPE_MTE2','PIPE_MTE3','BLOCK_M','BLOCK_N','BLOCK_K','VECTOR_ELEMS'
+    ]);
+
+    function highlightCpp(code) {
+      const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      const re = /(\/\/.*$)|(&quot;[^&]*?&quot;)|(\b\d+\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+      let out = '';
+      let last = 0;
+      let m;
+      while ((m = re.exec(escaped)) !== null) {
+        if (m.index > last) out += escaped.slice(last, m.index);
+        if (m[1]) out += `<span class="tk-comment">${m[1]}</span>`;
+        else if (m[2]) out += `<span class="tk-string">${m[2]}</span>`;
+        else if (m[3]) out += `<span class="tk-number">${m[3]}</span>`;
+        else if (m[4]) {
+          const id = m[4];
+          const next = escaped[re.lastIndex];
+          if (CPP_KEYWORDS.has(id)) out += `<span class="tk-keyword">${id}</span>`;
+          else if (CPP_TYPES.has(id)) out += `<span class="tk-type">${id}</span>`;
+          else if (next === '(') out += `<span class="tk-fn">${id}</span>`;
+          else out += id;
+        }
+        last = re.lastIndex;
+      }
+      if (last < escaped.length) out += escaped.slice(last);
+      return out;
+    }
+
+    function renderSource() {
+      const body = qs('#sourceBody');
+      if (!body) return;
+      const keyByLine = {};
+      LINES.forEach((l) => { keyByLine[l.line] = l; });
+      body.innerHTML = '';
+      SOURCE_LINES.forEach((code, idx) => {
+        const lineNo = idx + 1;
+        const key = keyByLine[lineNo];
+        const row = document.createElement('div');
+        let cls = 'source-line';
+        if (key) {
+          cls += ` is-key ${tagClass(key.kind)}`;
+          if (key.id === state.selectedId) cls += ' is-selected';
+        }
+        row.className = cls;
+        row.dataset.lineNo = lineNo;
+        if (key) {
+          row.dataset.lineId = key.id;
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', key.id === state.selectedId ? 'true' : 'false');
+          row.addEventListener('click', () => selectLine(key.id));
+        }
+        const tagHtml = key
+          ? `<span class="mode-tag source-line-tag ${tagClass(key.kind)}">${escapeHtml(key.tag)}</span>`
+          : '<span></span>';
+        row.innerHTML = `<span class="source-line-no">${lineNo}</span><span class="source-line-code">${highlightCpp(code)}</span>${tagHtml}`;
+        body.appendChild(row);
+        if (key) {
+          const detail = document.createElement('div');
+          detail.className = `line-detail ${key.id === state.selectedId ? 'is-open' : ''}`;
+          detail.dataset.lineId = key.id;
+          detail.innerHTML = renderLineDetail(key);
+          detail.addEventListener('click', () => selectLine(key.id));
+          body.appendChild(detail);
+        }
+      });
+      const sel = body.querySelector('.is-selected');
+      if (sel) {
+        const offset = sel.offsetTop - body.clientHeight / 2 + sel.offsetHeight / 2;
+        body.scrollTop = Math.max(0, offset);
+      }
+    }
+
+    function renderEvidence() {
+      const line = selectedLine();
+      qs('#selectedLineChip').textContent = `第 ${line.line} 行`;
+      qs('#selectedVerdictChip').textContent = line.verdict;
+      qs('#evidenceBody').innerHTML = `
+        <div class="evidence-summary">
+          <span class="mode-tag ${tagClass(line.kind)}">${escapeHtml(line.tag)}</span>
+          <div class="summary-line">L${line.line} ${escapeHtml(line.code)}</div>
+          <div class="summary-path">${escapeHtml(line.path)}</div>
+          <div class="reason-list">
+            ${line.reasons.map((reason) => `<span class="reason-pill">${escapeHtml(reason)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="evidence-explain">
+          <div class="evidence-block">
+            <span class="evidence-label">模式解释</span>
+            <p class="evidence-text">${escapeHtml(line.explanation)}</p>
+          </div>
+          <div class="evidence-block">
+            <div class="rewrite-head">
+              <span class="evidence-label">建议改写</span>
+              <button class="btn btn-solid btn-sm rewrite-apply" type="button" id="applyRewriteBtn" data-line-id="${line.id}">应用改写</button>
+            </div>
+            <pre class="rewrite-code">${highlightCpp(line.rewrite)}</pre>
+          </div>
+        </div>
+        <div class="evidence-metrics">
+          <div class="metric-card">
+            <span class="metric-label">置信度</span>
+            <span class="metric-value">${escapeHtml(line.metrics.confidence)}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">周期变化</span>
+            <span class="metric-value">${escapeHtml(line.metrics.cycles)}</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">资源压力</span>
+            <span class="metric-value">${escapeHtml(line.metrics.pressure)}</span>
+          </div>
+        </div>
+      `;
+      const applyBtn = qs('#applyRewriteBtn');
+      if (applyBtn) applyBtn.addEventListener('click', () => onApplyRewrite(applyBtn));
+    }
+
+    function reasonCode(reason) {
+      const mapped = REASON_CODE_MAP[reason];
+      if (mapped) return mapped;
+      const normalized = String(reason).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      return normalized || 'manual_review_reason';
+    }
+
+    function finding(title, text) {
+      return `<article class="finding"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(text)}</p></article>`;
+    }
+
+    function analysisFindings(line) {
+      const tier = TIER_TEXT[state.tier];
+      const items = [[tier[0], tier[2]]];
+      if (line.kind === 'compute') {
+        items.push(['SIMD 主区域', '当前路径保持 Cube / Vector 稠密执行，核心判断是形状规整、128B 对齐和低分支密度。']);
+      }
+      if (line.kind === 'memory') {
+        items.push(['NDDMA / 128B Sector', '访存检查会继续标注 stride、slice、broadcast 和 sector 命中率，未命中时进入重写建议。']);
+      }
+      if (line.id === 'l57') {
+        items.push(['C-V 交接点', '这一行是 Cube 域到 Vector 域的边界，FixPipe / BufferID 的顺序语义要进入白盒报告。']);
+      }
+      if (line.id === 'l82') {
+        items.push(['SIMT 岛', 'mask 随元素变化，建议把最小分支区域拆成 SIMT region，避免拖慢前后的 SIMD 主干。']);
+      }
+      if (state.tailLength === 0) {
+        items.push(['What-if', 'tail length 为 0 时，当前 kernel 可以收敛到 PURE SIMD，SIMT 岛和切换开销都可以消失。']);
+      } else {
+        items.push(['What-if', `tail length = ${state.tailLength}，保留 SIMT tail region；若 tail 密度继续升高，需要 T3 仿真校准分歧成本。`]);
+      }
+      if (state.kTile <= 64) {
+        items.push(['Tile 风险', 'K tile 偏小，Cube 利用率会下降，Inspector 会提高 SIMT 或重切 tile 的权重。']);
+      } else if (state.kTile >= 256) {
+        items.push(['寄存器压力', 'K tile 偏大，T2/T3 需要检查寄存器 spill 和 UB handoff 是否抵消 SIMD 收益。']);
+      }
+      return items;
+    }
+
+    function extraReasonCodes(line) {
+      const codes = [];
+      if (line.id === 'l57') codes.push('bufferid_migration_candidate', 'fixpipe_burst_boundary');
+      if (line.id === 'l82') codes.push('simt_region_split', 'lane_mask_penalty');
+      if (line.kind === 'memory') codes.push('sector_128b_watch', 'nddma_rewrite_candidate');
+      if (line.kind === 'compute') codes.push('dual_issue_candidate');
+      if (state.tailLength === 0) codes.push('counterfactual_tail_zero');
+      return codes;
+    }
+
+    function hybridSplitCards(line) {
+      const simtText = state.tailLength === 0
+        ? 'tail 已清零，SIMT 岛可以被折叠，CI 只需要保留 reason code 追踪。'
+        : `tail=${state.tailLength}，mask / ragged 分支保留为 SIMT 岛，避免 SIMD lane masking 侵蚀主循环吞吐。`;
+      const handoffText = line.id === 'l57'
+        ? '当前行就是主交接点：L0C 经 FixPipe / C-V 直通路进入 AIV UB，建议在报告中显式标注同步边界。'
+        : '主交接点仍在 L57：FixPipe、C-V 直通路和 BufferID 语义决定 Hybrid 切换成本。';
+      return [
+        ['SIMD trunk', `L42-L73 保持 GM/L2 预取、Cube FP8 MMAD 和 Vector epilogue 的稠密路径，K tile=${state.kTile}。`],
+        ['SIMT island', simtText],
+        ['Handoff cost', handoffText],
+        ['White-box report', 'Feature enablement report 应列出 NDDMA、C-V 直通路、FixPipe、BufferID、MXFPx 的使能率和未使能原因。']
+      ];
+    }
+
+    function renderInspectorDetails() {
+      const line = selectedLine();
+      const tier = TIER_TEXT[state.tier];
+      const modeTag = qs('#modeTag');
+      if (!modeTag) return;
+      modeTag.textContent = `${tier[1]} analysis`;
+      qsa('[data-tier]').forEach((button) => {
+        button.classList.toggle('is-selected', button.dataset.tier === state.tier);
+      });
+      syncTierIndicator();
+      qs('#kValue').textContent = state.kTile;
+      qs('#tailValue').textContent = state.tailLength;
+      qs('#analysisList').innerHTML = analysisFindings(line).map((item) => finding(item[0], item[1])).join('');
+      const codes = line.reasons.map(reasonCode).concat(extraReasonCodes(line));
+      qs('#reasonList').innerHTML = codes.map((code, index) => `
+        <div class="reason-row">
+          <code>${escapeHtml(code)}</code>
+          <span class="wb-chip">${index === 0 ? 'primary' : index < line.reasons.length ? 'supporting' : '950'}</span>
+        </div>
+      `).join('');
+      qs('#hybridSplit').innerHTML = hybridSplitCards(line).map((item) => `
+        <article class="hybrid-card">
+          <strong>${escapeHtml(item[0])}</strong>
+          <p>${escapeHtml(item[1])}</p>
+        </article>
+      `).join('');
+    }
+
+    function renderInspector() {
+      renderEvidence();
+      renderInspectorDetails();
+    }
+
+    function onApplyRewrite(btn) {
+      const original = btn.textContent;
+      btn.textContent = '已应用';
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1600);
+    }
+
+    function renderPathChips() {
+      const line = selectedLine();
+      const chips = qs('#pathChips');
+      chips.innerHTML = '';
+      line.path.split('→').map((item) => item.trim()).forEach((item, index) => {
+        const chip = document.createElement('span');
+        chip.className = `path-chip ${index > 0 && index < line.path.split('→').length - 1 ? 'is-active' : ''}`;
+        chip.textContent = item;
+        chips.appendChild(chip);
+      });
+    }
+
+    function clearHardwareFocus() {
+      postHardwareFocus([], []);
+    }
+
+    function applyHardwareFocus() {
+      const line = selectedLine();
+      postHardwareFocus(line.selectors, line.routes);
+    }
+
+    function selectLine(id) {
+      state.selectedId = id;
+      const selected = selectedLine();
+      state.pathKind = selected.kind;
+      syncPathButtons();
+      renderSource();
+      renderInspector();
+      renderPathChips();
+      applyHardwareFocus();
+    }
+
+    function syncPathButtons() {
+      qsa('[data-path-kind]').forEach((button) => {
+        button.classList.toggle('is-selected', button.dataset.pathKind === state.pathKind);
+      });
+    }
+
+    function selectPathKind(kind) {
+      state.pathKind = kind;
+      const next = LINES.find((line) => line.kind === kind);
+      if (next) state.selectedId = next.id;
+      syncPathButtons();
+      renderSource();
+      renderInspector();
+      renderPathChips();
+      applyHardwareFocus();
+    }
+
+    function renderHardware() {
+      const frame = qs('#hardwareFrame');
+      frame.addEventListener('load', () => {
+        state.frameReady = true;
+        requestAnimationFrame(() => {
+          if (state.fitted) fitHardware();
+          applyHardwareFocus();
+        });
+      });
+    }
+
+    function fitHardware() {
+      const viewport = qs('#hardwareViewport');
+      const scaleEl = qs('#hardwareScale');
+      if (!viewport || !scaleEl) return;
+      const availableWidth = Math.max(1, viewport.clientWidth - 28);
+      const availableHeight = Math.max(1, viewport.clientHeight - 76);
+      const scale = Math.min(1, availableWidth / state.frameSize.width, availableHeight / state.frameSize.height);
+      setHardwareScale(Math.max(0.36, scale));
+      state.fitted = true;
+    }
+
+    function actualSizeHardware() {
+      setHardwareScale(1);
+      state.fitted = false;
+    }
+
+    function setHardwareScale(scale) {
+      const scaleEl = qs('#hardwareScale');
+      const frame = qs('#hardwareFrame');
+      const naturalWidth = state.frameSize.width;
+      const naturalHeight = state.frameSize.height;
+      state.scale = scale;
+      scaleEl.style.width = `${Math.ceil(naturalWidth * scale)}px`;
+      scaleEl.style.height = `${Math.ceil(naturalHeight * scale)}px`;
+      frame.style.width = `${naturalWidth}px`;
+      frame.style.height = `${naturalHeight}px`;
+      frame.style.transform = `scale(${scale})`;
+      qs('#zoomReadout').textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function postHardwareFocus(selectors, routes) {
+      const frame = qs('#hardwareFrame');
+      if (!state.frameReady || !frame.contentWindow) return;
+      frame.contentWindow.postMessage({
+        type: 'hardware-focus',
+        selectors,
+        routes,
+      }, '*');
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function syncTierIndicator() {
+      const container = qs('.inspector-controls');
+      if (!container) return;
+      const sel = container.querySelector('.is-selected');
+      if (!sel) return;
+      const cr = container.getBoundingClientRect();
+      const sr = sel.getBoundingClientRect();
+      container.style.setProperty('--tier-x', `${sr.left - cr.left}px`);
+      container.style.setProperty('--tier-w', `${sr.width}px`);
+    }
+    window.addEventListener('resize', syncTierIndicator);
+
+    qsa('[data-path-kind]').forEach((button) => {
+      button.addEventListener('click', () => selectPathKind(button.dataset.pathKind));
+    });
+    qsa('[data-tier]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.tier = button.dataset.tier;
+        renderInspector();
+      });
+    });
+    qs('#kSlider').addEventListener('input', (event) => {
+      state.kTile = Number(event.target.value);
+      renderInspector();
+    });
+    qs('#tailSlider').addEventListener('input', (event) => {
+      state.tailLength = Number(event.target.value);
+      renderInspector();
+    });
+    qs('#fitBtn').addEventListener('click', fitHardware);
+    qs('#actualBtn').addEventListener('click', actualSizeHardware);
+    qs('#analyzeBtn').addEventListener('click', () => selectLine(state.selectedId));
+    window.addEventListener('message', (event) => {
+      if (!event.data || (event.data.type !== 'hardware-ready' && event.data.type !== 'hardware-size')) return;
+      state.frameSize = {
+        width: Math.max(1, Number(event.data.width) || state.frameSize.width),
+        height: Math.max(1, Number(event.data.height) || state.frameSize.height),
+      };
+      state.frameReady = true;
+      if (state.fitted) fitHardware();
+      applyHardwareFocus();
+    });
+    window.addEventListener('resize', () => {
+      if (state.fitted) fitHardware();
+    });
+
+    state.selectedId = 'l42';
+    state.pathKind = 'memory';
+    syncPathButtons();
+    renderSource();
+    renderInspector();
+    renderPathChips();
+    renderHardware();
+    setTimeout(() => {
+      selectLine('l42');
+    }, 50);
+  </script>
+</body>
+</html>

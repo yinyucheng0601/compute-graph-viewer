@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../design-system-share/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../design-system-share/patterns/memory-architecture/pattern.css">
+  <style>
+    html,
+    body {
+      width: max-content;
+      height: max-content;
+      margin: 0;
+      padding: 18px;
+      overflow: hidden;
+      background: transparent;
+      box-sizing: border-box;
+    }
+
+    #hardwareHost {
+      width: max-content;
+      height: max-content;
+      overflow: visible;
+    }
+
+    #hardwareHost [data-pto-mem-arch="true"],
+    #hardwareHost .pto-mem950 {
+      min-width: 0;
+    }
+
+    #hardwareHost .pto-mem950__notes {
+      display: none;
+    }
+
+    .is-path-focused [data-aic-node],
+    .is-path-focused [data-aiv-node],
+    .is-path-focused [data-mem950-node^="rail:"] {
+      opacity: 0.58;
+      filter: saturate(0.68);
+      transition: opacity 160ms ease, filter 160ms ease, outline-color 160ms ease;
+    }
+
+    .is-path-focused .is-hardware-active {
+      opacity: 1 !important;
+      filter: none !important;
+      outline: 2px solid color-mix(in srgb, #ffaa3b 80%, white);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 4px color-mix(in srgb, #ffaa3b 16%, transparent);
+      position: relative;
+      z-index: 8;
+    }
+
+    .is-path-focused .pto-mem950__overlay [data-route-id] {
+      opacity: 0.18;
+    }
+
+    .is-path-focused .pto-mem950__overlay [data-route-id].is-route-active {
+      opacity: 1;
+      filter: drop-shadow(0 0 7px color-mix(in srgb, #ffaa3b 72%, transparent));
+    }
+
+    .is-path-focused .pto-mem950__overlay [data-route-id].is-route-active path {
+      stroke-width: 3;
+    }
+  </style>
+</head>
+<body>
+  <div id="hardwareHost"></div>
+  <script src="../design-system-share/patterns/aiv-core-object/pattern.js"></script>
+  <script src="../design-system-share/patterns/aic-core-object/pattern.js"></script>
+  <script src="../design-system-share/patterns/memory-architecture/pattern.js"></script>
+  <script>
+    let overlay = null;
+
+    const qs = (selector, root = document) => root.querySelector(selector);
+    const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    const BLEED = 18;
+    function postSize(type = 'hardware-size') {
+      const stage = qs('#hardwareHost .pto-mem950');
+      if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      parent.postMessage({
+        type,
+        width: Math.ceil(rect.width) + BLEED * 2,
+        height: Math.ceil(rect.height) + BLEED * 2,
+      }, '*');
+    }
+
+    function activeRouteEndpoints(routeIds) {
+      const preset = window.PtoMemoryArchitecturePattern?.presets?.ascend950b;
+      if (!preset) return [];
+      return (preset.routes || [])
+        .filter((route) => routeIds.includes(route.id))
+        .flatMap((route) => [route.from, route.to])
+        .filter(Boolean);
+    }
+
+    function clearFocus() {
+      qsa('.is-hardware-active').forEach((el) => el.classList.remove('is-hardware-active'));
+      qsa('.is-route-active').forEach((el) => el.classList.remove('is-route-active'));
+    }
+
+    function applyFocus(selectors = [], routeIds = []) {
+      const host = qs('#hardwareHost');
+      clearFocus();
+      host.classList.add('is-path-focused');
+
+      [...selectors, ...activeRouteEndpoints(routeIds)].forEach((selector) => {
+        qsa(selector, host).forEach((el) => el.classList.add('is-hardware-active'));
+      });
+
+      routeIds.forEach((routeId) => {
+        qsa(`[data-route-id="${routeId}"]`, host).forEach((el) => el.classList.add('is-route-active'));
+      });
+    }
+
+    function render() {
+      const host = qs('#hardwareHost');
+      window.PtoMemoryArchitecturePattern.renderArchitecture(host, 'ascend950b');
+      overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, 'ascend950b');
+      requestAnimationFrame(() => {
+        overlay?.update?.();
+        requestAnimationFrame(() => {
+          postSize('hardware-ready');
+        });
+      });
+    }
+
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.data.type !== 'hardware-focus') return;
+      applyFocus(event.data.selectors || [], event.data.routes || []);
+      requestAnimationFrame(() => {
+        overlay?.update?.();
+        postSize();
+      });
+    });
+
+    window.addEventListener('resize', () => postSize());
+
+    render();
+    if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+      document.fonts.ready.then(() => {
+        overlay?.update?.();
+        postSize();
+      });
+    }
+  </script>
+</body>
+</html>
