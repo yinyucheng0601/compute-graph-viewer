@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../design-system-share/patterns/aic-core-object/pattern.css">
-  <link rel="stylesheet" href="../design-system-share/patterns/aiv-core-object/pattern.css">
-  <link rel="stylesheet" href="../design-system-share/patterns/memory-architecture/pattern.css">
+  <link rel="stylesheet" href="../patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../patterns/memory-architecture/pattern.css">
   <style>
     html,
     body {
       width: max-content;
       height: max-content;
       margin: 0;
-      padding: 18px;
+      padding: 32px;
       overflow: hidden;
       background: transparent;
       box-sizing: border-box;
@@ -67,16 +67,18 @@
 </head>
 <body>
   <div id="hardwareHost"></div>
-  <script src="../design-system-share/patterns/aiv-core-object/pattern.js"></script>
-  <script src="../design-system-share/patterns/aic-core-object/pattern.js"></script>
-  <script src="../design-system-share/patterns/memory-architecture/pattern.js"></script>
+  <script src="../patterns/aiv-core-object/pattern.js"></script>
+  <script src="../patterns/aic-core-object/pattern.js"></script>
+  <script src="../patterns/memory-architecture/pattern.js"></script>
   <script>
     let overlay = null;
+    let currentPreset = 'ascend950b';
+    let pendingFocus = { selectors: [], routes: [] };
 
     const qs = (selector, root = document) => root.querySelector(selector);
     const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-    const BLEED = 18;
+    const BLEED = 32;
     function postSize(type = 'hardware-size') {
       const stage = qs('#hardwareHost .pto-mem950');
       if (!stage) return;
@@ -89,7 +91,7 @@
     }
 
     function activeRouteEndpoints(routeIds) {
-      const preset = window.PtoMemoryArchitecturePattern?.presets?.ascend950b;
+      const preset = window.PtoMemoryArchitecturePattern?.presets?.[currentPreset];
       if (!preset) return [];
       return (preset.routes || [])
         .filter((route) => routeIds.includes(route.id))
@@ -118,10 +120,12 @@
 
     function render() {
       const host = qs('#hardwareHost');
-      window.PtoMemoryArchitecturePattern.renderArchitecture(host, 'ascend950b');
-      overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, 'ascend950b');
+      overlay?.destroy?.();
+      window.PtoMemoryArchitecturePattern.renderArchitecture(host, currentPreset);
+      overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, currentPreset);
       requestAnimationFrame(() => {
         overlay?.update?.();
+        applyFocus(pendingFocus.selectors, pendingFocus.routes);
         requestAnimationFrame(() => {
           postSize('hardware-ready');
         });
@@ -129,8 +133,20 @@
     }
 
     window.addEventListener('message', (event) => {
-      if (!event.data || event.data.type !== 'hardware-focus') return;
-      applyFocus(event.data.selectors || [], event.data.routes || []);
+      if (!event.data) return;
+      if (event.data.type === 'hardware-arch-change') {
+        const nextPreset = event.data.preset || 'ascend950b';
+        if (nextPreset === currentPreset) return;
+        currentPreset = nextPreset;
+        render();
+        return;
+      }
+      if (event.data.type !== 'hardware-focus') return;
+      pendingFocus = {
+        selectors: event.data.selectors || [],
+        routes: event.data.routes || []
+      };
+      applyFocus(pendingFocus.selectors, pendingFocus.routes);
       requestAnimationFrame(() => {
         overlay?.update?.();
         postSize();

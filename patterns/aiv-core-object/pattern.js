@@ -90,6 +90,76 @@
           }
         ]
       }
+    },
+    aiv910bSimd: {
+      id: 'aiv910bSimd',
+      name: 'AIV Core Object 910B SIMD',
+      title: 'AIV',
+      routes: [
+        { from: 'cache:DCache', to: 'buffer:UB', color: 'cache', style: 'elbow-h', fromSide: 'right', toSide: 'left', toBias: 0.60 },
+        { from: 'cache:ICache', to: 'exec:SIMD', color: 'cache', style: 'elbow-h', fromSide: 'right', toSide: 'top', fromBias: 0.62, toBias: 0.14, dashArray: '4 3', offset: -12 },
+        { from: 'scalar:Scalar', to: 'exec:SIMD', color: 'control', style: 'elbow-h', fromSide: 'right', toSide: 'top', fromBias: 0.5, toBias: 0.72 },
+        { from: 'buffer:UB', to: 'exec:SIMD', color: 'memory', style: 'elbow-h', fromSide: 'right', toSide: 'left', fromBias: 0.58, toBias: 0.72, offset: 6 },
+        { from: 'exec:SIMD', to: 'vector:Vector', color: 'compute', style: 'horizontal', fromSide: 'right', toSide: 'left', fromBias: 0.5 }
+      ],
+      layout: {
+        kind: 'group',
+        className: 'pto-aiv-core__layout',
+        children: [
+          {
+            kind: 'group',
+            className: 'pto-aiv-core__cache-stack',
+            children: [
+              {
+                kind: 'cache',
+                label: 'DCache',
+                grid: { rows: 4, cols: 12, cellSize: 12, gap: 1 }
+              },
+              {
+                kind: 'cache',
+                label: 'ICache',
+                grid: { rows: 4, cols: 12, cellSize: 12, gap: 1 }
+              }
+            ]
+          },
+          {
+            kind: 'group',
+            className: 'pto-aiv-core__center-stack',
+            children: [
+              {
+                kind: 'scalar',
+                label: 'Scalar',
+                frame: { width: 286, height: 72 }
+              },
+              {
+                kind: 'buffer',
+                key: 'UB',
+                label: 'UB',
+                capacity: 'SIMD local',
+                grid: { rows: 8, cols: 19, cellSize: 12, gap: 1, band: { from: 8, to: 9 } }
+              }
+            ]
+          },
+          {
+            kind: 'group',
+            className: 'pto-aiv-core__exec-stack',
+            children: [
+              {
+                kind: 'exec',
+                label: 'SIMD',
+                chipLabel: 'Vector Pipe',
+                chipTone: 'compute',
+                grid: { rows: 4, cols: 13, cellSize: 12, gap: 1, band: { from: 5, to: 6 } }
+              }
+            ]
+          },
+          {
+            kind: 'vector',
+            label: 'Vector',
+            frame: { width: 114, height: 156 }
+          }
+        ]
+      }
     }
   };
 
