@@ -44,8 +44,10 @@
     .wb-title-stack {
       min-width: 0;
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      flex-direction: row;
+      align-items: baseline;
+      gap: var(--space-2);
+      white-space: nowrap;
     }
 
     .wb-title {
@@ -66,7 +68,8 @@
       align-items: center;
       gap: var(--space-2);
       min-width: 0;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow: hidden;
     }
 
     .wb-chip {
@@ -115,6 +118,124 @@
     .wb-source-panel {
       grid-column: 1;
       grid-row: 1;
+    }
+
+    .kernel-tree {
+      flex: 0 0 auto;
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-1) 74%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .kernel-tree-title {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .kernel-tree-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .kernel-file {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: inherit;
+      padding: var(--space-2);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-2);
+      text-align: left;
+      cursor: pointer;
+      transition: background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
+    }
+
+    .kernel-file:hover {
+      background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      border-color: var(--border-subtle);
+    }
+
+    .kernel-file.is-selected {
+      background: color-mix(in srgb, var(--primary) 12%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--primary) 50%, var(--border-default));
+    }
+
+    .kernel-file-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .kernel-file-name {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kernel-file-path {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kernel-file-meta {
+      align-self: start;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .kernel-select-wrap {
+      min-width: 0;
+      position: relative;
+    }
+
+    .kernel-select {
+      width: min(100%, 320px);
+      min-height: 30px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+      color: var(--foreground);
+      font: var(--text-title-3);
+      letter-spacing: 0;
+      padding: 0 34px 0 var(--space-2);
+      appearance: none;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kernel-select-wrap::after {
+      content: "⌄";
+      position: absolute;
+      right: var(--space-2);
+      top: 50%;
+      transform: translateY(-52%);
+      color: var(--foreground-muted);
+      pointer-events: none;
+      font: 700 14px / 1 var(--font-sans);
+    }
+
+    .kernel-select:focus {
+      outline: 2px solid color-mix(in srgb, var(--primary) 46%, transparent);
+      outline-offset: 2px;
     }
 
     .wb-hardware-panel {
@@ -754,10 +875,10 @@
           </div>
         </div>
         <div class="wb-context" aria-label="Context">
-          <span class="wb-chip">内核 <strong>fp8_mmad_masked_reduce</strong></span>
-          <span class="wb-chip">目标 <strong>Ascend 950B</strong></span>
-          <span class="wb-chip">分析层级 <strong>T2 静态 + 画像</strong></span>
-          <span class="wb-chip is-verdict">结论 <strong>混合路径</strong></span>
+          <span class="wb-chip">内核 <strong id="contextKernelName">c_api_add</strong></span>
+          <span class="wb-chip">目标 <strong id="contextTarget">Ascend 950B</strong></span>
+          <span class="wb-chip">分析层级 <strong id="contextAnalysis">T1 静态</strong></span>
+          <span class="wb-chip is-verdict">结论 <strong id="contextVerdict">PURE SIMD</strong></span>
         </div>
       </div>
       <div class="layout-header-right">
@@ -771,13 +892,19 @@
         <header class="panel-shell-header">
           <div class="wb-header-copy">
             <span class="wb-panel-kicker">内核源代码</span>
-            <h1 class="panel-shell-title">fp8_mmad_masked_reduce.tik</h1>
+            <div class="kernel-select-wrap">
+              <select class="kernel-select" id="kernelSelect" aria-label="选择 kernel">
+                <option value="c_api_add" selected>c_api_add.asc</option>
+                <option value="fp8_mmad_masked_reduce">fp8_mmad_masked_reduce.tik</option>
+              </select>
+            </div>
           </div>
           <div class="panel-shell-meta">
-            <span class="wb-chip">100 行</span>
-            <span class="wb-chip is-verdict">6 行已标注</span>
+            <span class="wb-chip" id="sourceLineCount">136 行</span>
+            <span class="wb-chip is-verdict" id="sourceMarkCount">6 行已标注</span>
           </div>
         </header>
+        <div class="kernel-tree" aria-label="Kernel selector" id="kernelTree"></div>
         <div class="wb-source-body layout-surface-fill-strong" id="sourceBody" role="listbox" aria-label="Kernel source lines"></div>
       </section>
 
@@ -860,7 +987,7 @@
   </div>
 
   <script>
-    const LINES = [
+    const FP8_LINES = [
       {
         id: 'l42',
         line: 42,
@@ -959,7 +1086,7 @@
       }
     ];
 
-    const SOURCE_LINES = [
+    const FP8_SOURCE_LINES = [
       '#include "tikicpulib.h"',
       '#include "kernel_operator.h"',
       '',
@@ -1062,6 +1189,273 @@
       '};'
     ];
 
+    const C_API_ADD_SOURCE_LINES = String.raw`/**
+* Copyright (c) 2025 Huawei Technologies Co., Ltd.
+* This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+* CANN Open Software License Agreement Version 2.0 (the "License").
+* Please refer to the License for details. You may not use this file except in compliance with the License.
+* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+* INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+* See LICENSE in the root of the software repository for the full text of the License.
+*/
+
+
+/* !
+ * \file c_api_add.asc
+ * \brief
+ */
+
+#include <cstdint>
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <iterator>
+#include "acl/acl.h"
+#include "c_api/asc_simd.h"
+
+constexpr uint32_t TILE_LENGTH = 2048;
+constexpr uint32_t NUM_BLOCKS = 8;
+
+__vector__ __global__ __aicore__ void add_custom(__gm__ float* x, __gm__ float* y, __gm__ float* z)
+{
+    asc_init();
+
+    uint32_t blockLength = NUM_BLOCKS * TILE_LENGTH / asc_get_block_num();
+
+    __gm__ float* xGm = x + asc_get_block_idx() * blockLength;
+    __gm__ float* yGm = y + asc_get_block_idx() * blockLength;
+    __gm__ float* zGm = z + asc_get_block_idx() * blockLength;
+
+    __ubuf__ float xLocal[TILE_LENGTH];
+    __ubuf__ float yLocal[TILE_LENGTH];
+    __ubuf__ float zLocal[TILE_LENGTH];
+
+    asc_copy_gm2ub((__ubuf__ void*)xLocal, (__gm__ void*)xGm, blockLength * sizeof(float));
+    asc_copy_gm2ub((__ubuf__ void*)yLocal, (__gm__ void*)yGm, blockLength * sizeof(float));
+    asc_sync();
+
+    asc_add(zLocal, xLocal, yLocal, blockLength);
+    asc_sync();
+
+    asc_copy_ub2gm((__gm__ void*)zGm, (__ubuf__ void*)zLocal, blockLength * sizeof(float));
+    asc_sync();
+}
+
+std::vector<float> kernel_add(std::vector<float> &x, std::vector<float> &y)
+{
+    constexpr uint32_t numBlocks = NUM_BLOCKS;
+    uint32_t totalLength = x.size();
+    size_t totalByteSize = totalLength * sizeof(float);
+    int32_t deviceId = 0;
+    aclrtStream stream = nullptr;
+    uint8_t *xHost = reinterpret_cast<uint8_t *>(x.data());
+    uint8_t *yHost = reinterpret_cast<uint8_t *>(y.data());
+    uint8_t *zHost = nullptr;
+    float *xDevice = nullptr;
+    float *yDevice = nullptr;
+    float *zDevice = nullptr;
+
+    aclInit(nullptr);
+    aclrtSetDevice(deviceId);
+    aclrtCreateStream(&stream);
+
+    aclrtMallocHost((void **)(&zHost), totalByteSize);
+    aclrtMalloc((void **)&xDevice, totalByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void **)&yDevice, totalByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void **)&zDevice, totalByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+
+    aclrtMemcpy((uint8_t*)xDevice, totalByteSize, xHost, totalByteSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    aclrtMemcpy((uint8_t*)yDevice, totalByteSize, yHost, totalByteSize, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    add_custom<<<numBlocks, nullptr, stream>>>(xDevice, yDevice, zDevice);
+    aclrtSynchronizeStream(stream);
+
+    aclrtMemcpy(zHost, totalByteSize, (uint8_t*)zDevice, totalByteSize, ACL_MEMCPY_DEVICE_TO_HOST);
+    std::vector<float> z((float *)zHost, (float *)(zHost + totalByteSize));
+
+    aclrtFree(xDevice);
+    aclrtFree(yDevice);
+    aclrtFree(zDevice);
+    aclrtFreeHost(zHost);
+
+    aclrtDestroyStream(stream);
+    aclrtResetDevice(deviceId);
+    aclFinalize();
+
+    return z;
+}
+
+uint32_t VerifyResult(std::vector<float> &output, std::vector<float> &golden)
+{
+    auto printTensor = [](std::vector<float> &tensor, const char *name) {
+        constexpr size_t maxPrintSize = 20;
+        std::cout << name << ": ";
+        std::copy(tensor.begin(), tensor.begin() + std::min(tensor.size(), maxPrintSize),
+            std::ostream_iterator<float>(std::cout, " "));
+        if (tensor.size() > maxPrintSize) {
+            std::cout << "...";
+        }
+        std::cout << std::endl;
+    };
+    printTensor(output, "Output");
+    printTensor(golden, "Golden");
+    if (std::equal(golden.begin(), golden.end(), output.begin())) {
+        std::cout << "[Success] Case accuracy is verification passed." << std::endl;
+        return 0;
+    } else {
+        std::cout << "[Failed] Case accuracy is verification failed!" << std::endl;
+        return 1;
+    }
+    return 0;
+}
+
+int32_t main(int32_t argc, char *argv[])
+{
+    constexpr uint32_t totalLength = NUM_BLOCKS * TILE_LENGTH;
+    std::vector<float> x(totalLength);
+    std::vector<float> y(totalLength);
+    for (uint32_t i = 0; i < totalLength; ++i) {
+        x[i] = i * 0.1f;
+        y[i] = i * 0.1f;
+    }
+    std::vector<float> output = kernel_add(x, y);
+    std::vector<float> golden(totalLength);
+    for (uint32_t i = 0; i < totalLength; ++i) {
+        golden[i] = x[i] + y[i];
+    }
+    return VerifyResult(output, golden);
+}`.split('\n');
+
+    const C_API_ADD_LINES = [
+      {
+        id: 'add-l32',
+        line: 32,
+        kind: 'control',
+        tag: 'block 切分',
+        code: 'uint32_t blockLength = NUM_BLOCKS * TILE_LENGTH / asc_get_block_num();',
+        short: '按 block 均分连续向量，SIMD 主干没有额外 tail 分支。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="scalar:Scalar"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]'],
+        routes: [],
+        path: 'Block Scheduler → Scalar 参数 → SIMD 执行配置',
+        verdict: 'SIMD 分块',
+        reasons: ['固定 tile 长度', 'block 均分', '无数据相关分支'],
+        explanation: 'TILE_LENGTH 与 NUM_BLOCKS 都是编译期常量，blockLength 只由 block 数确定。Inspector 会把它判为稳定的 SIMD 分块策略。',
+        rewrite: 'uint32_t blockLength = AlignDown(NUM_BLOCKS * TILE_LENGTH / asc_get_block_num(), 8);',
+        metrics: { confidence: '89%', cycles: '0%', pressure: '控制低' }
+      },
+      {
+        id: 'add-l42',
+        line: 42,
+        kind: 'memory',
+        tag: 'GM→UB 读入',
+        code: 'asc_copy_gm2ub((__ubuf__ void*)xLocal, (__gm__ void*)xGm, blockLength * sizeof(float));',
+        short: 'x 向量从 GM/L2 连续搬入 UB，可观察 128B sector 命中。',
+        selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'],
+        routes: ['l2-to-aiv1'],
+        path: 'Global Memory → L2 → AIV UB',
+        verdict: '访存读入',
+        reasons: ['GM 连续读', 'UB 常驻输入', '128B sector 友好'],
+        explanation: 'xGm 基于 blockIdx 做连续偏移，源地址和长度都适合用 NDDMA / sector 命中报告进一步确认访存效率。',
+        rewrite: 'asc_copy_gm2ub((__ubuf__ void*)xLocal, (__gm__ void*)xGm, AlignTo(blockLength, 32) * sizeof(float));',
+        metrics: { confidence: '92%', cycles: '-12%', pressure: 'L2 低' }
+      },
+      {
+        id: 'add-l43',
+        line: 43,
+        kind: 'memory',
+        tag: 'GM→UB 读入',
+        code: 'asc_copy_gm2ub((__ubuf__ void*)yLocal, (__gm__ void*)yGm, blockLength * sizeof(float));',
+        short: '第二个输入保持相同 stride，适合与 x 读入合并成访存白盒报告。',
+        selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'],
+        routes: ['l2-to-aiv1'],
+        path: 'Global Memory → L2 → AIV UB',
+        verdict: '访存读入',
+        reasons: ['双输入对齐', 'burst 长度稳定', 'UB 常驻输入'],
+        explanation: 'yGm 与 xGm 的索引规则一致，工具可以把两条搬运合并观察，给出 sector 命中率和 NDDMA 重写收益。',
+        rewrite: 'asc_copy_gm2ub((__ubuf__ void*)yLocal, (__gm__ void*)yGm, AlignTo(blockLength, 32) * sizeof(float));',
+        metrics: { confidence: '91%', cycles: '-10%', pressure: 'L2 低' }
+      },
+      {
+        id: 'add-l46',
+        line: 46,
+        kind: 'compute',
+        tag: 'SIMD / Vector',
+        code: 'asc_add(zLocal, xLocal, yLocal, blockLength);',
+        short: '核心算子是稠密逐元素加法，直接落在 AIV SIMD / Vector 路径。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'],
+        routes: [],
+        path: 'AIV UB → SIMD → Vector',
+        verdict: 'PURE SIMD',
+        reasons: ['稠密向量通道', '无分支发散', '寄存器压力低'],
+        explanation: 'asc_add 的输入输出都在 UB，且没有 mask 或 ragged tail。模式建议器会给出 PURE SIMD，Hybrid Inspector 只保留解释而不拆 SIMT 岛。',
+        rewrite: 'asc_add(zLocal, xLocal, yLocal, AlignTo(blockLength, 8));',
+        metrics: { confidence: '97%', cycles: '-19%', pressure: 'UB 低' }
+      },
+      {
+        id: 'add-l49',
+        line: 49,
+        kind: 'memory',
+        tag: 'UB→GM 写回',
+        code: 'asc_copy_ub2gm((__gm__ void*)zGm, (__ubuf__ void*)zLocal, blockLength * sizeof(float));',
+        short: '输出向量从 UB 连续写回 GM，关注写回对齐和 MTE drain。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'],
+        routes: ['aiv1-to-l2'],
+        path: 'AIV UB → L2 → Global Memory',
+        verdict: '访存写回',
+        reasons: ['写回连续', 'UB 排空', 'MTE3 可搬运'],
+        explanation: 'zGm 与输入同样按 block 连续切分，写回路径可以用 128B sector 和 L2 Control Hint 做最终校准。',
+        rewrite: 'asc_copy_ub2gm((__gm__ void*)zGm, (__ubuf__ void*)zLocal, AlignTo(blockLength, 32) * sizeof(float));',
+        metrics: { confidence: '93%', cycles: '-11%', pressure: 'GM 低' }
+      },
+      {
+        id: 'add-l79',
+        line: 79,
+        kind: 'control',
+        tag: 'Kernel Launch',
+        code: 'add_custom<<<numBlocks, nullptr, stream>>>(xDevice, yDevice, zDevice);',
+        short: 'Host 侧 launch 决定 block 数，适合作为 910→950 迁移检查入口。',
+        selectors: ['#mem950-aiv1 [data-aiv-node="scalar:Scalar"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]'],
+        routes: [],
+        path: 'ACL Runtime → Kernel Launch → AIV SIMD',
+        verdict: '迁移检查点',
+        reasons: ['block 数显式', 'host/device 边界', '可做 what-if'],
+        explanation: 'numBlocks 当前固定为 8。What-if 分析可以快速比较 block 数、tile 长度和实际 block_num 对 SIMD 利用率的影响。',
+        rewrite: 'add_custom<<<numBlocks, nullptr, stream>>>(xDevice, yDevice, zDevice); // inspect block occupancy',
+        metrics: { confidence: '86%', cycles: 'what-if', pressure: '调度低' }
+      }
+    ];
+
+    const KERNELS = [
+      {
+        id: 'fp8_mmad_masked_reduce',
+        name: 'fp8_mmad_masked_reduce.tik',
+        label: 'fp8_mmad_masked_reduce',
+        path: 'kernels/fp8_mmad_masked_reduce.tik',
+        summary: 'FP8 MMAD + masked epilogue',
+        target: 'Ascend 950B',
+        analysis: 'T2 静态 + 画像',
+        verdict: '混合路径',
+        defaultTier: 't2',
+        selectedId: 'l42',
+        sourceLines: FP8_SOURCE_LINES,
+        annotations: FP8_LINES
+      },
+      {
+        id: 'c_api_add',
+        name: 'c_api_add.asc',
+        label: 'c_api_add',
+        path: '/Users/yin/Downloads/c_api_add.asc',
+        summary: 'C API vector add',
+        target: 'Ascend 950B',
+        analysis: 'T1 静态',
+        verdict: 'PURE SIMD',
+        defaultTier: 't1',
+        selectedId: 'add-l42',
+        sourceLines: C_API_ADD_SOURCE_LINES,
+        annotations: C_API_ADD_LINES
+      }
+    ];
+
     const TIER_TEXT = {
       t1: ['T1 Static · ~1.2s', 'STATIC', '静态层只读取控制流、访存步长和 tile 形状，适合快速指出 SIMD/SIMT 倾向。'],
       t2: ['T2 Compiled · ~18s', 'COMPILED', '编译层加入寄存器压力、FixPipe burst、C-V 直通路和编译期 cycle 估算。'],
@@ -1086,13 +1480,25 @@
       '标量守卫': 'scalar_guard_branch',
       '写回连续': 'contiguous_store',
       'UB 排空': 'ub_drain',
-      'MTE3 可搬运': 'mte3_store_eligible'
+      'MTE3 可搬运': 'mte3_store_eligible',
+      '固定 tile 长度': 'static_tile_length',
+      'block 均分': 'block_even_partition',
+      '无数据相关分支': 'no_data_dependent_branch',
+      'UB 常驻输入': 'ub_resident_input',
+      '128B sector 友好': 'sector_128b_friendly',
+      '双输入对齐': 'dual_input_aligned',
+      'burst 长度稳定': 'stable_burst_length',
+      '寄存器压力低': 'low_register_pressure',
+      'block 数显式': 'explicit_block_count',
+      'host/device 边界': 'host_device_boundary',
+      '可做 what-if': 'what_if_candidate'
     };
 
     const state = {
-      selectedId: 'l42',
+      selectedKernelId: 'c_api_add',
+      selectedId: 'add-l42',
       pathKind: 'memory',
-      tier: 't2',
+      tier: 't1',
       kTile: 128,
       tailLength: 17,
       fitted: true,
@@ -1104,8 +1510,21 @@
     const qs = (selector, root = document) => root.querySelector(selector);
     const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
+    function currentKernel() {
+      return KERNELS.find((kernel) => kernel.id === state.selectedKernelId) || KERNELS[0];
+    }
+
+    function currentAnnotations() {
+      return currentKernel().annotations || [];
+    }
+
+    function currentSourceLines() {
+      return currentKernel().sourceLines || [];
+    }
+
     function selectedLine() {
-      return LINES.find((line) => line.id === state.selectedId) || LINES[0];
+      const annotations = currentAnnotations();
+      return annotations.find((line) => line.id === state.selectedId) || annotations[0];
     }
 
     function tagClass(kind) {
@@ -1142,11 +1561,11 @@
     const CPP_KEYWORDS = new Set([
       'include','using','namespace','template','typename','class','struct','public','private','protected',
       'inline','const','constexpr','static','auto','for','if','else','return','void','default','sizeof',
-      'new','delete','this','true','false','nullptr','__aicore__'
+      'new','delete','this','true','false','nullptr','__aicore__','__vector__','__global__','__gm__','__ubuf__'
     ]);
     const CPP_TYPES = new Set([
-      'int','int32_t','int64_t','uint32_t','uint64_t','bool','float','double','char','size_t',
-      'LocalTensor','GM_ADDR','DataT','AccT',
+      'int','int32_t','int64_t','uint8_t','uint32_t','uint64_t','bool','float','double','char','size_t',
+      'LocalTensor','GM_ADDR','DataT','AccT','aclrtStream','std','vector',
       'PIPE_FIX','PIPE_V','PIPE_M','PIPE_MTE2','PIPE_MTE3','BLOCK_M','BLOCK_N','BLOCK_K','VECTOR_ELEMS'
     ]);
 
@@ -1178,13 +1597,62 @@
       return out;
     }
 
+    function renderKernelSelector() {
+      const tree = qs('#kernelTree');
+      if (!tree) return;
+      tree.innerHTML = `
+        <span class="kernel-tree-title">文件树 / Kernel</span>
+        <div class="kernel-tree-list">
+          ${KERNELS.map((kernel) => `
+            <button class="kernel-file ${kernel.id === state.selectedKernelId ? 'is-selected' : ''}" type="button" data-kernel-id="${kernel.id}">
+              <span class="kernel-file-main">
+                <span class="kernel-file-name">${escapeHtml(kernel.name)}</span>
+                <span class="kernel-file-path">${escapeHtml(kernel.path)}</span>
+              </span>
+              <span class="kernel-file-meta">${kernel.sourceLines.length}L</span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+      qsa('[data-kernel-id]', tree).forEach((button) => {
+        button.addEventListener('click', () => selectKernel(button.dataset.kernelId));
+      });
+      const select = qs('#kernelSelect');
+      if (select) {
+        select.innerHTML = KERNELS.map((kernel) => (
+          `<option value="${kernel.id}" ${kernel.id === state.selectedKernelId ? 'selected' : ''}>${escapeHtml(kernel.name)}</option>`
+        )).join('');
+        select.value = state.selectedKernelId;
+        select.onchange = () => selectKernel(select.value);
+      }
+    }
+
+    function renderKernelMeta() {
+      const kernel = currentKernel();
+      const annotations = currentAnnotations();
+      const select = qs('#kernelSelect');
+      if (select) select.value = kernel.id;
+      const lineCount = qs('#sourceLineCount');
+      if (lineCount) lineCount.textContent = `${kernel.sourceLines.length} 行`;
+      const markCount = qs('#sourceMarkCount');
+      if (markCount) markCount.textContent = `${annotations.length} 行已标注`;
+      const contextKernel = qs('#contextKernelName');
+      if (contextKernel) contextKernel.textContent = kernel.label;
+      const contextTarget = qs('#contextTarget');
+      if (contextTarget) contextTarget.textContent = kernel.target;
+      const contextAnalysis = qs('#contextAnalysis');
+      if (contextAnalysis) contextAnalysis.textContent = kernel.analysis;
+      const contextVerdict = qs('#contextVerdict');
+      if (contextVerdict) contextVerdict.textContent = kernel.verdict;
+    }
+
     function renderSource() {
       const body = qs('#sourceBody');
       if (!body) return;
       const keyByLine = {};
-      LINES.forEach((l) => { keyByLine[l.line] = l; });
+      currentAnnotations().forEach((l) => { keyByLine[l.line] = l; });
       body.innerHTML = '';
-      SOURCE_LINES.forEach((code, idx) => {
+      currentSourceLines().forEach((code, idx) => {
         const lineNo = idx + 1;
         const key = keyByLine[lineNo];
         const row = document.createElement('div');
@@ -1281,8 +1749,14 @@
     function analysisFindings(line) {
       const tier = TIER_TEXT[state.tier];
       const items = [[tier[0], tier[2]]];
+      if (currentKernel().id === 'c_api_add') {
+        items.push(['C API kernel', '__vector__ add_custom 以 GM→UB、SIMD add、UB→GM 三段构成，当前不需要拆 Hybrid SIMT 岛。']);
+      }
       if (line.kind === 'compute') {
-        items.push(['SIMD 主区域', '当前路径保持 Cube / Vector 稠密执行，核心判断是形状规整、128B 对齐和低分支密度。']);
+        const computeText = currentKernel().id === 'c_api_add'
+          ? '当前路径保持 AIV Vector 稠密执行，核心判断是输入连续、无 mask 分支和低寄存器压力。'
+          : '当前路径保持 Cube / Vector 稠密执行，核心判断是形状规整、128B 对齐和低分支密度。';
+        items.push(['SIMD 主区域', computeText]);
       }
       if (line.kind === 'memory') {
         items.push(['NDDMA / 128B Sector', '访存检查会继续标注 stride、slice、broadcast 和 sector 命中率，未命中时进入重写建议。']);
@@ -1308,6 +1782,7 @@
 
     function extraReasonCodes(line) {
       const codes = [];
+      if (currentKernel().id === 'c_api_add') codes.push('c_api_vector_kernel', 'pure_simd_candidate');
       if (line.id === 'l57') codes.push('bufferid_migration_candidate', 'fixpipe_burst_boundary');
       if (line.id === 'l82') codes.push('simt_region_split', 'lane_mask_penalty');
       if (line.kind === 'memory') codes.push('sector_128b_watch', 'nddma_rewrite_candidate');
@@ -1317,6 +1792,14 @@
     }
 
     function hybridSplitCards(line) {
+      if (currentKernel().id === 'c_api_add') {
+        return [
+          ['SIMD trunk', `L42-L49 形成 GM/L2 → UB → SIMD Vector → GM 的完整主干，K tile=${state.kTile} 仅作为 what-if 参数保留。`],
+          ['SIMT island', '未检测到 mask、ragged tail 或数据相关分支，当前建议是 PURE SIMD，不拆 SIMT 岛。'],
+          ['Handoff cost', '没有 Cube→Vector 的 FixPipe 交接，主要同步点是 asc_sync()，需要关注搬运和计算之间的流水空洞。'],
+          ['Migration note', '适合接入 910→950 迁移助手：检查 asc_copy_gm2ub / asc_copy_ub2gm 是否可升级为 NDDMA 或 128B sector 友好策略。']
+        ];
+      }
       const simtText = state.tailLength === 0
         ? 'tail 已清零，SIMT 岛可以被折叠，CI 只需要保留 reason code 追踪。'
         : `tail=${state.tailLength}，mask / ragged 分支保留为 SIMT 岛，避免 SIMD lane masking 侵蚀主循环吞吐。`;
@@ -1373,6 +1856,7 @@
 
     function renderPathChips() {
       const line = selectedLine();
+      if (!line) return;
       const chips = qs('#pathChips');
       chips.innerHTML = '';
       line.path.split('→').map((item) => item.trim()).forEach((item, index) => {
@@ -1389,12 +1873,33 @@
 
     function applyHardwareFocus() {
       const line = selectedLine();
+      if (!line) return;
       postHardwareFocus(line.selectors, line.routes);
+    }
+
+    function selectKernel(id) {
+      const kernel = KERNELS.find((item) => item.id === id);
+      if (!kernel) return;
+      state.selectedKernelId = kernel.id;
+      state.tier = kernel.defaultTier || state.tier;
+      state.selectedId = kernel.selectedId || kernel.annotations[0]?.id;
+      const selected = selectedLine();
+      state.pathKind = selected?.kind || state.pathKind;
+      renderKernelSelector();
+      renderKernelMeta();
+      syncPathButtons();
+      renderSource();
+      renderInspector();
+      renderPathChips();
+      applyHardwareFocus();
     }
 
     function selectLine(id) {
       state.selectedId = id;
+      const kernel = currentKernel();
+      kernel.selectedId = id;
       const selected = selectedLine();
+      if (!selected) return;
       state.pathKind = selected.kind;
       syncPathButtons();
       renderSource();
@@ -1411,8 +1916,11 @@
 
     function selectPathKind(kind) {
       state.pathKind = kind;
-      const next = LINES.find((line) => line.kind === kind);
-      if (next) state.selectedId = next.id;
+      const next = currentAnnotations().find((line) => line.kind === kind);
+      if (next) {
+        state.selectedId = next.id;
+        currentKernel().selectedId = next.id;
+      }
       syncPathButtons();
       renderSource();
       renderInspector();
@@ -1526,15 +2034,10 @@
       if (state.fitted) fitHardware();
     });
 
-    state.selectedId = 'l42';
-    state.pathKind = 'memory';
-    syncPathButtons();
-    renderSource();
-    renderInspector();
-    renderPathChips();
+    selectKernel(state.selectedKernelId);
     renderHardware();
     setTimeout(() => {
-      selectLine('l42');
+      selectLine(state.selectedId);
     }, 50);
   </script>
 </body>
