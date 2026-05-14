@@ -243,14 +243,16 @@
     return card;
   }
 
-  function buildTransportPill(label) {
+  function buildTransportPill(label, targetNode) {
     const pill = node('span', 'pto-aic-core__transport-pill', label || '');
+    pill.dataset.aicTransportTo = targetNode || '';
     return pill;
   }
 
   function buildBufferLane(laneConfig) {
     const lane = node('div', 'pto-aic-core__buffer-lane');
-    lane.appendChild(buildTransportPill(laneConfig.transport));
+    const targetNode = `buffer:${laneConfig.buffer?.key || laneConfig.buffer?.label || ''}`;
+    lane.appendChild(buildTransportPill(laneConfig.transport, targetNode));
     lane.appendChild(buildColumn(laneConfig.buffer));
     return lane;
   }
@@ -351,6 +353,8 @@
       const path = svgNode('path', {
         class: 'pto-aic-core__route',
         fill: 'none',
+        'data-aic-route-from': route.from,
+        'data-aic-route-to': route.to,
         'stroke-width': route.strokeWidth || '1.5',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
