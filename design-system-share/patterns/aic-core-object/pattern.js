@@ -46,7 +46,7 @@
                 kind: 'buffer',
                 key: 'L1',
                 label: 'L1',
-                capacity: '512kb',
+                capacity: '512KB',
                 grid: { rows: 26, cols: 10, cellSize: 12, gap: 1, band: { from: 4, to: 5 } },
               },
               {
@@ -60,7 +60,7 @@
                       kind: 'buffer',
                       key: 'L0A',
                       label: 'L0A',
-                      capacity: '64kb',
+                      capacity: '64KB',
                       grid: { rows: 4, cols: 10, cellSize: 12, gap: 1, band: { from: 4, to: 5 } },
                     },
                   },
@@ -71,7 +71,7 @@
                       kind: 'buffer',
                       key: 'L0B',
                       label: 'L0B',
-                      capacity: '64kb',
+                      capacity: '64KB',
                       grid: { rows: 4, cols: 10, cellSize: 12, gap: 1, band: { from: 4, to: 5 } },
                     },
                   },
@@ -82,7 +82,7 @@
                       kind: 'buffer',
                       key: 'BT',
                       label: 'BT',
-                      capacity: '64kb',
+                      capacity: '64KB',
                       grid: { rows: 4, cols: 10, cellSize: 12, gap: 1, band: { from: 4, to: 5 } },
                     },
                   },
@@ -93,7 +93,7 @@
                       kind: 'buffer',
                       key: 'FP',
                       label: 'FP',
-                      capacity: '64kb',
+                      capacity: '64KB',
                       grid: { rows: 4, cols: 10, cellSize: 12, gap: 1, band: { from: 4, to: 5 } },
                     },
                   },
@@ -108,7 +108,7 @@
                 kind: 'buffer',
                 key: 'L0C',
                 label: 'L0C',
-                capacity: '512kb',
+                capacity: '512KB',
                 grid: { rows: 16, cols: 10, cellSize: 12, gap: 1, band: { from: 6, to: 7 } },
               },
             ],
@@ -243,14 +243,16 @@
     return card;
   }
 
-  function buildTransportPill(label) {
+  function buildTransportPill(label, targetNode) {
     const pill = node('span', 'pto-aic-core__transport-pill', label || '');
+    pill.dataset.aicTransportTo = targetNode || '';
     return pill;
   }
 
   function buildBufferLane(laneConfig) {
     const lane = node('div', 'pto-aic-core__buffer-lane');
-    lane.appendChild(buildTransportPill(laneConfig.transport));
+    const targetNode = `buffer:${laneConfig.buffer?.key || laneConfig.buffer?.label || ''}`;
+    lane.appendChild(buildTransportPill(laneConfig.transport, targetNode));
     lane.appendChild(buildColumn(laneConfig.buffer));
     return lane;
   }
@@ -287,18 +289,53 @@
     return queue;
   }
 
-  function edgePoint(root, nodeEl, side, bias) {
+  function buildQueueStack(queueStackConfig) {
+    const stack = node('div', queueStackConfig.className || 'pto-aic-core__queue-stack');
+    (queueStackConfig.items || []).forEach((item) => stack.appendChild(buildQueue(item)));
+    return stack;
+  }
+
+  function scaleMetrics(root) {
     const rootRect = root.getBoundingClientRect();
-    const rect = nodeEl.getBoundingClientRect();
-    const cx = rect.left - rootRect.left + rect.width / 2;
-    const cy = rect.top - rootRect.top + rect.height / 2;
+    const width = Math.max(1, root.offsetWidth || rootRect.width || 1);
+    const height = Math.max(1, root.offsetHeight || rootRect.height || 1);
+    return {
+      rootRect,
+      width,
+      height,
+      scaleX: rootRect.width ? rootRect.width / width : 1,
+      scaleY: rootRect.height ? rootRect.height / height : 1,
+    };
+  }
+
+  function rectInRoot(root, el) {
+    const { rootRect, scaleX, scaleY } = scaleMetrics(root);
+    const rect = el.getBoundingClientRect();
+    const left = (rect.left - rootRect.left) / scaleX;
+    const top = (rect.top - rootRect.top) / scaleY;
+    const width = rect.width / scaleX;
+    const height = rect.height / scaleY;
+    return {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+    };
+  }
+
+  function edgePoint(root, nodeEl, side, bias) {
+    const rect = rectInRoot(root, nodeEl);
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
     const biasRatio = Math.max(0, Math.min(1, Number.isFinite(bias) ? bias : 0.5));
-    const xAtBias = rect.left - rootRect.left + rect.width * biasRatio;
-    const yAtBias = rect.top - rootRect.top + rect.height * biasRatio;
-    if (side === 'left') return { x: rect.left - rootRect.left, y: yAtBias };
-    if (side === 'right') return { x: rect.right - rootRect.left, y: yAtBias };
-    if (side === 'top') return { x: xAtBias, y: rect.top - rootRect.top };
-    if (side === 'bottom') return { x: xAtBias, y: rect.bottom - rootRect.top };
+    const xAtBias = rect.left + rect.width * biasRatio;
+    const yAtBias = rect.top + rect.height * biasRatio;
+    if (side === 'left') return { x: rect.left, y: yAtBias };
+    if (side === 'right') return { x: rect.right, y: yAtBias };
+    if (side === 'top') return { x: xAtBias, y: rect.top };
+    if (side === 'bottom') return { x: xAtBias, y: rect.bottom };
     return { x: cx, y: cy };
   }
 
@@ -331,15 +368,16 @@
         id: `pto-aic-arrow-${key}`,
         markerWidth: '8',
         markerHeight: '8',
-        refX: '7',
+        refX: '6.4',
         refY: '4',
         orient: 'auto',
+        markerUnits: 'userSpaceOnUse',
       });
       marker.appendChild(svgNode('path', {
-        d: 'M1,1 L7,4 L1,7',
+        d: 'M1.5,1.5 L6.4,4 L1.5,6.5',
         fill: 'none',
         stroke: color,
-        'stroke-width': '1.5',
+        'stroke-width': '1.6',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
       }));
@@ -351,6 +389,8 @@
       const path = svgNode('path', {
         class: 'pto-aic-core__route',
         fill: 'none',
+        'data-aic-route-from': route.from,
+        'data-aic-route-to': route.to,
         'stroke-width': route.strokeWidth || '1.5',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
@@ -362,8 +402,8 @@
     stage.appendChild(svg);
 
     function update() {
-      const rect = stage.getBoundingClientRect();
-      svg.setAttribute('viewBox', `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`);
+      const { width, height } = scaleMetrics(stage);
+      svg.setAttribute('viewBox', `0 0 ${Math.max(1, width)} ${Math.max(1, height)}`);
 
       routeEls.forEach(({ route, path }) => {
         const fromEl = stage.querySelector(`[data-aic-node="${route.from}"]`);
@@ -418,6 +458,7 @@
     if (columnConfig.kind === 'scalar') return buildScalar(columnConfig);
     if (columnConfig.kind === 'scheduler') return buildScheduler(columnConfig);
     if (columnConfig.kind === 'queue') return buildQueue(columnConfig);
+    if (columnConfig.kind === 'queue-stack') return buildQueueStack(columnConfig);
     if (columnConfig.kind === 'group') return buildGroup(columnConfig);
     return node('div', '', '');
   }

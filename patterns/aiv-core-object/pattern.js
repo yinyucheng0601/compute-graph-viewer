@@ -58,7 +58,7 @@
                 kind: 'buffer',
                 key: 'UB',
                 label: 'UB',
-                capacity: '64kb',
+                capacity: '256KB',
                 grid: { rows: 8, cols: 19, cellSize: 12, gap: 1, band: { from: 8, to: 9 } }
               }
             ]
@@ -71,6 +71,7 @@
                 kind: 'exec',
                 label: 'SIMT',
                 chipLabel: 'Warp Scheduler',
+                chipStackCount: 4,
                 chipTone: 'control',
                 grid: { rows: 3, cols: 13, cellSize: 12, gap: 1, band: { from: 5, to: 6 } }
               },
@@ -265,7 +266,21 @@
     const header = node('header', 'pto-aiv-core__exec-header');
     header.appendChild(node('span', 'pto-aiv-core__exec-label', execConfig.label || 'Exec'));
     if (execConfig.chipLabel) {
-      header.appendChild(node('span', `pto-aiv-core__exec-chip is-${execConfig.chipTone || 'control'}`, execConfig.chipLabel));
+      const chip = node(
+        'span',
+        `pto-aiv-core__exec-chip is-${execConfig.chipTone || 'control'}${execConfig.chipStackCount ? ' is-stacked' : ''}`
+      );
+      if (execConfig.chipStackCount) {
+        const stack = node('span', 'pto-aiv-core__chip-stack');
+        for (let index = 0; index < execConfig.chipStackCount; index += 1) {
+          stack.appendChild(node('span'));
+        }
+        chip.appendChild(stack);
+        chip.appendChild(node('span', 'pto-aiv-core__exec-chip-text', execConfig.chipLabel));
+      } else {
+        chip.textContent = execConfig.chipLabel;
+      }
+      header.appendChild(chip);
     }
     const width = gridContentWidth(execConfig.grid) + 28;
     card.style.width = `${width}px`;
@@ -285,32 +300,62 @@
 
   const COLUMN_SELECTOR = '.pto-aiv-core__cache-stack, .pto-aiv-core__center-stack, .pto-aiv-core__exec-stack';
 
-  function resolveLaneX(root, fromEl, toEl) {
+  function scaleMetrics(root) {
     const rootRect = root.getBoundingClientRect();
+    const width = Math.max(1, root.offsetWidth || rootRect.width || 1);
+    const height = Math.max(1, root.offsetHeight || rootRect.height || 1);
+    return {
+      rootRect,
+      width,
+      height,
+      scaleX: rootRect.width ? rootRect.width / width : 1,
+      scaleY: rootRect.height ? rootRect.height / height : 1,
+    };
+  }
+
+  function rectInRoot(root, el) {
+    const { rootRect, scaleX, scaleY } = scaleMetrics(root);
+    const rect = el.getBoundingClientRect();
+    const left = (rect.left - rootRect.left) / scaleX;
+    const top = (rect.top - rootRect.top) / scaleY;
+    const width = rect.width / scaleX;
+    const height = rect.height / scaleY;
+    return {
+      left,
+      top,
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+    };
+  }
+
+  function resolveLaneX(root, fromEl, toEl) {
     const fromColumn = fromEl.closest(COLUMN_SELECTOR) || fromEl;
     const toColumn = toEl.closest(COLUMN_SELECTOR) || toEl;
     if (fromColumn === toColumn) return null;
-    const fromRight = fromColumn.getBoundingClientRect().right - rootRect.left;
-    const toLeft = toColumn.getBoundingClientRect().left - rootRect.left;
+    const fromColumnRect = rectInRoot(root, fromColumn);
+    const toColumnRect = rectInRoot(root, toColumn);
+    const fromRight = fromColumnRect.right;
+    const toLeft = toColumnRect.left;
     if (fromRight < toLeft) return (fromRight + toLeft) / 2;
-    const fromLeft = fromColumn.getBoundingClientRect().left - rootRect.left;
-    const toRight = toColumn.getBoundingClientRect().right - rootRect.left;
+    const fromLeft = fromColumnRect.left;
+    const toRight = toColumnRect.right;
     if (toRight < fromLeft) return (toRight + fromLeft) / 2;
     return null;
   }
 
   function edgePoint(root, nodeEl, side, bias) {
-    const rootRect = root.getBoundingClientRect();
-    const rect = nodeEl.getBoundingClientRect();
-    const cx = rect.left - rootRect.left + rect.width / 2;
-    const cy = rect.top - rootRect.top + rect.height / 2;
+    const rect = rectInRoot(root, nodeEl);
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
     const biasRatio = Math.max(0, Math.min(1, Number.isFinite(bias) ? bias : 0.5));
-    const xAtBias = rect.left - rootRect.left + rect.width * biasRatio;
-    const yAtBias = rect.top - rootRect.top + rect.height * biasRatio;
-    if (side === 'left') return { x: rect.left - rootRect.left, y: yAtBias };
-    if (side === 'right') return { x: rect.right - rootRect.left, y: yAtBias };
-    if (side === 'top') return { x: xAtBias, y: rect.top - rootRect.top };
-    if (side === 'bottom') return { x: xAtBias, y: rect.bottom - rootRect.top };
+    const xAtBias = rect.left + rect.width * biasRatio;
+    const yAtBias = rect.top + rect.height * biasRatio;
+    if (side === 'left') return { x: rect.left, y: yAtBias };
+    if (side === 'right') return { x: rect.right, y: yAtBias };
+    if (side === 'top') return { x: xAtBias, y: rect.top };
+    if (side === 'bottom') return { x: xAtBias, y: rect.bottom };
     return { x: cx, y: cy };
   }
 
@@ -357,15 +402,16 @@
         id: `pto-aiv-arrow-${key}`,
         markerWidth: '8',
         markerHeight: '8',
-        refX: '7',
+        refX: '6.4',
         refY: '4',
         orient: 'auto',
+        markerUnits: 'userSpaceOnUse',
       });
       marker.appendChild(svgNode('path', {
-        d: 'M1,1 L7,4 L1,7',
+        d: 'M1.5,1.5 L6.4,4 L1.5,6.5',
         fill: 'none',
         stroke: color,
-        'stroke-width': '1.5',
+        'stroke-width': '1.6',
         'stroke-linecap': 'round',
         'stroke-linejoin': 'round',
       }));
@@ -388,13 +434,12 @@
     stage.appendChild(svg);
 
     function update() {
-      const rect = stage.getBoundingClientRect();
-      svg.setAttribute('viewBox', `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`);
+      const { width, height } = scaleMetrics(stage);
+      svg.setAttribute('viewBox', `0 0 ${Math.max(1, width)} ${Math.max(1, height)}`);
 
-      const stageRect = stage.getBoundingClientRect();
       const centerStack = stage.querySelector('.pto-aiv-core__center-stack');
       const centerBottom = centerStack
-        ? centerStack.getBoundingClientRect().bottom - stageRect.top
+        ? rectInRoot(stage, centerStack).bottom
         : null;
 
       routeEls.forEach(({ route, path }) => {

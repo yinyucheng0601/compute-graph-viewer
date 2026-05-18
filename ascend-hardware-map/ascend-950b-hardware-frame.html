@@ -73,6 +73,31 @@
       opacity: 1;
       filter: drop-shadow(0 0 7px color-mix(in srgb, #ffaa3b 66%, transparent));
     }
+
+    .is-path-focused .pto-aic-core__route {
+      opacity: 0.18;
+      filter: saturate(0.65);
+      transition: opacity 160ms ease, filter 160ms ease, stroke-width 160ms ease;
+    }
+
+    .is-path-focused .pto-aic-core__transport-pill {
+      opacity: 0.18;
+      filter: saturate(0.65);
+    }
+
+    .is-path-focused .pto-aic-core__route.is-internal-route-active {
+      opacity: 0.96;
+      filter: drop-shadow(0 0 6px color-mix(in srgb, #ffaa3b 58%, transparent));
+      stroke-width: 2.6;
+    }
+
+    .is-path-focused .pto-aic-core__transport-pill.is-internal-route-active {
+      opacity: 1;
+      filter: drop-shadow(0 0 6px color-mix(in srgb, #ffaa3b 48%, transparent));
+      background: #ffdf1f;
+      border-color: #ffdf1f;
+      color: #111111;
+    }
   </style>
 </head>
 <body>
@@ -82,6 +107,7 @@
   <script src="../design-system-share/patterns/memory-architecture/pattern.js"></script>
   <script>
     let overlay = null;
+    let hoverInteractions = null;
 
     const qs = (selector, root = document) => root.querySelector(selector);
     const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -109,6 +135,28 @@
     function clearFocus() {
       qsa('.is-hardware-active').forEach((el) => el.classList.remove('is-hardware-active'));
       qsa('.is-route-active').forEach((el) => el.classList.remove('is-route-active'));
+      qsa('.is-internal-route-active').forEach((el) => el.classList.remove('is-internal-route-active'));
+    }
+
+    function attrValue(value) {
+      return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
+    function applyInternalRouteFocus(host) {
+      qsa('.pto-aic-core__route[data-aic-route-from][data-aic-route-to]', host).forEach((routeEl) => {
+        const core = routeEl.closest('.pto-aic-core');
+        const fromEl = core?.querySelector(`[data-aic-node="${attrValue(routeEl.dataset.aicRouteFrom)}"]`);
+        const toEl = core?.querySelector(`[data-aic-node="${attrValue(routeEl.dataset.aicRouteTo)}"]`);
+        const isActive = Boolean(
+          fromEl?.classList.contains('is-hardware-active') &&
+          toEl?.classList.contains('is-hardware-active')
+        );
+        routeEl.classList.toggle('is-internal-route-active', isActive);
+        if (isActive) {
+          core?.querySelectorAll(`[data-aic-transport-to="${attrValue(routeEl.dataset.aicRouteTo)}"]`)
+            .forEach((pill) => pill.classList.add('is-internal-route-active'));
+        }
+      });
     }
 
     function applyFocus(selectors = [], routeIds = []) {
@@ -123,12 +171,17 @@
       routeIds.forEach((routeId) => {
         qsa(`[data-route-id="${routeId}"]`, host).forEach((el) => el.classList.add('is-route-active'));
       });
+
+      applyInternalRouteFocus(host);
     }
 
     function render() {
       const host = qs('#hardwareHost');
+      hoverInteractions?.destroy?.();
       window.PtoMemoryArchitecturePattern.renderArchitecture(host, 'ascend950b');
       overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, 'ascend950b');
+      hoverInteractions = window.PtoMemoryArchitecturePattern.attachHoverInteractions(host, 'ascend950b');
+      window.PtoMemoryArchitecturePattern.setDetailVisibility(host, true);
       requestAnimationFrame(() => {
         overlay?.update?.();
         requestAnimationFrame(() => {

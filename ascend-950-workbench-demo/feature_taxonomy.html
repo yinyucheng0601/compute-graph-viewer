@@ -501,6 +501,43 @@ aside.right-pane {
   font-weight: 400;
   margin-left: 6px;
 }
+.hw-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+}
+.hw-control {
+  appearance: none;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.hw-control:hover,
+.hw-control:focus-visible {
+  color: var(--foreground);
+  background: var(--surface-4);
+}
+.hw-control[disabled] {
+  color: var(--foreground-muted);
+  opacity: 0.35;
+  cursor: default;
+}
+.hw-zoom-readout {
+  min-width: 38px;
+  cursor: default;
+}
 
 .seg {
   display: inline-flex;
@@ -534,13 +571,14 @@ aside.right-pane {
   position: relative;
   overflow: hidden;
   background: var(--background);
+  --hw-scale: 0.6;
 }
 .hw-frame-wrap iframe {
-  width: 153.846%;
-  height: 153.846%;
+  width: calc(100% / var(--hw-scale));
+  height: calc(100% / var(--hw-scale));
   border: 0;
   display: block;
-  transform: scale(0.65);
+  transform: scale(var(--hw-scale));
   transform-origin: top left;
 }
 
@@ -664,6 +702,12 @@ aside.right-pane {
   <aside class="right-pane">
     <div class="hw-toolbar">
       <div class="title">硬件架构图 <small id="hw-status">910B</small></div>
+      <div class="hw-controls" aria-label="画布设置">
+        <button type="button" class="hw-control" id="hw-detail-toggle" aria-pressed="true">细节开</button>
+        <button type="button" class="hw-control" id="hw-zoom-out" aria-label="缩小">−</button>
+        <button type="button" class="hw-control hw-zoom-readout" id="hw-zoom-reset" aria-label="重置缩放">60%</button>
+        <button type="button" class="hw-control" id="hw-zoom-in" aria-label="放大">+</button>
+      </div>
     </div>
     <div class="hw-frame-wrap">
       <iframe id="hw-iframe" src="hardware-frame.html" title="hardware architecture"></iframe>
@@ -1033,7 +1077,11 @@ let state = {
   selectedId: 'map',  // category id or 'map'
   diff: false,        // show-diff toggled
   iframeReady: false,
+  hwDetailsVisible: true,
+  hwZoomIndex: 2,
 };
+
+const HW_ZOOM_LEVELS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
 
 const DIFF_950_NEW = {
   selectors: ['[data-aiv-node="exec:SIMT"]', '[data-aic-node="buffer:FP"]'],
@@ -1181,10 +1229,36 @@ function renderDetail() {
    ==================================================================== */
 const iframe = document.getElementById('hw-iframe');
 
+function syncHardwareControls() {
+  const scale = HW_ZOOM_LEVELS[state.hwZoomIndex] || 0.6;
+  const wrap = document.querySelector('.hw-frame-wrap');
+  const detailBtn = document.getElementById('hw-detail-toggle');
+  const zoomOut = document.getElementById('hw-zoom-out');
+  const zoomIn = document.getElementById('hw-zoom-in');
+  const zoomReset = document.getElementById('hw-zoom-reset');
+  wrap?.style.setProperty('--hw-scale', String(scale));
+  if (detailBtn) {
+    detailBtn.textContent = state.hwDetailsVisible ? '细节开' : '细节关';
+    detailBtn.setAttribute('aria-pressed', state.hwDetailsVisible ? 'true' : 'false');
+  }
+  if (zoomReset) zoomReset.textContent = `${Math.round(scale * 100)}%`;
+  if (zoomOut) zoomOut.disabled = state.hwZoomIndex <= 0;
+  if (zoomIn) zoomIn.disabled = state.hwZoomIndex >= HW_ZOOM_LEVELS.length - 1;
+}
+
+function postHardwareDetails() {
+  if (!state.iframeReady) return;
+  iframe.contentWindow.postMessage({
+    type: 'hardware-details',
+    visible: state.hwDetailsVisible,
+  }, '*');
+}
+
 window.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'hardware-ready') {
     state.iframeReady = true;
     applyArch();
+    postHardwareDetails();
   }
 });
 
@@ -1194,6 +1268,7 @@ function applyArch() {
     type: 'hardware-arch-change',
     preset: state.arch === '910b' ? 'ascend910b' : 'ascend950b',
   }, '*');
+  postHardwareDetails();
   document.getElementById('hw-status').textContent = state.arch === '910b' ? '910B' : '950';
 
   // diff button only available on 950
@@ -1267,11 +1342,33 @@ document.getElementById('diff-btn').addEventListener('click', () => {
   applyHighlight();
 });
 
+document.getElementById('hw-detail-toggle').addEventListener('click', () => {
+  state.hwDetailsVisible = !state.hwDetailsVisible;
+  syncHardwareControls();
+  postHardwareDetails();
+});
+
+document.getElementById('hw-zoom-out').addEventListener('click', () => {
+  state.hwZoomIndex = Math.max(0, state.hwZoomIndex - 1);
+  syncHardwareControls();
+});
+
+document.getElementById('hw-zoom-in').addEventListener('click', () => {
+  state.hwZoomIndex = Math.min(HW_ZOOM_LEVELS.length - 1, state.hwZoomIndex + 1);
+  syncHardwareControls();
+});
+
+document.getElementById('hw-zoom-reset').addEventListener('click', () => {
+  state.hwZoomIndex = HW_ZOOM_LEVELS.indexOf(0.6);
+  syncHardwareControls();
+});
+
 /* ====================================================================
    INIT
    ==================================================================== */
 renderNav();
 renderDetail();
+syncHardwareControls();
 // applyArch fires once iframe sends 'hardware-ready'.
 </script>
 

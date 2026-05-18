@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PTO Pattern - 950B Memory Architecture</title>
+  <title>PTO Pattern - Memory Architecture</title>
   <script>
     if (new URLSearchParams(window.location.search).has('embed')) {
       document.documentElement.dataset.embedPreview = 'true';
@@ -18,16 +18,28 @@
 </head>
 <body class="pto-pattern-memory-arch__page">
   <main class="pto-pattern-memory-arch__main">
-    <h1 class="pto-pattern-memory-arch__title">950B Memory Architecture Pattern</h1>
+    <h1 class="pto-pattern-memory-arch__title">910B / 950 Memory Architecture Pattern</h1>
     <p class="pto-pattern-memory-arch__subtitle">
       Full-stage PTO memory architecture preview built from the shared <code>aic-core-object</code> and
       <code>aiv-core-object</code> renderers. The chip-level routes follow the official AIC/AIV split memory model,
-      and the 950-specific direct CV lanes are added from the local 950 slide extracts.
+      with 910B SIMD baseline and 950 SIMD/SIMT presets sharing one route, detail, and hover contract.
     </p>
     <div class="pto-pattern-memory-arch__meta">
       <span class="pto-pattern-memory-arch__badge">pattern id: memory-architecture-layout</span>
-      <span class="pto-pattern-memory-arch__badge">default preset: ascend950b</span>
+      <span class="pto-pattern-memory-arch__badge">presets: ascend910b / ascend950b</span>
       <span class="pto-pattern-memory-arch__badge">contract: full-stage DOM shell + shared AIC/AIV renderers + SVG route overlay</span>
+    </div>
+    <div class="pto-pattern-memory-arch__toolbar">
+      <div class="pto-pattern-memory-arch__selector" aria-label="Architecture preset">
+        <button type="button" class="pto-pattern-memory-arch__control is-active" data-preset="ascend950b">950</button>
+        <button type="button" class="pto-pattern-memory-arch__control" data-preset="ascend910b">910B</button>
+      </div>
+      <div class="pto-pattern-memory-arch__canvas-controls" aria-label="Canvas controls">
+        <button type="button" class="pto-pattern-memory-arch__control" id="pattern-detail-toggle" aria-pressed="true">细节开</button>
+        <button type="button" class="pto-pattern-memory-arch__control pto-pattern-memory-arch__icon-control" id="pattern-zoom-out" aria-label="缩小">−</button>
+        <button type="button" class="pto-pattern-memory-arch__control pto-pattern-memory-arch__zoom-readout" id="pattern-zoom-reset" aria-label="重置缩放">100%</button>
+        <button type="button" class="pto-pattern-memory-arch__control pto-pattern-memory-arch__icon-control" id="pattern-zoom-in" aria-label="放大">+</button>
+      </div>
     </div>
     <section class="pto-pattern-memory-arch__stage">
       <div id="pattern-memory-arch-stage"></div>
@@ -42,7 +54,15 @@
       const helper = window.PtoMemoryArchitecturePattern;
       const stage = document.getElementById('pattern-memory-arch-stage');
       if (!helper || !stage) return;
+      const params = new URLSearchParams(window.location.search);
       const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      const zoomLevels = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
+      let zoomIndex = zoomLevels.indexOf(1);
+      let detailsVisible = params.get('details') !== 'off';
+      let currentPreset = params.get('preset') || 'ascend950b';
+      if (!helper.presets?.[currentPreset]) currentPreset = 'ascend950b';
+      let overlay = null;
+      let hover = null;
 
       const syncFrameHeight = () => {
         if (!isEmbedPreview || window.parent === window) return;
@@ -61,9 +81,67 @@
         }
       };
 
-      helper.renderArchitecture(stage, 'ascend950b');
-      const overlay = helper.createRouteOverlay(stage, 'ascend950b');
-      overlay?.render();
+      const updateControls = () => {
+        document.querySelectorAll('[data-preset]').forEach((button) => {
+          button.classList.toggle('is-active', button.dataset.preset === currentPreset);
+        });
+        const detailButton = document.getElementById('pattern-detail-toggle');
+        const zoomOut = document.getElementById('pattern-zoom-out');
+        const zoomReset = document.getElementById('pattern-zoom-reset');
+        const zoomIn = document.getElementById('pattern-zoom-in');
+        if (detailButton) {
+          detailButton.textContent = detailsVisible ? '细节开' : '细节关';
+          detailButton.setAttribute('aria-pressed', detailsVisible ? 'true' : 'false');
+        }
+        if (zoomReset) zoomReset.textContent = `${Math.round((zoomLevels[zoomIndex] || 1) * 100)}%`;
+        if (zoomOut) zoomOut.disabled = zoomIndex <= 0;
+        if (zoomIn) zoomIn.disabled = zoomIndex >= zoomLevels.length - 1;
+      };
+
+      const applyViewState = () => {
+        helper.setDetailVisibility(stage, detailsVisible);
+        helper.applyCanvasScale(stage, zoomLevels[zoomIndex] || 1);
+        overlay?.update?.();
+        updateControls();
+        syncFrameHeight();
+      };
+
+      const renderPreset = () => {
+        overlay?.destroy?.();
+        hover?.destroy?.();
+        helper.renderArchitecture(stage, currentPreset);
+        overlay = helper.createRouteOverlay(stage, currentPreset);
+        hover = helper.attachHoverInteractions(stage, currentPreset);
+        requestAnimationFrame(() => {
+          overlay?.render?.();
+          applyViewState();
+        });
+      };
+
+      document.querySelectorAll('[data-preset]').forEach((button) => {
+        button.addEventListener('click', () => {
+          currentPreset = button.dataset.preset || 'ascend950b';
+          renderPreset();
+        });
+      });
+      document.getElementById('pattern-detail-toggle')?.addEventListener('click', () => {
+        detailsVisible = !detailsVisible;
+        applyViewState();
+      });
+      document.getElementById('pattern-zoom-out')?.addEventListener('click', () => {
+        zoomIndex = Math.max(0, zoomIndex - 1);
+        applyViewState();
+      });
+      document.getElementById('pattern-zoom-in')?.addEventListener('click', () => {
+        zoomIndex = Math.min(zoomLevels.length - 1, zoomIndex + 1);
+        applyViewState();
+      });
+      document.getElementById('pattern-zoom-reset')?.addEventListener('click', () => {
+        zoomIndex = zoomLevels.indexOf(1);
+        applyViewState();
+      });
+
+      renderPreset();
 
       if (isEmbedPreview && 'ResizeObserver' in window) {
         const resizeObserver = new ResizeObserver(() => syncFrameHeight());

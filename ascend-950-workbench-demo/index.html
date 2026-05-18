@@ -1170,22 +1170,45 @@
       left: var(--seg-left);
       width: var(--seg-width);
       border-radius: var(--radius-pill);
-      background: color-mix(in srgb, var(--primary) 70%, var(--success));
+      background: var(--unit-color, var(--primary));
+    }
+
+    .pipeline-segment.is-mte {
+      --unit-color: #ffdf1f;
+    }
+
+    .pipeline-segment.is-vector {
+      --unit-color: rgba(29, 192, 108, 0.95);
+    }
+
+    .pipeline-segment.is-cube {
+      --unit-color: rgba(41, 199, 166, 0.94);
+    }
+
+    .pipeline-segment.is-scalar {
+      --unit-color: #ff9a54;
     }
 
     .pipeline-segment.is-critical {
-      background: var(--success);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 42%, transparent);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--foreground) 52%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--foreground) 18%, transparent);
     }
 
     .pipeline-segment.is-bubble {
       background:
         repeating-linear-gradient(
           135deg,
-          color-mix(in srgb, var(--warning) 44%, transparent) 0 3px,
+          rgba(255, 154, 84, 0.44) 0 3px,
           transparent 3px 6px
         );
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 58%, transparent);
+      box-shadow: inset 0 0 0 1px rgba(255, 154, 84, 0.58);
+    }
+
+    .pipeline-note {
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+      margin: 0;
     }
 
     .pipeline-legend {
@@ -1210,12 +1233,35 @@
       background: var(--primary);
     }
 
+    .pipeline-legend .is-mte::before {
+      background: #ffdf1f;
+    }
+
+    .pipeline-legend .is-vector::before {
+      background: rgba(29, 192, 108, 0.95);
+    }
+
+    .pipeline-legend .is-cube::before {
+      background: rgba(41, 199, 166, 0.94);
+    }
+
+    .pipeline-legend .is-scalar::before {
+      background: #ff9a54;
+    }
+
     .pipeline-legend .is-bubble::before {
-      background: var(--warning);
+      background:
+        repeating-linear-gradient(
+          135deg,
+          rgba(255, 154, 84, 0.58) 0 3px,
+          transparent 3px 6px
+        );
+      box-shadow: inset 0 0 0 1px rgba(255, 154, 84, 0.58);
     }
 
     .pipeline-legend .is-critical::before {
-      background: var(--success);
+      background: transparent;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 64%, transparent);
     }
 
     .inspector-controls {
@@ -2001,9 +2047,9 @@
         </div>
         <div class="wb-context" aria-label="Context">
           <span class="wb-chip">内核 <strong id="contextKernelName">c_api_add</strong></span>
-          <span class="wb-chip">目标 <strong id="contextTarget">Ascend 950B</strong></span>
+          <span class="wb-chip">目标 <strong id="contextTarget">Ascend 910B</strong></span>
           <span class="wb-chip">分析 <strong id="contextAnalysis">T1 静态</strong></span>
-          <span class="wb-chip is-verdict">结论 <strong id="contextVerdict">PURE SIMD</strong></span>
+          <span class="wb-chip is-verdict">结论 <strong id="contextVerdict">Native SIMD baseline</strong></span>
         </div>
       </div>
       <div class="layout-header-right">
@@ -2039,22 +2085,25 @@
             <span class="wb-panel-kicker">硬件架构图</span>
             <div class="kernel-select-wrap">
               <select class="kernel-select" id="archSelect" aria-label="选择硬件架构">
-                <option value="ascend950" selected>Ascend 950</option>
-                <option value="ascend910b">Ascend 910B</option>
+                <option value="ascend950">Ascend 950</option>
+                <option value="ascend910b" selected>Ascend 910B</option>
                 <option value="compare950910b">950 / 910B 对比视图</option>
               </select>
             </div>
           </div>
           <div class="panel-shell-meta">
             <div class="segmented-control segmented-control-muted" aria-label="Path filter">
-              <button class="btn btn-sm is-selected" type="button" data-path-kind="compute">计算路径</button>
-              <button class="btn btn-sm" type="button" data-path-kind="memory">访存路径</button>
+              <button class="btn btn-sm" type="button" data-path-kind="compute">计算路径</button>
+              <button class="btn btn-sm is-selected" type="button" data-path-kind="memory">访存路径</button>
               <button class="btn btn-sm" type="button" data-path-kind="control">控制路径</button>
             </div>
             <div class="toolbar-control">
+              <button class="btn btn-sm btn-ghost" type="button" id="hardwareDetailToggle" aria-pressed="true">细节开</button>
+              <button class="btn btn-sm btn-ghost" type="button" id="zoomOutBtn" aria-label="缩小硬件图">−</button>
               <button class="btn btn-sm btn-ghost" type="button" id="fitBtn">适配</button>
               <button class="btn btn-sm btn-ghost" type="button" id="actualBtn">1:1</button>
               <span class="toolbar-readout" id="zoomReadout">100%</span>
+              <button class="btn btn-sm btn-ghost" type="button" id="zoomInBtn" aria-label="放大硬件图">+</button>
             </div>
           </div>
         </header>
@@ -2068,22 +2117,22 @@
             <section class="hardware-compare-pane" aria-label="Ascend 950 architecture">
               <div class="hardware-compare-head">
                 <span>Ascend 950</span>
-                <span class="wb-chip">35%</span>
+                <span class="wb-chip">40%</span>
               </div>
               <div class="hardware-compare-stage">
                 <div class="hardware-scale" data-hardware-scale="ascend950">
-                  <iframe class="hardware-frame" data-hardware-frame="ascend950" src="./hardware-frame.html" title="Ascend 950 architecture map"></iframe>
+                  <iframe class="hardware-frame" data-hardware-frame="ascend950" data-src="./hardware-frame.html" loading="lazy" title="Ascend 950 architecture map"></iframe>
                 </div>
               </div>
             </section>
             <section class="hardware-compare-pane" aria-label="Ascend 910B architecture">
               <div class="hardware-compare-head">
                 <span>Ascend 910B</span>
-                <span class="wb-chip">35%</span>
+                <span class="wb-chip">40%</span>
               </div>
               <div class="hardware-compare-stage">
                 <div class="hardware-scale" data-hardware-scale="ascend910b">
-                  <iframe class="hardware-frame" data-hardware-frame="ascend910b" src="./hardware-frame.html" title="Ascend 910B architecture map"></iframe>
+                  <iframe class="hardware-frame" data-hardware-frame="ascend910b" data-src="./hardware-frame.html" loading="lazy" title="Ascend 910B architecture map"></iframe>
                 </div>
               </div>
             </section>
@@ -2114,11 +2163,11 @@
           <section class="inspector-section" aria-label="Analysis controls">
             <div class="inspector-section-head">
               <span class="inspector-section-title">分析配置 · Tunables</span>
-              <span class="wb-chip" id="modeTag">COMPILED analysis</span>
+              <span class="wb-chip" id="modeTag">SOURCE analysis</span>
             </div>
             <div class="inspector-controls" aria-label="Analysis tier">
-              <button class="btn btn-sm" type="button" data-tier="t1">T1 Source</button>
-              <button class="btn btn-sm is-selected" type="button" data-tier="t2">T2 Compiled</button>
+              <button class="btn btn-sm is-selected" type="button" data-tier="t1">T1 Source</button>
+              <button class="btn btn-sm" type="button" data-tier="t2">T2 Compiled</button>
               <button class="btn btn-sm" type="button" data-tier="t3">T3 Profiled</button>
             </div>
             <div class="slider-row" id="kSliderRow">
@@ -2310,27 +2359,32 @@
     };
 
     const state = {
-      selectedKernelId: 'fp8_mmad_masked_reduce',
-      selectedArch: 'compare950910b',
-      selectedId: 'l42',
+      selectedKernelId: 'c_api_add',
+      selectedArch: 'ascend910b',
+      selectedId: 'add-l42',
       pathKind: 'memory',
-      tier: 't2',
+      tier: 't1',
       kTile: 128,
       tailLength: 17,
       annotationsVisible: true,
       fitted: true,
       frameReady: { primary: false, ascend950: false, ascend910b: false },
+      framePresets: { primary: null, ascend950: null, ascend910b: null },
+      frameFocusKeys: { primary: null, ascend950: null, ascend910b: null },
       frameSizes: {
         primary: { width: 1200, height: 820 },
         ascend950: { width: 1200, height: 820 },
         ascend910b: { width: 1200, height: 820 }
       },
-      scales: { primary: 1, ascend950: 0.35, ascend910b: 0.35 },
-      scale: 1
+      scales: { primary: 1, ascend950: 0.4, ascend910b: 0.4 },
+      scale: 1,
+      hardwareDetailsVisible: true
     };
 
     const qs = (selector, root = document) => root.querySelector(selector);
     const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+    const HARDWARE_FRAME_SRC = './hardware-frame.html';
+    const HARDWARE_ZOOM_LEVELS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
 
     function currentKernel() {
       return KERNELS.find((kernel) => kernel.id === state.selectedKernelId) || KERNELS[0];
@@ -2371,6 +2425,32 @@
 
     function scaleForKey(key) {
       return qs(`[data-hardware-scale="${key}"]`);
+    }
+
+    function closestHardwareZoomLevel(scale) {
+      const clamped = Math.max(HARDWARE_ZOOM_LEVELS[0], Math.min(HARDWARE_ZOOM_LEVELS[HARDWARE_ZOOM_LEVELS.length - 1], Number(scale) || 1));
+      return HARDWARE_ZOOM_LEVELS.reduce((closest, level) => (
+        Math.abs(level - clamped) < Math.abs(closest - clamped) ? level : closest
+      ), HARDWARE_ZOOM_LEVELS[0]);
+    }
+
+    function hardwareZoomIndex(scale) {
+      const level = closestHardwareZoomLevel(scale);
+      return Math.max(0, HARDWARE_ZOOM_LEVELS.indexOf(level));
+    }
+
+    function ensureHardwareFrameLoaded(key) {
+      const frame = frameForKey(key);
+      if (!frame || frame.getAttribute('src')) return;
+      frame.setAttribute('src', frame.dataset.src || HARDWARE_FRAME_SRC);
+    }
+
+    function ensureActiveHardwareFramesLoaded() {
+      if (isCompareArch()) {
+        activeArchIds().forEach((archId) => ensureHardwareFrameLoaded(frameKeyForArch(archId)));
+        return;
+      }
+      ensureHardwareFrameLoaded('primary');
     }
 
     function frameSizeForKey(key) {
@@ -3427,7 +3507,7 @@
           gain: 'est. -18%'
         });
       }
-      if (pipeline.overlap < 50) {
+      if (pipeline.overlapActionable && pipeline.overlap < 50) {
         items.push({
           title: `Pipeline overlap 仅 ${pipeline.overlap}%`,
           text: `现象：关键路径卡在 ${pipeline.criticalUnit}。建议：尝试将 ${sliderModel().kLabel} 提升到 128，并复核 MTE2 / Cube 对齐。`,
@@ -3457,7 +3537,7 @@
       }
       items.push({
         title: '保留 T3 Profiled 校准点',
-        text: '现象：当前 V2 pipeline 仍为编译期估算。建议：进入 T3 后校准 bubble、sector 命中和 critical path。',
+        text: '现象：当前 V2 pipeline 在 T1/T2 只能推导源码顺序或编译期估算。建议：进入 T3 后校准 bubble、sector 命中和 critical path。',
         gain: 'risk down'
       });
       return items.slice(0, 3);
@@ -3602,47 +3682,179 @@
       host.innerHTML = activeArchIds().map(renderTilingCard).join('');
     }
 
-    function pipelineModel(archId = primaryArchId()) {
-      const kernel = currentKernel();
-      const total = archId === 'ascend910b' ? 280 : cycleSplitForArch(selectedAnnotation(), archId).total;
-      const isHybrid = kernel.id === 'fp8_mmad_masked_reduce';
-      const highPerf = kernel.profile === 'gelu_high_performance';
-      const overlap = archId === 'ascend910b' ? 42 : isHybrid ? Math.max(42, 70 - Math.round(state.tailLength * 0.35)) : highPerf ? 66 : 54;
-      const units = isHybrid ? ['MTE2', 'MTE1', 'Cube', 'MTE3', 'Vector', 'Scalar'] : ['MTE2', 'Vector', 'MTE3', 'Scalar'];
-      const segments = [
-        { unit: 'MTE2', start: 0, end: Math.round(total * 0.22), stage: 'prefetch' },
-        { unit: 'MTE2', start: Math.round(total * 0.34), end: Math.round(total * 0.48), stage: 'prefetch' },
-        { unit: 'MTE2', start: Math.round(total * 0.5), end: Math.round(total * 0.57), stage: 'bubble', isBubble: true, stallReason: '等 L2 sector' },
-        { unit: isHybrid ? 'MTE1' : 'Vector', start: Math.round(total * 0.12), end: Math.round(total * 0.38), stage: isHybrid ? 'load L0' : 'compute' },
-        { unit: isHybrid ? 'Cube' : 'Vector', start: Math.round(total * 0.3), end: Math.round(total * 0.78), stage: 'compute', isCritical: true },
-        { unit: 'MTE3', start: Math.round(total * 0.68), end: Math.round(total * 0.92), stage: 'store' },
-        { unit: 'Scalar', start: Math.round(total * 0.52), end: Math.round(total * 0.62), stage: 'guard' }
-      ].filter((segment) => units.includes(segment.unit));
+    function distributeCycles(total, weights) {
+      const weightTotal = weights.reduce((sum, weight) => sum + weight, 0) || 1;
+      const raw = weights.map((weight) => (total * weight) / weightTotal);
+      const base = raw.map(Math.floor);
+      let remain = total - base.reduce((sum, value) => sum + value, 0);
+      raw
+        .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+        .sort((a, b) => b.fraction - a.fraction)
+        .forEach(({ index }) => {
+          if (remain > 0) {
+            base[index] += 1;
+            remain -= 1;
+          }
+        });
+      return base;
+    }
+
+    function pipelineSourceLabel() {
+      if (state.tier === 't1') return 'source-inferred';
+      if (state.tier === 't2') return 'compiled estimate';
+      return 'profiled';
+    }
+
+    function pipelineRowCycles(split, id) {
+      return split.rows.find((row) => row.id === id)?.cycles || 0;
+    }
+
+    function pipelineSegment(unit, start, duration, options = {}) {
+      const safeDuration = Math.max(0, duration);
       return {
-        total,
-        units,
-        segments,
-        overlap,
-        criticalUnit: isHybrid ? 'Cube' : 'Vector',
-        criticalPct: isHybrid ? 78 : highPerf ? 64 : 58,
-        source: state.tier === 't3' ? 'profiled' : 'estimated'
+        unit,
+        start,
+        end: start + safeDuration,
+        ...options
       };
     }
 
-    function renderPipelineCard(archId) {
+    function pipelineUnitKind(unit) {
+      if (/^MTE/.test(unit)) return 'mte';
+      if (unit === 'Vector') return 'vector';
+      if (unit === 'Cube') return 'cube';
+      return 'scalar';
+    }
+
+    function sourceInferredAddPipeline(archId, split) {
+      const dataCycles = pipelineRowCycles(split, 'data');
+      const computeCycles = pipelineRowCycles(split, 'compute');
+      const syncCycles = pipelineRowCycles(split, 'sync');
+      const [readX, readY, writeZ] = distributeCycles(dataCycles, [1, 1, 1]);
+      const [inputSync, computeSync, writeSync] = distributeCycles(syncCycles, [1, 1, 1]);
+      let cursor = 0;
+      const segments = [];
+      const add = (unit, duration, stage, extra = {}) => {
+        segments.push(pipelineSegment(unit, cursor, duration, {
+          stage,
+          isCritical: true,
+          ...extra
+        }));
+        cursor += duration;
+      };
+
+      add('MTE2', readX, 'L42 asc_copy_gm2ub(x): GM/L2 → UB');
+      add('MTE2', readY, 'L43 asc_copy_gm2ub(y): GM/L2 → UB');
+      add('Scalar', inputSync, 'L44 asc_sync: wait for both input copies');
+      add('Vector', computeCycles, 'L46 asc_add: UB → SIMD/Vector');
+      add('Scalar', computeSync, 'L47 asc_sync: wait for vector compute');
+      add('MTE3', writeZ, 'L49 asc_copy_ub2gm(z): UB → GM/L2');
+      add('Scalar', writeSync, 'L50 asc_sync: wait for writeback');
+
+      return {
+        total: cursor,
+        units: ['MTE2', 'Vector', 'MTE3', 'Scalar'],
+        segments,
+        overlap: 0,
+        overlapLabel: 'Source barriers · 0%',
+        criticalUnit: 'source dependency chain',
+        criticalPct: 100,
+        criticalLabel: 'copy-in → add → copy-out · 100%',
+        source: pipelineSourceLabel(),
+        note: `${archById(archId).label}: derived from asc_copy_gm2ub → asc_sync → asc_add → asc_sync → asc_copy_ub2gm. No bubble is inferred at T1; sync bars are explicit source barriers.`,
+        overlapActionable: false
+      };
+    }
+
+    function estimatedGenericPipeline(archId, split) {
+      const kernel = currentKernel();
+      const isHybrid = kernel.id === 'fp8_mmad_masked_reduce';
+      const highPerf = kernel.profile === 'gelu_high_performance';
+      const computeCycles = pipelineRowCycles(split, 'compute');
+      const dataCycles = pipelineRowCycles(split, 'data');
+      const syncCycles = pipelineRowCycles(split, 'sync');
+      const [mte2Cycles, mte3Cycles] = distributeCycles(dataCycles, [2, 1]);
+      const [frontSync, tailSync] = distributeCycles(syncCycles, [1, 1]);
+      const allowEstimatedBubble = state.tier !== 't1';
+      const units = isHybrid ? ['MTE2', 'MTE1', 'Cube', 'MTE3', 'Vector', 'Scalar'] : ['MTE2', 'Vector', 'MTE3', 'Scalar'];
+      const segments = [];
+      const push = (unit, start, duration, stage, extra = {}) => {
+        segments.push(pipelineSegment(unit, start, duration, { stage, ...extra }));
+      };
+
+      if (isHybrid) {
+        const cubeCycles = Math.round(computeCycles * 0.68);
+        const vectorCycles = Math.max(1, computeCycles - cubeCycles);
+        push('MTE2', 0, mte2Cycles, 'prefetch GM/L2 tile', { isCritical: archId === 'ascend910b' });
+        push('MTE1', Math.round(mte2Cycles * 0.45), Math.round(mte2Cycles * 0.55), 'load L0 buffers');
+        push('Cube', Math.max(0, mte2Cycles - frontSync), cubeCycles, 'Cube / MMAD compute', { isCritical: archId !== 'ascend910b' });
+        push('Vector', Math.max(0, mte2Cycles + cubeCycles - Math.round(vectorCycles * 0.3)), vectorCycles, 'Vector tail / reduce');
+        push('MTE3', Math.max(0, mte2Cycles + cubeCycles - Math.round(mte3Cycles * 0.35)), mte3Cycles, 'writeback UB/L2 → GM');
+        push('Scalar', mte2Cycles + cubeCycles + vectorCycles, tailSync, 'mode/sync guard', { isCritical: archId === 'ascend910b' });
+        if (allowEstimatedBubble && syncCycles > 24) {
+          push('Scalar', Math.max(0, mte2Cycles + cubeCycles - Math.round(frontSync * 0.5)), frontSync, 'bubble: wait for tail island / barrier', {
+            isBubble: true,
+            stallReason: 'compiled estimate: waiting on tail island / barrier'
+          });
+        }
+      } else {
+        let cursor = 0;
+        push('MTE2', cursor, mte2Cycles, 'prefetch GM/L2 tile', { isCritical: archId === 'ascend910b' });
+        cursor += Math.max(0, mte2Cycles - Math.round(frontSync * 0.35));
+        push('Vector', cursor, computeCycles, highPerf ? 'RegBase/VF compute' : 'SIMD/Vector compute', { isCritical: true });
+        cursor += Math.max(0, computeCycles - Math.round(mte3Cycles * 0.25));
+        push('MTE3', cursor, mte3Cycles, 'writeback UB/L2 → GM');
+        push('Scalar', cursor + mte3Cycles, tailSync, 'sync guard');
+        if (allowEstimatedBubble && syncCycles > 32) {
+          push('Scalar', mte2Cycles, frontSync, 'bubble: wait for MTE completion', {
+            isBubble: true,
+            stallReason: 'compiled estimate: waiting for data movement'
+          });
+        }
+      }
+
+      const modelTotal = Math.max(split.total, ...segments.map((segment) => segment.end));
+      const overlap = state.tier === 't1' ? 0 : isHybrid ? (archId === 'ascend910b' ? 42 : 68) : (archId === 'ascend910b' ? 46 : 58);
+      return {
+        total: modelTotal,
+        units,
+        segments,
+        overlap,
+        overlapLabel: state.tier === 't1' ? 'Source order · 0%' : `MTE × ${isHybrid ? 'Cube' : 'Vector'} ${overlap}%`,
+        criticalUnit: isHybrid ? (archId === 'ascend910b' ? 'MTE2/Scalar' : 'Cube') : 'Vector',
+        criticalPct: isHybrid ? (archId === 'ascend910b' ? 64 : 78) : highPerf ? 64 : 58,
+        criticalLabel: isHybrid ? (archId === 'ascend910b' ? 'MTE2 + sync · 64%' : 'Cube path · 78%') : `Vector path · ${highPerf ? 64 : 58}%`,
+        source: pipelineSourceLabel(),
+        note: state.tier === 't1'
+          ? 'T1 only infers operator order and unit mapping; overlap and bubble require compiled/profiled data.'
+          : 'Overlap and bubble are compiled estimates until T3 profiler timestamps are available.',
+        overlapActionable: state.tier !== 't1'
+      };
+    }
+
+    function pipelineModel(archId = primaryArchId()) {
+      const split = cycleSplitForArch(selectedAnnotation(), archId);
+      if (currentKernel().id === 'c_api_add') {
+        return sourceInferredAddPipeline(archId, split);
+      }
+      return estimatedGenericPipeline(archId, split);
+    }
+
+    function renderPipelineCard(archId, model = pipelineModel(archId), axisTotal = model.total) {
       const arch = archById(archId);
-      const model = pipelineModel(archId);
-      const ticks = [0, Math.round(model.total * 0.25), Math.round(model.total * 0.5), Math.round(model.total * 0.75), model.total];
+      const ticks = [0, Math.round(axisTotal * 0.25), Math.round(axisTotal * 0.5), Math.round(axisTotal * 0.75), axisTotal];
+      const axisCopy = axisTotal > model.total ? `${model.total} cyc · shared ${axisTotal}` : `${model.total} cyc`;
       return `
         <article class="pipeline-card">
           <div class="v2-card-head">
             <strong class="v2-card-title">${escapeHtml(arch.label)}</strong>
-            <span class="v2-card-subtitle">${escapeHtml(model.source)} · cycle</span>
+            <span class="v2-card-subtitle">${escapeHtml(model.source)} · ${escapeHtml(axisCopy)}</span>
           </div>
           <div class="pipeline-stats">
-            <div class="pipeline-stat"><span>Overlap</span><strong>MTE × ${escapeHtml(model.criticalUnit)} ${model.overlap}%</strong></div>
-            <div class="pipeline-stat"><span>Critical path</span><strong>${escapeHtml(model.criticalUnit)} · ${model.criticalPct}%</strong></div>
+            <div class="pipeline-stat"><span>Overlap</span><strong>${escapeHtml(model.overlapLabel)}</strong></div>
+            <div class="pipeline-stat"><span>Critical path</span><strong>${escapeHtml(model.criticalLabel)}</strong></div>
           </div>
+          <p class="pipeline-note">${escapeHtml(model.note)}</p>
           <div class="pipeline-lanes">
             <div class="pipeline-axis">
               <span></span>
@@ -3653,17 +3865,20 @@
                 <span class="pipeline-unit">${escapeHtml(unit)}</span>
                 <div class="pipeline-track">
                   ${model.segments.filter((segment) => segment.unit === unit).map((segment) => {
-                    const left = model.total > 0 ? Math.round(segment.start / model.total * 100) : 0;
-                    const width = model.total > 0 ? Math.max(2, Math.round((segment.end - segment.start) / model.total * 100)) : 0;
-                    const cls = `${segment.isBubble ? 'is-bubble' : ''} ${segment.isCritical ? 'is-critical' : ''}`;
-                    return `<span class="pipeline-segment ${cls}" title="${escapeHtml(segment.stallReason || segment.stage)}" style="--seg-left: ${left}%; --seg-width: ${width}%"></span>`;
+                    const left = axisTotal > 0 ? Math.round(segment.start / axisTotal * 100) : 0;
+                    const width = axisTotal > 0 ? Math.max(2, Math.round((segment.end - segment.start) / axisTotal * 100)) : 0;
+                    const cls = `is-${pipelineUnitKind(segment.unit)} ${segment.isBubble ? 'is-bubble' : ''} ${segment.isCritical ? 'is-critical' : ''}`;
+                    return `<span class="pipeline-segment ${cls}" title="${escapeHtml(segment.stallReason || segment.stage)} · ${segment.start}-${segment.end} cyc" style="--seg-left: ${left}%; --seg-width: ${width}%"></span>`;
                   }).join('')}
                 </div>
               </div>
             `).join('')}
           </div>
           <div class="pipeline-legend">
-            <span>work</span>
+            <span class="is-mte">MTE</span>
+            <span class="is-vector">Vector/SIMD</span>
+            ${model.units.includes('Cube') ? '<span class="is-cube">Cube</span>' : ''}
+            <span class="is-scalar">Scalar/Sync</span>
             <span class="is-bubble">bubble</span>
             <span class="is-critical">critical path</span>
           </div>
@@ -3674,7 +3889,10 @@
     function renderPipeline() {
       const host = qs('#pipelinePanel');
       if (!host) return;
-      host.innerHTML = activeArchIds().map(renderPipelineCard).join('');
+      const archIds = activeArchIds();
+      const models = Object.fromEntries(archIds.map((archId) => [archId, pipelineModel(archId)]));
+      const axisTotal = isCompareArch() ? Math.max(...Object.values(models).map((model) => model.total)) : null;
+      host.innerHTML = archIds.map((archId) => renderPipelineCard(archId, models[archId], axisTotal || models[archId].total)).join('');
     }
 
     function reasonDisplayText(code) {
@@ -3725,6 +3943,15 @@
       renderInspectorDetails();
     }
 
+    let inspectorRenderFrame = 0;
+    function scheduleInspectorRender() {
+      if (inspectorRenderFrame) cancelAnimationFrame(inspectorRenderFrame);
+      inspectorRenderFrame = requestAnimationFrame(() => {
+        inspectorRenderFrame = 0;
+        renderInspector();
+      });
+    }
+
     function renderPathChips() {
       const baseLine = selectedAnnotation();
       if (!baseLine) return;
@@ -3762,15 +3989,45 @@
     }
 
     function postHardwareArch() {
+      ensureActiveHardwareFramesLoaded();
       activeArchIds().forEach((archId) => {
         const key = frameKeyForArch(archId);
         const frame = frameForKey(key);
         if (!state.frameReady[key] || !frame?.contentWindow) return;
+        const preset = archById(archId).preset;
+        if (state.framePresets[key] === preset) return;
+        state.framePresets[key] = preset;
+        state.frameFocusKeys[key] = null;
         frame.contentWindow.postMessage({
           type: 'hardware-arch-change',
-          preset: archById(archId).preset
+          preset
         }, '*');
       });
+      postHardwareDetails();
+    }
+
+    function postHardwareDetails() {
+      ['primary', 'ascend950', 'ascend910b'].forEach((key) => {
+        const frame = frameForKey(key);
+        if (!state.frameReady[key] || !frame?.contentWindow) return;
+        frame.contentWindow.postMessage({
+          type: 'hardware-details',
+          visible: state.hardwareDetailsVisible,
+        }, '*');
+      });
+    }
+
+    function syncHardwareDetailToggle() {
+      const button = qs('#hardwareDetailToggle');
+      if (!button) return;
+      button.textContent = state.hardwareDetailsVisible ? '细节开' : '细节关';
+      button.setAttribute('aria-pressed', state.hardwareDetailsVisible ? 'true' : 'false');
+    }
+
+    function toggleHardwareDetails() {
+      state.hardwareDetailsVisible = !state.hardwareDetailsVisible;
+      syncHardwareDetailToggle();
+      postHardwareDetails();
     }
 
     function selectArch(id) {
@@ -3865,7 +4122,7 @@
       const availableWidth = Math.max(1, viewport.clientWidth - 28);
       const availableHeight = Math.max(1, viewport.clientHeight - 76);
       const scale = Math.min(1, availableWidth / size.width, availableHeight / size.height);
-      setHardwareScale(Math.max(0.36, scale), 'primary');
+      setHardwareScale(closestHardwareZoomLevel(scale), 'primary');
       state.fitted = true;
     }
 
@@ -3879,8 +4136,18 @@
     }
 
     function setCompareHardwareScale() {
-      ['ascend950', 'ascend910b'].forEach((key) => setHardwareScale(0.35, key, false));
-      qs('#zoomReadout').textContent = '35%';
+      ['ascend950', 'ascend910b'].forEach((key) => setHardwareScale(0.4, key, false));
+      qs('#zoomReadout').textContent = '40%';
+      updateHardwareZoomButtons();
+    }
+
+    function updateHardwareZoomButtons() {
+      const compare = isCompareArch();
+      const index = hardwareZoomIndex(state.scales.primary || 1);
+      const zoomOut = qs('#zoomOutBtn');
+      const zoomIn = qs('#zoomInBtn');
+      if (zoomOut) zoomOut.disabled = compare || index <= 0;
+      if (zoomIn) zoomIn.disabled = compare || index >= HARDWARE_ZOOM_LEVELS.length - 1;
     }
 
     function setHardwareScale(scale, key = 'primary', updateReadout = true) {
@@ -3890,24 +4157,36 @@
       const size = frameSizeForKey(key);
       const naturalWidth = size.width;
       const naturalHeight = size.height;
-      state.scales[key] = scale;
-      if (key === 'primary') state.scale = scale;
-      scaleEl.style.width = `${Math.ceil(naturalWidth * scale)}px`;
-      scaleEl.style.height = `${Math.ceil(naturalHeight * scale)}px`;
+      const nextScale = closestHardwareZoomLevel(scale);
+      state.scales[key] = nextScale;
+      if (key === 'primary') state.scale = nextScale;
       frame.style.width = `${naturalWidth}px`;
       frame.style.height = `${naturalHeight}px`;
-      frame.style.transform = `scale(${scale})`;
-      if (updateReadout) qs('#zoomReadout').textContent = `${Math.round(scale * 100)}%`;
+      scaleEl.style.width = `${Math.ceil(naturalWidth * nextScale)}px`;
+      scaleEl.style.height = `${Math.ceil(naturalHeight * nextScale)}px`;
+      frame.style.transform = `scale(${nextScale})`;
+      if (updateReadout) qs('#zoomReadout').textContent = `${Math.round(nextScale * 100)}%`;
+      updateHardwareZoomButtons();
+    }
+
+    function stepHardwareZoom(direction) {
+      if (isCompareArch()) return;
+      const currentIndex = hardwareZoomIndex(state.scales.primary || 1);
+      const nextIndex = Math.max(0, Math.min(HARDWARE_ZOOM_LEVELS.length - 1, currentIndex + direction));
+      setHardwareScale(HARDWARE_ZOOM_LEVELS[nextIndex], 'primary');
+      state.fitted = false;
     }
 
     function renderHardwareMode() {
       const compare = isCompareArch();
+      ensureActiveHardwareFramesLoaded();
       const viewport = qs('#hardwareViewport');
       viewport?.classList.toggle('is-compare', compare);
       const fitBtn = qs('#fitBtn');
       const actualBtn = qs('#actualBtn');
       if (fitBtn) fitBtn.disabled = compare;
       if (actualBtn) actualBtn.disabled = compare;
+      updateHardwareZoomButtons();
       if (compare) {
         setCompareHardwareScale();
       } else if (state.fitted) {
@@ -3920,6 +4199,9 @@
     function postHardwareFocus(selectors, routes, key = 'primary') {
       const frame = frameForKey(key);
       if (!state.frameReady[key] || !frame?.contentWindow) return;
+      const focusKey = JSON.stringify([selectors, routes]);
+      if (state.frameFocusKeys[key] === focusKey) return;
+      state.frameFocusKeys[key] = focusKey;
       frame.contentWindow.postMessage({
         type: 'hardware-focus',
         selectors,
@@ -3969,19 +4251,23 @@
     });
     qs('#kSlider').addEventListener('input', (event) => {
       state.kTile = Number(event.target.value);
-      renderInspector();
+      scheduleInspectorRender();
     });
     qs('#tailSlider').addEventListener('input', (event) => {
       state.tailLength = Number(event.target.value);
-      renderInspector();
+      scheduleInspectorRender();
     });
     qs('#fitBtn').addEventListener('click', fitHardware);
     qs('#actualBtn').addEventListener('click', actualSizeHardware);
+    qs('#zoomOutBtn')?.addEventListener('click', () => stepHardwareZoom(-1));
+    qs('#zoomInBtn')?.addEventListener('click', () => stepHardwareZoom(1));
+    qs('#hardwareDetailToggle')?.addEventListener('click', toggleHardwareDetails);
     qs('#analyzeBtn').addEventListener('click', () => selectLine(state.selectedId));
     window.addEventListener('message', (event) => {
       if (!event.data || (event.data.type !== 'hardware-ready' && event.data.type !== 'hardware-size')) return;
       const key = frameKeyFromWindow(event.source);
       const currentSize = frameSizeForKey(key);
+      const ready = event.data.type === 'hardware-ready';
       state.frameSizes[key] = {
         width: Math.max(1, Number(event.data.width) || currentSize.width),
         height: Math.max(1, Number(event.data.height) || currentSize.height),
@@ -3989,20 +4275,29 @@
       state.frameReady[key] = true;
       if (isCompareArch()) setCompareHardwareScale();
       else if (key === 'primary' && state.fitted) fitHardware();
-      postHardwareArch();
-      applyHardwareFocus();
-    });
-    window.addEventListener('resize', () => {
-      if (isCompareArch()) setCompareHardwareScale();
-      else if (state.fitted) fitHardware();
+      if (ready) {
+        state.framePresets[key] = null;
+        state.frameFocusKeys[key] = null;
+        postHardwareArch();
+        applyHardwareFocus();
+      }
     });
 
+    let hardwareResizeFrame = 0;
+    window.addEventListener('resize', () => {
+      if (hardwareResizeFrame) cancelAnimationFrame(hardwareResizeFrame);
+      hardwareResizeFrame = requestAnimationFrame(() => {
+        hardwareResizeFrame = 0;
+        if (isCompareArch()) setCompareHardwareScale();
+        else if (state.fitted) fitHardware();
+      });
+    });
+
+    syncHardwareDetailToggle();
+    updateHardwareZoomButtons();
     renderArchSelector();
     selectKernel(state.selectedKernelId);
     renderHardware();
-    setTimeout(() => {
-      selectLine(state.selectedId);
-    }, 50);
   </script>
 </body>
 </html>

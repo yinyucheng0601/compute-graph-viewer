@@ -96,7 +96,9 @@
   <script src="../patterns/memory-architecture/pattern.js"></script>
   <script>
     let overlay = null;
+    let hoverInteractions = null;
     let currentPreset = 'ascend950b';
+    let detailsVisible = true;
     let pendingFocus = { selectors: [], routes: [] };
 
     const qs = (selector, root = document) => root.querySelector(selector);
@@ -169,8 +171,11 @@
     function render() {
       const host = qs('#hardwareHost');
       overlay?.destroy?.();
+      hoverInteractions?.destroy?.();
       window.PtoMemoryArchitecturePattern.renderArchitecture(host, currentPreset);
       overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, currentPreset);
+      hoverInteractions = window.PtoMemoryArchitecturePattern.attachHoverInteractions(host, currentPreset);
+      window.PtoMemoryArchitecturePattern.setDetailVisibility(host, detailsVisible);
       requestAnimationFrame(() => {
         overlay?.update?.();
         applyFocus(pendingFocus.selectors, pendingFocus.routes);
@@ -187,6 +192,15 @@
         if (nextPreset === currentPreset) return;
         currentPreset = nextPreset;
         render();
+        return;
+      }
+      if (event.data.type === 'hardware-details') {
+        detailsVisible = event.data.visible !== false;
+        window.PtoMemoryArchitecturePattern.setDetailVisibility(qs('#hardwareHost'), detailsVisible);
+        requestAnimationFrame(() => {
+          overlay?.update?.();
+          postSize();
+        });
         return;
       }
       if (event.data.type !== 'hardware-focus') return;
