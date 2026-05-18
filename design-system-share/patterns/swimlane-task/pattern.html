@@ -42,27 +42,33 @@
     (function renderPatternPreview() {
       const helper = window.PtoSwimlaneTaskPattern;
       if (!helper) return;
+      const colormap = helper.createTaskColormap({
+        semanticAliases: {
+          matmul_trans: 'matmul',
+          vec_cast: 'vec_elementwise',
+        },
+      });
       const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
 
       const rows = [
         {
-          color: '#4d79d4',
-          task: { label: 'Query-Linear', inputRawMagic: [], outputRawMagic: [] },
+          task: { colorKey: 'matmul', label: 'matmul', inputRawMagic: [], outputRawMagic: [] },
+          mode: 'semantic',
           state: {},
         },
         {
-          color: '#7b57bf',
-          task: { label: 'dispatch', inputRawMagic: new Array(6).fill(0), outputRawMagic: new Array(4).fill(0) },
+          task: { colorKey: 'vec_softmax', label: 'vec_softmax', inputRawMagic: new Array(6).fill(0), outputRawMagic: new Array(4).fill(0) },
+          mode: 'semantic',
           state: { isSelected: true },
         },
         {
-          color: '#4da56d',
-          task: { label: 'attention matmul', inputRawMagic: new Array(3).fill(0), outputRawMagic: new Array(3).fill(0) },
+          task: { colorKey: 'wrap-12', label: 'subgraph wrap-12', subgraphKey: 'wrap-12', inputRawMagic: new Array(3).fill(0), outputRawMagic: new Array(3).fill(0) },
+          mode: 'subgraph',
           state: { isRelated: true, isEmphasized: true },
         },
         {
-          color: '#d98f55',
-          task: { label: 'kernel', inputRawMagic: new Array(2).fill(0), outputRawMagic: [] },
+          task: { label: 'AIC task', laneKind: 'AIC', inputRawMagic: new Array(2).fill(0), outputRawMagic: [] },
+          mode: 'engine',
           state: {},
         },
       ];
@@ -110,7 +116,7 @@
             y: 0,
             width,
             height,
-            baseColor: rows[index].color,
+            baseColor: colormap.colorForTask(rows[index].task, rows[index].mode),
             isSelected: rows[index].state.isSelected,
             isRelated: rows[index].state.isRelated,
             isEmphasized: rows[index].state.isSelected || rows[index].state.isEmphasized,

@@ -137,6 +137,36 @@ components:
     textColor: "{colors.foreground}"
     rounded: "{rounded.xl}"
     padding: 16px
+  panel-shell-quiet:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.xl}"
+    border: "none"
+    elevation: "none"
+  workbench-frame:
+    backgroundColor: "{colors.background}"
+    gap: 16px
+    padding: 16px
+  workbench-pane:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.xl}"
+    border: "none"
+  inspector-rail:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.foreground}"
+    paddingX: 12px
+    paddingBottom: 12px
+  inspector-section:
+    backgroundColor: "transparent"
+    dividerColor: "{colors.border-subtle}"
+    paddingY: 16px
+  inspector-soft-card:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.foreground}"
+    rounded: "{rounded.md}"
+    border: "none"
+    padding: 12px
   card:
     backgroundColor: "{colors.surface-1}"
     textColor: "{colors.foreground}"
@@ -316,7 +346,7 @@ Rules:
 - allowed overrides must be explicit CSS variables or geometry fields documented by the pattern
 - forbidden overrides include internal radius, segment typography, divider shadows, and state rules unless the pattern source itself is updated
 
-For swimlane task bars, reuse pattern id `swimlane-task-bar`. The canonical source is the canvas renderer in `patterns/swimlane-task/pattern.js`, aligned to `pypto-swimlane-perf-tool/js/swimlane.js`. Do not rebuild it with DOM/CSS or rewrite segment math, color mixing, border alpha, or label truncation locally.
+For swimlane task bars, reuse pattern id `swimlane-task-bar`. The canonical source is the canvas renderer in `patterns/swimlane-task/pattern.js`, aligned to `pypto-swimlane-perf-tool/js/swimlane.js`. It also owns the shared swimlane task colormap via `PtoSwimlaneTaskPattern.createTaskColormap()`, including stable hash colors for semantic, stitch, engine, and subgraph modes. Do not rebuild it with DOM/CSS or rewrite segment math, color mixing, border alpha, stable hash color, colormap mode rules, or label truncation locally.
 
 For memory hierarchy diagrams, reuse pattern id `memory-architecture-layout`. The canonical source is the hybrid renderer in `patterns/memory-architecture/pattern.js`, extracted from `mem_viewer` DOM, BPG grid logic, and MTE overlay behavior. New hardware pages such as 950B should extend the preset/config surface there instead of copying `mem_viewer/index.html` or redrawing route geometry in page-local code.
 
@@ -328,7 +358,7 @@ For Pass-IR graph nodes, reuse pattern id `pass-ir-graph-node`. The canonical so
 
 Current extraction progress:
 
-- `swimlane-task-bar`: shared canvas renderer registered and previewed
+- `swimlane-task-bar`: shared canvas renderer and task colormap registered and previewed
 - `memory-architecture-layout`: shared full-stage 950B renderer registered and previewed
 - `aic-core-object`: shared config-driven object renderer registered and previewed
 - `aiv-core-object`: shared config-driven object renderer registered and previewed
@@ -406,6 +436,16 @@ Buttons should be grouped into a small, stable set:
 
 Do not invent page-local button archetypes unless they are first proven in preview pages and absorbed into tokens.
 
+### Tabs and Segments
+
+Tabs are navigation, not commit actions.
+
+- Page-level tabs use `.tab-control` and `.tab-control-item`
+- A selected tab uses a neutral elevated surface, not the white primary-action fill
+- In-panel path or mode filters use `.segmented-control.segmented-control-muted`
+- Canvas tools such as `Fit` and zoom values use `.toolbar-control` / `.toolbar-readout`
+- Reserve `.btn-solid` for the single primary workflow commit action
+
 ### Inputs
 
 Inputs must feel like tool inputs, not consumer rounded pills by default.
@@ -425,6 +465,12 @@ All modules should use a consistent shell language:
 - consistent border alpha
 - stable elevation hierarchy
 - similar header/body/footer rhythm
+
+For major workbench regions, prefer `.panel-shell.panel-shell-quiet`: a neutral filled section with no visible border. Use stronger borders only for selected rows, interactive controls, or warnings.
+
+Three-column workbenches should use a filled pane composition: `.workbench-frame` provides page padding and gutters; each column uses `.workbench-pane` or `.panel-shell.panel-shell-quiet` on `--surface-2`. Do not leave side rails visually fused with the black canvas.
+
+Inspector/detail rails should not become stacks of bordered cards. Use `.inspector-rail` as the scroll body, split content with `.inspector-section` dividers, and use `.inspector-soft-card` only for the one or two emphasized blocks inside a section. Status emphasis should be tinted fill plus compact labels/dots, not a full border or inset rail on every card.
 
 ### Code Editors
 

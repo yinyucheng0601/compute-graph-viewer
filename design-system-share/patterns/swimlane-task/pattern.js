@@ -8,14 +8,46 @@
     maxInWidth: 42,
     minOutWidth: 12,
     maxOutWidth: 48,
-    selectedLightenAmount: 28,
-    emphasizedLightenAmount: 14,
-    baseFillAlpha: 0.24,
+    selectedLightenAmount: 14,
+    emphasizedLightenAmount: 8,
+    toneDownRatio: 0.16,
+    toneDownTarget: '#171a20',
+    baseFillAlpha: 0.18,
     borderSelected: 'rgba(255,255,255,0.88)',
-    borderRelated: 'rgba(255,255,255,0.46)',
-    borderDefault: 'rgba(255,255,255,0.16)',
+    borderRelated: 'rgba(255,255,255,0.34)',
+    borderDefault: 'rgba(255,255,255,0.10)',
     textColor: 'rgba(255,255,255,0.92)',
-    topHighlight: 'rgba(255,255,255,0.08)',
+    topHighlight: 'rgba(255,255,255,0.04)',
+  };
+
+  const DEFAULT_STITCH_COLORS = ['#735bb4', '#4d70ba', '#4a9568', '#ba8053', '#45a2ad', '#b46494', '#238fcf', '#c99524'];
+
+  const DEFAULT_LABEL_COLORS = {
+    'Prolog-Quant': '#8d6bc7',
+    'Query-Linear': '#735bb4',
+    'Query-Dequant': '#4d70ba',
+    'Query-Hadamard': '#6f63b8',
+    'Weight-Linear': '#4a9568',
+    'Key-Linear': '#ba8053',
+    'Key-Hadamard': '#c48b60',
+    'Key-LayerNorm': '#b46494',
+    'Key-Rope2D': '#45a2ad',
+    fake: '#6f6a64',
+    unknown: '#6f6a64',
+  };
+
+  const DEFAULT_LANE_KIND_COLORS = {
+    fake: '#6f6a64',
+    aic: '#735bb4',
+    AIC: '#735bb4',
+    aiv: '#4d70ba',
+    AIV: '#4d70ba',
+    aicpu: '#4a9568',
+    AICCtrl: '#4a9568',
+    AICSched: '#4a9568',
+    MTEIn: '#ba8053',
+    MTEOut: '#ba8053',
+    other: '#8c847c',
   };
 
   function buildTaskSegmentSpec(task, widthPx) {
@@ -37,7 +69,8 @@
     const r = Math.min(255, (value >> 16) + amount);
     const g = Math.min(255, ((value >> 8) & 0xff) + amount);
     const b = Math.min(255, (value & 0xff) + amount);
-    return `rgb(${r},${g},${b})`;
+    const toHex = (channel) => Math.round(channel).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 
   function alphaHexColor(color, alpha) {
@@ -57,7 +90,121 @@
     const r = mix(from >> 16, to >> 16);
     const g = mix((from >> 8) & 0xff, (to >> 8) & 0xff);
     const b = mix(from & 0xff, to & 0xff);
-    return `rgb(${r},${g},${b})`;
+    const toHex = (channel) => Math.round(channel).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function stableHash(input) {
+    let hash = 2166136261;
+    const value = String(input || '');
+    for (let i = 0; i < value.length; i += 1) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function hslToHex(hueDegrees, saturationPct, lightnessPct) {
+    const h = (((hueDegrees % 360) + 360) % 360) / 360;
+    const s = Math.max(0, Math.min(1, saturationPct / 100));
+    const l = Math.max(0, Math.min(1, lightnessPct / 100));
+    const hue2rgb = (p, q, t) => {
+      let next = t;
+      if (next < 0) next += 1;
+      if (next > 1) next -= 1;
+      if (next < 1 / 6) return p + (q - p) * 6 * next;
+      if (next < 1 / 2) return q;
+      if (next < 2 / 3) return p + (q - p) * (2 / 3 - next) * 6;
+      return p;
+    };
+
+    let r;
+    let g;
+    let b;
+    if (s === 0) {
+      r = l;
+      g = l;
+      b = l;
+    } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1 / 3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1 / 3);
+    }
+
+    const toHex = (value) => Math.round(value * 255).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function hashColor(input, saturation = 46, lightness = 48) {
+    return hslToHex(stableHash(input) % 360, saturation, lightness);
+  }
+
+  function normalizeTaskColorKey(task) {
+    return String(
+      task?.colorKey ||
+      task?.opType ||
+      task?.label ||
+      task?.displayName ||
+      task?.rawName ||
+      task?.opName ||
+      'unknown'
+    );
+  }
+
+  function createTaskColormap(options = {}) {
+    const stitchColors = options.stitchColors || DEFAULT_STITCH_COLORS;
+    const labelColors = {
+      ...DEFAULT_LABEL_COLORS,
+      ...(options.labelColors || {}),
+    };
+    const laneKindColors = {
+      ...DEFAULT_LANE_KIND_COLORS,
+      ...(options.laneKindColors || {}),
+    };
+    const semanticAliases = options.semanticAliases || {};
+    const saturation = options.saturation ?? 46;
+    const lightness = options.lightness ?? 48;
+    const subgraphSaturation = options.subgraphSaturation ?? 48;
+    const subgraphLightness = options.subgraphLightness ?? 48;
+
+    const normalizeSemanticKey = (task) => {
+      const key = normalizeTaskColorKey(task);
+      return semanticAliases[key] || key;
+    };
+
+    return {
+      colorForLaneKind(kind) {
+        return laneKindColors[kind] || laneKindColors.other;
+      },
+      colorForTask(task, mode = 'semantic') {
+        if (mode === 'stitch') {
+          const index = Math.abs(task?.seqNo || task?.sequence || 0) % stitchColors.length;
+          return stitchColors[index];
+        }
+        if (mode === 'engine') {
+          return this.colorForLaneKind(task?.laneKind || task?.lane?.kind);
+        }
+        if (mode === 'subgraph') {
+          const key = task?.subgraphKey || task?.subGraphId || task?.leafHash || normalizeSemanticKey(task);
+          return hashColor(key, subgraphSaturation, subgraphLightness);
+        }
+        const key = normalizeSemanticKey(task);
+        return labelColors[key] || hashColor(key, saturation, lightness);
+      },
+      legendForKeys(keys, mode = 'semantic') {
+        return keys.map((item) => {
+          const key = typeof item === 'string' ? item : item.key;
+          const label = typeof item === 'string' ? item : (item.label || item.key);
+          return {
+            key,
+            label,
+            color: this.colorForTask({ colorKey: key, label: key }, mode),
+          };
+        });
+      },
+    };
   }
 
   function resolveDisplayColor(baseColor, options = {}) {
@@ -85,6 +232,7 @@
       isSelected: options.isSelected,
       isEmphasized: options.isEmphasized,
     });
+    const tonedColor = mixHexColors(displayColor, DEFAULTS.toneDownTarget, DEFAULTS.toneDownRatio);
     const borderColor = resolveBorderColor({
       isSelected: options.isSelected,
       isRelated: options.isRelated,
@@ -99,13 +247,13 @@
     ctx.roundRect(barX, barY, width, height, radius + 1);
     ctx.clip();
 
-    ctx.fillStyle = alphaHexColor(displayColor, DEFAULTS.baseFillAlpha);
+    ctx.fillStyle = alphaHexColor(tonedColor, DEFAULTS.baseFillAlpha);
     ctx.fillRect(barX, barY, width, height);
 
     [
-      { x: barX, w: inW, fill: mixHexColors(displayColor, '#ffffff', 0.16) },
-      { x: barX + inW, w: computeW, fill: displayColor },
-      { x: barX + inW + computeW, w: outW, fill: mixHexColors(displayColor, '#0b0f17', 0.2) },
+      { x: barX, w: inW, fill: mixHexColors(tonedColor, '#ffffff', 0.10) },
+      { x: barX + inW, w: computeW, fill: tonedColor },
+      { x: barX + inW + computeW, w: outW, fill: mixHexColors(tonedColor, '#0b0f17', 0.18) },
     ].forEach((segment) => {
       if (segment.w <= 0) return;
       ctx.fillStyle = segment.fill;
@@ -125,6 +273,7 @@
     if (width < 28) {
       return {
         displayColor,
+        tonedColor,
         borderColor,
         segmentWidths: { inW, computeW, outW },
       };
@@ -164,6 +313,7 @@
 
     return {
       displayColor,
+      tonedColor,
       borderColor,
       segmentWidths: { inW, computeW, outW },
     };
@@ -175,6 +325,10 @@
     lightenHexColor,
     alphaHexColor,
     mixHexColors,
+    stableHash,
+    hslToHex,
+    hashColor,
+    createTaskColormap,
     resolveDisplayColor,
     resolveBorderColor,
     drawTaskBar,

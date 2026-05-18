@@ -1,0 +1,3660 @@
+<!DOCTYPE html>
+<!--
+  PyPTOUX prototype bundle
+  source: /Users/wny/Documents/1 项目 Projects/PyPTOUX/05-prototypes/06-a5-pmu-visualization/experiments/group2-loop
+  built : 2026-05-13 11:23:45
+  level : L3 demo · exploration-only
+  built-by: 06-tools/01-prototype-kit/converters/prototype-bundler
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>A5 PMU · Group 2 Pipeline Balance · Diagnosis Loop</title>
+
+<link rel="stylesheet" href="../design-system-share/tokens/foundation.css">
+<link rel="stylesheet" href="../design-system-share/tokens/semantic.css">
+<link rel="stylesheet" href="../design-system-share/tokens/components.css">
+<link rel="stylesheet" href="../design-system-share/css/style.css">
+<script src="../design-system-share/patterns/swimlane-task/pattern.js"></script>
+
+<style data-bundled-from="styles/tokens.css">
+/* ===================================================================
+ * A5 PMU Group 2 · Design Tokens
+ * 参考 05-prototypes/05-pypto-studio 深色专业工具风格
+ * =================================================================== */
+
+:root {
+  /* PTO design-system bridge: all neutral UI surfaces route through shared tokens. */
+  --bg-base: var(--background);
+  --bg-elev-1: var(--background-elevated);
+  --bg-elev-2: var(--surface-1);
+  --bg-elev-3: var(--surface-2);
+  --bg-elev-4: var(--surface-3);
+  --bg-hover: var(--state-hover);
+  --border: var(--border-subtle);
+
+  --text-primary: var(--foreground);
+  --text-secondary: var(--foreground-secondary);
+  --text-tertiary: var(--foreground-muted);
+  --text-muted: var(--foreground-disabled);
+
+  /* Shared semantic status aliases. */
+  --green: var(--success);
+  --green-dim: color-mix(in srgb, var(--success) 15%, transparent);
+  --green-strong: color-mix(in srgb, var(--success) 30%, transparent);
+  --yellow: var(--warning);
+  --yellow-dim: color-mix(in srgb, var(--warning) 15%, transparent);
+  --yellow-strong: color-mix(in srgb, var(--warning) 30%, transparent);
+  --red: var(--danger);
+  --red-dim: color-mix(in srgb, var(--danger) 15%, transparent);
+  --red-strong: color-mix(in srgb, var(--danger) 28%, transparent);
+  --blue: var(--primary);
+  --blue-dim: color-mix(in srgb, var(--primary) 15%, transparent);
+  --blue-strong: color-mix(in srgb, var(--primary) 30%, transparent);
+
+  /* Data-viz-only PMU hues: lane, counter-family, graph, and hardware-path encodings. */
+  --purple: #bc8cff;
+  --purple-dim: rgba(188,140,255,0.15);
+  --purple-strong: rgba(188,140,255,0.30);
+  --orange: #db6d28;
+  --orange-dim: rgba(219,109,40,0.15);
+  --pink: #f778ba;
+  --pink-dim: rgba(247,120,186,0.13);
+  --cyan: #39d0d8;
+  --cyan-dim: rgba(57,208,216,0.15);
+  --indigo: #7c8cff;
+  --teal: #2dc7a2;
+  --amber: #e3a93a;
+  --coral: #ff8a65;
+  --magenta: #d971e0;
+
+  /* group-2 composition coloring (mix mode · 微观) — by counter family */
+  --c-compute: #6f7dd0;   /* cube + vec busy */
+  --c-scalar: #6f7680;
+  --c-mte1: #2ea68e;
+  --c-mte2: #c59142;
+  --c-mte3: #c87555;
+  --c-fixpipe: #b86bc2;
+  --c-uncovered: #d76060; /* wait suspect (striped) */
+  --c-overlap: #9a78c9;   /* overlap suspect (striped) */
+
+  /* lane group tints */
+  --lane-tint-cpu: rgba(88,166,255,0.06);
+  --lane-tint-aic: rgba(188,140,255,0.05);
+  --lane-tint-aiv: rgba(247,120,186,0.04);
+  --lane-tint-mte: rgba(219,109,40,0.06);
+  --lane-tint-wrap-odd: rgba(63,185,80,0.03);
+  --lane-tint-wrap-even: rgba(188,140,255,0.04);
+  --lane-tint-wrap-critical: rgba(227,169,58,0.10);
+
+  /* sizes */
+  --topbar-h: 50px;
+  --lane-h: 14px;
+  --lane-label-w: 110px;
+  --left-w: 280px;
+  --right-w: 400px;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-ui: var(--font-sans);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+code, .mono { font-family: var(--font-mono); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--bg-elev-3); border-radius: 4px; border: 2px solid var(--bg-base); }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-elev-4); }
+
+.ok { color: var(--green); }
+.warn-fg { color: var(--yellow); }
+.bad { color: var(--red); }
+.muted { color: var(--text-tertiary); }
+
+/* Buttons use design-system-share .btn / .btn-solid / .btn-ghost. */
+.btn .ico { font-family: var(--font-mono); font-weight: 700; opacity: 0.9; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 var(--yellow-strong); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+</style>
+<style data-bundled-from="styles/layout.css">
+/* ===================================================================
+ * Layout · topbar + 3-pane workspace
+ * =================================================================== */
+
+/* ---------- Top bar ---------- */
+.topbar {
+  height: var(--topbar-h);
+  flex: 0 0 var(--topbar-h);
+  background: var(--bg-elev-1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.topbar > * { flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 10px; padding-right: 12px; border-right: 1px solid var(--border); }
+.brand-logo {
+  width: 26px; height: 26px;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  color: var(--background);
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.brand-name { font-weight: 600; font-size: 13px; letter-spacing: 0; }
+.brand-name .secondary { color: var(--text-tertiary); font-weight: 400; margin-left: 6px; font-size: 11px; }
+
+.session-info {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.session-info .kernel-name { color: var(--text-primary); font-family: var(--font-mono); }
+.session-info .sep { color: var(--text-muted); }
+.session-info .mono { color: var(--text-secondary); }
+
+.ctrl-group {
+  display: flex; align-items: center; gap: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+  height: 30px;
+}
+.ctrl-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+.ctrl-select {
+  min-height: var(--input-height-md);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  padding: 0 var(--space-3);
+  border-radius: var(--input-radius);
+  font-size: 12px;
+}
+
+.group-tabs { display: inline-flex; gap: var(--segmented-control-gap); }
+.group-tab {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  position: relative;
+}
+.group-tab[data-sampled="true"]:not(.is-selected)::after {
+  content: '●';
+  position: absolute;
+  top: -2px; right: -3px;
+  font-size: 8px;
+  color: var(--green);
+}
+.group-tab[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mix-toggle {
+  min-height: var(--button-height-sm);
+  gap: var(--space-2);
+  padding-left: var(--space-1);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+}
+.mix-toggle .mix-knob {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  transition: all 0.18s ease;
+}
+.mix-toggle[data-on="true"] {
+  background: var(--yellow-dim);
+  border-color: var(--yellow-strong);
+  color: var(--yellow);
+}
+.mix-toggle[data-on="true"] .mix-knob { background: var(--yellow); }
+
+.topbar-spacer { flex: 1; }
+
+.health-pill {
+  display: flex; align-items: center; gap: 8px;
+  min-height: var(--tag-height);
+  padding: 4px var(--space-3);
+  background: var(--comp-tag-bg);
+  border: 1px solid var(--comp-tag-border);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+}
+.hp-item { display: inline-flex; gap: 6px; align-items: center; }
+.hp-k { color: var(--text-tertiary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.hp-v { color: var(--text-primary); }
+.hp-v.ok { color: var(--green); }
+.hp-sep { color: var(--text-muted); }
+
+/* ---------- Workspace ---------- */
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--left-w) minmax(0, 1fr) var(--right-w);
+  gap: var(--workbench-frame-gap);
+  padding: var(--workbench-frame-padding);
+  background: var(--background);
+  min-height: 0;
+}
+.left-panel,
+.right-panel,
+.center-panel {
+  min-width: 0;
+  min-height: 0;
+  background: var(--workbench-pane-bg);
+  border: 0;
+  border-radius: var(--workbench-pane-radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.left-panel { border-right: 0; }
+.right-panel { border-left: 0; }
+
+</style>
+<style data-bundled-from="styles/swimlane.css">
+/* ===================================================================
+ * Swimlane area · 78 lanes scrollable
+ * =================================================================== */
+
+.sl-toolbar {
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: transparent;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.sl-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.sl-legend {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.sl-legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sl-legend .lg-sw {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  flex: 0 0 auto;
+}
+.sl-tools { display: flex; align-items: center; gap: 2px; }
+.sl-tool {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.sl-zoom-val { width: 36px; text-align: center; color: var(--text-secondary); font-size: 11px; }
+
+.swimlane-host {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: var(--workbench-pane-body-bg);
+}
+
+.sl-svg { display: block; }
+
+/* lane label column (fixed left via separate <g>) */
+.sl-lane-label {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  user-select: none;
+  dominant-baseline: central;
+}
+.sl-lane-label.is-section { fill: var(--text-primary); font-weight: 600; }
+.sl-lane-label.is-aic { fill: var(--purple); }
+.sl-lane-label.is-aiv { fill: var(--pink); }
+.sl-lane-label.is-mte { fill: var(--orange); }
+.sl-lane-label.is-cpu { fill: var(--blue); }
+
+/* lane row background */
+.sl-lane-bg { fill: transparent; }
+.sl-lane-bg.is-wrap-odd { fill: var(--lane-tint-wrap-odd); }
+.sl-lane-bg.is-wrap-even { fill: var(--lane-tint-wrap-even); }
+.sl-lane-bg.is-wrap-critical { fill: var(--lane-tint-wrap-critical); }
+.sl-lane-bg.is-cpu-section { fill: var(--lane-tint-cpu); }
+.sl-lane-bg.is-mte-section { fill: var(--lane-tint-mte); }
+
+/* divider line between sections */
+.sl-section-divider { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 3; }
+
+/* wrap-block label tab (mix mode) */
+.sl-wrap-tab {
+  fill: var(--bg-elev-2);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.sl-wrap-tab.is-critical { fill: var(--yellow-dim); stroke: var(--yellow-strong); }
+.sl-wrap-tab-text {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+.sl-wrap-tab-text.is-critical { fill: var(--yellow); }
+
+/* task bar */
+.sl-task-pattern {
+  pointer-events: none;
+}
+.sl-task {
+  cursor: pointer;
+  transition: filter 0.1s;
+  fill: transparent;
+}
+.sl-task:hover { filter: brightness(1.12); }
+.sl-task.is-selected { stroke: var(--text-primary); stroke-width: 1.5; }
+.sl-task.is-critical { stroke: var(--yellow); stroke-width: 1; }
+.sl-task.is-suspect-wait { stroke: var(--red); stroke-width: 1; }
+.sl-task.is-suspect-overlap { stroke: var(--purple); stroke-width: 1; }
+
+/* task internal composition segments (mix mode) */
+.sl-seg { pointer-events: none; }
+.sl-seg-uncovered {
+  fill: var(--c-uncovered);
+  fill-opacity: 0.35;
+}
+.sl-seg-overlap {
+  fill: var(--c-overlap);
+  fill-opacity: 0.30;
+}
+
+/* task name label */
+.sl-task-name {
+  fill: var(--background);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+  dominant-baseline: central;
+  letter-spacing: -0.2px;
+}
+.sl-task-name.is-dark-bg { fill: var(--text-primary); }
+
+/* time-axis grid */
+.sl-axis-tick { stroke: var(--border); stroke-width: 0.5; }
+.sl-axis-label {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-anchor: middle;
+}
+
+/* badge (gap / overlap / accounted) — small icon at task right edge */
+.sl-badge {
+  pointer-events: none;
+}
+.sl-badge-r { fill: var(--bg-elev-1); stroke-width: 0.75; }
+.sl-badge-r.wait { stroke: var(--red); fill: var(--red-dim); }
+.sl-badge-r.overlap { stroke: var(--purple); fill: var(--purple-dim); }
+.sl-badge-r.accounted { stroke: var(--green); fill: var(--green-dim); }
+.sl-badge-t {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  dominant-baseline: central;
+  text-anchor: middle;
+}
+.sl-badge-t.wait { fill: var(--red); }
+.sl-badge-t.overlap { fill: var(--purple); }
+.sl-badge-t.accounted { fill: var(--green); }
+
+/* marker (top of swimlane area) */
+.sl-marker {
+  cursor: pointer;
+}
+.sl-marker-shape {
+  fill: var(--yellow);
+  stroke: var(--bg-base);
+  stroke-width: 1.5;
+}
+.sl-marker.is-wait .sl-marker-shape { fill: var(--red); }
+.sl-marker.is-overlap .sl-marker-shape { fill: var(--purple); }
+.sl-marker.is-hw .sl-marker-shape { fill: var(--cyan); }
+.sl-marker.is-critical .sl-marker-shape { fill: var(--yellow); }
+
+/* tooltip */
+.sl-tooltip {
+  position: absolute;
+  display: none;
+  background: var(--bg-elev-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 11px;
+  z-index: 12;
+  pointer-events: none;
+  box-shadow: var(--shadow-md);
+  min-width: 220px;
+  max-width: 340px;
+}
+.sl-tooltip.visible { display: block; animation: fade-in 0.1s ease; }
+.tt-op {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.5;
+}
+.tt-k { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+.tt-v { color: var(--text-primary); font-family: var(--font-mono); }
+.tt-mini-bar {
+  margin-top: 4px;
+  display: flex;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+.tt-mini-bar > span { display: block; height: 100%; }
+
+</style>
+<style data-bundled-from="styles/panel.css">
+/* ===================================================================
+ * Side panels · Immediate Attention (left) + Detail Panel (right)
+ * =================================================================== */
+
+.panel-head {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+}
+.panel-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+.panel-headline {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.panel-headline .mono { font-family: var(--font-mono); }
+
+.panel-body {
+  flex: 1;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: auto;
+  background: var(--workbench-pane-body-bg);
+}
+.right-panel .panel-body {
+  gap: 0;
+  padding: 0 var(--inspector-rail-padding-x) var(--inspector-rail-padding-bottom);
+}
+
+/* ----- Summary panel cards ----- */
+.sum-card {
+  background: var(--inspector-soft-card-bg);
+  border: 0;
+  border-radius: var(--inspector-soft-card-radius);
+  padding: var(--inspector-soft-card-padding);
+}
+.sum-card.is-critical {
+  background: color-mix(in srgb, var(--warning) 8%, var(--inspector-soft-card-bg));
+}
+.sum-card.is-wait {
+  background: color-mix(in srgb, var(--danger) 8%, var(--inspector-soft-card-bg));
+}
+.sum-card.is-overlap {
+  background: color-mix(in srgb, var(--purple) 8%, var(--inspector-soft-card-bg));
+}
+.sum-card.is-suggestion {
+  background: color-mix(in srgb, var(--primary) 8%, var(--inspector-soft-card-bg));
+}
+
+.sum-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sum-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); }
+.sum-card.is-wait .sum-eyebrow .dot { background: var(--red); }
+.sum-card.is-overlap .sum-eyebrow .dot { background: var(--purple); }
+.sum-card.is-suggestion .sum-eyebrow .dot { background: var(--blue); }
+
+.sum-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+}
+.sum-desc {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+}
+.sum-row .k { color: var(--text-tertiary); }
+.sum-row .v { color: var(--text-primary); }
+.sum-action {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+/* ----- Top-wraps list ----- */
+.wrap-rank-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wrap-rank-list li {
+  display: grid;
+  grid-template-columns: 56px 1fr 50px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.wrap-rank-list li:hover { background: var(--state-hover); }
+.wrap-rank-list li:last-child { border-bottom: none; }
+.wr-name { font-family: var(--font-mono); color: var(--text-primary); }
+.wr-counter { color: var(--text-secondary); font-family: var(--font-mono); font-size: 10.5px; }
+.wr-ratio { font-family: var(--font-mono); text-align: right; font-weight: 600; }
+.wr-ratio.high { color: var(--red); }
+.wr-ratio.mid { color: var(--yellow); }
+.wr-ratio.low { color: var(--green); }
+
+/* ----- Detail panel ----- */
+.dp-empty {
+  padding: 32px 22px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.dp-empty .ico { font-size: 28px; opacity: 0.4; margin-bottom: 10px; display: block; }
+
+.dp-section {
+  margin-bottom: 0;
+  padding: var(--inspector-section-padding-y) 0;
+  border-top: 1px solid var(--inspector-section-divider);
+}
+.panel-body > .dp-section:first-child { border-top: 0; }
+.dp-section:last-child { margin-bottom: 0; }
+
+.dp-conclusion {
+  padding: var(--inspector-soft-card-padding);
+  background: var(--inspector-soft-card-bg);
+  border: 0;
+  border-radius: var(--inspector-soft-card-radius);
+}
+.dp-conclusion.is-wait {
+  background: color-mix(in srgb, var(--danger) 8%, var(--inspector-soft-card-bg));
+}
+.dp-conclusion.is-overlap {
+  background: color-mix(in srgb, var(--purple) 8%, var(--inspector-soft-card-bg));
+}
+.dp-conclusion.is-accounted {
+  background: color-mix(in srgb, var(--success) 8%, var(--inspector-soft-card-bg));
+}
+.dp-conclusion-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+.dp-conclusion-badge.wait { background: var(--red-dim); color: var(--red); }
+.dp-conclusion-badge.overlap { background: var(--purple-dim); color: var(--purple); }
+.dp-conclusion-badge.accounted { background: var(--green-dim); color: var(--green); }
+.dp-conclusion-text {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+.dp-conclusion-text .mono { color: var(--text-primary); font-family: var(--font-mono); }
+
+.dp-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+/* counter breakdown */
+.cb-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-elev-2);
+  margin-bottom: 8px;
+  position: relative;
+}
+.cb-bar > span { display: block; height: 100%; }
+.cb-total-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+}
+.cb-total-tag {
+  position: absolute;
+  top: -16px;
+  transform: translateX(-50%);
+  background: var(--bg-elev-3);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.cb-rows { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 4px 8px; align-items: center; }
+.cb-rows .sw { width: 10px; height: 10px; border-radius: 2px; }
+.cb-rows .name { font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+.cb-rows .name.is-dominant { color: var(--text-primary); font-weight: 700; }
+.cb-rows .val { font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); text-align: right; }
+.cb-rows .pct { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-tertiary); text-align: right; }
+.cb-rows .name.is-event { color: var(--text-tertiary); font-style: italic; }
+
+/* derived metric chips */
+.dp-derived {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--state-muted);
+  border: 0;
+  border-radius: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+.dp-chip .k { color: var(--text-tertiary); }
+.dp-chip .v { color: var(--text-primary); }
+.dp-chip.is-bad {
+  background: color-mix(in srgb, var(--danger) 10%, var(--state-muted));
+  color: var(--red);
+}
+.dp-chip.is-bad .v { color: var(--red); }
+.dp-chip.is-ok {
+  background: color-mix(in srgb, var(--success) 10%, var(--state-muted));
+  color: var(--green);
+}
+.dp-chip.is-warn {
+  background: color-mix(in srgb, var(--warning) 10%, var(--state-muted));
+  color: var(--yellow);
+}
+
+/* hardware path summary */
+.hw-summary {
+  background: var(--inspector-soft-card-bg);
+  border: 0;
+  border-radius: var(--inspector-soft-card-radius);
+  padding: var(--inspector-soft-card-padding);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+.hw-summary .hw-pipe {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--cyan-dim);
+  border: 0;
+  color: var(--cyan);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  margin: 0 2px;
+}
+
+/* peer-task list */
+.peer-list { display: flex; flex-direction: column; gap: 4px; }
+.peer-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 50px 56px;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--inspector-soft-card-bg);
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+}
+.peer-row:hover { background: var(--inspector-soft-card-bg-hover); }
+.peer-row.is-self {
+  background: color-mix(in srgb, var(--primary) 8%, var(--inspector-soft-card-bg));
+}
+.peer-lane { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-tertiary); }
+.peer-op { font-family: var(--font-mono); color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peer-end { font-family: var(--font-mono); color: var(--text-secondary); text-align: right; }
+.peer-status { font-family: var(--font-mono); font-size: 10px; text-align: right; }
+.peer-status.wait { color: var(--red); }
+.peer-status.overlap { color: var(--purple); }
+.peer-status.ok { color: var(--green); }
+
+/* jump actions */
+.dp-jumps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.dp-jump-btn {
+  padding: var(--space-2) 10px;
+  background: var(--inspector-soft-card-bg);
+  border: 0;
+  border-radius: var(--inspector-soft-card-radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition: all 0.12s;
+}
+.dp-jump-btn:hover {
+  background: var(--inspector-soft-card-bg-hover);
+}
+.dp-jump-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+.dp-jump-btn:disabled:hover {
+  background: var(--inspector-soft-card-bg);
+  box-shadow: none;
+}
+.dp-jump-ico {
+  width: 24px; height: 24px;
+  background: var(--bg-elev-3);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--blue);
+  flex: 0 0 24px;
+}
+.dp-jump-meta { display: flex; flex-direction: column; min-width: 0; }
+.dp-jump-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.dp-jump-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* next-collection suggestion */
+.next-suggest {
+  background: color-mix(in srgb, var(--primary) 8%, var(--inspector-soft-card-bg));
+  border: 0;
+  border-radius: var(--inspector-soft-card-radius);
+  padding: var(--inspector-soft-card-padding);
+}
+.next-suggest-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blue);
+  margin-bottom: 5px;
+}
+.next-suggest-text {
+  font-size: 11.5px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.next-suggest-cmd {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  font-family: var(--font-mono);
+}
+.next-suggest-cmd .cmd {
+  flex: 1;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  border: 0;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-primary);
+}
+.next-suggest-cmd .copy {
+  min-height: auto;
+  font-family: var(--font-mono);
+}
+
+</style>
+<style data-bundled-from="styles/modal.css">
+/* ===================================================================
+ * Modal · jump destinations (source / CALL / Block Graph / HW path)
+ * =================================================================== */
+
+.modal-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+.modal-root.is-open { pointer-events: auto; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 12, 0.62);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.14s ease;
+}
+
+.modal-window {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-elev-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 820px;
+  max-width: 92vw;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slide-up 0.22s ease;
+}
+
+.modal-head {
+  flex: 0 0 auto;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev-2);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.modal-kicker {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--blue);
+  font-weight: 700;
+}
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.modal-sub {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+.modal-head-spacer { flex: 1; }
+.modal-close {
+  width: 28px; height: 28px;
+  font-size: 16px;
+}
+
+.modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+  min-height: 240px;
+}
+
+/* ----- Source view ----- */
+.src-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  margin-bottom: 10px;
+}
+.src-meta .k { color: var(--text-tertiary); margin-right: 4px; }
+.src-code {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.src-line {
+  display: flex;
+  gap: 14px;
+  padding: 1px 14px;
+}
+.src-line .ln {
+  flex: 0 0 36px;
+  color: var(--text-muted);
+  text-align: right;
+  user-select: none;
+}
+.src-line .code-text {
+  white-space: pre;
+  color: var(--text-secondary);
+}
+.src-line.is-hot {
+  background: var(--yellow-dim);
+  border-left: 3px solid var(--yellow);
+  padding-left: 11px;
+}
+.src-line.is-hot .ln { color: var(--yellow); font-weight: 700; }
+.src-line.is-hot .code-text { color: var(--text-primary); }
+.src-line.is-range {
+  background: var(--bg-elev-1);
+}
+.src-tok-keyword { color: var(--purple); }
+.src-tok-type { color: var(--cyan); }
+.src-tok-fn { color: var(--blue); }
+.src-tok-num { color: var(--orange); }
+.src-tok-str { color: var(--green); }
+.src-tok-comment { color: var(--text-muted); font-style: italic; }
+
+/* ----- CALL view ----- */
+.call-tree {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.call-node {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.call-node .branch {
+  color: var(--text-muted);
+  font-weight: 400;
+  user-select: none;
+}
+.call-node .op { color: var(--blue); font-weight: 600; }
+.call-node .magic { color: var(--text-tertiary); font-size: 10.5px; }
+.call-node .meta { color: var(--text-tertiary); font-size: 10.5px; }
+.call-node.is-target {
+  background: var(--blue-dim);
+  border-left: 3px solid var(--blue);
+}
+.call-node.is-target .op { color: var(--text-primary); }
+.call-node.is-target .magic { color: var(--blue); }
+
+/* ----- Block Graph view ----- */
+.bg-canvas {
+  display: block;
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.bg-node {
+  fill: var(--bg-elev-2);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  cursor: pointer;
+  transition: fill 0.12s;
+}
+.bg-node:hover { fill: var(--bg-elev-3); }
+.bg-node.is-target {
+  fill: var(--yellow-dim);
+  stroke: var(--yellow);
+  stroke-width: 2;
+}
+.bg-node.is-related {
+  fill: var(--blue-dim);
+  stroke: var(--blue);
+}
+.bg-node-text {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.bg-node-sub {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.bg-edge {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+.bg-edge.is-hot { stroke: var(--yellow); stroke-width: 2; }
+.bg-legend {
+  margin-top: 12px;
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.bg-legend .sw {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.bg-legend .sw.is-target { background: var(--yellow-dim); border: 1px solid var(--yellow); }
+.bg-legend .sw.is-related { background: var(--blue-dim); border: 1px solid var(--blue); }
+.bg-legend .sw.is-normal { background: var(--bg-elev-2); border: 1px solid var(--border-strong); }
+
+/* ----- Hardware path view ----- */
+.hw-canvas-wrap {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  min-height: 360px;
+}
+.hw-canvas {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: block;
+}
+.hw-node {
+  stroke-width: 1;
+  cursor: pointer;
+  transition: stroke 0.12s, stroke-width 0.12s;
+}
+.hw-node.is-aic { fill: rgba(188,140,255,0.10); stroke: var(--purple); }
+.hw-node.is-aiv { fill: rgba(247,120,186,0.08); stroke: var(--pink); }
+.hw-node.is-storage { fill: var(--bg-elev-2); stroke: var(--border-strong); }
+.hw-node.is-compute { fill: rgba(124,140,255,0.12); stroke: var(--indigo); }
+.hw-node.is-mte { fill: rgba(57,208,216,0.10); stroke: var(--cyan); }
+.hw-node.is-fix { fill: rgba(217,113,224,0.12); stroke: var(--magenta); }
+.hw-node.is-highlight {
+  stroke: var(--yellow);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 8px rgba(227,169,58,0.5));
+}
+.hw-edge {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+.hw-edge.is-hot { stroke: var(--yellow); stroke-width: 2; }
+.hw-label {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.hw-sub {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+.hw-rail {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  overflow: auto;
+}
+.hw-rail-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.hw-rail-counter {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.hw-rail-counter:last-child { border-bottom: none; }
+.hw-rail-counter .n { color: var(--text-secondary); }
+.hw-rail-counter .v { color: var(--text-primary); font-weight: 600; }
+.hw-rail-counter.is-dominant { background: var(--yellow-dim); padding-left: 6px; padding-right: 6px; margin: 0 -6px; border-radius: 2px; }
+.hw-rail-counter.is-dominant .n { color: var(--yellow); }
+
+.hw-explain {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.hw-explain b { color: var(--text-primary); }
+
+/* ----- Toast (copy feedback) ----- */
+.toast-root {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-elev-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  animation: slide-up 0.2s ease;
+  margin-top: 6px;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ===================== Top Bar ===================== -->
+<header class="topbar" id="topbar">
+  <div class="brand">
+    <div class="brand-logo">A5</div>
+    <div class="brand-name">PMU Diagnostic Workbench<span class="secondary">v0.1 · L3 demo</span></div>
+  </div>
+
+  <div class="session-info">
+    <span class="kernel-name">run_dav3510_matmul_2026_05_10</span>
+    <span class="sep">·</span>
+    <span class="mono">trace #c4a7e21</span>
+  </div>
+
+  <div class="ctrl-group" id="chip-group">
+    <label class="ctrl-label">Chip</label>
+    <select class="ctrl-select mono" id="chip-select">
+      <option value="dav_3510" selected>A5 / dav_3510</option>
+      <option value="dav_2201" disabled>dav_2201 (coming soon)</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group" id="group-group">
+    <label class="ctrl-label">PMU Group</label>
+    <div class="group-tabs segmented-control segmented-control-muted" id="group-tabs"><!-- populated by topbar.js --></div>
+  </div>
+
+  <div class="ctrl-group">
+    <label class="ctrl-label">Mix Mode</label>
+    <button class="btn btn-sm mix-toggle" id="mix-toggle" data-on="false">
+      <span class="mix-knob"></span>
+      <span class="mix-label">OFF</span>
+    </button>
+  </div>
+
+  <div class="topbar-spacer"></div>
+
+  <div class="health-pill" id="health-pill">
+    <span class="hp-item"><span class="hp-k">sampled</span><span class="hp-v ok mono">group 2</span></span>
+    <span class="hp-sep">·</span>
+    <span class="hp-item"><span class="hp-k">tasks</span><span class="hp-v mono" id="hp-task-count">—</span></span>
+    <span class="hp-sep">·</span>
+    <span class="hp-item"><span class="hp-k">wraps</span><span class="hp-v mono">24</span></span>
+  </div>
+</header>
+
+<!-- ===================== Workspace ===================== -->
+<main class="workspace workbench-frame">
+
+  <!-- LEFT: Immediate Attention -->
+  <aside class="left-panel workbench-pane panel-shell-quiet" id="summary-panel">
+    <!-- populated by summary.js -->
+  </aside>
+
+  <!-- CENTER: Swimlane -->
+  <section class="center-panel workbench-pane panel-shell-quiet">
+    <div class="sl-toolbar">
+      <div class="sl-title" id="sl-title">Pipeline Balance · 默认顺序</div>
+      <div class="sl-legend" id="sl-legend"><!-- populated by swimlane.js --></div>
+      <div class="sl-tools">
+        <button class="btn btn-ghost btn-icon btn-sm sl-tool" id="sl-zoom-out" title="缩小">−</button>
+        <span class="sl-zoom-val mono" id="sl-zoom-val">1.0×</span>
+        <button class="btn btn-ghost btn-icon btn-sm sl-tool" id="sl-zoom-in" title="放大">+</button>
+        <button class="btn btn-ghost btn-icon btn-sm sl-tool" id="sl-fit" title="重置">⤢</button>
+      </div>
+    </div>
+    <div class="swimlane-host workbench-pane-body-fill" id="swimlane-host">
+      <!-- populated by swimlane.js -->
+    </div>
+  </section>
+
+  <!-- RIGHT: Detail Panel -->
+  <aside class="right-panel workbench-pane panel-shell-quiet" id="detail-panel">
+    <!-- populated by detail-panel.js -->
+  </aside>
+
+</main>
+
+<!-- ===================== Modal mount ===================== -->
+<div class="modal-root" id="modal-root"></div>
+<div class="toast-root" id="toast-root"></div>
+
+
+<script type="module" data-bundled-entry="js/main.js">
+const __PYPTOUX_MODULES__ = {};
+
+/* === inlined module: js/data/tasks.js === */
+(function(__exports){
+// L3 demo data — exploration-only. Replace with Codex L2 before share-safe.
+// 78 lanes: 1 AI CPU Ctrl + 3 AI CPU Sched + 24 AIC + 48 AIV + mte_in + mte_out.
+// Time unit: µs.
+
+// ---------- seeded RNG ----------
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(20260512);
+const rand = (lo, hi) => lo + (hi - lo) * rng();
+const irand = (lo, hi) => Math.floor(rand(lo, hi + 1));
+const pick = arr => arr[Math.floor(rng() * arr.length)];
+
+// ---------- timeline ----------
+const TIMELINE = {
+  startUs: 0,
+  endUs: 10000,
+};
+
+// ---------- Wraps ----------
+// Wrap k pairs AIC k with AIV (2k-1) and AIV (2k). k = 1..24.
+const NUM_WRAPS = 24;
+const WRAPS = Array.from({ length: NUM_WRAPS }, (_, i) => {
+  const k = i + 1;
+  return {
+    id: `wrap-${k}`,
+    index: k,
+    aicLaneId: `aic-${k}`,
+    aivLaneIds: [`aiv-${2 * k - 1}`, `aiv-${2 * k}`],
+  };
+});
+
+// 3 critical wraps with hand-tuned signatures
+const CRITICAL_WRAPS = new Set(['wrap-7', 'wrap-12', 'wrap-19']);
+
+// ---------- Lanes ----------
+const LANES = [];
+LANES.push({ id: 'cpu-ctrl', kind: 'AICCtrl', label: 'AI CPU Ctrl', index: 0 });
+for (let i = 1; i <= 3; i++) LANES.push({ id: `cpu-sched-${i}`, kind: 'AICSched', label: `AI CPU Sched ${i}`, index: i });
+for (let k = 1; k <= NUM_WRAPS; k++) LANES.push({ id: `aic-${k}`, kind: 'AIC', label: `AIC ${k}`, index: k, wrapId: `wrap-${k}` });
+for (let v = 1; v <= 48; v++) {
+  const wrapK = Math.ceil(v / 2);
+  LANES.push({ id: `aiv-${v}`, kind: 'AIV', label: `AIV ${v}`, index: v, wrapId: `wrap-${wrapK}` });
+}
+LANES.push({ id: 'mte-in', kind: 'MTEIn', label: 'mte_in', index: 0 });
+LANES.push({ id: 'mte-out', kind: 'MTEOut', label: 'mte_out', index: 0 });
+
+// ---------- op-types (default coloring) ----------
+const AIC_OPS = ['matmul', 'matmul', 'matmul', 'conv', 'matmul_trans'];
+const AIV_OPS = ['vec_softmax', 'vec_layernorm', 'vec_elementwise', 'vec_reduce', 'vec_elementwise', 'vec_cast'];
+const MTE_IN_OPS = ['dma_load_gm', 'nddma_load', 'dma_load_gm'];
+const MTE_OUT_OPS = ['dma_store_gm', 'nddma_store'];
+const CPU_OPS = ['cpu_dispatch', 'cpu_barrier', 'cpu_event'];
+
+// ---------- helpers ----------
+let TASK_SEQ = 0;
+const nextId = () => `t${(++TASK_SEQ).toString().padStart(4, '0')}`;
+
+function makeTraceLinks(opName, wrapId) {
+  return {
+    rootHash: `0x${(0xa1b2 + Math.floor(rng() * 0xffff)).toString(16)}`,
+    callOpMagic: `op_${irand(1000, 9999)}`,
+    leafHash: `0x${(0xab00 + Math.floor(rng() * 0xff)).toString(16)}_${(Math.floor(rng() * 0xffff)).toString(16).padStart(4, '0')}_e3`,
+    source: {
+      path: opName.startsWith('matmul')
+        ? `kernels/${opName}_k${wrapId ? wrapId.split('-')[1] : '0'}.cce`
+        : opName.startsWith('vec')
+        ? `kernels/vec/${opName}.cce`
+        : opName.startsWith('dma')
+        ? `runtime/dma/${opName}.cpp`
+        : `runtime/cpu/${opName}.cpp`,
+      lineStart: irand(20, 200),
+      lineEnd: 0, hotLine: 0,
+    },
+  };
+}
+function fillSourceRange(tl, lenLines = 36) {
+  tl.source.lineEnd = tl.source.lineStart + lenLines;
+  tl.source.hotLine = tl.source.lineStart + irand(6, lenLines - 6);
+  return tl;
+}
+
+// ---------- Group 2 PMU generator ----------
+// All cycle-like counters in µs. clc = sum of cycle-like counters.
+function genGroup2Pmu({ totalCycle, profile }) {
+  // profile: 'wait' | 'accounted' | 'overlap'
+  //          'compute-bound' | 'mte2-bound' | 'mte1-bound' | 'scalar-bound' | 'fix-bound'
+  //          'vec-compute' | 'vec-mte3-bound' | 'idle'
+  const out = {
+    pmu_idc_aic_vec_busy_o: 0,
+    cube_instr_busy: 0,
+    scalar_instr_busy: 0,
+    mte1_instr_busy: 0,
+    mte2_instr_busy: 0,
+    mte3_instr_busy: 0,
+    pmu_fix_instr_busy: 0,
+    icache_req: irand(60, 2400),
+    icache_miss: irand(2, 60),
+  };
+
+  // helper to set composition proportions of cycle-like sum
+  function compose(target, fractions) {
+    // fractions: { key: weight } — auto-normalize to target
+    const sum = Object.values(fractions).reduce((a, b) => a + b, 0);
+    for (const k of Object.keys(fractions)) {
+      out[k] = Math.round((fractions[k] / sum) * target);
+    }
+  }
+
+  let clcTarget;
+  switch (profile) {
+    case 'wait': // clc < total
+      clcTarget = totalCycle * (0.45 + rand(0, 0.18));
+      compose(clcTarget, { cube_instr_busy: 0.15, scalar_instr_busy: 0.10, mte1_instr_busy: 0.10, mte2_instr_busy: 0.55, mte3_instr_busy: 0.07, pmu_fix_instr_busy: 0.03 });
+      break;
+    case 'accounted':
+      clcTarget = totalCycle * (0.92 + rand(0, 0.08));
+      compose(clcTarget, { cube_instr_busy: 0.40, scalar_instr_busy: 0.10, mte1_instr_busy: 0.18, mte2_instr_busy: 0.18, mte3_instr_busy: 0.10, pmu_fix_instr_busy: 0.04 });
+      break;
+    case 'overlap':
+      clcTarget = totalCycle * (1.18 + rand(0, 0.15));
+      compose(clcTarget, { cube_instr_busy: 0.45, scalar_instr_busy: 0.08, mte1_instr_busy: 0.22, mte2_instr_busy: 0.12, mte3_instr_busy: 0.10, pmu_fix_instr_busy: 0.03 });
+      break;
+    case 'compute-bound':
+      clcTarget = totalCycle * (0.93 + rand(0, 0.07));
+      compose(clcTarget, { cube_instr_busy: 0.70, scalar_instr_busy: 0.08, mte1_instr_busy: 0.08, mte2_instr_busy: 0.08, mte3_instr_busy: 0.04, pmu_fix_instr_busy: 0.02 });
+      break;
+    case 'mte2-bound':
+      clcTarget = totalCycle * (0.55 + rand(0, 0.10));
+      compose(clcTarget, { cube_instr_busy: 0.16, scalar_instr_busy: 0.06, mte1_instr_busy: 0.12, mte2_instr_busy: 0.57, mte3_instr_busy: 0.06, pmu_fix_instr_busy: 0.03 });
+      break;
+    case 'mte1-bound':
+      clcTarget = totalCycle * (0.92 + rand(0, 0.06));
+      compose(clcTarget, { cube_instr_busy: 0.22, scalar_instr_busy: 0.06, mte1_instr_busy: 0.50, mte2_instr_busy: 0.12, mte3_instr_busy: 0.08, pmu_fix_instr_busy: 0.02 });
+      break;
+    case 'scalar-bound':
+      clcTarget = totalCycle * (0.68 + rand(0, 0.08));
+      compose(clcTarget, { cube_instr_busy: 0.10, scalar_instr_busy: 0.55, mte1_instr_busy: 0.10, mte2_instr_busy: 0.10, mte3_instr_busy: 0.10, pmu_fix_instr_busy: 0.05 });
+      break;
+    case 'fix-bound':
+      clcTarget = totalCycle * (0.92 + rand(0, 0.06));
+      compose(clcTarget, { cube_instr_busy: 0.25, scalar_instr_busy: 0.10, mte1_instr_busy: 0.10, mte2_instr_busy: 0.08, mte3_instr_busy: 0.10, pmu_fix_instr_busy: 0.37 });
+      break;
+    case 'vec-compute':
+      clcTarget = totalCycle * (0.94 + rand(0, 0.06));
+      compose(clcTarget, { pmu_idc_aic_vec_busy_o: 0.60, scalar_instr_busy: 0.10, mte1_instr_busy: 0.06, mte2_instr_busy: 0.12, mte3_instr_busy: 0.10, pmu_fix_instr_busy: 0.02 });
+      break;
+    case 'vec-mte3-bound':
+      clcTarget = totalCycle * (0.66 + rand(0, 0.08));
+      compose(clcTarget, { pmu_idc_aic_vec_busy_o: 0.22, scalar_instr_busy: 0.08, mte1_instr_busy: 0.06, mte2_instr_busy: 0.08, mte3_instr_busy: 0.52, pmu_fix_instr_busy: 0.04 });
+      break;
+    case 'idle':
+    default:
+      clcTarget = totalCycle * (0.30 + rand(0, 0.20));
+      compose(clcTarget, { pmu_idc_aic_vec_busy_o: 0.20, scalar_instr_busy: 0.20, mte1_instr_busy: 0.20, mte2_instr_busy: 0.20, mte3_instr_busy: 0.15, pmu_fix_instr_busy: 0.05 });
+  }
+  return out;
+}
+
+// ---------- Tasks ----------
+const TASKS = [];
+
+function emit(task) {
+  TASKS.push(task);
+  return task;
+}
+
+// 1) Wrap-scoped tasks (24 wraps × 1 AIC + 2 AIV)
+//    Each wrap has a primary matmul on AIC (long), and 1-3 vec tasks per AIV.
+//    Plus some non-wrap-primary tasks on the AIC/AIV lanes (idle / smaller ops).
+for (const wrap of WRAPS) {
+  const isCritical = CRITICAL_WRAPS.has(wrap.id);
+  const wrapStart = irand(200, 1200) + (wrap.index - 1) * irand(60, 220);
+  // Primary matmul on AIC
+  const matmulLen = isCritical
+    ? (wrap.id === 'wrap-7'  ? 8800
+      : wrap.id === 'wrap-12' ? 7200
+      :                          9000)  // wrap-19
+    : irand(2200, 5800);
+  const matmulStart = Math.min(wrapStart, TIMELINE.endUs - matmulLen - 100);
+  const matmulEnd = matmulStart + matmulLen;
+
+  let profile;
+  if (wrap.id === 'wrap-7') profile = 'wait';        // mte2-dominant + uncovered tail
+  else if (wrap.id === 'wrap-12') profile = 'scalar-bound';
+  else if (wrap.id === 'wrap-19') profile = 'overlap';
+  else profile = pick(['accounted', 'accounted', 'compute-bound', 'compute-bound', 'mte1-bound', 'fix-bound']);
+
+  const matmulName = `${pick(AIC_OPS)}_k${wrap.index}`;
+  const matmul = emit({
+    id: nextId(),
+    laneId: wrap.aicLaneId,
+    laneKind: 'AIC',
+    wrapId: wrap.id,
+    opType: matmulName.startsWith('matmul') ? 'matmul' : matmulName.startsWith('conv') ? 'conv' : 'matmul',
+    opName: matmulName,
+    start: matmulStart,
+    end: matmulEnd,
+    totalCycle: matmulLen,
+    isWrapPrimary: true,
+    g2: genGroup2Pmu({ totalCycle: matmulLen, profile }),
+    traceLinks: fillSourceRange(makeTraceLinks(matmulName, wrap.id), irand(36, 68)),
+  });
+  matmul.profileTag = profile;
+
+  // Some pre/post small ops on the same AIC lane (gap fillers)
+  let cursor = matmulStart - irand(200, 600);
+  while (cursor > TIMELINE.startUs + 60) {
+    const len = irand(120, 380);
+    const s = Math.max(TIMELINE.startUs + 20, cursor - len);
+    emit({
+      id: nextId(), laneId: wrap.aicLaneId, laneKind: 'AIC', wrapId: null,
+      opType: 'matmul', opName: `mm_small_${nextId()}`.slice(0, 14),
+      start: s, end: cursor, totalCycle: cursor - s,
+      g2: genGroup2Pmu({ totalCycle: cursor - s, profile: 'compute-bound' }),
+      traceLinks: fillSourceRange(makeTraceLinks('matmul_small', null), 20),
+    });
+    cursor = s - irand(150, 700);
+  }
+  cursor = matmulEnd + irand(200, 600);
+  while (cursor < TIMELINE.endUs - 60) {
+    const len = irand(140, 400);
+    const e = Math.min(TIMELINE.endUs - 20, cursor + len);
+    emit({
+      id: nextId(), laneId: wrap.aicLaneId, laneKind: 'AIC', wrapId: null,
+      opType: 'matmul', opName: `mm_tail_${nextId()}`.slice(0, 14),
+      start: cursor, end: e, totalCycle: e - cursor,
+      g2: genGroup2Pmu({ totalCycle: e - cursor, profile: 'compute-bound' }),
+      traceLinks: fillSourceRange(makeTraceLinks('matmul_tail', null), 20),
+    });
+    cursor = e + irand(200, 700);
+  }
+
+  // AIV tasks per wrap: each AIV lane has 1 primary + 1-3 fillers
+  for (const aivLaneId of wrap.aivLaneIds) {
+    const aivStart = matmulStart + irand(0, 300);
+    let aivLen;
+    if (wrap.id === 'wrap-7') aivLen = irand(3800, 5200);           // V finishes early → C tail
+    else if (wrap.id === 'wrap-19') aivLen = irand(4200, 6000);     // C overlap dominates (still critical)
+    else if (wrap.id === 'wrap-12') aivLen = irand(4500, 6000);     // V mte3 wait, but C still critical
+    else aivLen = Math.max(800, matmulLen - irand(200, 800));
+    const aivEnd = Math.min(matmulEnd + irand(-200, 200), aivStart + aivLen);
+    const opName = pick(AIV_OPS);
+    let vprofile;
+    if (wrap.id === 'wrap-7') vprofile = 'vec-compute';
+    else if (wrap.id === 'wrap-12') vprofile = 'vec-mte3-bound';
+    else if (wrap.id === 'wrap-19') vprofile = 'vec-compute';
+    else vprofile = pick(['vec-compute', 'vec-compute', 'accounted', 'accounted']);
+
+    emit({
+      id: nextId(),
+      laneId: aivLaneId, laneKind: 'AIV', wrapId: wrap.id,
+      opType: opName, opName: `${opName}_w${wrap.index}`,
+      start: aivStart, end: aivEnd, totalCycle: aivEnd - aivStart,
+      isWrapPrimary: true,
+      g2: genGroup2Pmu({ totalCycle: aivEnd - aivStart, profile: vprofile }),
+      traceLinks: fillSourceRange(makeTraceLinks(opName, wrap.id), irand(28, 60)),
+    });
+
+    // pre/post small vec ops
+    let aivCursor = aivStart - irand(200, 600);
+    while (aivCursor > TIMELINE.startUs + 80) {
+      const len = irand(80, 260);
+      const s = Math.max(TIMELINE.startUs + 30, aivCursor - len);
+      const op2 = pick(AIV_OPS);
+      emit({
+        id: nextId(), laneId: aivLaneId, laneKind: 'AIV', wrapId: null,
+        opType: op2, opName: `${op2}_s${nextId().slice(1)}`,
+        start: s, end: aivCursor, totalCycle: aivCursor - s,
+        g2: genGroup2Pmu({ totalCycle: aivCursor - s, profile: 'vec-compute' }),
+        traceLinks: fillSourceRange(makeTraceLinks(op2, null), 20),
+      });
+      aivCursor = s - irand(180, 800);
+    }
+    aivCursor = aivEnd + irand(200, 600);
+    while (aivCursor < TIMELINE.endUs - 80) {
+      const len = irand(100, 320);
+      const e = Math.min(TIMELINE.endUs - 30, aivCursor + len);
+      const op2 = pick(AIV_OPS);
+      emit({
+        id: nextId(), laneId: aivLaneId, laneKind: 'AIV', wrapId: null,
+        opType: op2, opName: `${op2}_t${nextId().slice(1)}`,
+        start: aivCursor, end: e, totalCycle: e - aivCursor,
+        g2: genGroup2Pmu({ totalCycle: e - aivCursor, profile: pick(['vec-compute', 'vec-mte3-bound']) }),
+        traceLinks: fillSourceRange(makeTraceLinks(op2, null), 20),
+      });
+      aivCursor = e + irand(200, 800);
+    }
+  }
+}
+
+// 2) AI CPU lanes — sparse scheduling signals (no PMU)
+for (const lane of LANES.filter(l => l.kind === 'AICCtrl' || l.kind === 'AICSched')) {
+  let cursor = TIMELINE.startUs + irand(100, 600);
+  while (cursor < TIMELINE.endUs - 200) {
+    const len = irand(60, 220);
+    const e = cursor + len;
+    const op = pick(CPU_OPS);
+    emit({
+      id: nextId(), laneId: lane.id, laneKind: lane.kind, wrapId: null,
+      opType: lane.kind === 'AICCtrl' ? 'cpu_ctrl' : 'cpu_sched',
+      opName: op,
+      start: cursor, end: e, totalCycle: e - cursor,
+      g2: null,
+      traceLinks: fillSourceRange(makeTraceLinks(op, null), 14),
+    });
+    cursor = e + irand(400, 1400);
+  }
+}
+
+// 3) MTE lanes — global data movement (no group 2 internal composition)
+for (const lane of LANES.filter(l => l.kind === 'MTEIn' || l.kind === 'MTEOut')) {
+  let cursor = TIMELINE.startUs + irand(120, 400);
+  while (cursor < TIMELINE.endUs - 200) {
+    const len = irand(180, 720);
+    const e = cursor + len;
+    const op = pick(lane.kind === 'MTEIn' ? MTE_IN_OPS : MTE_OUT_OPS);
+    emit({
+      id: nextId(), laneId: lane.id, laneKind: lane.kind, wrapId: null,
+      opType: lane.kind === 'MTEIn' ? 'mte_load' : 'mte_store',
+      opName: op,
+      start: cursor, end: e, totalCycle: e - cursor,
+      g2: null,
+      traceLinks: fillSourceRange(makeTraceLinks(op, null), 18),
+    });
+    cursor = e + irand(220, 800);
+  }
+}
+
+// ---------- pre-compute task index ----------
+const TASKS_BY_ID = Object.fromEntries(TASKS.map(t => [t.id, t]));
+const TASKS_BY_LANE = LANES.reduce((acc, lane) => {
+  acc[lane.id] = TASKS.filter(t => t.laneId === lane.id).sort((a, b) => a.start - b.start);
+  return acc;
+}, {});
+
+// ---------- one canonical "default selected task" ----------
+//   The matmul of wrap-7 — anchors the script.
+const ANCHOR_TASK_ID = TASKS.find(t => t.wrapId === 'wrap-7' && t.isWrapPrimary && t.laneKind === 'AIC').id;
+
+// ---------- sampled group context ----------
+const SAMPLED_GROUP = 2; // this run only sampled group 2
+
+  __exports.TIMELINE = TIMELINE;
+  __exports.WRAPS = WRAPS;
+  __exports.LANES = LANES;
+  __exports.TASKS = TASKS;
+  __exports.TASKS_BY_ID = TASKS_BY_ID;
+  __exports.TASKS_BY_LANE = TASKS_BY_LANE;
+  __exports.ANCHOR_TASK_ID = ANCHOR_TASK_ID;
+  __exports.SAMPLED_GROUP = SAMPLED_GROUP;
+})(__PYPTOUX_MODULES__['js/data/tasks.js'] = {});
+
+/* === inlined module: js/state.js === */
+(function(__exports){
+// Single store with pub/sub.
+
+const listeners = new Set();
+
+const state = {
+  chip: 'dav_3510',
+  groupId: 2,           // active workbench
+  mixMode: false,       // OFF → default lane order + identity coloring
+                        // ON  → wrap-grouped order + counter-composition coloring
+  selectedTaskId: null,
+  hoveredTaskId: null,
+  zoom: 1.0,            // 1.0 = fit horizontally
+  scrollLeft: 0,
+  highlightedWrapId: null,
+  openModal: null,      // null | { type: 'source'|'call'|'blockgraph'|'hw', task, derived }
+};
+
+function setState(patch) {
+  Object.assign(state, patch);
+  for (const fn of listeners) fn(state, patch);
+}
+
+function subscribe(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+  __exports.state = state;
+  __exports.setState = setState;
+  __exports.subscribe = subscribe;
+})(__PYPTOUX_MODULES__['js/state.js'] = {});
+
+/* === inlined module: js/data/hw-map.js === */
+(function(__exports){
+// counter → hardware pipe + diagnosis + next-group suggestion
+// All wording is mock / inferred — replace with verified content before share-safe.
+
+const COUNTER_META = {
+  cube_instr_busy: {
+    family: 'compute',
+    color: 'var(--c-compute)',
+    label: 'cube_instr_busy',
+    pipe: 'Cube',
+    explain: 'AIC 内 Cube 矩阵引擎指令 busy 时长。',
+    nextGroup: { id: 1, reason: '查看 cube FP/INT 比例确认是否真算术瓶颈' },
+  },
+  pmu_idc_aic_vec_busy_o: {
+    family: 'compute',
+    color: 'var(--c-compute)',
+    label: 'vec_busy',
+    pipe: 'Vector',
+    explain: 'AIV 内 Vector 单元 busy 时长。',
+    nextGroup: { id: 7, reason: '确认 Vector compute-heavy 还是 UB/MTE access-heavy' },
+  },
+  scalar_instr_busy: {
+    family: 'scalar',
+    color: 'var(--c-scalar)',
+    label: 'scalar_instr_busy',
+    pipe: 'Scalar',
+    explain: 'Scalar 单元 busy 时长（指令发射 / 地址计算 / 流程控制）。',
+    nextGroup: { id: 6, reason: 'Scalar 拖尾常伴 issue 限制，建议看 issue / VF pressure' },
+  },
+  mte1_instr_busy: {
+    family: 'mte',
+    color: 'var(--c-mte1)',
+    label: 'mte1_instr_busy',
+    pipe: 'MTE1 (L1→L0A/L0B)',
+    explain: 'L1 → L0A / L0B 数据装载通路 busy 时长。',
+    nextGroup: { id: 5, reason: '深入 L0A / L0B / L0C 路径分解' },
+  },
+  mte2_instr_busy: {
+    family: 'mte',
+    color: 'var(--c-mte2)',
+    label: 'mte2_instr_busy',
+    pipe: 'MTE2 (GM→L1)',
+    explain: 'Global Memory → L1 加载通路 busy 时长，常见外部内存压力指示。',
+    nextGroup: { id: 4, reason: '验证 main / UB / L1 访问压力的真实层级' },
+  },
+  mte3_instr_busy: {
+    family: 'mte',
+    color: 'var(--c-mte3)',
+    label: 'mte3_instr_busy',
+    pipe: 'MTE3 (L0C/UB→GM)',
+    explain: 'L0C / UB → GM 输出通路 busy 时长（FixPipe 输出阶段邻近）。',
+    nextGroup: { id: 8, reason: '确认 L2 victim / 写侧 hit rate 是否拖慢输出' },
+  },
+  pmu_fix_instr_busy: {
+    family: 'fixpipe',
+    color: 'var(--c-fixpipe)',
+    label: 'pmu_fix_instr_busy',
+    pipe: 'FixPipe',
+    explain: 'FixPipe 后处理（随路量化 / ReLU / 类型转换）busy 时长。',
+    nextGroup: { id: 5, reason: '深入 FixPipe 读 L0C 与输出路径' },
+  },
+  icache_req: {
+    family: 'event',
+    color: 'var(--c-scalar)',
+    label: 'icache_req',
+    pipe: 'I-cache',
+    explain: 'I-cache 请求事件计数（不参与 clc_cycle 聚合）。',
+    nextGroup: null,
+    isEvent: true,
+  },
+  icache_miss: {
+    family: 'event',
+    color: 'var(--c-scalar)',
+    label: 'icache_miss',
+    pipe: 'I-cache',
+    explain: 'I-cache miss 事件计数（不参与 clc_cycle 聚合）。',
+    nextGroup: null,
+    isEvent: true,
+  },
+};
+
+// cycle-like counters (the ones that go into clc_cycle)
+const CYCLE_LIKE = [
+  'pmu_idc_aic_vec_busy_o',
+  'cube_instr_busy',
+  'scalar_instr_busy',
+  'mte1_instr_busy',
+  'mte2_instr_busy',
+  'mte3_instr_busy',
+  'pmu_fix_instr_busy',
+];
+
+const EVENT_COUNTERS = ['icache_req', 'icache_miss'];
+
+  __exports.COUNTER_META = COUNTER_META;
+  __exports.CYCLE_LIKE = CYCLE_LIKE;
+  __exports.EVENT_COUNTERS = EVENT_COUNTERS;
+})(__PYPTOUX_MODULES__['js/data/hw-map.js'] = {});
+
+/* === inlined module: js/derived/group2-metrics.js === */
+(function(__exports){
+  const { CYCLE_LIKE, COUNTER_META } = __PYPTOUX_MODULES__['js/data/hw-map.js'];
+
+// derive { clcCycle, gap, gapRatio, severity, status, dominantCounter, dominantPipe, composition }
+function deriveGroup2(task) {
+  if (!task.g2) return null;
+  const g = task.g2;
+  let clc = 0;
+  const composition = [];
+  for (const k of CYCLE_LIKE) {
+    const v = g[k] || 0;
+    if (v > 0) composition.push({ counter: k, value: v });
+    clc += v;
+  }
+  composition.sort((a, b) => b.value - a.value);
+  const dominant = composition[0] || null;
+
+  const total = task.totalCycle;
+  const gap = clc - total;
+  const gapRatio = total > 0 ? gap / total : 0;
+
+  let status; // 'wait' | 'accounted' | 'overlap'
+  if (gapRatio < -0.10) status = 'wait';
+  else if (gapRatio > 0.10) status = 'overlap';
+  else status = 'accounted';
+
+  // severity score for sorting Immediate Attention
+  let severity = 0;
+  if (status === 'wait') severity = total * Math.abs(gapRatio);
+  else if (status === 'overlap') severity = total * gapRatio * 0.6;
+  else severity = total * 0.05; // accounted tasks contribute mildly
+
+  return {
+    clcCycle: clc,
+    gap,
+    gapRatio,
+    status,
+    severity,
+    dominantCounter: dominant?.counter || null,
+    dominantValue: dominant?.value || 0,
+    dominantPipe: dominant ? COUNTER_META[dominant.counter]?.pipe : null,
+    composition,
+  };
+}
+
+// aggregate at wrap-level
+function deriveWrapMetrics(wrap, tasks) {
+  const primary = tasks.filter(t => t.wrapId === wrap.id && t.isWrapPrimary);
+  if (primary.length === 0) return null;
+  const wrapStart = Math.min(...primary.map(t => t.start));
+  const wrapEnd = Math.max(...primary.map(t => t.end));
+  const wrapTotal = wrapEnd - wrapStart;
+
+  // task on critical path = task with the latest end
+  const critical = primary.reduce((a, b) => (a.end > b.end ? a : b));
+  const criticalDerived = deriveGroup2(critical);
+
+  // uncovered_ratio: how much of (wrapEnd - earliest peer end) is not explained by clc
+  const peers = primary.filter(t => t.id !== critical.id);
+  const peerMaxEnd = peers.length ? Math.max(...peers.map(t => t.end)) : critical.end;
+  const tailLen = Math.max(0, critical.end - peerMaxEnd);
+  const uncoveredRatio = wrapTotal > 0 ? tailLen / wrapTotal : 0;
+
+  return {
+    wrapId: wrap.id,
+    wrapIndex: wrap.index,
+    wrapStart, wrapEnd, wrapTotal,
+    critical, criticalDerived,
+    peers,
+    peerMaxEnd,
+    tailLen,
+    uncoveredRatio,
+    dominantCounter: criticalDerived?.dominantCounter,
+    status: criticalDerived?.status,
+  };
+}
+
+// overall group-2 summary
+function summarizeGroup2({ LANES, WRAPS, TASKS, TASKS_BY_LANE }) {
+  const wrapMetrics = WRAPS.map(w => deriveWrapMetrics(w, TASKS)).filter(Boolean);
+
+  // critical lane = lane with the longest sum-of-uncovered across all wraps it participates in
+  const laneScores = {};
+  for (const wm of wrapMetrics) {
+    const id = wm.critical.laneId;
+    laneScores[id] = (laneScores[id] || 0) + Math.max(0, wm.tailLen) + (wm.criticalDerived?.severity || 0);
+  }
+  const criticalLaneId = Object.entries(laneScores).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  // top-3 wraps · combined severity (wrap-level tail + PMU-level gap)
+  const wrapSeverity = (w) => (w.tailLen || 0) + (w.criticalDerived?.severity || 0);
+  const topWraps = [...wrapMetrics].sort((a, b) => wrapSeverity(b) - wrapSeverity(a)).slice(0, 3);
+
+  // dominant counter overall: vote across critical tasks
+  const counterVotes = {};
+  for (const wm of wrapMetrics) {
+    const dc = wm.dominantCounter;
+    if (dc) counterVotes[dc] = (counterVotes[dc] || 0) + (wm.criticalDerived?.dominantValue || 0);
+  }
+  const overallDominant = Object.entries(counterVotes).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  // overall explanation ratio: avg clc/total across primary tasks
+  let totalSum = 0, clcSum = 0;
+  for (const wm of wrapMetrics) {
+    totalSum += wm.critical.totalCycle;
+    clcSum += wm.criticalDerived?.clcCycle || 0;
+  }
+  const explainRatio = totalSum > 0 ? clcSum / totalSum : 0;
+
+  return {
+    criticalLaneId,
+    topWraps,
+    overallDominant,
+    explainRatio,
+    wrapMetrics,
+  };
+}
+
+function findPeers(task, TASKS_BY_LANE, WRAPS) {
+  if (!task.wrapId) return [];
+  const wrap = WRAPS.find(w => w.id === task.wrapId);
+  if (!wrap) return [];
+  const laneIds = [wrap.aicLaneId, ...wrap.aivLaneIds];
+  const peers = [];
+  for (const lid of laneIds) {
+    const primaries = TASKS_BY_LANE[lid].filter(t => t.wrapId === task.wrapId && t.isWrapPrimary);
+    for (const p of primaries) peers.push(p);
+  }
+  return peers;
+}
+
+  __exports.deriveGroup2 = deriveGroup2;
+  __exports.deriveWrapMetrics = deriveWrapMetrics;
+  __exports.summarizeGroup2 = summarizeGroup2;
+  __exports.findPeers = findPeers;
+})(__PYPTOUX_MODULES__['js/derived/group2-metrics.js'] = {});
+
+/* === inlined module: js/groups/group2.js === */
+(function(__exports){
+  const { CYCLE_LIKE, EVENT_COUNTERS, COUNTER_META } = __PYPTOUX_MODULES__['js/data/hw-map.js'];
+  const { deriveGroup2, summarizeGroup2, findPeers } = __PYPTOUX_MODULES__['js/derived/group2-metrics.js'];
+// Group 2 · Pipeline Balance workbench.
+// Encapsulates everything specific to "cycle-like counter composition + clc/total gap".
+
+
+const group2 = {
+  id: 2,
+  title: 'Pipeline Balance View',
+  shortTitle: 'Pipeline Balance',
+  primaryQuestion: 'AIC / AIV0 / AIV1 谁占流水，谁拖尾？',
+
+  // counter taxonomy
+  cycleLikeCounters: CYCLE_LIKE,
+  eventCounters: EVENT_COUNTERS,
+  validCounters: [...CYCLE_LIKE, ...EVENT_COUNTERS],
+
+  // legend for the swimlane area when colored by counters (mix mode)
+  legend: [
+    { key: 'compute', label: 'compute (cube/vec)', color: 'var(--c-compute)' },
+    { key: 'scalar', label: 'scalar', color: 'var(--c-scalar)' },
+    { key: 'mte1', label: 'mte1 (L1→L0)', color: 'var(--c-mte1)' },
+    { key: 'mte2', label: 'mte2 (GM→L1)', color: 'var(--c-mte2)' },
+    { key: 'mte3', label: 'mte3 (L0C→GM)', color: 'var(--c-mte3)' },
+    { key: 'fixpipe', label: 'fixpipe', color: 'var(--c-fixpipe)' },
+    { key: 'uncovered', label: 'uncovered (wait suspect)', color: 'var(--c-uncovered)', striped: true },
+    { key: 'overlap', label: 'overlap suspect', color: 'var(--c-overlap)', striped: true },
+  ],
+
+  // derive per-task
+  derive: deriveGroup2,
+
+  // composition family lookup (used by overlay renderer)
+  familyOf(counter) {
+    if (counter === 'cube_instr_busy' || counter === 'pmu_idc_aic_vec_busy_o') return 'compute';
+    if (counter === 'scalar_instr_busy') return 'scalar';
+    if (counter === 'mte1_instr_busy') return 'mte1';
+    if (counter === 'mte2_instr_busy') return 'mte2';
+    if (counter === 'mte3_instr_busy') return 'mte3';
+    if (counter === 'pmu_fix_instr_busy') return 'fixpipe';
+    return 'scalar';
+  },
+  familyColor(family) {
+    switch (family) {
+      case 'compute': return 'var(--c-compute)';
+      case 'scalar': return 'var(--c-scalar)';
+      case 'mte1': return 'var(--c-mte1)';
+      case 'mte2': return 'var(--c-mte2)';
+      case 'mte3': return 'var(--c-mte3)';
+      case 'fixpipe': return 'var(--c-fixpipe)';
+      default: return 'var(--c-scalar)';
+    }
+  },
+
+  // summary across all tasks / wraps
+  summarize: summarizeGroup2,
+
+  // peer task lookup
+  findPeers,
+
+  // map a dominant counter → narrative
+  describeDominant(task, derived) {
+    if (!derived || !derived.dominantCounter) return null;
+    const meta = COUNTER_META[derived.dominantCounter];
+    return {
+      counter: derived.dominantCounter,
+      pipe: meta?.pipe,
+      explain: meta?.explain,
+    };
+  },
+
+  // suggest next group based on dominant counter + status
+  suggestNextGroup(task, derived) {
+    if (!derived) return null;
+    const dc = derived.dominantCounter;
+    const meta = COUNTER_META[dc];
+    if (!meta || !meta.nextGroup) return null;
+    return {
+      group: meta.nextGroup.id,
+      reason: meta.nextGroup.reason,
+      cmd: `PROF_PMU_EVENT_TYPE=${meta.nextGroup.id}`,
+    };
+  },
+};
+
+  __exports.group2 = group2;
+})(__PYPTOUX_MODULES__['js/groups/group2.js'] = {});
+
+/* === inlined module: js/groups/registry.js === */
+(function(__exports){
+  const { group2 } = __PYPTOUX_MODULES__['js/groups/group2.js'];
+// Group workbench registry.
+// Each entry conforms to the same interface so a future multi-group switcher
+// can call .summarize(), .renderTaskOverlay(), .describeDominant(),
+// .suggestNextGroup() without knowing the group's id.
+
+const GROUP_REGISTRY = {
+  1: { id: 1, title: 'Cube Arithmetic View',     sampled: false, available: false, impl: null },
+  2: { id: 2, title: 'Pipeline Balance View',    sampled: true,  available: true,  impl: group2 },
+  4: { id: 4, title: 'Memory Access Flow View',  sampled: false, available: false, impl: null },
+  5: { id: 5, title: 'Cube L0 Path View',        sampled: false, available: false, impl: null },
+  6: { id: 6, title: 'Conflict / Issue View',    sampled: false, available: false, impl: null },
+  7: { id: 7, title: 'Local Buffer Pressure',    sampled: false, available: false, impl: null },
+  8: { id: 8, title: 'L2 Efficiency View',       sampled: false, available: false, impl: null },
+};
+
+function getGroup(id) {
+  return GROUP_REGISTRY[id];
+}
+
+  __exports.GROUP_REGISTRY = GROUP_REGISTRY;
+  __exports.getGroup = getGroup;
+})(__PYPTOUX_MODULES__['js/groups/registry.js'] = {});
+
+/* === inlined module: js/view/topbar.js === */
+(function(__exports){
+  const { state, setState } = __PYPTOUX_MODULES__['js/state.js'];
+  const { GROUP_REGISTRY } = __PYPTOUX_MODULES__['js/groups/registry.js'];
+
+
+function renderTopbar() {
+  const tabsEl = document.getElementById('group-tabs');
+  tabsEl.innerHTML = '';
+  for (const g of Object.values(GROUP_REGISTRY)) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-sm group-tab' + (state.groupId === g.id ? ' is-selected' : '');
+    btn.textContent = `G${g.id}`;
+    btn.dataset.groupId = String(g.id);
+    btn.dataset.sampled = String(g.sampled);
+    btn.dataset.disabled = String(!g.sampled && !g.available);
+    btn.title = g.sampled
+      ? `${g.title} · 本次 run 已采集`
+      : `${g.title} · 本次未采集，切换后展示空状态`;
+    btn.addEventListener('click', () => setState({ groupId: g.id, selectedTaskId: null }));
+    tabsEl.appendChild(btn);
+  }
+
+  const mix = document.getElementById('mix-toggle');
+  mix.dataset.on = String(state.mixMode);
+  mix.querySelector('.mix-label').textContent = state.mixMode ? 'ON' : 'OFF';
+  mix.onclick = () => setState({ mixMode: !state.mixMode });
+}
+
+function setHpTaskCount(n) {
+  document.getElementById('hp-task-count').textContent = String(n);
+}
+
+  __exports.renderTopbar = renderTopbar;
+  __exports.setHpTaskCount = setHpTaskCount;
+})(__PYPTOUX_MODULES__['js/view/topbar.js'] = {});
+
+/* === inlined module: js/view/swimlane.js === */
+(function(__exports){
+  const { LANES, WRAPS, TASKS, TASKS_BY_LANE, TIMELINE } = __PYPTOUX_MODULES__['js/data/tasks.js'];
+  const { state, setState } = __PYPTOUX_MODULES__['js/state.js'];
+  const { getGroup } = __PYPTOUX_MODULES__['js/groups/registry.js'];
+// Swimlane renderer.
+// - Default order: AICCtrl → AICSched → AIC ×24 → AIV ×48 → MTEIn, MTEOut
+// - Mix order:     AICCtrl → AICSched → [Wrap k = AIC k / AIV (2k-1) / AIV 2k] ×24 → MTEIn, MTEOut
+// - Default coloring: by taskIdentity (opType)
+// - Mix coloring:     by group-2 cycle-like counter composition
+
+
+
+
+const LANE_H = 14;
+const LANE_LABEL_W = 110;
+const TIME_AXIS_H = 22;
+const WRAP_GUTTER = 6;       // extra px between wraps in mix mode
+const WRAP_TAB_W = 14;
+const SECTION_GAP = 4;       // small visual gap between section groups
+const MARKER_H = 14;
+
+const CRITICAL_WRAPS = new Set(['wrap-7', 'wrap-12', 'wrap-19']);
+const sharedTaskBarCache = new Map();
+const TASK_COLORMAP = window.PtoSwimlaneTaskPattern?.createTaskColormap?.({
+  saturation: 44,
+  lightness: 46,
+  subgraphSaturation: 46,
+  subgraphLightness: 46,
+  semanticAliases: {
+    conv: 'matmul',
+    matmul_trans: 'matmul',
+    vec_cast: 'vec_elementwise',
+    mte_store: 'mte_load',
+    cpu_ctrl: 'cpu_sched',
+  },
+});
+
+const IDENTITY_LEGEND_KEYS = [
+  { key: 'matmul', label: 'matmul / conv' },
+  { key: 'vec_softmax', label: 'vec_softmax' },
+  { key: 'vec_layernorm', label: 'vec_layernorm' },
+  { key: 'vec_elementwise', label: 'vec_elementwise' },
+  { key: 'vec_reduce', label: 'vec_reduce' },
+  { key: 'mte_load', label: 'mte_load / store' },
+  { key: 'cpu_sched', label: 'cpu_sched / ctrl' },
+];
+
+function colorForTaskIdentity(taskOrKey) {
+  const key = typeof taskOrKey === 'string'
+    ? taskOrKey
+    : (taskOrKey?.opType || taskOrKey?.label || taskOrKey?.opName || 'unknown');
+  const taskInput = typeof taskOrKey === 'string' ? {} : (taskOrKey || {});
+  if (TASK_COLORMAP?.colorForTask) {
+    return TASK_COLORMAP.colorForTask({ ...taskInput, colorKey: key, label: key }, 'semantic');
+  }
+  return '#6f6a64';
+}
+
+function resolveCssColor(color, fallback = '#5f6775', depth = 0) {
+  if (!color) return fallback;
+  const raw = String(color).trim();
+  const varMatch = raw.match(/^var\((--[^),\s]+)\)$/);
+  if (!varMatch) return raw.startsWith('#') ? raw : fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varMatch[1]).trim();
+  if (value.startsWith('#')) return value;
+  if (value.startsWith('var(') && depth < 4) return resolveCssColor(value, fallback, depth + 1);
+  return fallback;
+}
+
+function renderSharedTaskBarImage(task, x, y, width, height, baseColor, options = {}) {
+  const pattern = window.PtoSwimlaneTaskPattern;
+  const color = resolveCssColor(baseColor);
+  const roundedWidth = Math.max(1, Math.round(width * 10) / 10);
+  const roundedHeight = Math.max(1, Math.round(height * 10) / 10);
+  const key = [
+    task.id,
+    roundedWidth,
+    roundedHeight,
+    color,
+    options.isSelected ? 'selected' : '',
+    options.isRelated ? 'related' : '',
+    options.isEmphasized ? 'emph' : '',
+  ].join('|');
+
+  let href = sharedTaskBarCache.get(key);
+  if (!href && pattern?.drawTaskBar) {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(roundedWidth * dpr);
+    canvas.height = Math.ceil(roundedHeight * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    pattern.drawTaskBar(ctx, {
+      x: 0,
+      y: 0,
+      width: roundedWidth,
+      height: roundedHeight,
+      baseColor: color,
+      task: {
+        label: task.opName,
+        displayName: task.opName,
+        rawName: task.opName,
+        inputRawMagic: task.inputRawMagic || [],
+        outputRawMagic: task.outputRawMagic || [],
+      },
+      isSelected: options.isSelected,
+      isRelated: options.isRelated,
+      isEmphasized: options.isEmphasized,
+      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+    });
+    href = canvas.toDataURL('image/png');
+    sharedTaskBarCache.set(key, href);
+  }
+
+  if (!href) {
+    return `<rect class="sl-task-pattern" x="${x}" y="${y}" width="${width}" height="${height}" rx="2" fill="${baseColor}"/>`;
+  }
+
+  return `<image class="sl-task-pattern" href="${href}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="none"/>`;
+}
+
+let host;
+let tooltipEl;
+
+function initSwimlane(containerId) {
+  host = document.getElementById(containerId);
+  tooltipEl = document.createElement('div');
+  tooltipEl.className = 'sl-tooltip';
+  host.appendChild(tooltipEl);
+}
+
+// Compute lane ordering for the current state.
+function computeLaneOrder(mixMode) {
+  const cpuLanes = LANES.filter(l => l.kind === 'AICCtrl' || l.kind === 'AICSched');
+  const aicLanes = LANES.filter(l => l.kind === 'AIC');
+  const aivLanes = LANES.filter(l => l.kind === 'AIV');
+  const mteLanes = LANES.filter(l => l.kind === 'MTEIn' || l.kind === 'MTEOut');
+
+  // returns array of { lane, sectionStart? , wrap? }
+  const rows = [];
+  // section: CPU
+  for (const l of cpuLanes) rows.push({ lane: l, section: 'cpu' });
+  rows.push({ separator: true, section: 'cpu→' + (mixMode ? 'wrap' : 'aic') });
+
+  if (!mixMode) {
+    for (const l of aicLanes) rows.push({ lane: l, section: 'aic' });
+    rows.push({ separator: true, section: 'aic→aiv' });
+    for (const l of aivLanes) rows.push({ lane: l, section: 'aiv' });
+    rows.push({ separator: true, section: 'aiv→mte' });
+  } else {
+    for (const wrap of WRAPS) {
+      const aicLane = aicLanes.find(l => l.id === wrap.aicLaneId);
+      const aiv1 = aivLanes.find(l => l.id === wrap.aivLaneIds[0]);
+      const aiv2 = aivLanes.find(l => l.id === wrap.aivLaneIds[1]);
+      rows.push({ wrapHeader: wrap, section: 'wrap' });
+      rows.push({ lane: aicLane, section: 'wrap', wrap });
+      rows.push({ lane: aiv1, section: 'wrap', wrap });
+      rows.push({ lane: aiv2, section: 'wrap', wrap });
+    }
+    rows.push({ separator: true, section: 'wrap→mte' });
+  }
+  for (const l of mteLanes) rows.push({ lane: l, section: 'mte' });
+  return rows;
+}
+
+function timeScale(viewWidth, zoom) {
+  const usable = viewWidth - LANE_LABEL_W - 16;
+  const span = TIMELINE.endUs - TIMELINE.startUs;
+  return (us) => LANE_LABEL_W + ((us - TIMELINE.startUs) / span) * usable * zoom;
+}
+
+function renderSwimlane() {
+  if (!host) return;
+  const mix = state.mixMode;
+  const group = getGroup(state.groupId)?.impl;
+
+  // ---- compute geometry ----
+  const rows = computeLaneOrder(mix);
+  const hostWidth = host.clientWidth || 1200;
+  const zoom = state.zoom;
+  const usable = hostWidth - LANE_LABEL_W - 16;
+  const totalWidth = LANE_LABEL_W + usable * zoom + 16;
+  const ts = timeScale(hostWidth, zoom);
+
+  // resolve row y positions
+  let y = TIME_AXIS_H + MARKER_H;
+  const rowY = [];
+  for (const row of rows) {
+    if (row.separator) {
+      rowY.push({ y, h: SECTION_GAP });
+      y += SECTION_GAP;
+    } else if (row.wrapHeader) {
+      rowY.push({ y, h: WRAP_GUTTER });
+      y += WRAP_GUTTER;
+    } else {
+      rowY.push({ y, h: LANE_H });
+      y += LANE_H;
+    }
+  }
+  const totalHeight = y + 8;
+
+  // ---- build SVG ----
+  let svg = `<svg class="sl-svg" width="${totalWidth}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // background lanes + labels
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const { y, h } = rowY[i];
+    if (row.separator) {
+      svg += `<line class="sl-section-divider" x1="${LANE_LABEL_W}" x2="${totalWidth}" y1="${y + h / 2}" y2="${y + h / 2}"/>`;
+      continue;
+    }
+    if (row.wrapHeader) {
+      // wrap tab (left) + tinted background spanning 3 lane rows
+      const wrap = row.wrapHeader;
+      const isCritical = CRITICAL_WRAPS.has(wrap.id);
+      const blockTopY = y;
+      const blockH = WRAP_GUTTER + LANE_H * 3;
+      // background for whole wrap block
+      svg += `<rect class="sl-lane-bg ${isCritical ? 'is-wrap-critical' : (wrap.index % 2 === 0 ? 'is-wrap-even' : 'is-wrap-odd')}" x="${WRAP_TAB_W}" y="${blockTopY}" width="${totalWidth - WRAP_TAB_W}" height="${blockH}"/>`;
+      // wrap tab
+      svg += `<rect class="sl-wrap-tab ${isCritical ? 'is-critical' : ''}" x="0" y="${blockTopY}" width="${WRAP_TAB_W}" height="${blockH - 1}" rx="2"/>`;
+      svg += `<text class="sl-wrap-tab-text ${isCritical ? 'is-critical' : ''}" x="${WRAP_TAB_W / 2}" y="${blockTopY + blockH / 2}" transform="rotate(-90 ${WRAP_TAB_W / 2} ${blockTopY + blockH / 2})">W${wrap.index}${isCritical ? ' ●' : ''}</text>`;
+      continue;
+    }
+    // lane row
+    const lane = row.lane;
+    const tintClass =
+      (lane.kind === 'AICCtrl' || lane.kind === 'AICSched') ? 'is-cpu-section' :
+      (lane.kind === 'MTEIn' || lane.kind === 'MTEOut') ? 'is-mte-section' : '';
+    svg += `<rect class="sl-lane-bg ${tintClass}" x="${mix && row.wrap ? WRAP_TAB_W : 0}" y="${y}" width="${totalWidth - (mix && row.wrap ? WRAP_TAB_W : 0)}" height="${h}"/>`;
+
+    // lane label
+    const labelClass =
+      (lane.kind === 'AIC') ? 'is-aic' :
+      (lane.kind === 'AIV') ? 'is-aiv' :
+      (lane.kind === 'MTEIn' || lane.kind === 'MTEOut') ? 'is-mte' :
+      'is-cpu';
+    svg += `<text class="sl-lane-label ${labelClass}" x="${(mix && row.wrap ? WRAP_TAB_W : 0) + 6}" y="${y + h / 2}">${lane.label}</text>`;
+  }
+
+  // time-axis ticks
+  const tickStep = 1000; // µs
+  for (let t = 0; t <= TIMELINE.endUs; t += tickStep) {
+    const x = ts(t);
+    svg += `<line class="sl-axis-tick" x1="${x}" x2="${x}" y1="${TIME_AXIS_H + MARKER_H}" y2="${totalHeight}"/>`;
+    svg += `<text class="sl-axis-label" x="${x}" y="${TIME_AXIS_H - 6}">${t} µs</text>`;
+  }
+
+  // tasks
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (row.separator || row.wrapHeader) continue;
+    const { y, h } = rowY[i];
+    const lane = row.lane;
+    const laneTasks = TASKS_BY_LANE[lane.id] || [];
+    for (const task of laneTasks) {
+      svg += renderTask(task, ts, y, h, mix, group);
+    }
+  }
+
+  // markers (top strip)
+  svg += renderMarkers(ts);
+
+  svg += `</svg>`;
+  host.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = svg;
+  host.appendChild(wrapper.firstChild);
+  // re-attach tooltip
+  host.appendChild(tooltipEl);
+
+  attachInteractions();
+}
+
+function renderTask(task, ts, y, h, mix, group) {
+  const x1 = ts(task.start);
+  const x2 = ts(task.end);
+  const w = Math.max(1.2, x2 - x1);
+  const top = y + 1;
+  const barH = h - 2;
+
+  const derived = group && task.g2 ? group.derive(task) : null;
+  const isSelected = task.id === state.selectedTaskId;
+  const isCritical = CRITICAL_WRAPS.has(task.wrapId) && task.isWrapPrimary;
+  let suspectClass = '';
+  if (derived?.status === 'wait' && mix && task.isWrapPrimary) suspectClass = 'is-suspect-wait';
+  else if (derived?.status === 'overlap' && mix && task.isWrapPrimary) suspectClass = 'is-suspect-overlap';
+  else if (isCritical) suspectClass = 'is-critical';
+
+  // determine base fill
+  let fill;
+  if (!mix) {
+    // shared colormap: stable op identity color
+    fill = colorForTaskIdentity(task);
+  } else if (task.g2 && derived) {
+    fill = 'var(--bg-elev-2)'; // base canvas, segments drawn on top
+  } else {
+    // non-AIC/AIV in mix mode keep shared identity color
+    fill = colorForTaskIdentity(task);
+  }
+
+  let out = '';
+  out += `<g class="sl-task-group">`;
+  out += renderSharedTaskBarImage(task, x1, top, w, barH, fill, {
+    isSelected,
+    isEmphasized: Boolean(suspectClass),
+  });
+
+  // composition segments (mix mode + has g2)
+  if (mix && task.g2 && derived) {
+    out += renderComposition(task, derived, ts, top, barH, group);
+  }
+
+  // In mix mode, PMU composition overlays the shared task-bar text, so keep a direct task label.
+  if (mix && task.g2 && w > 36) {
+    const fontSize = w > 80 ? 9 : 8;
+    const labelX = x1 + 4;
+    const labelMaxW = Math.max(20, w - 8);
+    const labelClass = (mix && task.g2) ? 'is-dark-bg' : '';
+    out += `<text class="sl-task-name ${labelClass}" x="${labelX}" y="${top + barH / 2}" font-size="${fontSize}" clip-path="inset(0 ${Math.max(0, w - labelMaxW)}px 0 0)">${task.opName}</text>`;
+  }
+
+  // status badge (right tip) for primary wrap tasks in mix mode
+  if (mix && derived && task.isWrapPrimary && w > 28) {
+    const bx = x2 - 14;
+    const by = top + 1;
+    const bw = 12, bh = barH - 2;
+    const klass = derived.status; // 'wait' | 'accounted' | 'overlap'
+    const sym = klass === 'wait' ? '!' : klass === 'overlap' ? '◇' : '✓';
+    out += `<g class="sl-badge"><rect class="sl-badge-r ${klass}" x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="2"/><text class="sl-badge-t ${klass}" x="${bx + bw / 2}" y="${by + bh / 2}">${sym}</text></g>`;
+  }
+
+  out += `<rect class="sl-task ${isSelected ? 'is-selected' : ''} ${suspectClass}" data-task-id="${task.id}" x="${x1}" y="${top}" width="${w}" height="${barH}" rx="2" fill="transparent" pointer-events="all"/>`;
+  out += `</g>`;
+  return out;
+}
+
+function renderComposition(task, derived, ts, top, barH, group) {
+  const x1 = ts(task.start);
+  const x2 = ts(task.end);
+  const w = x2 - x1;
+  let out = '';
+
+  if (derived.status === 'wait') {
+    // Layout: compress cycle-like segments into a (clc/total)*w prefix; rest is uncovered.
+    const ratio = Math.min(1, derived.clcCycle / task.totalCycle);
+    const usedW = w * ratio;
+    let cursor = x1;
+    for (const seg of derived.composition) {
+      const family = group.familyOf(seg.counter);
+      const segW = (seg.value / derived.clcCycle) * usedW;
+      if (segW < 0.4) continue;
+      out += `<rect class="sl-seg" x="${cursor}" y="${top}" width="${segW}" height="${barH}" fill="${group.familyColor(family)}" fill-opacity="0.72"/>`;
+      cursor += segW;
+    }
+    // uncovered (striped via diagonal pattern made of overlay)
+    const uncoveredW = x2 - cursor;
+    if (uncoveredW > 0.5) {
+      out += `<rect class="sl-seg sl-seg-uncovered" x="${cursor}" y="${top}" width="${uncoveredW}" height="${barH}"/>`;
+      // diagonal hatch lines
+      const hatchN = Math.floor(uncoveredW / 4);
+      for (let h = 0; h < hatchN; h++) {
+        const hx = cursor + h * 4;
+        out += `<line stroke="var(--c-uncovered)" stroke-opacity="0.65" stroke-width="0.7" x1="${hx}" y1="${top}" x2="${hx + 4}" y2="${top + barH}"/>`;
+      }
+    }
+  } else if (derived.status === 'overlap') {
+    // Layout: fill bar with composition; render purple overlay across whole bar to indicate overlap risk.
+    let cursor = x1;
+    for (const seg of derived.composition) {
+      const family = group.familyOf(seg.counter);
+      const segW = (seg.value / derived.clcCycle) * w;
+      if (segW < 0.4) continue;
+      out += `<rect class="sl-seg" x="${cursor}" y="${top}" width="${Math.min(w - (cursor - x1), segW)}" height="${barH}" fill="${group.familyColor(family)}" fill-opacity="0.68"/>`;
+      cursor += segW;
+    }
+    out += `<rect class="sl-seg sl-seg-overlap" x="${x1}" y="${top}" width="${w}" height="${barH}"/>`;
+    // marker bar at right showing how much overflow
+    const overflowRatio = Math.min(0.4, (derived.clcCycle - task.totalCycle) / task.totalCycle);
+    const tickX = x2 + 1;
+    const tickW = Math.max(2, overflowRatio * w);
+    out += `<rect class="sl-seg" x="${tickX}" y="${top + barH / 2 - 1}" width="${tickW}" height="2" fill="var(--c-overlap)" fill-opacity="0.85"/>`;
+  } else {
+    // accounted: layout segments by clc fraction of total
+    let cursor = x1;
+    for (const seg of derived.composition) {
+      const family = group.familyOf(seg.counter);
+      const segW = (seg.value / derived.clcCycle) * w;
+      if (segW < 0.4) continue;
+      out += `<rect class="sl-seg" x="${cursor}" y="${top}" width="${Math.min(w - (cursor - x1), segW)}" height="${barH}" fill="${group.familyColor(family)}" fill-opacity="0.72"/>`;
+      cursor += segW;
+    }
+  }
+  return out;
+}
+
+function renderMarkers(ts) {
+  // Markers: critical task / wait suspect / overlap suspect — one per critical wrap.
+  const group = getGroup(state.groupId)?.impl;
+  if (!group) return '';
+  let out = '';
+  for (const w of WRAPS) {
+    if (!CRITICAL_WRAPS.has(w.id)) continue;
+    // critical task = wrap primary AIC matmul
+    const t = TASKS.find(t => t.wrapId === w.id && t.isWrapPrimary && t.laneKind === 'AIC');
+    if (!t) continue;
+    const derived = group.derive(t);
+    const mx = ts(t.start);
+    const my = TIME_AXIS_H + MARKER_H - 9;
+    const klass = derived?.status === 'wait' ? 'is-wait' : derived?.status === 'overlap' ? 'is-overlap' : 'is-critical';
+    const symbol = derived?.status === 'wait' ? '!' : derived?.status === 'overlap' ? '◇' : '▲';
+    out += `<g class="sl-marker ${klass}" data-task-id="${t.id}" transform="translate(${mx}, ${my})">`;
+    out += `<polygon class="sl-marker-shape" points="-7,0 7,0 0,9"/>`;
+    out += `<text fill="var(--background)" font-family="var(--font-mono)" font-size="9" font-weight="700" text-anchor="middle" y="-1.5">${symbol}</text>`;
+    out += `</g>`;
+  }
+  return out;
+}
+
+// ---------- legend ----------
+function renderLegend(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!state.mixMode) {
+    const items = TASK_COLORMAP?.legendForKeys
+      ? TASK_COLORMAP.legendForKeys(IDENTITY_LEGEND_KEYS, 'semantic')
+      : IDENTITY_LEGEND_KEYS.map((item) => ({ ...item, color: colorForTaskIdentity(item.key) }));
+    el.innerHTML = `<span class="muted">默认着色 · shared colormap</span>` +
+      items.map((item) => `<span class="lg"><span class="lg-sw" style="background:${item.color}"></span>${item.label}</span>`).join('');
+  } else {
+    const group = getGroup(state.groupId)?.impl;
+    if (!group) {
+      el.innerHTML = `<span class="muted">Mix · group ${state.groupId} 未采集</span>`;
+      return;
+    }
+    el.innerHTML = `<span class="muted">Mix · group ${state.groupId} composition</span>` +
+      group.legend.map(it => `<span class="lg"><span class="lg-sw" style="background:${it.color};${it.striped ? 'background-image:repeating-linear-gradient(45deg,'+it.color+' 0,'+it.color+' 2px,transparent 2px,transparent 4px);' : ''}"></span>${it.label}</span>`).join('');
+  }
+}
+
+function renderTitle(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const group = getGroup(state.groupId)?.impl;
+  const orderTag = state.mixMode ? 'Wrap-grouped 顺序' : '默认顺序';
+  el.textContent = `${group ? group.shortTitle : 'Group'} · ${orderTag}`;
+}
+
+// ---------- interactions ----------
+function attachInteractions() {
+  host.querySelectorAll('.sl-task, .sl-marker').forEach(el => {
+    el.addEventListener('click', e => {
+      const id = el.dataset.taskId;
+      if (id) setState({ selectedTaskId: id });
+      e.stopPropagation();
+    });
+    el.addEventListener('mouseenter', e => {
+      const id = el.dataset.taskId;
+      const task = TASKS.find(t => t.id === id);
+      if (task) showTooltip(task, e);
+    });
+    el.addEventListener('mousemove', moveTooltip);
+    el.addEventListener('mouseleave', hideTooltip);
+  });
+}
+
+function showTooltip(task, e) {
+  const group = getGroup(state.groupId)?.impl;
+  const derived = task.g2 && group ? group.derive(task) : null;
+  let html = `<div class="tt-op">${task.opName}</div>`;
+  html += `<div class="tt-row"><span class="tt-k">lane</span><span class="tt-v">${task.laneKind} · ${task.laneId}</span></div>`;
+  html += `<div class="tt-row"><span class="tt-k">total</span><span class="tt-v">${task.totalCycle.toFixed(0)} µs</span></div>`;
+  if (derived) {
+    html += `<div class="tt-row"><span class="tt-k">clc</span><span class="tt-v">${derived.clcCycle.toFixed(0)} µs</span></div>`;
+    const gapStr = derived.gap >= 0 ? `+${derived.gap.toFixed(0)}` : `${derived.gap.toFixed(0)}`;
+    html += `<div class="tt-row"><span class="tt-k">gap</span><span class="tt-v">${gapStr} µs (${(derived.gapRatio * 100).toFixed(1)}%)</span></div>`;
+    html += `<div class="tt-row"><span class="tt-k">status</span><span class="tt-v ${derived.status === 'wait' ? 'bad' : derived.status === 'overlap' ? 'warn-fg' : 'ok'}">${derived.status}</span></div>`;
+    if (derived.dominantCounter) {
+      html += `<div class="tt-row"><span class="tt-k">dominant</span><span class="tt-v">${derived.dominantCounter}</span></div>`;
+    }
+  }
+  if (task.wrapId) {
+    html += `<div class="tt-row"><span class="tt-k">wrap</span><span class="tt-v">${task.wrapId}</span></div>`;
+  }
+  tooltipEl.innerHTML = html;
+  tooltipEl.classList.add('visible');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  if (!tooltipEl.classList.contains('visible')) return;
+  const rect = host.getBoundingClientRect();
+  const x = e.clientX - rect.left + 14;
+  const y = e.clientY - rect.top + 14;
+  tooltipEl.style.left = `${Math.min(x, host.clientWidth - 280)}px`;
+  tooltipEl.style.top = `${Math.min(y, host.clientHeight - 160)}px`;
+}
+function hideTooltip() {
+  tooltipEl.classList.remove('visible');
+}
+
+// scroll to a task
+function scrollToTask(taskId) {
+  const task = TASKS.find(t => t.id === taskId);
+  if (!task) return;
+  const hostWidth = host.clientWidth;
+  const ts = timeScale(hostWidth, state.zoom);
+  const xCenter = (ts(task.start) + ts(task.end)) / 2;
+  const target = Math.max(0, xCenter - hostWidth / 2);
+  host.scrollTo({ left: target, behavior: 'smooth' });
+
+  // y scroll: find the task's row
+  const rows = computeLaneOrder(state.mixMode);
+  let y = TIME_AXIS_H + MARKER_H;
+  for (const row of rows) {
+    if (row.separator) { y += SECTION_GAP; continue; }
+    if (row.wrapHeader) { y += WRAP_GUTTER; continue; }
+    if (row.lane.id === task.laneId) break;
+    y += LANE_H;
+  }
+  host.scrollTo({ top: Math.max(0, y - host.clientHeight / 2), left: target, behavior: 'smooth' });
+}
+
+  __exports.initSwimlane = initSwimlane;
+  __exports.computeLaneOrder = computeLaneOrder;
+  __exports.renderSwimlane = renderSwimlane;
+  __exports.renderLegend = renderLegend;
+  __exports.renderTitle = renderTitle;
+  __exports.scrollToTask = scrollToTask;
+})(__PYPTOUX_MODULES__['js/view/swimlane.js'] = {});
+
+/* === inlined module: js/view/summary.js === */
+(function(__exports){
+  const { state, setState } = __PYPTOUX_MODULES__['js/state.js'];
+  const { LANES, WRAPS, TASKS, TASKS_BY_LANE } = __PYPTOUX_MODULES__['js/data/tasks.js'];
+  const { getGroup } = __PYPTOUX_MODULES__['js/groups/registry.js'];
+  const { COUNTER_META } = __PYPTOUX_MODULES__['js/data/hw-map.js'];
+  const { scrollToTask } = __PYPTOUX_MODULES__['js/view/swimlane.js'];
+// Immediate Attention panel (left)
+
+
+
+
+
+function renderSummary() {
+  const el = document.getElementById('summary-panel');
+  const group = getGroup(state.groupId);
+  if (!group || !group.sampled || !group.impl) {
+    el.innerHTML = renderUnsampled(group);
+    return;
+  }
+  const impl = group.impl;
+  const summary = impl.summarize({ LANES, WRAPS, TASKS, TASKS_BY_LANE });
+  const criticalLane = LANES.find(l => l.id === summary.criticalLaneId);
+
+  // pick the worst wrap as "the headline"
+  const headWrap = summary.topWraps[0];
+  const headStatus = headWrap?.status || 'accounted';
+  // dominant counter reflects the headline wrap (more actionable than overall vote)
+  const headDominant = headWrap?.dominantCounter || summary.overallDominant;
+  const dom = headDominant ? COUNTER_META[headDominant] : null;
+
+  const ratioPct = (summary.explainRatio * 100).toFixed(0);
+  const ratioClass = summary.explainRatio < 0.7 ? 'is-bad' : summary.explainRatio < 0.9 ? 'is-warn' : 'is-ok';
+
+  const next = headWrap ? impl.suggestNextGroup(headWrap.critical, headWrap.criticalDerived) : null;
+
+  el.innerHTML = `
+    <div class="panel-head">
+      <div class="panel-title">Immediate Attention</div>
+      <div class="panel-headline">${impl.shortTitle}</div>
+      <div class="sum-row" style="margin-top:8px;">
+        <span class="k">explain ratio</span>
+        <span class="v"><span class="dp-chip ${ratioClass}"><span class="k">clc/total</span><span class="v">${ratioPct}%</span></span></span>
+      </div>
+    </div>
+
+    <div class="panel-body inspector-rail">
+
+      <div class="sum-card inspector-soft-card is-critical">
+        <div class="sum-eyebrow"><span class="dot"></span>Critical lane</div>
+        <div class="sum-title">${criticalLane?.label || '—'}</div>
+        <div class="sum-desc">在 24 个 Wrap 中，该 lane 出现在 critical path 的累计 severity 最高。</div>
+      </div>
+
+      <div class="sum-card inspector-soft-card is-${headStatus === 'wait' ? 'wait' : headStatus === 'overlap' ? 'overlap' : 'critical'}">
+        <div class="sum-eyebrow"><span class="dot"></span>Critical Wrap · top suspect</div>
+        <div class="sum-title">Wrap ${headWrap?.wrapIndex || '—'} <span class="muted mono" style="font-weight:400;font-size:11px;">${headWrap?.status || ''}</span></div>
+        <div class="sum-desc">${describeWrap(headWrap)}</div>
+        <div class="sum-action">
+          <button class="btn btn-solid btn-sm" id="sum-focus-head">查看 critical task</button>
+        </div>
+      </div>
+
+      <div class="sum-card inspector-soft-card">
+        <div class="sum-eyebrow"><span class="dot" style="background:var(--c-mte2)"></span>Dominant counter · Wrap ${headWrap?.wrapIndex || '—'}</div>
+        <div class="sum-title mono">${headDominant || '—'}</div>
+        <div class="sum-desc">${dom?.explain || ''}</div>
+        <div class="sum-row"><span class="k">硬件路径</span><span class="v">${dom?.pipe || '—'}</span></div>
+      </div>
+
+      <div>
+        <div class="dp-section-title">Top-3 Wraps · by severity</div>
+        <ul class="wrap-rank-list" id="wrap-rank-list">
+          ${summary.topWraps.map(w => {
+            const gap = w.criticalDerived?.gapRatio || 0;
+            const r = (gap * 100).toFixed(0);
+            const absGap = Math.abs(gap);
+            const cls = absGap > 0.30 ? 'high' : absGap > 0.15 ? 'mid' : 'low';
+            const sign = gap > 0 ? '+' : '';
+            return `<li data-wrap-id="${w.wrapId}" data-task-id="${w.critical.id}">
+              <span class="wr-name">W${w.wrapIndex}</span>
+              <span class="wr-counter">${w.dominantCounter || '—'}</span>
+              <span class="wr-ratio ${cls}">${sign}${r}%</span>
+            </li>`;
+          }).join('')}
+        </ul>
+      </div>
+
+      ${next ? `
+      <div class="next-suggest inspector-soft-card">
+        <div class="next-suggest-eyebrow">下一次采集建议</div>
+        <div class="next-suggest-text">当前 group 解释度 <b class="mono">${ratioPct}%</b>。${next.reason}。</div>
+        <div class="next-suggest-cmd">
+          <span class="cmd">${next.cmd}</span>
+          <button class="btn btn-sm btn-ghost copy" id="sum-copy-cmd">复制</button>
+        </div>
+      </div>` : ''}
+    </div>
+  `;
+
+  // bindings
+  const focusBtn = el.querySelector('#sum-focus-head');
+  if (focusBtn && headWrap) {
+    focusBtn.addEventListener('click', () => {
+      setState({ selectedTaskId: headWrap.critical.id });
+      scrollToTask(headWrap.critical.id);
+    });
+  }
+  el.querySelectorAll('#wrap-rank-list li').forEach(li => {
+    li.addEventListener('click', () => {
+      const tid = li.dataset.taskId;
+      setState({ selectedTaskId: tid });
+      scrollToTask(tid);
+    });
+  });
+  const copyBtn = el.querySelector('#sum-copy-cmd');
+  if (copyBtn && next) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(next.cmd);
+      toast(`已复制：${next.cmd}`);
+    });
+  }
+}
+
+function describeWrap(w) {
+  if (!w) return '';
+  const d = w.criticalDerived;
+  if (!d) return '';
+  if (d.status === 'wait') {
+    return `clc <b>${d.clcCycle.toFixed(0)} µs</b> &lt; total <b>${w.critical.totalCycle.toFixed(0)} µs</b>，gap=${(d.gapRatio*100).toFixed(0)}%；可能是 uncovered / wait / idle / sync。`;
+  }
+  if (d.status === 'overlap') {
+    return `clc <b>${d.clcCycle.toFixed(0)} µs</b> &gt; total <b>${w.critical.totalCycle.toFixed(0)} µs</b>；可能是 pipeline overlap 或 non-exclusive double-count，不能直接判断为更好。`;
+  }
+  return `clc ≈ total，当前 group 解释充分。dominant 仍可指引下一步。`;
+}
+
+function renderUnsampled(group) {
+  return `
+    <div class="panel-head">
+      <div class="panel-title">Immediate Attention</div>
+      <div class="panel-headline">${group?.title || 'Unknown'}</div>
+    </div>
+    <div class="panel-body inspector-rail">
+      <div class="sum-card inspector-soft-card is-suggestion">
+        <div class="sum-eyebrow"><span class="dot"></span>本次 run 未采集 group ${group?.id}</div>
+        <div class="sum-title">无本 group 数据</div>
+        <div class="sum-desc">一次运行只能采集一个 PMU group。若需要 group ${group?.id} 的诊断，请重新运行并设置对应环境变量。</div>
+      </div>
+      <div class="next-suggest inspector-soft-card">
+        <div class="next-suggest-eyebrow">下一次采集</div>
+        <div class="next-suggest-text">设置环境变量后重新启动 trace。</div>
+        <div class="next-suggest-cmd">
+          <span class="cmd">PROF_PMU_EVENT_TYPE=${group?.id}</span>
+          <button class="btn btn-sm btn-ghost copy" onclick="navigator.clipboard.writeText('PROF_PMU_EVENT_TYPE=${group?.id}')">复制</button>
+        </div>
+      </div>
+      <div class="sum-card inspector-soft-card">
+        <div class="sum-eyebrow"><span class="dot" style="background:var(--green)"></span>当前已采集</div>
+        <div class="sum-title mono">Group 2 · Pipeline Balance</div>
+        <div class="sum-desc">切回 G2 即可继续诊断。</div>
+        <div class="sum-action"><button class="btn btn-solid btn-sm" onclick="window.__switchG2()">切到 G2</button></div>
+      </div>
+    </div>
+  `;
+}
+
+function toast(text) {
+  const root = document.getElementById('toast-root');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = text;
+  root.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+  __exports.renderSummary = renderSummary;
+})(__PYPTOUX_MODULES__['js/view/summary.js'] = {});
+
+/* === inlined module: js/jump/source-view.js === */
+(function(__exports){
+// Mock source viewer. Real kernel source is not in the prototype; we synthesize
+// a plausible matmul/vector kernel template parameterized by the task identity.
+
+const KEYWORDS = new Set(['for', 'if', 'else', 'return', 'while', 'void', 'inline', 'static', 'const', '__aicore__', '__global__', 'pipe_barrier', 'set_flag', 'wait_flag']);
+const TYPES = new Set(['int', 'uint32_t', 'half', 'float', 'GlobalTensor', 'LocalTensor', 'Tensor', 'TPipe', 'TQue']);
+
+function highlight(line) {
+  // primitive token-coloring
+  return line
+    .replace(/("[^"]*")/g, '<span class="src-tok-str">$1</span>')
+    .replace(/\b(\d+(\.\d+)?[ufFlL]?)\b/g, '<span class="src-tok-num">$1</span>')
+    .replace(/\b([A-Za-z_][A-Za-z0-9_]*)\b/g, (m) => {
+      if (KEYWORDS.has(m)) return `<span class="src-tok-keyword">${m}</span>`;
+      if (TYPES.has(m)) return `<span class="src-tok-type">${m}</span>`;
+      return m;
+    })
+    .replace(/(\/\/[^\n]*)/g, '<span class="src-tok-comment">$1</span>');
+}
+
+function buildKernelLines(task) {
+  const isMatmul = task.opName.startsWith('matmul') || task.opName.startsWith('conv');
+  const wrap = task.wrapId ? task.wrapId.split('-')[1] : '0';
+
+  const matmulSrc = [
+    '#include "kernel_common.h"',
+    '#include "tiling/matmul_tiling.h"',
+    '',
+    `// Wrap-${wrap} matmul kernel · A5 / dav_3510`,
+    `// Owner: kernel-team. PMU group 2 hot path: MTE2 -> L1 -> L0A/L0B -> Cube`,
+    '',
+    `template <typename T>`,
+    `class MatmulK${wrap} {`,
+    `public:`,
+    `  __aicore__ inline void Init(GlobalTensor<T> a, GlobalTensor<T> b, GlobalTensor<T> c,`,
+    `                              const TilingData &tiling) {`,
+    `    pipe_.InitBuffer(inQueueA_, BUFFER_NUM, A_BLOCK_SIZE * sizeof(T));`,
+    `    pipe_.InitBuffer(inQueueB_, BUFFER_NUM, B_BLOCK_SIZE * sizeof(T));`,
+    `    pipe_.InitBuffer(outQueueC_, BUFFER_NUM, C_BLOCK_SIZE * sizeof(T));`,
+    `    a_gm_.SetGlobalBuffer(a); b_gm_.SetGlobalBuffer(b); c_gm_.SetGlobalBuffer(c);`,
+    `    tiling_ = tiling;`,
+    `  }`,
+    '',
+    `  __aicore__ inline void Process() {`,
+    `    for (int32_t i = 0; i < tiling_.outerLoop; ++i) {`,
+    `      CopyInA(i);                  // MTE2  -- GM -> L1`,
+    `      CopyInB(i);                  // MTE2  -- GM -> L1`,
+    `      LoadToL0(i);                 // MTE1  -- L1 -> L0A / L0B`,
+    `      Compute(i);                  // Cube  -- L0A x L0B -> L0C`,
+    `      FixOutput(i);                // FixPipe + MTE3 -- L0C -> GM`,
+    `    }`,
+    `  }`,
+    '',
+    `private:`,
+    `  __aicore__ inline void CopyInA(int32_t i);`,
+    `  __aicore__ inline void CopyInB(int32_t i);`,
+    `  __aicore__ inline void LoadToL0(int32_t i);`,
+    `  __aicore__ inline void Compute(int32_t i);  // <-- inner-most hot loop`,
+    `  __aicore__ inline void FixOutput(int32_t i);`,
+    '',
+    `  TPipe pipe_;`,
+    `  TQue<TPosition::A1, BUFFER_NUM> inQueueA_;`,
+    `  TQue<TPosition::A1, BUFFER_NUM> inQueueB_;`,
+    `  TQue<TPosition::CO1, BUFFER_NUM> outQueueC_;`,
+    `  GlobalTensor<T> a_gm_, b_gm_, c_gm_;`,
+    `  TilingData tiling_;`,
+    `};`,
+  ];
+
+  const vecSrc = [
+    '#include "kernel_common.h"',
+    `// ${task.opName} · Vector kernel`,
+    '',
+    `template <typename T>`,
+    `class ${task.opName.replace(/[^a-zA-Z0-9_]/g, '_')}_Kernel {`,
+    `public:`,
+    `  __aicore__ inline void Init(GlobalTensor<T> x, GlobalTensor<T> y,`,
+    `                              const TilingData &tiling) {`,
+    `    pipe_.InitBuffer(inQ_, BUFFER_NUM, UB_TILE * sizeof(T));`,
+    `    pipe_.InitBuffer(outQ_, BUFFER_NUM, UB_TILE * sizeof(T));`,
+    `  }`,
+    '',
+    `  __aicore__ inline void Process() {`,
+    `    for (int32_t i = 0; i < tiling_.tileCount; ++i) {`,
+    `      CopyInToUB(i);     // MTE2  -- GM -> UB`,
+    `      VecCompute(i);     // Vector ops on UB`,
+    `      CopyOutFromUB(i);  // MTE3  -- UB -> GM`,
+    `    }`,
+    `  }`,
+    '};',
+  ];
+
+  const dmaSrc = [
+    '#include "runtime/dma.h"',
+    `// ${task.opName} · global memory transfer`,
+    '',
+    'Status DmaTransfer(const DmaSpec &spec) {',
+    `  if (spec.use_nddma) {`,
+    `    return NdDma::Issue(spec.src, spec.dst, spec.bytes);`,
+    `  }`,
+    `  return PlainDma::Issue(spec.src, spec.dst, spec.bytes);`,
+    '}',
+  ];
+
+  return isMatmul ? matmulSrc : task.opName.startsWith('dma') ? dmaSrc : vecSrc;
+}
+
+function renderSource(ctx) {
+  const { task } = ctx;
+  const src = task.traceLinks.source;
+  const allLines = buildKernelLines(task);
+  // align to provided lineStart..lineEnd window
+  const startLine = src.lineStart;
+  const endLine = src.lineEnd;
+  const hotLine = src.hotLine;
+  const linesHtml = allLines.map((text, idx) => {
+    const ln = startLine + idx;
+    if (ln > endLine + 4) return '';
+    const isHot = ln === hotLine;
+    const inRange = ln >= startLine && ln <= endLine;
+    return `<div class="src-line ${isHot ? 'is-hot' : inRange ? 'is-range' : ''}">
+      <span class="ln">${ln}</span>
+      <span class="code-text">${highlight(text)}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="src-meta">
+      <span><span class="k">file</span><b>${src.path}</b></span>
+      <span><span class="k">range</span>L${src.lineStart}–L${src.lineEnd}</span>
+      <span><span class="k">hot</span>L${src.hotLine}</span>
+      <span><span class="k">leafHash</span>${task.traceLinks.leafHash}</span>
+    </div>
+    <div class="src-code">${linesHtml}</div>
+    <p class="muted" style="margin-top:10px;font-size:11.5px;">
+      L3 演示数据：源码模板按 op 类型生成。生产版本应跳转到真实 kernel 源码，并按 leafHash 命中到具体 inline 展开点。
+    </p>
+  `;
+}
+
+  __exports.renderSource = renderSource;
+})(__PYPTOUX_MODULES__['js/jump/source-view.js'] = {});
+
+/* === inlined module: js/jump/call-view.js === */
+(function(__exports){
+// Mock CALL tree, focused on the task's callOpMagic.
+
+function renderCall(ctx) {
+  const { task } = ctx;
+  const magic = task.traceLinks.callOpMagic;
+  const wrap = task.wrapId ? task.wrapId.split('-')[1] : null;
+  const opName = task.opName;
+
+  const nodes = [
+    { depth: 0, op: 'Model.forward', magic: 'op_0001', meta: 'glm_attention' },
+    { depth: 1, op: 'Attention.compute', magic: 'op_0042', meta: 'B=4 S=4096 H=8192' },
+    { depth: 2, op: 'AttnFusedMatmul.run', magic: 'op_0103', meta: `wrap ${wrap ?? '*'}` },
+    { depth: 3, op: `KernelLaunch[${opName}]`, magic, meta: 'a5/dav_3510', target: true },
+    { depth: 4, op: 'CopyInA / CopyInB', magic: 'op_0205', meta: 'MTE2 · GM→L1' },
+    { depth: 4, op: 'LoadToL0', magic: 'op_0206', meta: 'MTE1 · L1→L0A/B' },
+    { depth: 4, op: 'Compute', magic: 'op_0207', meta: 'Cube · L0AxL0B→L0C' },
+    { depth: 4, op: 'FixOutput', magic: 'op_0208', meta: 'FixPipe + MTE3 · L0C→GM' },
+  ];
+
+  return `
+    <div class="call-tree">
+      ${nodes.map(n => {
+        const indent = '│  '.repeat(Math.max(0, n.depth - 1)) + (n.depth > 0 ? '├─ ' : '');
+        return `<div class="call-node ${n.target ? 'is-target' : ''}">
+          <span class="branch">${indent}</span>
+          <span class="op">${n.op}</span>
+          <span class="magic">${n.magic}</span>
+          <span class="meta">${n.meta}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="muted" style="margin-top:14px;font-size:11.5px;">
+      L3 演示数据：调用链由 op 类型与 wrap 编号合成。生产版本应根据 <b>callOpMagic</b> 命中真实节点，并支持向上/向下展开。
+    </p>
+  `;
+}
+
+  __exports.renderCall = renderCall;
+})(__PYPTOUX_MODULES__['js/jump/call-view.js'] = {});
+
+/* === inlined module: js/jump/block-graph.js === */
+(function(__exports){
+// Mock Block Graph SVG.
+// Target node = the leafHash of the selected task; surrounding nodes are
+// schematic CFG/DAG neighbors.
+
+function renderBlockGraph(ctx) {
+  const { task } = ctx;
+  const leaf = task.traceLinks.leafHash;
+  const wrap = task.wrapId ? task.wrapId.split('-')[1] : '?';
+
+  const nodes = [
+    { id: 'b0', label: 'Entry',         x: 60,  y: 60,  kind: 'normal' },
+    { id: 'b1', label: 'TileLoop',      x: 60,  y: 140, kind: 'normal' },
+    { id: 'b2', label: 'CopyInA',       x: 220, y: 220, kind: 'related' },
+    { id: 'b3', label: 'CopyInB',       x: 360, y: 220, kind: 'related' },
+    { id: 'b4', label: 'LoadToL0',      x: 290, y: 300, kind: 'related' },
+    { id: 'b5', label: 'Compute',       x: 290, y: 380, kind: 'target', sub: `leaf ${leaf.slice(0,8)}…` },
+    { id: 'b6', label: 'FixOutput',     x: 290, y: 460, kind: 'related' },
+    { id: 'b7', label: 'LoopExit',      x: 540, y: 380, kind: 'normal' },
+    { id: 'b8', label: 'Exit',          x: 540, y: 460, kind: 'normal' },
+  ];
+  const edges = [
+    ['b0','b1'], ['b1','b2'], ['b1','b3'], ['b2','b4'], ['b3','b4'],
+    ['b4','b5','hot'], ['b5','b6','hot'], ['b6','b1'], ['b1','b7'], ['b7','b8'],
+  ];
+
+  const W = 660, H = 540;
+
+  const nodeRender = (n) => {
+    const w = 110, h = 36;
+    const cx = n.x + w / 2, cy = n.y + h / 2;
+    const klass = n.kind === 'target' ? 'is-target' : n.kind === 'related' ? 'is-related' : '';
+    return `<g>
+      <rect class="bg-node ${klass}" x="${n.x}" y="${n.y}" width="${w}" height="${h}" rx="4"/>
+      <text class="bg-node-text" x="${cx}" y="${cy - 2}">${n.label}</text>
+      ${n.sub ? `<text class="bg-node-sub" x="${cx}" y="${cy + 11}">${n.sub}</text>` : ''}
+    </g>`;
+  };
+
+  const edgeRender = ([a, b, hot]) => {
+    const A = nodes.find(n => n.id === a); const B = nodes.find(n => n.id === b);
+    if (!A || !B) return '';
+    const ax = A.x + 55, ay = A.y + 36;
+    const bx = B.x + 55, by = B.y;
+    const midY = (ay + by) / 2;
+    const path = `M ${ax} ${ay} C ${ax} ${midY}, ${bx} ${midY}, ${bx} ${by - 4}`;
+    return `<path class="bg-edge ${hot ? 'is-hot' : ''}" d="${path}" marker-end="url(#arr)"/>`;
+  };
+
+  return `
+    <svg class="bg-canvas" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
+        </marker>
+      </defs>
+      ${edges.map(edgeRender).join('')}
+      ${nodes.map(nodeRender).join('')}
+    </svg>
+    <div class="bg-legend">
+      <span><span class="sw is-target"></span>当前 leafHash · Compute (wrap ${wrap})</span>
+      <span><span class="sw is-related"></span>相邻热路径节点</span>
+      <span><span class="sw is-normal"></span>其它节点</span>
+      <span style="margin-left:auto;color:var(--text-tertiary);">L3 演示：节点 / 边为示意，生产版本由 IR / Block IR 实际拓扑生成。</span>
+    </div>
+  `;
+}
+
+  __exports.renderBlockGraph = renderBlockGraph;
+})(__PYPTOUX_MODULES__['js/jump/block-graph.js'] = {});
+
+/* === inlined module: js/jump/hw-path.js === */
+(function(__exports){
+// A5 hardware micro-architecture diagram (structural reference from
+// 05-prototypes/03-ascend-hardware-architecture/experiments/html/ascend-950-hardware-v1.html).
+// Layout: AIC subsystem (L1 → L0A/B → Cube → L0C → FixPipe/MTE3 → GM)
+//         AIV subsystem (UB ↔ Vector / Scalar; MTE2/3 to GM)
+// The dominant pipe of the selected task is highlighted.
+
+const HW_NODES = [
+  // shared / GM
+  { id: 'GM',      label: 'GM',      sub: 'Global Memory', kind: 'storage', x: 320, y: 30,  w: 160, h: 36 },
+
+  // AIC subsystem (top-left block)
+  { id: 'L1',      label: 'L1',      sub: 'L1 Buffer',     kind: 'storage', x: 60,  y: 130, w: 110, h: 34 },
+  { id: 'L0A',     label: 'L0A',     sub: 'matrix A in',   kind: 'storage', x: 30,  y: 210, w: 100, h: 34 },
+  { id: 'L0B',     label: 'L0B',     sub: 'matrix B in',   kind: 'storage', x: 140, y: 210, w: 100, h: 34 },
+  { id: 'Cube',    label: 'Cube',    sub: 'Matrix Engine', kind: 'compute', x: 60,  y: 290, w: 180, h: 40 },
+  { id: 'L0C',     label: 'L0C',     sub: 'output / acc',  kind: 'storage', x: 60,  y: 360, w: 180, h: 34 },
+  { id: 'FixPipe', label: 'FixPipe', sub: 'L0C → GM/L1',   kind: 'fix',     x: 60,  y: 430, w: 180, h: 36 },
+  { id: 'ScalarA', label: 'Scalar',  sub: 'AIC dispatch',  kind: 'compute', x: 260, y: 290, w: 80,  h: 40 },
+
+  // MTE units (AIC side)
+  { id: 'MTE2_AIC', label: 'MTE2',   sub: 'GM → L1',       kind: 'mte',     x: 200, y: 100, w: 88, h: 30 },
+  { id: 'MTE1',     label: 'MTE1',   sub: 'L1 → L0A/B',    kind: 'mte',     x: 200, y: 175, w: 88, h: 30 },
+  { id: 'MTE3_AIC', label: 'MTE3',   sub: 'L0C → GM',      kind: 'mte',     x: 200, y: 480, w: 88, h: 30 },
+
+  // AIV subsystem (right side)
+  { id: 'UB',      label: 'Unified Buffer', sub: 'AIV main', kind: 'storage', x: 460, y: 210, w: 150, h: 34 },
+  { id: 'Vector',  label: 'Vector', sub: 'Vec Engine',    kind: 'compute', x: 460, y: 290, w: 150, h: 40 },
+  { id: 'ScalarV', label: 'Scalar', sub: 'AIV dispatch',  kind: 'compute', x: 630, y: 290, w: 80,  h: 40 },
+  { id: 'MTE2_AIV', label: 'MTE2',  sub: 'GM → UB',       kind: 'mte',     x: 460, y: 130, w: 88, h: 30 },
+  { id: 'MTE3_AIV', label: 'MTE3',  sub: 'UB → GM',       kind: 'mte',     x: 555, y: 130, w: 88, h: 30 },
+];
+
+const HW_EDGES = [
+  ['GM',       'MTE2_AIC',   'mte2'],
+  ['MTE2_AIC', 'L1',         'mte2'],
+  ['L1',       'MTE1',       'mte1'],
+  ['MTE1',     'L0A',        'mte1'],
+  ['MTE1',     'L0B',        'mte1'],
+  ['L0A',      'Cube',       'cube'],
+  ['L0B',      'Cube',       'cube'],
+  ['Cube',     'L0C',        'cube'],
+  ['L0C',      'FixPipe',    'fixpipe'],
+  ['FixPipe',  'MTE3_AIC',   'mte3'],
+  ['MTE3_AIC', 'GM',         'mte3'],
+  ['ScalarA',  'Cube',       'scalar'],
+
+  ['GM',       'MTE2_AIV',   'mte2'],
+  ['MTE2_AIV', 'UB',         'mte2'],
+  ['UB',       'Vector',     'vec'],
+  ['Vector',   'UB',         'vec'],
+  ['UB',       'MTE3_AIV',   'mte3'],
+  ['MTE3_AIV', 'GM',         'mte3'],
+  ['ScalarV',  'Vector',     'scalar'],
+];
+
+// counter family → which nodes & edges to highlight
+const HIGHLIGHT_BY_FAMILY = {
+  compute:  { nodes: ['Cube', 'Vector', 'L0A', 'L0B', 'L0C', 'UB'], edges: ['cube', 'vec'] },
+  scalar:   { nodes: ['ScalarA', 'ScalarV'], edges: ['scalar'] },
+  mte1:     { nodes: ['MTE1', 'L1', 'L0A', 'L0B'], edges: ['mte1'] },
+  mte2:     { nodes: ['MTE2_AIC', 'MTE2_AIV', 'L1', 'UB', 'GM'], edges: ['mte2'] },
+  mte3:     { nodes: ['MTE3_AIC', 'MTE3_AIV', 'L0C', 'UB', 'GM'], edges: ['mte3'] },
+  fixpipe:  { nodes: ['FixPipe', 'L0C'], edges: ['fixpipe'] },
+};
+
+function familyOfCounter(counter) {
+  if (counter === 'cube_instr_busy' || counter === 'pmu_idc_aic_vec_busy_o') return 'compute';
+  if (counter === 'scalar_instr_busy') return 'scalar';
+  if (counter === 'mte1_instr_busy') return 'mte1';
+  if (counter === 'mte2_instr_busy') return 'mte2';
+  if (counter === 'mte3_instr_busy') return 'mte3';
+  if (counter === 'pmu_fix_instr_busy') return 'fixpipe';
+  return null;
+}
+
+function renderHwPath(ctx) {
+  const { task, derived, dominantMeta } = ctx;
+  const family = derived ? familyOfCounter(derived.dominantCounter) : null;
+  const hl = family ? HIGHLIGHT_BY_FAMILY[family] : { nodes: [], edges: [] };
+  const hlNodes = new Set(hl.nodes);
+  const hlEdges = new Set(hl.edges);
+
+  const W = 760, H = 540;
+
+  const nodeKindClass = {
+    storage: 'is-storage', compute: 'is-compute', mte: 'is-mte', fix: 'is-fix',
+  };
+
+  const nodeRender = (n) => {
+    const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+    const hl = hlNodes.has(n.id) ? 'is-highlight' : '';
+    return `<g>
+      <rect class="hw-node ${nodeKindClass[n.kind]} ${hl}" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="4"/>
+      <text class="hw-label" x="${cx}" y="${cy - 4}">${n.label}</text>
+      <text class="hw-sub" x="${cx}" y="${cy + 9}">${n.sub}</text>
+    </g>`;
+  };
+  const findN = id => HW_NODES.find(n => n.id === id);
+  const edgeRender = ([a, b, fam]) => {
+    const A = findN(a), B = findN(b);
+    if (!A || !B) return '';
+    const ax = A.x + A.w / 2, ay = A.y + A.h;
+    const bx = B.x + B.w / 2, by = B.y;
+    const midY = (ay + by) / 2;
+    const hot = hlEdges.has(fam) ? 'is-hot' : '';
+    return `<path class="hw-edge ${hot}" d="M ${ax} ${ay} C ${ax} ${midY}, ${bx} ${midY}, ${bx} ${by - 2}" marker-end="url(#hwarr)"/>`;
+  };
+
+  // rail: list cycle-like counters with values; mark dominant
+  const railHtml = derived ? `
+    <div class="hw-rail">
+      <div class="hw-rail-title">Cycle-like counters</div>
+      ${derived.composition.map(seg => {
+        const isDom = seg.counter === derived.dominantCounter;
+        const pct = (seg.value / derived.clcCycle * 100).toFixed(1);
+        return `<div class="hw-rail-counter ${isDom ? 'is-dominant' : ''}">
+          <span class="n">${seg.counter}</span>
+          <span class="v">${seg.value.toFixed(0)} µs · ${pct}%</span>
+        </div>`;
+      }).join('')}
+      <div class="hw-explain">
+        <b>${dominantMeta?.pipe || '—'}</b>：${dominantMeta?.explain || ''}
+        <br/><span style="color:var(--text-tertiary);">右图中黄色描边为该 counter 命中的硬件路径。</span>
+      </div>
+    </div>` : `<div class="hw-rail"><div class="hw-rail-title">无 group 2 数据</div></div>`;
+
+  return `
+    <div class="hw-canvas-wrap">
+      <svg class="hw-canvas" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="hwarr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--text-muted)"/>
+          </marker>
+        </defs>
+
+        <!-- AIC group box -->
+        <rect x="14" y="86" width="320" height="412" rx="6" fill="rgba(188,140,255,0.04)" stroke="rgba(188,140,255,0.30)" stroke-dasharray="4 3"/>
+        <text x="174" y="100" fill="var(--purple)" font-family="var(--font-mono)" font-size="11" text-anchor="middle">AIC subsystem</text>
+
+        <!-- AIV group box -->
+        <rect x="444" y="116" width="296" height="220" rx="6" fill="rgba(247,120,186,0.04)" stroke="rgba(247,120,186,0.30)" stroke-dasharray="4 3"/>
+        <text x="592" y="130" fill="var(--pink)" font-family="var(--font-mono)" font-size="11" text-anchor="middle">AIV subsystem</text>
+
+        ${HW_EDGES.map(edgeRender).join('')}
+        ${HW_NODES.map(nodeRender).join('')}
+      </svg>
+      ${railHtml}
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:11.5px;">
+      L3 演示：硬件结构参考 <code>03-ascend-hardware-architecture/experiments/html/ascend-950-hardware-v1.html</code> 简化。生产版本应使用 Codex 提供的 A5 / dav_3510 真实拓扑与 counter→pipe 映射。
+    </p>
+  `;
+}
+
+  __exports.renderHwPath = renderHwPath;
+})(__PYPTOUX_MODULES__['js/jump/hw-path.js'] = {});
+
+/* === inlined module: js/jump/modal.js === */
+(function(__exports){
+  const { renderSource } = __PYPTOUX_MODULES__['js/jump/source-view.js'];
+  const { renderCall } = __PYPTOUX_MODULES__['js/jump/call-view.js'];
+  const { renderBlockGraph } = __PYPTOUX_MODULES__['js/jump/block-graph.js'];
+  const { renderHwPath } = __PYPTOUX_MODULES__['js/jump/hw-path.js'];
+// Modal shell for the 4 jump destinations.
+
+
+
+
+const TITLES = {
+  source: { kicker: 'Source', label: '源码片段' },
+  call: { kicker: 'CALL', label: '调用图定位' },
+  blockgraph: { kicker: 'Block Graph', label: 'Block Graph 定位' },
+  hw: { kicker: 'Hardware Path', label: 'A5 微架构 · dominant pipe' },
+};
+
+function openModal(type, ctx) {
+  const root = document.getElementById('modal-root');
+  root.classList.add('is-open');
+
+  let bodyHtml = '';
+  if (type === 'source') bodyHtml = renderSource(ctx);
+  else if (type === 'call') bodyHtml = renderCall(ctx);
+  else if (type === 'blockgraph') bodyHtml = renderBlockGraph(ctx);
+  else if (type === 'hw') bodyHtml = renderHwPath(ctx);
+
+  const t = TITLES[type];
+  const sub = type === 'source'
+    ? `${ctx.task.traceLinks.source.path}:${ctx.task.traceLinks.source.lineStart}-${ctx.task.traceLinks.source.lineEnd}`
+    : type === 'call' ? `callOpMagic ${ctx.task.traceLinks.callOpMagic}`
+    : type === 'blockgraph' ? `leafHash ${ctx.task.traceLinks.leafHash}`
+    : `${ctx.dominantMeta?.pipe || '—'}`;
+
+  root.innerHTML = `
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-window" role="dialog">
+      <div class="modal-head">
+        <div>
+          <div class="modal-kicker">${t.kicker}</div>
+          <div class="modal-title">${t.label}</div>
+        </div>
+        <div class="modal-sub">${sub}</div>
+        <div class="modal-head-spacer"></div>
+        <button class="btn btn-ghost btn-icon btn-sm modal-close" id="modal-close" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">${bodyHtml}</div>
+    </div>
+  `;
+
+  const close = () => {
+    root.classList.remove('is-open');
+    root.innerHTML = '';
+    document.removeEventListener('keydown', onKey);
+  };
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onKey);
+  root.querySelector('#modal-close').addEventListener('click', close);
+  root.querySelector('#modal-backdrop').addEventListener('click', close);
+}
+
+  __exports.openModal = openModal;
+})(__PYPTOUX_MODULES__['js/jump/modal.js'] = {});
+
+/* === inlined module: js/view/detail-panel.js === */
+(function(__exports){
+  const { state, setState } = __PYPTOUX_MODULES__['js/state.js'];
+  const { LANES, WRAPS, TASKS, TASKS_BY_ID, TASKS_BY_LANE } = __PYPTOUX_MODULES__['js/data/tasks.js'];
+  const { getGroup } = __PYPTOUX_MODULES__['js/groups/registry.js'];
+  const { COUNTER_META, EVENT_COUNTERS } = __PYPTOUX_MODULES__['js/data/hw-map.js'];
+  const { openModal } = __PYPTOUX_MODULES__['js/jump/modal.js'];
+  const { scrollToTask } = __PYPTOUX_MODULES__['js/view/swimlane.js'];
+// Right-side Detail Panel.
+// Conclusion-first → counter breakdown → hardware path → peer task → 6 jump actions.
+
+
+
+
+
+
+function renderDetail() {
+  const el = document.getElementById('detail-panel');
+  const task = state.selectedTaskId ? TASKS_BY_ID[state.selectedTaskId] : null;
+  if (!task) {
+    el.innerHTML = `
+      <div class="panel-head">
+        <div class="panel-title">Detail</div>
+        <div class="panel-headline muted">未选中 task</div>
+      </div>
+      <div class="dp-empty">
+        <span class="ico">◐</span>
+        <div>点击泳道上的 task，或从左侧 critical Wrap 列表跳入。</div>
+      </div>
+    `;
+    return;
+  }
+
+  const group = getGroup(state.groupId)?.impl;
+  const derived = (task.g2 && group) ? group.derive(task) : null;
+  const peers = group ? group.findPeers(task, TASKS_BY_LANE, WRAPS) : [];
+  const dominantMeta = derived?.dominantCounter ? COUNTER_META[derived.dominantCounter] : null;
+  const next = derived ? group.suggestNextGroup(task, derived) : null;
+
+  el.innerHTML = `
+    <div class="panel-head">
+      <div class="panel-title">Detail · ${task.laneKind} ${task.wrapId ? '· ' + task.wrapId : ''}</div>
+      <div class="panel-headline mono">${task.opName}</div>
+      <div class="dp-derived" style="margin-top:6px;">
+        <span class="dp-chip"><span class="k">total</span><span class="v">${task.totalCycle.toFixed(0)} µs</span></span>
+        ${derived ? `<span class="dp-chip"><span class="k">clc</span><span class="v">${derived.clcCycle.toFixed(0)} µs</span></span>` : ''}
+        ${derived ? renderGapChip(derived) : ''}
+      </div>
+    </div>
+
+    <div class="panel-body inspector-rail">
+      ${derived ? renderConclusion(task, derived, dominantMeta, peers) : renderNoPmuConclusion(task)}
+
+      ${derived ? renderCounterBreakdown(task, derived, group) : ''}
+
+      ${dominantMeta ? `
+        <div class="dp-section inspector-section">
+          <div class="dp-section-title">Hardware path · dominant</div>
+          <div class="hw-summary inspector-soft-card">
+            ${dominantMeta.explain} 对应硬件路径：<span class="hw-pipe">${dominantMeta.pipe}</span>。
+          </div>
+        </div>
+      ` : ''}
+
+      ${peers.length > 0 ? `
+        <div class="dp-section inspector-section">
+          <div class="dp-section-title">Peer tasks · 同 Wrap</div>
+          <div class="peer-list" id="peer-list">
+            ${peers.map(p => renderPeerRow(p, task, group)).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="dp-section inspector-section">
+        <div class="dp-section-title">Jump · 一跳定位</div>
+        <div class="dp-jumps">
+          <button class="dp-jump-btn" data-jump="source"><span class="dp-jump-ico">{ }</span><span class="dp-jump-meta"><span class="dp-jump-name">源码</span><span class="dp-jump-sub">${task.traceLinks.source.path}:${task.traceLinks.source.hotLine}</span></span></button>
+          <button class="dp-jump-btn" data-jump="call"><span class="dp-jump-ico">CL</span><span class="dp-jump-meta"><span class="dp-jump-name">CALL</span><span class="dp-jump-sub">${task.traceLinks.callOpMagic}</span></span></button>
+          <button class="dp-jump-btn" data-jump="blockgraph"><span class="dp-jump-ico">BG</span><span class="dp-jump-meta"><span class="dp-jump-name">Block Graph</span><span class="dp-jump-sub">leaf ${task.traceLinks.leafHash.slice(0, 14)}…</span></span></button>
+          <button class="dp-jump-btn" data-jump="hw" ${dominantMeta ? '' : 'disabled'}><span class="dp-jump-ico">HW</span><span class="dp-jump-meta"><span class="dp-jump-name">硬件路径</span><span class="dp-jump-sub">${dominantMeta ? dominantMeta.pipe : '需要 group 2 数据'}</span></span></button>
+          <button class="dp-jump-btn" data-jump="peer" ${peers.length > 0 ? '' : 'disabled'}><span class="dp-jump-ico">PR</span><span class="dp-jump-meta"><span class="dp-jump-name">Peer 视图</span><span class="dp-jump-sub">${state.mixMode ? '已开启 Mix' : '建议开启 Mix 模式'}</span></span></button>
+          <button class="dp-jump-btn" data-jump="next" ${next ? '' : 'disabled'}><span class="dp-jump-ico">▶︎</span><span class="dp-jump-meta"><span class="dp-jump-name">下次采集</span><span class="dp-jump-sub">${next ? 'Group ' + next.group : '—'}</span></span></button>
+        </div>
+      </div>
+
+      ${next ? `
+        <div class="next-suggest inspector-soft-card">
+          <div class="next-suggest-eyebrow">下一次采集建议</div>
+          <div class="next-suggest-text">${next.reason}。</div>
+          <div class="next-suggest-cmd">
+            <span class="cmd">${next.cmd}</span>
+            <button class="btn btn-sm btn-ghost copy" id="dp-copy-cmd">复制</button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  attachDetailEvents(task, derived, dominantMeta, peers, next);
+}
+
+function renderGapChip(d) {
+  const cls = d.status === 'wait' ? 'is-bad' : d.status === 'overlap' ? 'is-warn' : 'is-ok';
+  const sign = d.gap >= 0 ? '+' : '';
+  return `<span class="dp-chip ${cls}"><span class="k">gap</span><span class="v">${sign}${d.gap.toFixed(0)} µs · ${(d.gapRatio * 100).toFixed(1)}%</span></span>`;
+}
+
+function renderConclusion(task, d, dominantMeta, peers) {
+  let badge, lead, body;
+  if (d.status === 'wait') {
+    badge = '<span class="dp-conclusion-badge wait">Wait suspect</span>';
+    lead = `<b class="mono">clc=${d.clcCycle.toFixed(0)} µs</b> &lt; <b class="mono">total=${task.totalCycle.toFixed(0)} µs</b>，gap_ratio = <b>${(d.gapRatio*100).toFixed(1)}%</b>。`;
+    body = `当前 group 的 cycle-like counter 只解释了 task 生命周期的 ${(d.clcCycle/task.totalCycle*100).toFixed(0)}%。Dominant 指向 <b class="mono">${d.dominantCounter}</b>（${dominantMeta?.pipe}），但仍有显著未解释时间 — 疑似 <b>uncovered / wait / idle / sync / 未统计 stall</b>。`;
+  } else if (d.status === 'overlap') {
+    badge = '<span class="dp-conclusion-badge overlap">Overlap suspect</span>';
+    lead = `<b class="mono">clc=${d.clcCycle.toFixed(0)} µs</b> &gt; <b class="mono">total=${task.totalCycle.toFixed(0)} µs</b>，overflow = <b>${(d.gapRatio*100).toFixed(1)}%</b>。`;
+    body = `cycle-like 求和超过 total。可能是 <b>pipeline overlap</b>（pipe 间并行），也可能是 <b>non-exclusive counter double-count</b>。<b style="color:var(--yellow)">不能直接表述为"更好"</b>，需结合 dominant counter 与 peer task 判断。`;
+  } else {
+    badge = '<span class="dp-conclusion-badge accounted">Accounted</span>';
+    lead = `<b class="mono">clc ≈ total</b>，PMU pipeline 解释充分。`;
+    body = `Dominant <b class="mono">${d.dominantCounter}</b>（${dominantMeta?.pipe}）。可继续追溯硬件路径或对比 peer task。`;
+  }
+  const peerHint = peers.length > 1 && !state.mixMode
+    ? `<div style="margin-top:8px;color:var(--text-tertiary);font-size:11px;">提示：开启 <b>Mix 模式</b> 可看到同 Wrap C / V peer 的开始 / 结束 / 拖尾关系。</div>` : '';
+  return `<div class="dp-section inspector-section">
+    <div class="dp-conclusion inspector-soft-card is-${d.status}">
+      ${badge}
+      <div class="dp-conclusion-text">${lead}</div>
+      <div class="dp-conclusion-text" style="margin-top:6px;color:var(--text-secondary);">${body}</div>
+      ${peerHint}
+    </div>
+  </div>`;
+}
+
+function renderNoPmuConclusion(task) {
+  return `<div class="dp-section inspector-section">
+    <div class="dp-conclusion inspector-soft-card is-accounted" style="background:var(--inspector-soft-card-bg);">
+      <span class="dp-conclusion-badge" style="background:var(--bg-elev-3);color:var(--text-secondary);">No PMU</span>
+      <div class="dp-conclusion-text">本 lane (${task.laneKind}) 不参与 group 2 PMU 解释。<br/>
+      它属于全局调度 / 数据迁移层。如需 PMU 数据，请关注 AIC / AIV lane 上的 task。</div>
+    </div>
+  </div>`;
+}
+
+function renderCounterBreakdown(task, d, group) {
+  const total = task.totalCycle;
+  // composition bar (clc-relative widths, with a marker for total)
+  let segs = d.composition.map(seg => {
+    const family = group.familyOf(seg.counter);
+    const color = group.familyColor(family);
+    const pct = (seg.value / d.clcCycle) * 100;
+    return `<span title="${seg.counter} · ${seg.value.toFixed(0)} µs" style="width:${pct}%;background:${color}"></span>`;
+  }).join('');
+
+  // mark the "total" position relative to the displayed clc bar width.
+  // If clc<total, the bar represents clc; the total marker sits past the bar.
+  // If clc>total, the bar represents clc; the total marker sits inside the bar.
+  let totalMarkerHtml = '';
+  if (d.status === 'wait') {
+    // bar width = (clc/total)*100%; so total marker is at 100% relative to (clc/total) bar
+    // Place marker at right edge of total range
+    const barClcRatio = d.clcCycle / total; // < 1
+    const totalAtBar = 100 / barClcRatio;   // > 100; outside container
+    if (totalAtBar < 220) {
+      totalMarkerHtml = `<span class="cb-total-marker" style="left:${totalAtBar}%;"></span><span class="cb-total-tag" style="left:${totalAtBar}%;">total ${total.toFixed(0)} µs</span>`;
+    }
+  } else if (d.status === 'overlap') {
+    const totalPct = (total / d.clcCycle) * 100;
+    totalMarkerHtml = `<span class="cb-total-marker" style="left:${totalPct}%;"></span><span class="cb-total-tag" style="left:${totalPct}%;">total ${total.toFixed(0)} µs</span>`;
+  }
+
+  let rows = '';
+  for (const seg of d.composition) {
+    const meta = COUNTER_META[seg.counter];
+    const family = group.familyOf(seg.counter);
+    const color = group.familyColor(family);
+    const pct = ((seg.value / d.clcCycle) * 100).toFixed(1);
+    const isDominant = seg.counter === d.dominantCounter;
+    rows += `<span class="sw" style="background:${color}"></span>
+             <span class="name ${isDominant ? 'is-dominant' : ''}">${meta?.label || seg.counter}</span>
+             <span class="val">${seg.value.toFixed(0)} µs</span>
+             <span class="pct">${pct}%</span>`;
+  }
+
+  // event counters
+  let eventRows = '';
+  for (const ec of EVENT_COUNTERS) {
+    const v = task.g2[ec];
+    if (v == null) continue;
+    eventRows += `<span class="sw" style="background:var(--bg-elev-3);border:1px dashed var(--border-strong);"></span>
+                  <span class="name is-event">${ec}</span>
+                  <span class="val">${v}</span>
+                  <span class="pct">event</span>`;
+  }
+
+  return `<div class="dp-section inspector-section">
+    <div class="dp-section-title">Counter breakdown · cycle-like（µs）</div>
+    <div class="cb-bar" style="position:relative;overflow:visible;">${segs}${totalMarkerHtml}</div>
+    <div class="cb-rows">${rows}</div>
+    ${eventRows ? `<div class="dp-section-title" style="margin-top:10px;">事件计数 · 不参与 clc 求和</div>
+                   <div class="cb-rows">${eventRows}</div>` : ''}
+  </div>`;
+}
+
+function renderPeerRow(p, self, group) {
+  const isSelf = p.id === self.id;
+  const d = (p.g2 && group) ? group.derive(p) : null;
+  const status = d?.status || '—';
+  return `<div class="peer-row inspector-soft-card is-interactive ${isSelf ? 'is-self' : ''}" data-task-id="${p.id}">
+    <span class="peer-lane">${p.laneId}</span>
+    <span class="peer-op">${p.opName}</span>
+    <span class="peer-end">${p.end.toFixed(0)} µs</span>
+    <span class="peer-status ${status === 'wait' ? 'wait' : status === 'overlap' ? 'overlap' : status === 'accounted' ? 'ok' : ''}">${status}</span>
+  </div>`;
+}
+
+function attachDetailEvents(task, derived, dominantMeta, peers, next) {
+  const el = document.getElementById('detail-panel');
+  el.querySelectorAll('.dp-jump-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const jump = btn.dataset.jump;
+      if (jump === 'source') openModal('source', { task });
+      else if (jump === 'call') openModal('call', { task });
+      else if (jump === 'blockgraph') openModal('blockgraph', { task });
+      else if (jump === 'hw') openModal('hw', { task, derived, dominantMeta });
+      else if (jump === 'peer') {
+        if (!state.mixMode) setState({ mixMode: true });
+        scrollToTask(task.id);
+      } else if (jump === 'next' && next) {
+        navigator.clipboard?.writeText(next.cmd);
+        toast(`下次采集：${next.cmd}（已复制）`);
+      }
+    });
+  });
+  el.querySelectorAll('.peer-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const tid = row.dataset.taskId;
+      setState({ selectedTaskId: tid });
+      scrollToTask(tid);
+    });
+  });
+  const copyBtn = el.querySelector('#dp-copy-cmd');
+  if (copyBtn && next) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(next.cmd);
+      toast(`已复制：${next.cmd}`);
+    });
+  }
+}
+
+function toast(text) {
+  const root = document.getElementById('toast-root');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = text;
+  root.appendChild(t);
+  setTimeout(() => t.remove(), 1800);
+}
+
+  __exports.renderDetail = renderDetail;
+})(__PYPTOUX_MODULES__['js/view/detail-panel.js'] = {});
+
+/* === inlined module: js/main.js === */
+(function(__exports){
+  const { TASKS, ANCHOR_TASK_ID, SAMPLED_GROUP } = __PYPTOUX_MODULES__['js/data/tasks.js'];
+  const { state, setState, subscribe } = __PYPTOUX_MODULES__['js/state.js'];
+  const { renderTopbar, setHpTaskCount } = __PYPTOUX_MODULES__['js/view/topbar.js'];
+  const { initSwimlane, renderSwimlane, renderLegend, renderTitle } = __PYPTOUX_MODULES__['js/view/swimlane.js'];
+  const { renderSummary } = __PYPTOUX_MODULES__['js/view/summary.js'];
+  const { renderDetail } = __PYPTOUX_MODULES__['js/view/detail-panel.js'];
+// Entry. Loads data, subscribes views to state, installs initial selection.
+
+
+
+
+
+
+function renderAll() {
+  renderTopbar();
+  renderLegend('sl-legend');
+  renderTitle('sl-title');
+  renderSwimlane();
+  renderSummary();
+  renderDetail();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  setHpTaskCount(TASKS.length);
+  initSwimlane('swimlane-host');
+
+  // expose helper for unsampled-state "switch to G2" button
+  window.__switchG2 = () => setState({ groupId: 2 });
+
+  // subscribe FIRST so that any setState fires re-renders.
+  subscribe((s, patch) => {
+    // Topbar (mix toggle + group tabs reflect state)
+    if ('mixMode' in patch || 'groupId' in patch) {
+      renderTopbar();
+      renderLegend('sl-legend');
+      renderTitle('sl-title');
+      renderSwimlane();
+      renderSummary();
+      renderDetail();
+      return;
+    }
+    if ('selectedTaskId' in patch || 'hoveredTaskId' in patch) {
+      renderSwimlane(); // re-render to update selection stroke
+      renderDetail();
+      return;
+    }
+    if ('zoom' in patch) {
+      renderSwimlane();
+      return;
+    }
+  });
+
+  // initial render
+  renderAll();
+
+  // initial selection = the anchor (Wrap 7 critical task)
+  setState({ selectedTaskId: ANCHOR_TASK_ID });
+
+  // zoom controls
+  document.getElementById('sl-zoom-in').addEventListener('click', () => {
+    const z = Math.min(4, state.zoom * 1.25);
+    setState({ zoom: z });
+    document.getElementById('sl-zoom-val').textContent = z.toFixed(1) + '×';
+  });
+  document.getElementById('sl-zoom-out').addEventListener('click', () => {
+    const z = Math.max(0.5, state.zoom / 1.25);
+    setState({ zoom: z });
+    document.getElementById('sl-zoom-val').textContent = z.toFixed(1) + '×';
+  });
+  document.getElementById('sl-fit').addEventListener('click', () => {
+    setState({ zoom: 1 });
+    document.getElementById('sl-zoom-val').textContent = '1.0×';
+  });
+});
+
+})(__PYPTOUX_MODULES__['js/main.js'] = {});
+</script>
+</body>
+</html>

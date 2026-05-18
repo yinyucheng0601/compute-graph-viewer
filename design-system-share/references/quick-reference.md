@@ -103,6 +103,9 @@ Do not use `.btn-solid` or white selected buttons for tabs. Reserve white fill f
 
 ### Panels & cards
 
+- `.workbench-frame` — page-level three-pane workbench grid with padding and gutters
+- `.workbench-pane` — filled gray workbench column; use for left / center / right panes
+- `.workbench-pane-body-fill` — inner gray body fill for canvas or dense inspector content
 - `.panel-shell` — outermost panel container with header / body
 - `.panel-shell.panel-shell-quiet` — main workbench section surface; neutral fill, no visual border
 - `.panel-shell-header`, `.panel-shell-title`, `.panel-shell-meta`, `.panel-shell-close`
@@ -119,6 +122,12 @@ Do not use `.btn-solid` or white selected buttons for tabs. Reserve white fill f
 ### Inspector / details
 
 - `.detail-header`, `.detail-body`, `.detail-close`, `.detail-connections`, `.detail-conn-chip`
+- `.inspector-rail` — scroll body for right-side detail rails; uses quiet padding and no card gap
+- `.inspector-section`, `.inspector-section-head`, `.inspector-section-title`, `.inspector-section-kicker` — continuous detail sections separated by `--border-subtle`
+- `.inspector-soft-card` — emphasized content inside a section, no full border, neutral soft surface
+- `.inspector-soft-card.is-info` / `.is-warning` / `.is-danger` / `.is-success` — status emphasis via tinted fill, not a border
+
+Use inspector sections for dense right rails. Do not wrap every metric row in a bordered card; prefer section dividers, neutral row surfaces, and one soft emphasized block for the current conclusion or next action.
 
 ### Toggles & control flow blocks (specialized)
 
@@ -161,10 +170,10 @@ These are allowed to use hard-coded colors **outside** the semantic palette, bec
 
 - Color maps (heatmaps, density)
 - Graph node semantic accents
-- Swimlane event colors
+- Swimlane event colors: use `PtoSwimlaneTaskPattern.createTaskColormap()` for task categories, engine lanes, stitches, and subgraphs
 - Stitch / dependency colors
 
-Document the choice and keep the values in module-local CSS, not in the global tokens.
+Document the choice. Reusable swimlane color rules belong in the shared pattern colormap; one-off data encodings stay module-local and must not become global UI tokens.
 
 ---
 
