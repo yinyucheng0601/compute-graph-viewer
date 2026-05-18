@@ -115,15 +115,52 @@ header.topbar {
 
 /* ============ Main Grid ============ */
 main.layout {
-  display: grid;
-  grid-template-columns: 260px 1fr 1000px;
+  display: flex;
+  align-items: stretch;
   height: 100%;
   overflow: hidden;
   min-height: 0;
+  --split-gutter-size: 10px;
+}
+
+.split-gutter {
+  flex: 0 0 var(--split-gutter-size);
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  background: var(--background);
+}
+
+.split-gutter::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 2px;
+  border-radius: var(--radius-pill);
+  transform: translateX(-50%);
+  background: var(--border-default);
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.split-gutter:hover::before,
+.split-gutter:focus-visible::before,
+body.is-column-resizing .split-gutter::before {
+  background: color-mix(in srgb, var(--primary-hover) 72%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+body.is-column-resizing,
+body.is-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 /* ============ Left Nav ============ */
 nav.left-nav {
+  flex: 0 0 auto;
   background: var(--surface-1);
   border-right: 1px solid var(--border-subtle);
   overflow-y: auto;
@@ -191,6 +228,7 @@ nav.left-nav h2 {
 
 /* ============ Middle Detail ============ */
 section.detail {
+  flex: 0 0 auto;
   overflow-y: auto;
   padding: 28px 36px 56px 36px;
   background: var(--background);
@@ -476,6 +514,7 @@ table.spec .code {
 
 /* ============ Right Hardware Pane ============ */
 aside.right-pane {
+  flex: 0 0 auto;
   background: var(--surface-1);
   border-left: 1px solid var(--border-subtle);
   display: grid;
@@ -726,6 +765,7 @@ aside.right-pane {
   </aside>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
 <script>
 /* ====================================================================
    CATEGORY DATA — 9 essential differences + reverse map
@@ -1082,6 +1122,121 @@ let state = {
 };
 
 const HW_ZOOM_LEVELS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
+const TAXONOMY_SPLIT_KEY = 'ascend950-taxonomy-column-sizes-v1';
+const TAXONOMY_SPLIT_DEFAULT = [17, 33, 50];
+const TAXONOMY_SPLIT_MIN = [220, 420, 520];
+
+function readSplitSizes(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || 'null');
+    if (Array.isArray(value) && value.length === fallback.length && value.every(item => Number.isFinite(item) && item > 4)) {
+      return value;
+    }
+  } catch (error) {
+    return fallback;
+  }
+  return fallback;
+}
+
+function writeSplitSizes(key, sizes) {
+  try {
+    localStorage.setItem(key, JSON.stringify(sizes.map(item => Math.round(item * 100) / 100)));
+  } catch (error) {
+    // Ignore storage failures; the current drag session still applies.
+  }
+}
+
+function makeSplitGutter(index, direction) {
+  const gutter = document.createElement('div');
+  gutter.className = `split-gutter split-gutter-${direction}`;
+  gutter.setAttribute('role', 'separator');
+  gutter.setAttribute('aria-orientation', 'vertical');
+  gutter.setAttribute('aria-label', '调整相邻栏宽度');
+  gutter.tabIndex = 0;
+  return gutter;
+}
+
+let splitLayoutFrame = 0;
+function scheduleSplitLayoutRefresh() {
+  if (splitLayoutFrame) cancelAnimationFrame(splitLayoutFrame);
+  splitLayoutFrame = requestAnimationFrame(() => {
+    splitLayoutFrame = 0;
+    syncHardwareControls();
+  });
+}
+
+function initFallbackSplit(panes, sizes, minSizes, storageKey) {
+  panes.forEach((pane, index) => {
+    pane.style.width = `${sizes[index]}%`;
+  });
+  panes.slice(0, -1).forEach((pane, index) => {
+    const gutter = makeSplitGutter(index + 1, 'horizontal');
+    pane.after(gutter);
+    gutter.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      gutter.setPointerCapture?.(event.pointerId);
+      document.body.classList.add('is-column-resizing');
+      const startX = event.clientX;
+      const startWidths = panes.map(item => item.getBoundingClientRect().width);
+      const totalWidth = startWidths.reduce((sum, width) => sum + width, 0);
+      const leftIndex = index;
+      const rightIndex = index + 1;
+
+      const move = (moveEvent) => {
+        const dx = moveEvent.clientX - startX;
+        let leftWidth = startWidths[leftIndex] + dx;
+        let rightWidth = startWidths[rightIndex] - dx;
+        if (leftWidth < minSizes[leftIndex]) {
+          rightWidth -= minSizes[leftIndex] - leftWidth;
+          leftWidth = minSizes[leftIndex];
+        }
+        if (rightWidth < minSizes[rightIndex]) {
+          leftWidth -= minSizes[rightIndex] - rightWidth;
+          rightWidth = minSizes[rightIndex];
+        }
+        panes[leftIndex].style.width = `${Math.max(minSizes[leftIndex], leftWidth) / totalWidth * 100}%`;
+        panes[rightIndex].style.width = `${Math.max(minSizes[rightIndex], rightWidth) / totalWidth * 100}%`;
+        scheduleSplitLayoutRefresh();
+      };
+
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        document.body.classList.remove('is-column-resizing');
+        const nextTotal = panes.reduce((sum, item) => sum + item.getBoundingClientRect().width, 0);
+        writeSplitSizes(storageKey, panes.map(item => item.getBoundingClientRect().width / nextTotal * 100));
+      };
+
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up, { once: true });
+    });
+  });
+}
+
+function initTaxonomySplit() {
+  const panes = ['#left-nav', '#detail', '.right-pane']
+    .map(selector => document.querySelector(selector))
+    .filter(Boolean);
+  if (panes.length !== 3) return;
+  const sizes = readSplitSizes(TAXONOMY_SPLIT_KEY, TAXONOMY_SPLIT_DEFAULT);
+  if (typeof window.Split === 'function') {
+    window.Split(panes, {
+      sizes,
+      minSize: TAXONOMY_SPLIT_MIN,
+      gutterSize: 10,
+      snapOffset: 0,
+      cursor: 'col-resize',
+      gutter: makeSplitGutter,
+      onDrag: scheduleSplitLayoutRefresh,
+      onDragEnd: (nextSizes) => {
+        writeSplitSizes(TAXONOMY_SPLIT_KEY, nextSizes);
+        scheduleSplitLayoutRefresh();
+      },
+    });
+    return;
+  }
+  initFallbackSplit(panes, sizes, TAXONOMY_SPLIT_MIN, TAXONOMY_SPLIT_KEY);
+}
 
 const DIFF_950_NEW = {
   selectors: ['[data-aiv-node="exec:SIMT"]', '[data-aic-node="buffer:FP"]'],
@@ -1369,6 +1524,7 @@ document.getElementById('hw-zoom-reset').addEventListener('click', () => {
 renderNav();
 renderDetail();
 syncHardwareControls();
+initTaxonomySplit();
 // applyArch fires once iframe sends 'hardware-ready'.
 </script>
 

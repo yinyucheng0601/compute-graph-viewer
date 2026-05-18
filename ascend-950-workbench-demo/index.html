@@ -117,18 +117,53 @@
     .wb-workbench {
       min-height: 0;
       padding: var(--space-4);
-      display: grid;
-      grid-template-columns: minmax(440px, 34%) minmax(520px, 42%) minmax(320px, 24%);
-      grid-template-rows: minmax(0, 1fr);
-      gap: var(--space-4);
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      --split-gutter-size: 12px;
     }
 
     .wb-panel {
+      flex: 0 0 auto;
       min-width: 0;
       min-height: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    .split-gutter {
+      flex: 0 0 var(--split-gutter-size);
+      position: relative;
+      cursor: col-resize;
+      touch-action: none;
+      outline: none;
+    }
+
+    .split-gutter::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      left: 50%;
+      width: 2px;
+      border-radius: var(--radius-pill);
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--border-default) 78%, transparent);
+      transition: background var(--duration-fast) var(--easing-default), box-shadow var(--duration-fast) var(--easing-default);
+    }
+
+    .split-gutter:hover::before,
+    .split-gutter:focus-visible::before,
+    body.is-column-resizing .split-gutter::before {
+      background: color-mix(in srgb, var(--primary-hover) 78%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+    }
+
+    body.is-column-resizing,
+    body.is-column-resizing * {
+      cursor: col-resize !important;
+      user-select: none;
     }
 
     .layout-header {
@@ -2241,6 +2276,7 @@
   <script src="./kernels/gelu_high_api.js"></script>
   <script src="./kernels/gelu_high_performance.js"></script>
   <script src="./kernels/fp8_mmad_masked_reduce.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
   <script>
     const ARCHES = {
       ascend950: {
@@ -2385,6 +2421,124 @@
     const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
     const HARDWARE_FRAME_SRC = './hardware-frame.html';
     const HARDWARE_ZOOM_LEVELS = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2];
+    const WORKBENCH_SPLIT_KEY = 'ascend950-workbench-column-sizes-v1';
+    const WORKBENCH_SPLIT_DEFAULT = [34, 42, 24];
+    const WORKBENCH_SPLIT_MIN = [360, 480, 300];
+
+    function readSplitSizes(key, fallback) {
+      try {
+        const value = JSON.parse(localStorage.getItem(key) || 'null');
+        if (Array.isArray(value) && value.length === fallback.length && value.every((item) => Number.isFinite(item) && item > 4)) {
+          return value;
+        }
+      } catch (error) {
+        return fallback;
+      }
+      return fallback;
+    }
+
+    function writeSplitSizes(key, sizes) {
+      try {
+        localStorage.setItem(key, JSON.stringify(sizes.map((item) => Math.round(item * 100) / 100)));
+      } catch (error) {
+        // Ignore private browsing or storage quota failures; resizing still works for the session.
+      }
+    }
+
+    function makeSplitGutter(index, direction) {
+      const gutter = document.createElement('div');
+      gutter.className = `split-gutter split-gutter-${direction}`;
+      gutter.setAttribute('role', 'separator');
+      gutter.setAttribute('aria-orientation', 'vertical');
+      gutter.setAttribute('aria-label', '调整相邻栏宽度');
+      gutter.tabIndex = 0;
+      return gutter;
+    }
+
+    let splitLayoutFrame = 0;
+    function scheduleSplitLayoutRefresh() {
+      if (splitLayoutFrame) cancelAnimationFrame(splitLayoutFrame);
+      splitLayoutFrame = requestAnimationFrame(() => {
+        splitLayoutFrame = 0;
+        syncTierIndicator();
+        if (isCompareArch()) setCompareHardwareScale();
+        else if (state.fitted) fitHardware();
+      });
+    }
+
+    function initFallbackSplit(panes, sizes, minSizes, storageKey) {
+      const totalGutter = 12 * (panes.length - 1);
+      panes.forEach((pane, index) => {
+        pane.style.width = `calc(${sizes[index]}% - ${totalGutter / panes.length}px)`;
+      });
+      panes.slice(0, -1).forEach((pane, index) => {
+        const gutter = makeSplitGutter(index + 1, 'horizontal');
+        pane.after(gutter);
+        gutter.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          gutter.setPointerCapture?.(event.pointerId);
+          document.body.classList.add('is-column-resizing');
+          const startX = event.clientX;
+          const startWidths = panes.map((item) => item.getBoundingClientRect().width);
+          const totalWidth = startWidths.reduce((sum, width) => sum + width, 0);
+          const leftIndex = index;
+          const rightIndex = index + 1;
+
+          const move = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            let leftWidth = startWidths[leftIndex] + dx;
+            let rightWidth = startWidths[rightIndex] - dx;
+            if (leftWidth < minSizes[leftIndex]) {
+              rightWidth -= minSizes[leftIndex] - leftWidth;
+              leftWidth = minSizes[leftIndex];
+            }
+            if (rightWidth < minSizes[rightIndex]) {
+              leftWidth -= minSizes[rightIndex] - rightWidth;
+              rightWidth = minSizes[rightIndex];
+            }
+            panes[leftIndex].style.width = `${Math.max(minSizes[leftIndex], leftWidth) / totalWidth * 100}%`;
+            panes[rightIndex].style.width = `${Math.max(minSizes[rightIndex], rightWidth) / totalWidth * 100}%`;
+            scheduleSplitLayoutRefresh();
+          };
+
+          const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            document.body.classList.remove('is-column-resizing');
+            const nextTotal = panes.reduce((sum, item) => sum + item.getBoundingClientRect().width, 0);
+            writeSplitSizes(storageKey, panes.map((item) => item.getBoundingClientRect().width / nextTotal * 100));
+          };
+
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up, { once: true });
+        });
+      });
+    }
+
+    function initWorkbenchSplit() {
+      const panes = ['.wb-source-panel', '.wb-hardware-panel', '.wb-inspector-panel']
+        .map((selector) => qs(selector))
+        .filter(Boolean);
+      if (panes.length !== 3) return;
+      const sizes = readSplitSizes(WORKBENCH_SPLIT_KEY, WORKBENCH_SPLIT_DEFAULT);
+      if (typeof window.Split === 'function') {
+        window.Split(panes, {
+          sizes,
+          minSize: WORKBENCH_SPLIT_MIN,
+          gutterSize: 12,
+          snapOffset: 0,
+          cursor: 'col-resize',
+          gutter: makeSplitGutter,
+          onDrag: scheduleSplitLayoutRefresh,
+          onDragEnd: (nextSizes) => {
+            writeSplitSizes(WORKBENCH_SPLIT_KEY, nextSizes);
+            scheduleSplitLayoutRefresh();
+          },
+        });
+        return;
+      }
+      initFallbackSplit(panes, sizes, WORKBENCH_SPLIT_MIN, WORKBENCH_SPLIT_KEY);
+    }
 
     function currentKernel() {
       return KERNELS.find((kernel) => kernel.id === state.selectedKernelId) || KERNELS[0];
@@ -4295,6 +4449,7 @@
 
     syncHardwareDetailToggle();
     updateHardwareZoomButtons();
+    initWorkbenchSplit();
     renderArchSelector();
     selectKernel(state.selectedKernelId);
     renderHardware();
