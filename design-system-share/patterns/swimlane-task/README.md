@@ -6,8 +6,9 @@ The visual contract comes from `pypto-swimlane-perf-tool/js/swimlane.js` task-ba
 
 Color contract:
 
-- Callers provide a semantic `baseColor`; the pattern does not choose a continuous color map.
-- Dense swimlanes should use `PtoSwimlaneTaskPattern.createTaskColormap()` to map task categories, engine lanes, stitches, or subgraphs to stable colors, then pass the category color into `drawTaskBar`.
+- Callers provide a semantic `baseColor`, usually from `PtoSwimlaneTaskPattern.createTaskColormap()`.
+- Dense swimlanes should use `createTaskColormap()` to map task categories, engine lanes, stitches, or subgraphs to stable colors, then pass the category color into `drawTaskBar`.
+- The default semantic colormap maps a stable task domain onto a categorical palette, then falls back to hash indexing into the same palette for unknown keys. It must not use raw `hash % 360` hue selection because nearby task keys can cluster into one hue family.
 - `drawTaskBar` tones the received color toward the dark workbench surface before painting segments, so dense rows stay readable without becoming neon.
 - Selection/emphasis may lightly raise luminance, but should not change category identity.
 

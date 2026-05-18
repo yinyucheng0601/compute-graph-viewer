@@ -173,7 +173,7 @@ These are allowed to use hard-coded colors **outside** the semantic palette, bec
 - Swimlane event colors: use `PtoSwimlaneTaskPattern.createTaskColormap()` for task categories, engine lanes, stitches, and subgraphs
 - Stitch / dependency colors
 
-Document the choice. Reusable swimlane color rules belong in the shared pattern colormap; one-off data encodings stay module-local and must not become global UI tokens.
+Document the choice. Reusable swimlane color rules belong in the shared pattern colormap; one-off data encodings stay module-local and must not become global UI tokens. Task identity fallback colors use the categorical palette in `patterns/swimlane-task/pattern.js`, not raw `hash % 360` hue mapping.
 
 ---
 

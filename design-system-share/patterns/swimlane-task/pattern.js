@@ -22,6 +22,31 @@
 
   const DEFAULT_STITCH_COLORS = ['#735bb4', '#4d70ba', '#4a9568', '#ba8053', '#45a2ad', '#b46494', '#238fcf', '#c99524'];
 
+  const DEFAULT_CATEGORICAL_COLORMAP = [
+    '#5b8def',
+    '#f2a23a',
+    '#a97ae6',
+    '#38b8b2',
+    '#e46b8a',
+    '#43a3d9',
+    '#8b929e',
+    '#76b85a',
+    '#c58b5f',
+    '#d86ad9',
+    '#d7b84e',
+    '#6d88d7',
+  ];
+
+  const DEFAULT_SEMANTIC_DOMAIN = [
+    'matmul',
+    'vec_softmax',
+    'vec_layernorm',
+    'vec_elementwise',
+    'vec_reduce',
+    'mte_load',
+    'cpu_sched',
+  ];
+
   const DEFAULT_LABEL_COLORS = {
     'Prolog-Quant': '#8d6bc7',
     'Query-Linear': '#735bb4',
@@ -141,6 +166,22 @@
     return hslToHex(stableHash(input) % 360, saturation, lightness);
   }
 
+  function colorFromColormap(input, palette = DEFAULT_CATEGORICAL_COLORMAP, domain = []) {
+    const colors = Array.isArray(palette) && palette.length ? palette : DEFAULT_CATEGORICAL_COLORMAP;
+    const key = String(input || 'unknown');
+    const domainIndex = Array.isArray(domain) ? domain.indexOf(key) : -1;
+    const colorIndex = domainIndex >= 0 ? domainIndex : stableHash(key) % colors.length;
+    return colors[colorIndex % colors.length];
+  }
+
+  function categoricalHashColor(input, saturation = 44, lightness = 46, hueSet = null) {
+    if (Array.isArray(hueSet) && hueSet.length) {
+      const hue = hueSet[stableHash(input) % hueSet.length];
+      return hslToHex(hue, saturation, lightness);
+    }
+    return colorFromColormap(input);
+  }
+
   function normalizeTaskColorKey(task) {
     return String(
       task?.colorKey ||
@@ -155,6 +196,8 @@
 
   function createTaskColormap(options = {}) {
     const stitchColors = options.stitchColors || DEFAULT_STITCH_COLORS;
+    const colormap = options.colormap || options.palette || DEFAULT_CATEGORICAL_COLORMAP;
+    const semanticDomain = options.semanticDomain || DEFAULT_SEMANTIC_DOMAIN;
     const labelColors = {
       ...DEFAULT_LABEL_COLORS,
       ...(options.labelColors || {}),
@@ -168,6 +211,7 @@
     const lightness = options.lightness ?? 48;
     const subgraphSaturation = options.subgraphSaturation ?? 48;
     const subgraphLightness = options.subgraphLightness ?? 48;
+    const categoricalHues = options.categoricalHues || null;
 
     const normalizeSemanticKey = (task) => {
       const key = normalizeTaskColorKey(task);
@@ -188,10 +232,14 @@
         }
         if (mode === 'subgraph') {
           const key = task?.subgraphKey || task?.subGraphId || task?.leafHash || normalizeSemanticKey(task);
-          return hashColor(key, subgraphSaturation, subgraphLightness);
+          return categoricalHues
+            ? categoricalHashColor(key, subgraphSaturation, subgraphLightness, categoricalHues)
+            : colorFromColormap(key, colormap);
         }
         const key = normalizeSemanticKey(task);
-        return labelColors[key] || hashColor(key, saturation, lightness);
+        if (labelColors[key]) return labelColors[key];
+        if (categoricalHues) return categoricalHashColor(key, saturation, lightness, categoricalHues);
+        return colorFromColormap(key, colormap, semanticDomain);
       },
       legendForKeys(keys, mode = 'semantic') {
         return keys.map((item) => {
@@ -328,6 +376,8 @@
     stableHash,
     hslToHex,
     hashColor,
+    colorFromColormap,
+    categoricalHashColor,
     createTaskColormap,
     resolveDisplayColor,
     resolveBorderColor,
