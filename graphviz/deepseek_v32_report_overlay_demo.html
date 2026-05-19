@@ -182,6 +182,14 @@
       backdrop-filter: blur(18px);
     }
 
+    body.is-report-off .overlay-header {
+      right: var(--space-4);
+    }
+
+    body.is-report-off .panel-shell.report-inspector {
+      display: none;
+    }
+
     .panel-shell-header {
       display: flex;
       align-items: flex-start;
@@ -549,6 +557,7 @@
           <button type="button" data-filter="P0">P0</button>
           <button type="button" data-filter="P1">P1</button>
           <button type="button" data-filter="P2">P2</button>
+          <button type="button" data-filter="off">Off</button>
         </div>
         <button id="refreshOverlay" class="header-action" type="button">Refresh</button>
       </div>
@@ -1058,8 +1067,16 @@
           .replace(/'/g, "&#039;");
       }
 
+      function isReportOverlayEnabled() {
+        return state.activeFilter !== "off";
+      }
+
+      function syncOverlayMode() {
+        document.body.classList.toggle("is-report-off", !isReportOverlayEnabled());
+      }
+
       function isReportVisible(report) {
-        return state.activeFilter === "all" || report.priority === state.activeFilter;
+        return isReportOverlayEnabled() && (state.activeFilter === "all" || report.priority === state.activeFilter);
       }
 
       function visibleReportIds() {
@@ -1133,6 +1150,13 @@
       }
 
       function renderInspector() {
+        syncOverlayMode();
+        if (!isReportOverlayEnabled()) {
+          updateCounts();
+          applySelectedState();
+          return;
+        }
+
         let report = REPORTS[state.selectedNodeId];
         if (!report || !isReportVisible(report)) {
           state.selectedNodeId = visibleReportIds()[0] || REPORT_ORDER[0];
@@ -1155,6 +1179,14 @@
       }
 
       function updateCounts() {
+        if (!isReportOverlayEnabled()) {
+          els.overlayCount.textContent = "Off";
+          els.sourceStatus.textContent = state.sourceNodes
+            ? `source graph · ${state.sourceNodes} nodes · overlay off`
+            : "source graph loading";
+          return;
+        }
+
         const visibleTotal = visibleReportIds().length;
         els.overlayCount.textContent = `${state.decorated} / ${visibleTotal}`;
         els.sourceStatus.textContent = state.sourceNodes
@@ -1490,9 +1522,10 @@
           group.addEventListener("click", onSourceNodeClick, true);
 
           const shouldShow = Boolean(report && isReportVisible(report));
+          const isSelected = isReportOverlayEnabled() && nodeId === state.selectedNodeId;
           group.classList.remove("report-priority-p0", "report-priority-p1", "report-priority-p2");
           group.classList.toggle("report-source-hit", shouldShow);
-          group.classList.toggle("report-source-selected", nodeId === state.selectedNodeId);
+          group.classList.toggle("report-source-selected", isSelected);
           if (shouldShow) group.classList.add(`report-priority-${report.priority.toLowerCase()}`);
 
           const oldOverlay = group.querySelector(".report-source-overlay");
@@ -1543,7 +1576,7 @@
         });
 
         state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`).forEach((group) => {
-          const isSelected = nodeIdFromGroup(group) === state.selectedNodeId;
+          const isSelected = isReportOverlayEnabled() && nodeIdFromGroup(group) === state.selectedNodeId;
           group.classList.toggle("report-source-selected", isSelected);
         });
       }
@@ -1826,6 +1859,8 @@
           document.querySelectorAll("[data-filter]").forEach((item) => {
             item.classList.toggle("is-active", item === button);
           });
+          hideSourcePopup();
+          syncOverlayMode();
           decorateSourceGraph();
           renderInspector();
         });
