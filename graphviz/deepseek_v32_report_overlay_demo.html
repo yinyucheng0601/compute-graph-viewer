@@ -303,6 +303,54 @@
       font: var(--text-body-sm);
     }
 
+    .source-note {
+      display: grid;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+    }
+
+    .source-note-row {
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .source-note-label {
+      width: max-content;
+      max-width: 100%;
+      min-height: var(--tag-height);
+      display: inline-flex;
+      align-items: center;
+      padding: 0 var(--tag-padding-x);
+      border-radius: var(--tag-radius);
+      background: var(--state-muted);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+
+    .source-note-label[data-tone="inference"] {
+      background: color-mix(in srgb, var(--primary) 18%, var(--surface-3));
+      color: var(--foreground);
+    }
+
+    .source-note-label[data-tone="report"] {
+      background: color-mix(in srgb, var(--success) 18%, var(--surface-3));
+      color: var(--foreground);
+    }
+
+    .source-note-label[data-tone="mapping"] {
+      background: color-mix(in srgb, var(--warning) 20%, var(--surface-3));
+      color: var(--foreground);
+    }
+
+    .source-note-text {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
     .metric-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -580,6 +628,7 @@
         <section class="inspector-section">
           <h2 class="section-title">Diagnosis</h2>
           <p id="inspectorSummary" class="section-copy"></p>
+          <div id="sourceNote" class="source-note"></div>
           <div id="metricGrid" class="metric-grid"></div>
         </section>
 
@@ -1031,6 +1080,39 @@
         dsv32arch_shared_d18aac96: "dsv32arch_moe_63e885ca"
       };
 
+      const DEFAULT_SOURCE_NOTES = [
+        {
+          label: "页面归纳",
+          tone: "inference",
+          text: "Diagnosis 文案由报告指标、source graph 节点名和架构映射整理，不是逐句照搬 report 原文。"
+        },
+        {
+          label: "报告原文证据",
+          tone: "report",
+          text: "数值和算子证据来自 report (5).html 与 ds3.2_report (9).html 的指标、kernel 统计和节点语义。"
+        }
+      ];
+
+      const SOURCE_NOTES = {
+        dsv32arch_logits_c7d6c722: [
+          {
+            label: "页面推断",
+            tone: "inference",
+            text: "“更接近 logits 后处理 / speculative verify 附近”是 overlay 根据 logits 节点、lm_head/logits_cast 语义和 runtime_auxiliary 时序做的归因，不是 report 原文句子。"
+          },
+          {
+            label: "报告原文",
+            tone: "report",
+            text: "report (5).html #十三 瓶颈诊断：WAIT_ANCHOR_FALSE_HOTSPOT；OnesLike wait_ratio=99.7%、total_cost=464.1us；Duration 极短但 Wait 极长。"
+          },
+          {
+            label: "映射证据",
+            tone: "mapping",
+            text: "ds3.2_report (9).html：lm_head ×4 约 192us；logits_cast 是 fp32 cast；spec_token_verify_main 约 5.5ms/45 kernels，spec_token_verify_mtp 约 1.6ms/15 kernels。"
+          }
+        ]
+      };
+
       const state = {
         activeFilter: "all",
         selectedNodeId: "dsv32arch_block_0214b4b3",
@@ -1050,6 +1132,7 @@
         inspectorTitle: document.getElementById("inspectorTitle"),
         inspectorNodeId: document.getElementById("inspectorNodeId"),
         inspectorSummary: document.getElementById("inspectorSummary"),
+        sourceNote: document.getElementById("sourceNote"),
         metricGrid: document.getElementById("metricGrid"),
         factList: document.getElementById("factList"),
         operatorList: document.getElementById("operatorList"),
@@ -1120,6 +1203,16 @@
         }).join("");
       }
 
+      function renderSourceNote(nodeId) {
+        const notes = SOURCE_NOTES[nodeId] || DEFAULT_SOURCE_NOTES;
+        els.sourceNote.innerHTML = notes.map((item) => `
+          <div class="source-note-row">
+            <span class="source-note-label" data-tone="${escapeHtml(item.tone)}">${escapeHtml(item.label)}</span>
+            <p class="source-note-text">${escapeHtml(item.text)}</p>
+          </div>
+        `).join("");
+      }
+
       function renderOperators(report) {
         if (!report.operators.length) {
           els.operatorList.innerHTML = `<div class="empty-state">No operator evidence.</div>`;
@@ -1169,6 +1262,7 @@
         els.inspectorTitle.textContent = report.title;
         els.inspectorNodeId.textContent = state.selectedNodeId;
         els.inspectorSummary.textContent = report.summary;
+        renderSourceNote(state.selectedNodeId);
         renderMetrics(report);
         renderList(els.factList, report.facts);
         renderOperators(report);
