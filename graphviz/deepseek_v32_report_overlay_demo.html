@@ -190,6 +190,10 @@
       display: none;
     }
 
+    body.is-report-off .timeline-panel {
+      display: none;
+    }
+
     .report-inspector .panel-shell-header {
       display: flex;
       align-items: flex-start;
@@ -300,54 +304,6 @@
     .section-copy {
       margin: 0;
       color: var(--foreground);
-      font: var(--text-body-sm);
-    }
-
-    .source-note {
-      display: grid;
-      gap: var(--space-2);
-      padding: var(--space-3);
-      border-radius: var(--radius-md);
-      background: var(--surface-3);
-    }
-
-    .source-note-row {
-      display: grid;
-      gap: var(--space-1);
-    }
-
-    .source-note-label {
-      width: max-content;
-      max-width: 100%;
-      min-height: var(--tag-height);
-      display: inline-flex;
-      align-items: center;
-      padding: 0 var(--tag-padding-x);
-      border-radius: var(--tag-radius);
-      background: var(--state-muted);
-      color: var(--foreground-secondary);
-      font: var(--text-label);
-      white-space: nowrap;
-    }
-
-    .source-note-label[data-tone="inference"] {
-      background: color-mix(in srgb, var(--primary) 18%, var(--surface-3));
-      color: var(--foreground);
-    }
-
-    .source-note-label[data-tone="report"] {
-      background: color-mix(in srgb, var(--success) 18%, var(--surface-3));
-      color: var(--foreground);
-    }
-
-    .source-note-label[data-tone="mapping"] {
-      background: color-mix(in srgb, var(--warning) 20%, var(--surface-3));
-      color: var(--foreground);
-    }
-
-    .source-note-text {
-      margin: 0;
-      color: var(--foreground-secondary);
       font: var(--text-body-sm);
     }
 
@@ -543,6 +499,490 @@
       font: var(--text-body-sm);
     }
 
+    .timeline-panel {
+      position: absolute;
+      z-index: var(--z-overlay);
+      left: var(--space-4);
+      right: 432px;
+      bottom: var(--space-4);
+      height: min(34vh, 330px);
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 0;
+      border-radius: var(--workbench-pane-radius, var(--panel-shell-radius, var(--radius-xl)));
+      background: var(--workbench-pane-bg, var(--surface-2));
+      color: var(--foreground);
+    }
+
+    .timeline-panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: 12px 14px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .timeline-title-group {
+      min-width: 0;
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .timeline-title {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-title-3);
+      letter-spacing: 0;
+    }
+
+    .timeline-caption {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .timeline-tabs {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--segmented-control-gap);
+      padding: var(--segmented-control-padding);
+      border: 1px solid var(--segmented-control-border);
+      border-radius: var(--segmented-control-radius);
+      background: color-mix(in srgb, var(--background) 42%, transparent);
+    }
+
+    .timeline-tabs button {
+      height: var(--button-height-sm);
+      border: 0;
+      border-radius: var(--radius-md);
+      padding: 0 var(--button-padding-x-sm);
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: var(--button-font);
+      cursor: pointer;
+    }
+
+    .timeline-tabs button:hover {
+      color: var(--foreground);
+      background: var(--button-ghost-bg-hover);
+    }
+
+    .timeline-tabs button.is-active {
+      color: var(--foreground);
+      background: var(--state-selected);
+    }
+
+    .timeline-panel-body {
+      min-height: 0;
+      flex: 1;
+      overflow: auto;
+      padding: var(--space-3) 14px 14px;
+    }
+
+    .timeline-tab-panel {
+      display: none;
+      min-height: 100%;
+    }
+
+    .timeline-tab-panel.is-active {
+      display: block;
+    }
+
+    .timeline-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .timeline-stat {
+      min-width: 0;
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+    }
+
+    .timeline-stat-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .timeline-stat-value {
+      margin-top: var(--space-1);
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+
+    .timeline-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      min-height: var(--tag-height);
+      padding: 0 var(--tag-padding-x);
+      border-radius: var(--tag-radius);
+      background: var(--state-muted);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+
+    .legend-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--legend-color);
+    }
+
+    .step-timeline,
+    .module-timeline,
+    .stream-summary-list,
+    .coverage-list {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .step-row {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr) 152px;
+      gap: var(--space-2);
+      align-items: center;
+      min-height: 42px;
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+    }
+
+    .step-row[data-kind="warmup"] {
+      background: color-mix(in srgb, var(--warning) 18%, var(--surface-3));
+    }
+
+    .step-label,
+    .module-label,
+    .stream-label {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .step-name,
+    .module-name,
+    .stream-name {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .step-meta,
+    .module-meta,
+    .stream-meta {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .step-stack {
+      display: flex;
+      height: 12px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--background) 48%, transparent);
+    }
+
+    .step-stack span {
+      min-width: 2px;
+      height: 100%;
+    }
+
+    .step-stack-compute {
+      background: var(--success);
+    }
+
+    .step-stack-comm {
+      background: var(--warning);
+    }
+
+    .step-stack-free {
+      background: var(--danger);
+    }
+
+    .step-values {
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .module-row {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr) 190px;
+      gap: var(--space-2);
+      align-items: center;
+      min-height: 44px;
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+    }
+
+    .module-row[data-node-id] {
+      cursor: pointer;
+    }
+
+    .module-row[data-node-id]:hover {
+      background: var(--state-hover);
+    }
+
+    .module-row.is-active {
+      background: color-mix(in srgb, var(--primary) 18%, var(--surface-3));
+      outline: 1px solid color-mix(in srgb, var(--primary) 50%, transparent);
+    }
+
+    .stream-player {
+      display: grid;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+    }
+
+    .stream-player-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+
+    .stream-play-button {
+      height: var(--button-height-md, 36px);
+      border: 0;
+      border-radius: var(--radius-md);
+      padding: 0 var(--button-padding-x-md, 16px);
+      background: var(--primary);
+      color: var(--background);
+      font: var(--button-font);
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
+    }
+
+    .stream-play-button:hover {
+      background: var(--primary-hover);
+      color: var(--background);
+    }
+
+    .stream-time-readout {
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: nowrap;
+    }
+
+    .stream-axis {
+      position: relative;
+      height: 52px;
+      border-radius: var(--radius-md);
+      background:
+        linear-gradient(90deg, transparent 0 24%, color-mix(in srgb, var(--border-subtle) 78%, transparent) 24% 24.5%, transparent 24.5% 49%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 49% 49.5%, transparent 49.5% 74%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 74% 74.5%, transparent 74.5%),
+        color-mix(in srgb, var(--background) 48%, transparent);
+      cursor: pointer;
+    }
+
+    .stream-axis-segment {
+      position: absolute;
+      top: 16px;
+      left: var(--axis-left);
+      width: var(--axis-width);
+      min-width: 3px;
+      height: 16px;
+      border-radius: var(--radius-pill);
+      background: var(--axis-color);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 10%, transparent);
+      opacity: 0.9;
+    }
+
+    .stream-axis-segment[data-hot="true"] {
+      box-shadow: 0 0 0 1px var(--danger);
+    }
+
+    .stream-axis-segment.is-active {
+      opacity: 1;
+      box-shadow:
+        0 0 0 2px var(--foreground),
+        0 0 0 6px color-mix(in srgb, var(--foreground) 12%, transparent);
+    }
+
+    .stream-axis-playhead {
+      position: absolute;
+      top: 5px;
+      bottom: 5px;
+      left: var(--playhead-left, 0%);
+      width: 2px;
+      border-radius: var(--radius-pill);
+      background: var(--foreground);
+      transform: translateX(-1px);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--foreground) 12%, transparent);
+      pointer-events: none;
+    }
+
+    .stream-axis-playhead::before {
+      content: "";
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--foreground);
+      transform: translateX(-50%);
+    }
+
+    .stream-scrubber {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .module-track {
+      position: relative;
+      height: 16px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background:
+        linear-gradient(90deg, transparent 0 24%, color-mix(in srgb, var(--border-subtle) 78%, transparent) 24% 24.5%, transparent 24.5% 49%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 49% 49.5%, transparent 49.5% 74%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 74% 74.5%, transparent 74.5%),
+        color-mix(in srgb, var(--background) 48%, transparent);
+    }
+
+    .module-bar {
+      position: absolute;
+      top: 2px;
+      left: var(--bar-left);
+      width: var(--bar-width);
+      min-width: 3px;
+      height: 12px;
+      border-radius: var(--radius-pill);
+      background: var(--bar-color);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 12%, transparent);
+    }
+
+    .module-bar[data-category="auxiliary"] {
+      opacity: 0.72;
+    }
+
+    .module-bar[data-hot="true"] {
+      box-shadow: 0 0 0 1px var(--danger);
+    }
+
+    .module-values {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: nowrap;
+    }
+
+    .stream-summary-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: var(--space-3);
+    }
+
+    .stream-summary-item {
+      min-width: 0;
+      display: grid;
+      gap: var(--space-1);
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+    }
+
+    .stream-meter {
+      display: flex;
+      height: 5px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--background) 48%, transparent);
+    }
+
+    .stream-meter span:first-child {
+      width: var(--stream-work);
+      background: var(--success);
+    }
+
+    .stream-meter span:last-child {
+      flex: 1;
+      background: var(--danger);
+      opacity: 0.82;
+    }
+
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-3);
+    }
+
+    .coverage-column {
+      min-width: 0;
+      display: grid;
+      align-content: start;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: var(--surface-3);
+    }
+
+    .coverage-title {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .coverage-column[data-status="covered"] .coverage-title {
+      color: var(--success);
+    }
+
+    .coverage-column[data-status="partial"] .coverage-title {
+      color: var(--warning);
+    }
+
+    .coverage-column[data-status="missing"] .coverage-title {
+      color: var(--danger);
+    }
+
+    .coverage-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .coverage-list li {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
     @media (max-width: 980px) {
       .overlay-header {
         right: var(--space-4);
@@ -554,6 +994,10 @@
         left: var(--space-4);
         width: auto;
         height: min(48vh, 520px);
+      }
+
+      .timeline-panel {
+        display: none;
       }
     }
 
@@ -573,6 +1017,7 @@
     }
 
     :root[data-preview="true"] .overlay-header,
+    :root[data-preview="true"] .timeline-panel,
     :root[data-preview="true"] .panel-shell.report-inspector {
       display: none;
     }
@@ -628,7 +1073,6 @@
         <section class="inspector-section">
           <h2 class="section-title">Diagnosis</h2>
           <p id="inspectorSummary" class="section-copy"></p>
-          <div id="sourceNote" class="source-note"></div>
           <div id="metricGrid" class="metric-grid"></div>
         </section>
 
@@ -653,6 +1097,25 @@
         </section>
       </div>
     </aside>
+
+    <section class="timeline-panel" aria-label="report timeline">
+      <div class="timeline-panel-header">
+        <div class="timeline-title-group">
+          <h2 class="timeline-title">Step / Stream Timeline</h2>
+          <p id="timelineCaption" class="timeline-caption">Step 15 playable wall-time lanes from ds3.2_report (9).html</p>
+        </div>
+        <div class="timeline-tabs" aria-label="timeline view">
+          <button type="button" data-timeline-tab="steps">Steps</button>
+          <button type="button" class="is-active" data-timeline-tab="streams">Streams</button>
+          <button type="button" data-timeline-tab="coverage">Coverage</button>
+        </div>
+      </div>
+      <div class="timeline-panel-body">
+        <div id="stepTimelinePanel" class="timeline-tab-panel"></div>
+        <div id="streamTimelinePanel" class="timeline-tab-panel is-active"></div>
+        <div id="coverageTimelinePanel" class="timeline-tab-panel"></div>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -1011,13 +1474,11 @@
           ],
           facts: [
             "aclnnInplaceOne_OnesLikeAiCore_OnesLike duration 约 1.4 us，但 wait 约 462.7 us。",
-            "spec_token_verify_main 含 45 个 kernel，dominant stream=47。",
-            "spec_token_verify_mtp 含 15 个 kernel，dominant stream=47。"
+            "spec_token_verify_main 是 runtime timeline 阶段段：约 5.5 ms、45 个 kernel，dominant stream=47。",
+            "spec_token_verify_mtp 是 runtime timeline 阶段段：约 1.6 ms、15 个 kernel，dominant stream=47。"
           ],
           operators: [
-            ["OnesLike", "wait_ratio 99.7%"],
-            ["spec_token_verify_main", "5.5 ms"],
-            ["spec_token_verify_mtp", "1.6 ms"]
+            ["OnesLike", "wait_ratio 99.7%"]
           ],
           actions: [
             "把 OnesLike 标为等待锚点，避免当作真实计算热点优化。",
@@ -1080,47 +1541,175 @@
         dsv32arch_shared_d18aac96: "dsv32arch_moe_63e885ca"
       };
 
-      const DEFAULT_SOURCE_NOTES = [
-        {
-          label: "页面归纳",
-          tone: "inference",
-          text: "Diagnosis 文案由报告指标、source graph 节点名和架构映射整理，不是逐句照搬 report 原文。"
-        },
-        {
-          label: "报告原文证据",
-          tone: "report",
-          text: "数值和算子证据来自 report (5).html 与 ds3.2_report (9).html 的指标、kernel 统计和节点语义。"
-        }
+      const DEFAULT_SELECTED_NODE_ID = "dsv32arch_block_0214b4b3";
+
+      const DESCENDANT_NODE_IDS = {
+        dsv32arch_transformer_9236e026: [
+          "dsv32arch_embedding_2f81ba1b",
+          "dsv32arch_block_0214b4b3",
+          "dsv32arch_block_entry_90eb6882",
+          "dsv32arch_attn_norm_9eedf758",
+          "dsv32arch_attention_call_612a5ae9",
+          "dsv32arch_attention_d0278de5",
+          "dsv32arch_q_path_b399f580",
+          "dsv32arch_kv_path_a69fbb2b",
+          "dsv32arch_cache_b0359280",
+          "dsv32arch_indexer_dfa17da7",
+          "dsv32arch_topk_e1fd5d33",
+          "dsv32arch_sparse_attn_f5c98e92",
+          "dsv32arch_o_proj_652c0be4",
+          "dsv32arch_ffn_norm_6d0e622d",
+          "dsv32arch_ffn_a2b90028",
+          "dsv32arch_ffn_choice_710c2f62",
+          "dsv32arch_dense_c8e834d8",
+          "dsv32arch_dense_w1w3_0b7a312e",
+          "dsv32arch_dense_act_88b5a19d",
+          "dsv32arch_dense_w2_8e01455d",
+          "dsv32arch_moe_63e885ca",
+          "dsv32arch_router_77eb1db6",
+          "dsv32arch_top_experts_dedfd965",
+          "dsv32arch_experts_cfbede3c",
+          "dsv32arch_shared_d18aac96",
+          "dsv32arch_moe_sum_50118d9a",
+          "dsv32arch_block_out_821a34da",
+          "dsv32arch_final_norm_2010d80f",
+          "dsv32arch_lm_head_2b98b847",
+          "dsv32arch_logits_c7d6c722"
+        ],
+        dsv32arch_block_0214b4b3: [
+          "dsv32arch_block_entry_90eb6882",
+          "dsv32arch_attn_norm_9eedf758",
+          "dsv32arch_attention_call_612a5ae9",
+          "dsv32arch_attention_d0278de5",
+          "dsv32arch_q_path_b399f580",
+          "dsv32arch_kv_path_a69fbb2b",
+          "dsv32arch_cache_b0359280",
+          "dsv32arch_indexer_dfa17da7",
+          "dsv32arch_topk_e1fd5d33",
+          "dsv32arch_sparse_attn_f5c98e92",
+          "dsv32arch_o_proj_652c0be4",
+          "dsv32arch_ffn_norm_6d0e622d",
+          "dsv32arch_ffn_a2b90028",
+          "dsv32arch_ffn_choice_710c2f62",
+          "dsv32arch_dense_c8e834d8",
+          "dsv32arch_dense_w1w3_0b7a312e",
+          "dsv32arch_dense_act_88b5a19d",
+          "dsv32arch_dense_w2_8e01455d",
+          "dsv32arch_moe_63e885ca",
+          "dsv32arch_router_77eb1db6",
+          "dsv32arch_top_experts_dedfd965",
+          "dsv32arch_experts_cfbede3c",
+          "dsv32arch_shared_d18aac96",
+          "dsv32arch_moe_sum_50118d9a",
+          "dsv32arch_block_out_821a34da"
+        ],
+        dsv32arch_attention_call_612a5ae9: [
+          "dsv32arch_attention_d0278de5",
+          "dsv32arch_q_path_b399f580",
+          "dsv32arch_kv_path_a69fbb2b",
+          "dsv32arch_cache_b0359280",
+          "dsv32arch_indexer_dfa17da7",
+          "dsv32arch_topk_e1fd5d33",
+          "dsv32arch_sparse_attn_f5c98e92",
+          "dsv32arch_o_proj_652c0be4"
+        ],
+        dsv32arch_dense_c8e834d8: [
+          "dsv32arch_dense_w1w3_0b7a312e",
+          "dsv32arch_dense_act_88b5a19d",
+          "dsv32arch_dense_w2_8e01455d"
+        ],
+        dsv32arch_moe_63e885ca: [
+          "dsv32arch_router_77eb1db6",
+          "dsv32arch_top_experts_dedfd965",
+          "dsv32arch_experts_cfbede3c",
+          "dsv32arch_shared_d18aac96",
+          "dsv32arch_moe_sum_50118d9a"
+        ]
+      };
+
+      const STEP_TIMELINE = [
+        { step: 10, stageUs: 64444, compute: 17.4, comm: 68.7, free: 13.9, overlap: 0.03, kind: "warmup" },
+        { step: 11, stageUs: 23738, compute: 58.4, comm: 9.1, free: 32.5, overlap: 0.47, kind: "normal" },
+        { step: 12, stageUs: 21272, compute: 52.5, comm: 13.0, free: 34.5, overlap: 0.38, kind: "normal" },
+        { step: 13, stageUs: 23012, compute: 60.2, comm: 9.6, free: 30.2, overlap: 0.47, kind: "normal" },
+        { step: 14, stageUs: 20503, compute: 54.5, comm: 10.6, free: 34.9, overlap: 0.48, kind: "normal" },
+        { step: 15, stageUs: 23287, compute: 59.4, comm: 6.1, free: 34.5, overlap: 0.76, kind: "normal" },
+        { step: 16, stageUs: 24443, compute: 56.7, comm: 9.0, free: 34.3, overlap: 0.48, kind: "normal" },
+        { step: 17, stageUs: 21758, compute: 51.4, comm: 11.4, free: 37.2, overlap: 0.52, kind: "normal" },
+        { step: 18, stageUs: 21414, compute: 52.1, comm: 10.6, free: 37.3, overlap: 0.48, kind: "normal" },
+        { step: 19, stageUs: 23694, compute: 58.4, comm: 7.4, free: 34.2, overlap: 0.61, kind: "normal" }
       ];
 
-      const SOURCE_NOTES = {
-        dsv32arch_logits_c7d6c722: [
-          {
-            label: "页面推断",
-            tone: "inference",
-            text: "“更接近 logits 后处理 / speculative verify 附近”是 overlay 根据 logits 节点、lm_head/logits_cast 语义和 runtime_auxiliary 时序做的归因，不是 report 原文句子。"
-          },
-          {
-            label: "报告原文",
-            tone: "report",
-            text: "report (5).html #十三 瓶颈诊断：WAIT_ANCHOR_FALSE_HOTSPOT；OnesLike wait_ratio=99.7%、total_cost=464.1us；Duration 极短但 Wait 极长。"
-          },
-          {
-            label: "映射证据",
-            tone: "mapping",
-            text: "ds3.2_report (9).html：lm_head ×4 约 192us；logits_cast 是 fp32 cast；spec_token_verify_main 约 5.5ms/45 kernels，spec_token_verify_mtp 约 1.6ms/15 kernels。"
-          }
+      const MODULE_TIMELINE = [
+        { name: "step_start_init", nodeId: "dsv32arch_logits_c7d6c722", startUs: 1773295061394254.8, endUs: 1773295061395828.2, wallUs: 1573.5, opUs: 958.1, waitUs: 1157.67, kernels: 17, streams: ["47", "186", "43", "None"], dominant: "47", category: "auxiliary", color: "#61afef" },
+        { name: "embedding", nodeId: "dsv32arch_embedding_2f81ba1b", startUs: 1773295061395829.5, endUs: 1773295061395875.5, wallUs: 46.0, opUs: 71.48, waitUs: 1.49, kernels: 10, streams: ["186", "189", "None"], dominant: "189", category: "auxiliary", color: "#4fc1ff" },
+        { name: "DeepseekV3DecoderLayer_dense x3", nodeId: "dsv32arch_dense_c8e834d8", startUs: 1773295061396682.0, endUs: 1773295061397494.0, wallUs: 812.0, opUs: 853.8, waitUs: 15.17, kernels: 34, streams: ["189", "191", "192"], dominant: "189", category: "main", color: "#7ec699" },
+        { name: "DeepseekV3DecoderLayer_moe x3", nodeId: "dsv32arch_moe_63e885ca", startUs: 1773295061398287.0, endUs: 1773295061399431.5, wallUs: 1144.5, opUs: 1278.48, waitUs: 23.22, kernels: 42, streams: ["189", "190", "191", "192"], dominant: "189", category: "main", color: "#61afef" },
+        { name: "main_final_norm", nodeId: "", startUs: 1773295061401686.8, endUs: 1773295061401690.2, wallUs: 3.5, opUs: 3.54, waitUs: 0.87, kernels: 1, streams: ["189"], dominant: "189", category: "auxiliary", color: "#e06c75" },
+        { name: "lm_head x4", nodeId: "dsv32arch_lm_head_2b98b847", startUs: 1773295061401707.2, endUs: 1773295061401899.2, wallUs: 192.0, opUs: 250.4, waitUs: 20.29, kernels: 7, streams: ["186", "189", "None"], dominant: "189", category: "auxiliary", color: "#61afef" },
+        { name: "spec_token_verify_main", nodeId: "dsv32arch_logits_c7d6c722", startUs: 1773295061402205.8, endUs: 1773295061407729.5, wallUs: 5523.75, opUs: 3180.88, waitUs: 2730.18, kernels: 45, streams: ["176", "43", "47", "None"], dominant: "47", category: "auxiliary", color: "#98c379" },
+        { name: "DeepseekV3MTPLayer x3", nodeId: "dsv32arch_logits_c7d6c722", startUs: 1773295061407702.5, endUs: 1773295061409206.5, wallUs: 1504.0, opUs: 1978.26, waitUs: 70.1, kernels: 60, streams: ["176", "179", "180", "181", "182", "None"], dominant: "179", category: "main", color: "#4fc1ff" },
+        { name: "spec_token_verify_mtp", nodeId: "dsv32arch_logits_c7d6c722", startUs: 1773295061409737.0, endUs: 1773295061411349.0, wallUs: 1612.0, opUs: 267.68, waitUs: 1755.13, kernels: 15, streams: ["43", "47", "None"], dominant: "47", category: "auxiliary", color: "#d19a66" },
+        { name: "final_step_sample", nodeId: "dsv32arch_logits_c7d6c722", startUs: 1773295061417274.0, endUs: 1773295061417542.0, wallUs: 268.0, opUs: 69.72, waitUs: 472.22, kernels: 6, streams: ["47"], dominant: "47", category: "auxiliary", color: "#c678dd" }
+      ];
+
+      const STREAM_SUMMARY = [
+        { stream: "47", opUs: 3297.6, waitUs: 5819.12, ops: 72 },
+        { stream: "179", opUs: 1371.7, waitUs: 65.05, ops: 42 },
+        { stream: "189", opUs: 2037.92, waitUs: 31.89, ops: 66 },
+        { stream: "None", opUs: 752.18, waitUs: 211.69, ops: 9 },
+        { stream: "43", opUs: 459.64, waitUs: 61.95, ops: 3 },
+        { stream: "180", opUs: 379.28, waitUs: 0.16, ops: 4 },
+        { stream: "186", opUs: 200.3, waitUs: 2.12, ops: 6 },
+        { stream: "192", opUs: 112.9, waitUs: 9.69, ops: 16 },
+        { stream: "190", opUs: 99.72, waitUs: 1.39, ops: 4 },
+        { stream: "176", opUs: 87.96, waitUs: 38.63, ops: 4 },
+        { stream: "182", opUs: 58.42, waitUs: 4.65, ops: 8 },
+        { stream: "191", opUs: 37.08, waitUs: 0, ops: 2 },
+        { stream: "181", opUs: 17.64, waitUs: 0, ops: 1 }
+      ];
+
+      const COVERAGE_AUDIT = {
+        covered: [
+          "Analysis context: Ascend 910B3, V2 schema, Step 10-19, Device_id=3",
+          "P0 HOST_BOUND / P2 WAIT_ANCHOR_FALSE_HOTSPOT diagnosis",
+          "Step 10-19 iteration split, including warmup step 10",
+          "Step 15 top-level module wall timeline and stream summary",
+          "Architecture mappings for embedding, attention, dense FFN, MoE, lm_head and logits",
+          "Optimization direction: 降低 Host Dispatch / Free Time and trace the wait-anchor upstream"
+        ],
+        partial: [
+          "Top-10 operator list is distributed across mapped nodes, not shown as one complete global table",
+          "Hardware MFU is summarized for GroupedMatmul and MatMul; individual sample rows are not all tabulated",
+          "Operator-bound counts include OP_MEMORY_BOUND/AivKernel signals, but rows are not reproduced one by one",
+          "Communication efficiency includes comm_not_overlap and stream lanes; AllReduce/AllGather counts and the zero-bandwidth media table are not visualized as a table",
+          "Device bubble summary includes underfeed; internal_bubble_total is noted but not plotted"
+        ],
+        missing: [
+          "Raw 548 kernel records and tooltip fields from ds3.2_report are not embedded",
+          "All 88 timeline nodes and expandable child tree are not reproduced; the demo shows the 10 top-level nodes",
+          "Full wait-anchor ranking list is not rendered; only the leading OnesLike false-hotspot evidence is surfaced",
+          "Host trace event overlap is unavailable in the report, so it cannot be mapped to source nodes",
+          "Multi-card balance is unavailable because the report only has Device_id=3"
         ]
       };
 
       const state = {
         activeFilter: "all",
-        selectedNodeId: "dsv32arch_block_0214b4b3",
+        selectedNodeId: DEFAULT_SELECTED_NODE_ID,
         decorated: 0,
         sourceNodes: 0,
         sourceDoc: null,
         observer: null,
-        decorateTimer: 0
+        decorateTimer: 0,
+        activeTimelineTab: "streams",
+        streamPosition: 0,
+        streamPlaying: false,
+        streamAnimation: 0,
+        streamStartedAt: 0,
+        streamStartPosition: 0,
+        activeTimelineSegment: -1,
+        sourceDimEnabled: false
       };
 
       const els = {
@@ -1132,13 +1721,16 @@
         inspectorTitle: document.getElementById("inspectorTitle"),
         inspectorNodeId: document.getElementById("inspectorNodeId"),
         inspectorSummary: document.getElementById("inspectorSummary"),
-        sourceNote: document.getElementById("sourceNote"),
         metricGrid: document.getElementById("metricGrid"),
         factList: document.getElementById("factList"),
         operatorList: document.getElementById("operatorList"),
         actionList: document.getElementById("actionList"),
         nodeList: document.getElementById("nodeList"),
-        refreshOverlay: document.getElementById("refreshOverlay")
+        refreshOverlay: document.getElementById("refreshOverlay"),
+        timelineCaption: document.getElementById("timelineCaption"),
+        stepTimelinePanel: document.getElementById("stepTimelinePanel"),
+        streamTimelinePanel: document.getElementById("streamTimelinePanel"),
+        coverageTimelinePanel: document.getElementById("coverageTimelinePanel")
       };
 
       function escapeHtml(value) {
@@ -1164,6 +1756,35 @@
 
       function visibleReportIds() {
         return REPORT_ORDER.filter((id) => isReportVisible(REPORTS[id]));
+      }
+
+      function collectRenderedDescendantIds(nodeId, ids) {
+        if (!state.sourceDoc || ids.has(`${nodeId}::visited`)) return;
+        ids.add(`${nodeId}::visited`);
+
+        const group = findSourceGroup(nodeId);
+        const data = group && Array.isArray(group.__data__) ? group.__data__[1] : null;
+        const children = Array.isArray(data && data.nodes) ? data.nodes : [];
+        children.forEach((childId) => {
+          ids.add(childId);
+          collectRenderedDescendantIds(childId, ids);
+        });
+      }
+
+      function selectedSourceIds() {
+        const ids = new Set();
+        if (!isReportOverlayEnabled() || !state.selectedNodeId) return ids;
+        ids.add(state.selectedNodeId);
+        collectRenderedDescendantIds(state.selectedNodeId, ids);
+        Array.from(ids).forEach((id) => {
+          if (id.endsWith("::visited")) ids.delete(id);
+        });
+        (DESCENDANT_NODE_IDS[state.selectedNodeId] || []).forEach((id) => ids.add(id));
+        return ids;
+      }
+
+      function isPrimarySelectedSource(nodeId) {
+        return isReportOverlayEnabled() && nodeId === state.selectedNodeId;
       }
 
       function renderList(container, items) {
@@ -1203,16 +1824,6 @@
         }).join("");
       }
 
-      function renderSourceNote(nodeId) {
-        const notes = SOURCE_NOTES[nodeId] || DEFAULT_SOURCE_NOTES;
-        els.sourceNote.innerHTML = notes.map((item) => `
-          <div class="source-note-row">
-            <span class="source-note-label" data-tone="${escapeHtml(item.tone)}">${escapeHtml(item.label)}</span>
-            <p class="source-note-text">${escapeHtml(item.text)}</p>
-          </div>
-        `).join("");
-      }
-
       function renderOperators(report) {
         if (!report.operators.length) {
           els.operatorList.innerHTML = `<div class="empty-state">No operator evidence.</div>`;
@@ -1242,6 +1853,357 @@
         }).join("");
       }
 
+      function formatDuration(us) {
+        if (us >= 1000) {
+          const value = us / 1000;
+          return `${value >= 10 ? value.toFixed(1) : value.toFixed(2)} ms`;
+        }
+        return `${us < 10 ? us.toFixed(1) : us.toFixed(0)} us`;
+      }
+
+      function streamBounds() {
+        const minStart = Math.min(...MODULE_TIMELINE.map((item) => item.startUs));
+        const maxEnd = Math.max(...MODULE_TIMELINE.map((item) => item.endUs));
+        return { minStart, maxEnd, span: maxEnd - minStart };
+      }
+
+      function segmentAtPosition(pct) {
+        const { minStart, span } = streamBounds();
+        const time = minStart + span * Math.max(0, Math.min(100, pct)) / 100;
+        const sorted = MODULE_TIMELINE
+          .map((item, index) => ({ ...item, index }))
+          .sort((a, b) => a.startUs - b.startUs);
+        const current = sorted.find((item) => time >= item.startUs && time <= item.endUs);
+        if (current) return current;
+
+        for (let i = sorted.length - 1; i >= 0; i -= 1) {
+          if (time >= sorted[i].endUs) return sorted[i];
+        }
+        return sorted[0] || null;
+      }
+
+      function setActiveTimelineSegment(segment, options = {}) {
+        const index = segment ? segment.index : -1;
+        document.querySelectorAll("[data-segment-index]").forEach((item) => {
+          item.classList.toggle("is-active", Number(item.dataset.segmentIndex) === index);
+        });
+
+        if (!segment || !segment.nodeId || !REPORTS[segment.nodeId]) {
+          state.activeTimelineSegment = index;
+          return;
+        }
+
+        const shouldSelect = state.activeTimelineSegment !== index || state.selectedNodeId !== segment.nodeId;
+        state.activeTimelineSegment = index;
+        if (shouldSelect) {
+          selectNode(segment.nodeId, { focusSource: options.focusSource });
+        }
+      }
+
+      function syncStreamTimelineSelection(options = {}) {
+        const segment = segmentAtPosition(state.streamPosition);
+        setActiveTimelineSegment(segment, options);
+      }
+
+      function updateStreamPlayhead(options = {}) {
+        const playhead = document.getElementById("streamPlayhead");
+        const scrubber = document.getElementById("streamScrubber");
+        const readout = document.getElementById("streamTimeReadout");
+        const button = document.getElementById("streamPlayButton");
+        if (!playhead || !scrubber || !readout || !button) return;
+
+        const { span } = streamBounds();
+        const pct = Math.max(0, Math.min(100, state.streamPosition));
+        const currentUs = span * pct / 100;
+        const segment = segmentAtPosition(pct);
+        playhead.style.setProperty("--playhead-left", `${pct}%`);
+        scrubber.value = String(pct);
+        readout.textContent = `${formatDuration(currentUs)} / ${formatDuration(span)} · ${segment ? segment.name : "gap"}`;
+        button.textContent = state.streamPlaying ? "Pause" : "Play";
+        if (options.syncSelection !== false) {
+          syncStreamTimelineSelection({ focusSource: Boolean(options.focusSource || state.streamPlaying) });
+        }
+      }
+
+      function clearStreamTimelineSelection() {
+        state.activeTimelineSegment = -1;
+        document.querySelectorAll("[data-segment-index].is-active").forEach((item) => {
+          item.classList.remove("is-active");
+        });
+      }
+
+      function stopStreamPlayback() {
+        if (state.streamAnimation) {
+          window.cancelAnimationFrame(state.streamAnimation);
+          state.streamAnimation = 0;
+        }
+        state.streamPlaying = false;
+        updateStreamPlayhead({ syncSelection: false });
+      }
+
+      function resetStreamPlayback() {
+        if (state.streamAnimation) {
+          window.cancelAnimationFrame(state.streamAnimation);
+          state.streamAnimation = 0;
+        }
+        state.streamPlaying = false;
+        state.streamPosition = 0;
+        state.streamStartedAt = 0;
+        state.streamStartPosition = 0;
+        state.sourceDimEnabled = false;
+        state.selectedNodeId = DEFAULT_SELECTED_NODE_ID;
+        clearStreamTimelineSelection();
+        renderInspector();
+        updateStreamPlayhead({ syncSelection: false });
+      }
+
+      function startStreamPlayback() {
+        stopStreamPlayback();
+        state.streamPlaying = true;
+        state.sourceDimEnabled = true;
+        state.streamStartedAt = 0;
+        state.streamStartPosition = state.streamPosition >= 99.9 ? 0 : state.streamPosition;
+
+        const durationMs = 9000;
+        const tick = (timestamp) => {
+          if (!state.streamPlaying) return;
+          if (!state.streamStartedAt) state.streamStartedAt = timestamp;
+          const elapsed = timestamp - state.streamStartedAt;
+          const pct = state.streamStartPosition + (elapsed / durationMs) * 100;
+          state.streamPosition = Math.min(100, pct);
+          updateStreamPlayhead();
+          if (state.streamPosition >= 100) {
+            resetStreamPlayback();
+            return;
+          }
+          state.streamAnimation = window.requestAnimationFrame(tick);
+        };
+
+        state.streamAnimation = window.requestAnimationFrame(tick);
+        updateStreamPlayhead();
+      }
+
+      function seekStreamPosition(pct) {
+        stopStreamPlayback();
+        state.streamPosition = Math.max(0, Math.min(100, pct));
+        updateStreamPlayhead({ focusSource: true });
+      }
+
+      function renderStepTimeline() {
+        const normalSteps = STEP_TIMELINE.filter((step) => step.kind === "normal");
+        const meanStage = normalSteps.reduce((sum, step) => sum + step.stageUs, 0) / normalSteps.length;
+        const meanCompute = normalSteps.reduce((sum, step) => sum + step.compute, 0) / normalSteps.length;
+        const meanComm = normalSteps.reduce((sum, step) => sum + step.comm, 0) / normalSteps.length;
+        const meanFree = normalSteps.reduce((sum, step) => sum + step.free, 0) / normalSteps.length;
+
+        const summary = [
+          ["normal stage", formatDuration(meanStage)],
+          ["Computing", `${meanCompute.toFixed(1)}%`],
+          ["CommNO", `${meanComm.toFixed(1)}%`],
+          ["Free", `${meanFree.toFixed(1)}%`]
+        ].map(([label, value]) => `
+          <div class="timeline-stat">
+            <div class="timeline-stat-label">${escapeHtml(label)}</div>
+            <div class="timeline-stat-value">${escapeHtml(value)}</div>
+          </div>
+        `).join("");
+
+        const rows = STEP_TIMELINE.map((step) => `
+          <div class="step-row" data-kind="${escapeHtml(step.kind)}">
+            <div class="step-label">
+              <span class="step-name">Step ${step.step}</span>
+              <span class="step-meta">${step.kind === "warmup" ? "warmup" : "normal"}</span>
+            </div>
+            <div class="step-stack" title="Computing ${step.compute}%, CommNO ${step.comm}%, Free ${step.free}%">
+              <span class="step-stack-compute" style="width:${step.compute}%"></span>
+              <span class="step-stack-comm" style="width:${step.comm}%"></span>
+              <span class="step-stack-free" style="width:${step.free}%"></span>
+            </div>
+            <div class="step-values">${formatDuration(step.stageUs)} · O ${step.overlap}%</div>
+          </div>
+        `).join("");
+
+        const legend = `
+          <div class="timeline-legend" aria-label="step color legend">
+            <span class="legend-item"><span class="legend-swatch" style="--legend-color:var(--success)"></span>Green Computing</span>
+            <span class="legend-item"><span class="legend-swatch" style="--legend-color:var(--warning)"></span>Yellow CommNO</span>
+            <span class="legend-item"><span class="legend-swatch" style="--legend-color:var(--danger)"></span>Red Free / bubble</span>
+          </div>
+        `;
+
+        els.stepTimelinePanel.innerHTML = `
+          <div class="timeline-summary-grid">${summary}</div>
+          ${legend}
+          <div class="step-timeline">${rows}</div>
+        `;
+      }
+
+      function renderStreamTimeline() {
+        const { minStart, span } = streamBounds();
+        const maxStreamCost = Math.max(...STREAM_SUMMARY.map((item) => item.opUs + item.waitUs));
+
+        const axisSegments = MODULE_TIMELINE
+          .map((item, index) => ({ ...item, index }))
+          .sort((a, b) => a.startUs - b.startUs)
+          .map((item) => {
+            const left = ((item.startUs - minStart) / span) * 100;
+            const width = Math.max(0.6, (item.wallUs / span) * 100);
+            const hot = item.waitUs > item.opUs;
+            return `
+              <span
+                class="stream-axis-segment"
+                data-segment-index="${item.index}"
+                data-hot="${hot ? "true" : "false"}"
+                style="--axis-left:${left.toFixed(2)}%;--axis-width:${width.toFixed(2)}%;--axis-color:${escapeHtml(item.color)}"
+                title="${escapeHtml(item.name)} · wall ${formatDuration(item.wallUs)}"></span>
+            `;
+          }).join("");
+
+        const rows = MODULE_TIMELINE
+          .map((item, index) => ({ ...item, index }))
+          .sort((a, b) => a.startUs - b.startUs)
+          .map((item) => {
+            const left = ((item.startUs - minStart) / span) * 100;
+            const width = Math.max(0.6, (item.wallUs / span) * 100);
+            const nodeAttr = item.nodeId ? ` data-node-id="${escapeHtml(item.nodeId)}"` : "";
+            const hot = item.waitUs > item.opUs;
+            return `
+              <div class="module-row"${nodeAttr} data-segment-index="${item.index}">
+                <div class="module-label">
+                  <span class="module-name">${escapeHtml(item.name)}</span>
+                  <span class="module-meta">dom ${escapeHtml(item.dominant)} · ${escapeHtml(item.streams.join("/"))}</span>
+                </div>
+                <div class="module-track">
+                  <span
+                    class="module-bar"
+                    data-category="${escapeHtml(item.category)}"
+                    data-hot="${hot ? "true" : "false"}"
+                    style="--bar-left:${left.toFixed(2)}%;--bar-width:${width.toFixed(2)}%;--bar-color:${escapeHtml(item.color)}"
+                    title="${escapeHtml(item.name)} · wall ${formatDuration(item.wallUs)} · wait ${formatDuration(item.waitUs)}"></span>
+                </div>
+                <div class="module-values">
+                  <span>${formatDuration(item.wallUs)}</span>
+                  <span>${item.kernels} kernels</span>
+                </div>
+              </div>
+            `;
+          }).join("");
+
+        const streams = STREAM_SUMMARY.map((item) => {
+          const cost = item.opUs + item.waitUs;
+          const workPct = cost ? Math.max(2, Math.min(100, item.opUs / cost * 100)) : 100;
+          const widthPct = Math.max(8, Math.min(100, cost / maxStreamCost * 100));
+          return `
+            <div class="stream-summary-item">
+              <div class="stream-label">
+                <span class="stream-name">Stream ${escapeHtml(item.stream)}</span>
+                <span class="stream-meta">${item.ops} ops · ${formatDuration(cost)}</span>
+              </div>
+              <div class="stream-meter" style="width:${widthPct.toFixed(1)}%;--stream-work:${workPct.toFixed(1)}%">
+                <span></span><span></span>
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        els.streamTimelinePanel.innerHTML = `
+          <div class="stream-player">
+            <div class="stream-player-header">
+              <button id="streamPlayButton" type="button" class="stream-play-button">Play</button>
+              <span id="streamTimeReadout" class="stream-time-readout">0 us / ${formatDuration(span)}</span>
+            </div>
+            <div id="streamAxis" class="stream-axis" aria-label="playable Step 15 timeline">
+              ${axisSegments}
+              <span id="streamPlayhead" class="stream-axis-playhead"></span>
+            </div>
+            <input id="streamScrubber" class="stream-scrubber" type="range" min="0" max="100" step="0.1" value="0" aria-label="stream timeline scrubber">
+          </div>
+          <div class="module-timeline">${rows}</div>
+          <div class="stream-summary-list">${streams}</div>
+        `;
+        bindStreamPlayer();
+      }
+
+      function bindStreamPlayer() {
+        const button = document.getElementById("streamPlayButton");
+        const scrubber = document.getElementById("streamScrubber");
+        const axis = document.getElementById("streamAxis");
+        if (!button || !scrubber || !axis) return;
+
+        button.addEventListener("click", () => {
+          if (state.streamPlaying) {
+            stopStreamPlayback();
+          } else {
+            startStreamPlayback();
+          }
+        });
+
+        scrubber.addEventListener("input", () => {
+          seekStreamPosition(Number(scrubber.value));
+        });
+
+        axis.addEventListener("click", (event) => {
+          const rect = axis.getBoundingClientRect();
+          if (!rect.width) return;
+          const pct = ((event.clientX - rect.left) / rect.width) * 100;
+          seekStreamPosition(pct);
+        });
+
+        updateStreamPlayhead({ syncSelection: false });
+      }
+
+      function renderCoverageAudit() {
+        const context = [
+          ["chip", "Ascend 910B3"],
+          ["schema", "V2"],
+          ["steps", "10-19"],
+          ["device", "Device_id=3"]
+        ].map(([label, value]) => `
+          <div class="timeline-stat">
+            <div class="timeline-stat-label">${escapeHtml(label)}</div>
+            <div class="timeline-stat-value">${escapeHtml(value)}</div>
+          </div>
+        `).join("");
+
+        const columns = Object.entries(COVERAGE_AUDIT).map(([status, items]) => `
+          <div class="coverage-column" data-status="${escapeHtml(status)}">
+            <h3 class="coverage-title">${escapeHtml(status)}</h3>
+            <ul class="coverage-list">
+              ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          </div>
+        `).join("");
+
+        els.coverageTimelinePanel.innerHTML = `
+          <div class="timeline-summary-grid">${context}</div>
+          <div class="coverage-grid">${columns}</div>
+        `;
+      }
+
+      function renderTimelinePanels() {
+        renderStepTimeline();
+        renderStreamTimeline();
+        renderCoverageAudit();
+      }
+
+      function activateTimelineTab(tabName) {
+        state.activeTimelineTab = tabName;
+        if (tabName !== "streams") stopStreamPlayback();
+        const captions = {
+          steps: "Step 10-19 stage split from report (5).html",
+          streams: "Step 15 playable wall-time lanes from ds3.2_report (9).html",
+          coverage: "Coverage audit against both HTML reports"
+        };
+        document.querySelectorAll("[data-timeline-tab]").forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.timelineTab === tabName);
+        });
+        document.querySelectorAll(".timeline-tab-panel").forEach((panel) => {
+          panel.classList.toggle("is-active", panel.id === `${tabName === "steps" ? "step" : tabName === "streams" ? "stream" : "coverage"}TimelinePanel`);
+        });
+        els.timelineCaption.textContent = captions[tabName] || captions.steps;
+        if (tabName === "streams") updateStreamPlayhead({ syncSelection: state.sourceDimEnabled });
+      }
+
       function renderInspector() {
         syncOverlayMode();
         if (!isReportOverlayEnabled()) {
@@ -1262,7 +2224,6 @@
         els.inspectorTitle.textContent = report.title;
         els.inspectorNodeId.textContent = state.selectedNodeId;
         els.inspectorSummary.textContent = report.summary;
-        renderSourceNote(state.selectedNodeId);
         renderMetrics(report);
         renderList(els.factList, report.facts);
         renderOperators(report);
@@ -1606,6 +2567,8 @@
         if (!state.sourceDoc) return;
         getRootOverlayLayer(state.sourceDoc);
         const groups = Array.from(state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`));
+        const selectedIds = selectedSourceIds();
+        const selectedBounds = selectedBoundaryBounds();
         let decorated = 0;
 
         groups.forEach((group) => {
@@ -1616,10 +2579,13 @@
           group.addEventListener("click", onSourceNodeClick, true);
 
           const shouldShow = Boolean(report && isReportVisible(report));
-          const isSelected = isReportOverlayEnabled() && nodeId === state.selectedNodeId;
+          const isSelected = selectedIds.has(nodeId) || isGroupInsideBounds(group, selectedBounds);
+          const isPrimarySelected = isPrimarySelectedSource(nodeId);
           group.classList.remove("report-priority-p0", "report-priority-p1", "report-priority-p2");
           group.classList.toggle("report-source-hit", shouldShow);
           group.classList.toggle("report-source-selected", isSelected);
+          group.classList.toggle("report-source-primary-selected", isPrimarySelected);
+          group.classList.toggle("report-source-context-selected", isSelected && !isPrimarySelected);
           if (shouldShow) group.classList.add(`report-priority-${report.priority.toLowerCase()}`);
 
           const oldOverlay = group.querySelector(".report-source-overlay");
@@ -1663,15 +2629,56 @@
         state.decorateTimer = window.setTimeout(decorateSourceGraph, 80);
       }
 
+      function groupBounds(group) {
+        if (!group || typeof group.getBBox !== "function") return null;
+        try {
+          return group.getBBox();
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function selectedBoundaryBounds() {
+        const group = findSourceGroup(state.selectedNodeId);
+        if (!group || !group.classList.contains(BOUNDARY_CLASS)) return null;
+        return groupBounds(group);
+      }
+
+      function isGroupInsideBounds(group, bounds) {
+        const box = groupBounds(group);
+        if (!box || !bounds) return false;
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        return centerX >= bounds.x
+          && centerX <= bounds.x + bounds.width
+          && centerY >= bounds.y
+          && centerY <= bounds.y + bounds.height;
+      }
+
       function applySelectedState() {
         if (!state.sourceDoc) return;
+        const selectedIds = selectedSourceIds();
+        const selectedBounds = selectedBoundaryBounds();
+        const hasSelection = selectedIds.size > 0;
+        state.sourceDoc.documentElement.classList.toggle("report-has-selection", hasSelection && state.sourceDimEnabled);
+
         state.sourceDoc.querySelectorAll(`.${NODE_CLASS}.report-source-selected, .${BOUNDARY_CLASS}.report-source-selected`).forEach((group) => {
-          if (nodeIdFromGroup(group) !== state.selectedNodeId) group.classList.remove("report-source-selected");
+          const nodeId = nodeIdFromGroup(group);
+          if (!selectedIds.has(nodeId) && !isGroupInsideBounds(group, selectedBounds)) group.classList.remove("report-source-selected");
         });
 
         state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`).forEach((group) => {
-          const isSelected = isReportOverlayEnabled() && nodeIdFromGroup(group) === state.selectedNodeId;
+          const nodeId = nodeIdFromGroup(group);
+          const isSelected = selectedIds.has(nodeId) || isGroupInsideBounds(group, selectedBounds);
+          const isPrimarySelected = isPrimarySelectedSource(nodeId);
           group.classList.toggle("report-source-selected", isSelected);
+          group.classList.toggle("report-source-primary-selected", isPrimarySelected);
+          group.classList.toggle("report-source-context-selected", isSelected && !isPrimarySelected);
+        });
+
+        state.sourceDoc.querySelectorAll(".report-root-overlay").forEach((overlay) => {
+          overlay.classList.toggle("report-root-overlay-selected", selectedIds.has(overlay.dataset.reportNodeId));
+          overlay.classList.toggle("report-root-overlay-primary-selected", isPrimarySelectedSource(overlay.dataset.reportNodeId));
         });
       }
 
@@ -1722,11 +2729,13 @@
 
         const frameRect = els.frame.getBoundingClientRect();
         const inspectorReserve = window.matchMedia("(max-width: 980px)").matches ? 0 : 416;
+        const timelineReserve = window.matchMedia("(max-width: 980px)").matches ? 0 : Math.min(330, window.innerHeight * 0.34) + 32;
         const availableWidth = Math.max(360, frameRect.width - inspectorReserve);
+        const availableHeight = Math.max(320, frameRect.height - timelineReserve);
         const current = svg.__zoom || d3.zoomTransform(svg);
         const scale = Math.max(0.8, Math.min(1.7, Number(current.k) || 1.15));
         const transform = d3.zoomIdentity
-          .translate(availableWidth / 2 - point.x * scale, frameRect.height / 2 - point.y * scale)
+          .translate(availableWidth / 2 - point.x * scale, availableHeight / 2 - point.y * scale)
           .scale(scale);
 
         svg.__zoom = transform;
@@ -1755,6 +2764,54 @@
 
           #graph-container_8738e552-e764-4a57-839a-6321bc3ae7d3 {
             background: transparent !important;
+          }
+
+          .${NODE_CLASS},
+          .${BOUNDARY_CLASS},
+          .report-root-overlay {
+            transition: opacity 120ms ease, filter 120ms ease;
+          }
+
+          html.report-has-selection .${NODE_CLASS}:not(.report-source-selected),
+          html.report-has-selection .${BOUNDARY_CLASS}:not(.report-source-selected),
+          html.report-has-selection .report-root-overlay:not(.report-root-overlay-selected) {
+            opacity: 0.08 !important;
+          }
+
+          html.report-has-selection .${NODE_CLASS}.report-source-selected,
+          html.report-has-selection .${BOUNDARY_CLASS}.report-source-selected,
+          html.report-has-selection .report-root-overlay.report-root-overlay-selected {
+            opacity: 1 !important;
+          }
+
+          html.report-has-selection .${NODE_CLASS}.report-source-primary-selected,
+          html.report-has-selection .${BOUNDARY_CLASS}.report-source-primary-selected,
+          html.report-has-selection .report-root-overlay.report-root-overlay-primary-selected {
+            filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary) 70%, transparent));
+          }
+
+          html.report-has-selection .${NODE_CLASS}.report-source-context-selected {
+            filter: drop-shadow(0 0 5px color-mix(in srgb, var(--foreground) 28%, transparent));
+          }
+
+          html.report-has-selection .${NODE_CLASS}.report-source-context-selected > rect:first-of-type {
+            fill: color-mix(in srgb, var(--foreground) 18%, var(--graphviz-node-fill, #263341)) !important;
+            stroke: color-mix(in srgb, var(--foreground) 72%, transparent) !important;
+            stroke-width: 1.8px !important;
+            fill-opacity: 1 !important;
+          }
+
+          html.report-has-selection .${BOUNDARY_CLASS}.report-source-context-selected > rect:first-of-type {
+            fill-opacity: 0.28 !important;
+            stroke: color-mix(in srgb, var(--foreground) 48%, transparent) !important;
+            stroke-width: 2.1px !important;
+          }
+
+          html.report-has-selection .${NODE_CLASS}.report-source-selected text,
+          html.report-has-selection .${BOUNDARY_CLASS}.report-source-selected text {
+            opacity: 1 !important;
+            fill-opacity: 1 !important;
+            fill: var(--foreground) !important;
           }
 
           .${NODE_CLASS}.report-source-hit {
@@ -1800,11 +2857,11 @@
           }
 
           .${NODE_CLASS}.report-source-selected > rect:first-of-type {
-            stroke-width: 2px !important;
+            stroke-width: 3px !important;
           }
 
           .${BOUNDARY_CLASS}.report-source-selected > rect:first-of-type {
-            stroke-width: 2.3px !important;
+            stroke-width: 3.4px !important;
           }
 
           .report-source-overlay {
@@ -1966,6 +3023,30 @@
         selectNode(button.dataset.nodeId, { focusSource: true });
       });
 
+      document.querySelectorAll("[data-timeline-tab]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activateTimelineTab(button.dataset.timelineTab);
+        });
+      });
+
+      els.streamTimelinePanel.addEventListener("click", (event) => {
+        const segmentRow = event.target.closest("[data-segment-index]");
+        if (segmentRow && segmentRow.classList.contains("module-row")) {
+          const segment = MODULE_TIMELINE
+            .map((item, index) => ({ ...item, index }))
+            .find((item) => item.index === Number(segmentRow.dataset.segmentIndex));
+          if (segment) {
+            const { minStart, span } = streamBounds();
+            const midpoint = segment.startUs + segment.wallUs / 2;
+            seekStreamPosition(((midpoint - minStart) / span) * 100);
+            return;
+          }
+        }
+
+        const row = event.target.closest("[data-node-id]");
+        if (row) selectNode(row.dataset.nodeId, { focusSource: true });
+      });
+
       els.refreshOverlay.addEventListener("click", () => {
         decorateSourceGraph();
         renderInspector();
@@ -1978,6 +3059,7 @@
         }
       }, 300);
 
+      renderTimelinePanels();
       renderInspector();
     })();
   </script>

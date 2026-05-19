@@ -1027,7 +1027,7 @@ function ptoBuildColorMap(keys) {
     let containerHierarchy = {};
     let vizInstance = null;
     let containerNodeCounts = {};
-    let torchVistaColorMap = new Map();
+    let architectureColorMap = new Map();
     let retainedZoomTransform = null;
     let retainedAnchorScreen = null;
 
@@ -1089,6 +1089,44 @@ function ptoBuildColorMap(keys) {
     const GRAPHVIZ_TENSOR_STROKE = resolveGraphvizTokenColor("var(--graphviz-tensor-stroke)");
     const GRAPHVIZ_TENSOR_RADIUS = resolveGraphvizTokenLength("var(--radius-lg)");
     const GRAPHVIZ_TENSOR_NODE_TYPES = new Set(["Input", "Output", "Constant", "Parameter", "Tensor"]);
+    const ARCHITECTURE_AREA_COLOR_KEYS = [
+        "stage:transformer",
+        "stage:attention",
+        "stage:ffn",
+        "stage:moe",
+        "stage:dense",
+        "stage:indexer"
+    ];
+    const ARCHITECTURE_AREA_BY_NODE = new Map([
+        ["dsv32arch_transformer_9236e026", "stage:transformer"],
+        ["dsv32arch_block_0214b4b3", "stage:transformer"],
+        ["dsv32arch_embedding_2f81ba1b", "stage:transformer"],
+        ["dsv32arch_final_norm_2010d80f", "stage:transformer"],
+        ["dsv32arch_lm_head_2b98b847", "stage:transformer"],
+        ["dsv32arch_attention_d0278de5", "stage:attention"],
+        ["dsv32arch_attention_call_612a5ae9", "stage:attention"],
+        ["dsv32arch_attn_norm_9eedf758", "stage:attention"],
+        ["dsv32arch_q_path_b399f580", "stage:attention"],
+        ["dsv32arch_kv_path_a69fbb2b", "stage:attention"],
+        ["dsv32arch_cache_b0359280", "stage:attention"],
+        ["dsv32arch_sparse_attn_f5c98e92", "stage:attention"],
+        ["dsv32arch_o_proj_652c0be4", "stage:attention"],
+        ["dsv32arch_ffn_a2b90028", "stage:ffn"],
+        ["dsv32arch_ffn_choice_710c2f62", "stage:ffn"],
+        ["dsv32arch_ffn_norm_6d0e622d", "stage:ffn"],
+        ["dsv32arch_moe_63e885ca", "stage:moe"],
+        ["dsv32arch_router_77eb1db6", "stage:moe"],
+        ["dsv32arch_top_experts_dedfd965", "stage:moe"],
+        ["dsv32arch_experts_cfbede3c", "stage:moe"],
+        ["dsv32arch_shared_d18aac96", "stage:moe"],
+        ["dsv32arch_moe_sum_50118d9a", "stage:moe"],
+        ["dsv32arch_dense_c8e834d8", "stage:dense"],
+        ["dsv32arch_dense_w1w3_0b7a312e", "stage:dense"],
+        ["dsv32arch_dense_act_88b5a19d", "stage:dense"],
+        ["dsv32arch_dense_w2_8e01455d", "stage:dense"],
+        ["dsv32arch_indexer_dfa17da7", "stage:indexer"],
+        ["dsv32arch_topk_e1fd5d33", "stage:indexer"]
+    ]);
 
     if (graphContainerElement && graphContainerElement.parentElement === document.body) {
         document.documentElement.style.margin = "0";
@@ -1118,19 +1156,6 @@ function ptoBuildColorMap(keys) {
         return repeat_containers.has(nodeName);
     }
 
-    function getTopColorParent(nodeName) {
-        let current = nodeName;
-        let parent = ancestor_map[current];
-        if (!parent) {
-            return containerNodes.has(nodeName) ? nodeName : null;
-        }
-        while (parent && ancestor_map[parent]) {
-            current = parent;
-            parent = ancestor_map[parent];
-        }
-        return parent || current;
-    }
-
     function normalizeColorToken(value) {
         return String(value || "")
             .replace(/[^\w.-]+/g, " ")
@@ -1138,66 +1163,74 @@ function ptoBuildColorMap(keys) {
             .toLowerCase();
     }
 
-    function inferTorchVistaSemantic(nodeName) {
-        const displayName = graph_node_display_names[nodeName] || graph_node_name_to_without_suffix[nodeName] || nodeName;
-        const label = normalizeColorToken(displayName);
-        if (label.includes("linear") || label.includes("matmul") || label.includes("gemm")) return "sem:linear";
-        if (label.includes("conv")) return "sem:conv";
-        if (label.includes("norm") || label.includes("batchnorm") || label.includes("layernorm")) return "sem:norm";
-        if (label.includes("attention") || label.includes("attn")) return "sem:attention";
-        if (label.includes("relu") || label.includes("gelu") || label.includes("silu") || label.includes("sigmoid") || label.includes("tanh")) return "sem:activation";
-        if (label.includes("pool")) return "sem:pool";
-        if (label.includes("embed")) return "sem:embedding";
-        if (label.includes("dropout")) return "sem:dropout";
-        if (label.includes("loss")) return "sem:loss";
-        if (label.includes("add") || label.includes("mul") || label.includes("sum") || label.includes("cat") || label.includes("view") || label.includes("reshape")) return "sem:tensor-op";
-        return "sem:" + label;
+    function getArchitectureAreaFromInfo(nodeName) {
+        const stage = module_info[nodeName]?.attributes?.stage;
+        if (stage === "model") return "stage:transformer";
+        if (stage === "attention") return "stage:attention";
+        if (stage === "ffn") return "stage:ffn";
+        if (stage === "moe") return "stage:moe";
+        return null;
     }
 
-    function getTorchVistaColorKey(nodeName) {
+    function inferArchitectureAreaFromLabel(nodeName) {
+        const displayName = [
+            graph_node_display_names[nodeName],
+            graph_node_name_to_without_suffix[nodeName],
+            node_to_module_path[nodeName],
+            func_info[nodeName]?.qualname
+        ].filter(Boolean).join(" ");
+        const label = normalizeColorToken(displayName || nodeName);
+        if (label.includes("indexer") || label.includes("top k") || label.includes("top-k") || label.includes("topk")) return "stage:indexer";
+        if (label.includes("moe") || label.includes("expert") || label.includes("router") || label.includes("gate")) return "stage:moe";
+        if (label.includes("dense") || label.includes("w1") || label.includes("w2") || label.includes("w3") || label.includes("silu")) return "stage:dense";
+        if (label.includes("ffn") || label.includes("feed forward") || label.includes("feed-forward")) return "stage:ffn";
+        if (label.includes("attention") || label.includes("attn") || label.includes("mla") || label.includes("kv") || label.includes("q path") || label.includes("sparse") || label.includes("cache") || label.includes("o projection")) return "stage:attention";
+        if (label.includes("transformer") || label.includes("decoder") || label.includes("embedding") || label.includes("lm head") || label.includes("final")) return "stage:transformer";
+        return null;
+    }
+
+    function getArchitectureColorKey(nodeName) {
         const nodeData = adj_list_collapsed_nodes[nodeName] || adj_list[nodeName];
-        if (!nodeData) return "type:unknown";
+        if (!nodeData) return "stage:transformer";
+        if (repeat_containers.has(nodeName)) return "stage:repeat";
 
-        if (nodeData.node_type === "Input") return "io:input";
-        if (nodeData.node_type === "Output") return "io:output";
-        if (nodeData.node_type === "Constant") return "io:constant";
-        if (nodeData.node_type === "Parameter") return "io:parameter";
-        if (repeat_containers.has(nodeName)) return "container:repeat";
+        let current = nodeName;
+        while (current) {
+            const explicitArea = ARCHITECTURE_AREA_BY_NODE.get(current);
+            if (explicitArea) return explicitArea;
 
-        if (nodeData.node_type === "Operation") return inferTorchVistaSemantic(nodeName);
-        if (nodeData.node_type === "Module") return "module:" + (graph_node_name_to_without_suffix[nodeName] || nodeName);
-        const parent = ancestor_map[nodeName];
-        if (parent) return "parent:" + (graph_node_name_to_without_suffix[parent] || parent);
-        return "type:" + nodeData.node_type;
+            const infoArea = getArchitectureAreaFromInfo(current);
+            if (infoArea) return infoArea;
+
+            const inferredArea = inferArchitectureAreaFromLabel(current);
+            if (inferredArea) return inferredArea;
+
+            current = ancestor_map[current];
+        }
+
+        return "stage:transformer";
     }
 
-    function buildTorchVistaColorMap() {
-        const keys = [];
+    function buildArchitectureColorMap() {
+        const keys = [...ARCHITECTURE_AREA_COLOR_KEYS];
         const nodeNames = new Set([
             ...Object.keys(adj_list_collapsed_nodes),
             ...Object.keys(adj_list),
             ...Array.from(containerNodes)
         ]);
         for (const nodeName of nodeNames) {
-            keys.push(getTorchVistaColorKey(nodeName));
+            const key = getArchitectureColorKey(nodeName);
+            if (!ARCHITECTURE_AREA_COLOR_KEYS.includes(key)) keys.push(key);
         }
-        const semanticKeys = keys.filter(key => !key.startsWith("io:")).sort();
-        const palette = ptoBuildColorMap(semanticKeys);
-        const map = new Map();
-        map.set("io:input", ptoNormalizeColormapColor("#A855F7"));
-        map.set("io:output", ptoNormalizeColormapColor("#34D399"));
-        map.set("io:constant", ptoNormalizeColormapColor("#64748B"));
-        map.set("io:parameter", ptoNormalizeColormapColor("#3B82F6"));
-        map.set("container:repeat", REPEAT_CONTAINER_COLOR);
-        for (const [key, color] of palette.entries()) {
-            if (!map.has(key)) map.set(key, color);
-        }
+        const dynamicKeys = [...new Set(keys.slice(ARCHITECTURE_AREA_COLOR_KEYS.length))].sort();
+        const map = ptoBuildColorMap([...ARCHITECTURE_AREA_COLOR_KEYS, ...dynamicKeys]);
+        map.set("stage:repeat", REPEAT_CONTAINER_COLOR);
         return map;
     }
 
-    function getTorchVistaColor(nodeName, fallbackColor) {
-        const key = getTorchVistaColorKey(nodeName);
-        return torchVistaColorMap.get(key) || fallbackColor;
+    function getArchitectureAreaColor(nodeName, fallbackColor) {
+        const key = getArchitectureColorKey(nodeName);
+        return architectureColorMap.get(key) || fallbackColor;
     }
 
     function getNodeVisualType(nodeName) {
@@ -1225,16 +1258,28 @@ function ptoBuildColorMap(keys) {
         return nodeData.height / 2;
     }
 
-    function safeNodeColor(nodeName) {
+    function resolveNodeVisualStyle(nodeName) {
         const nodeData = adj_list_collapsed_nodes[nodeName] || adj_list[nodeName];
-        if (isTensorVisualNode(nodeName)) return GRAPHVIZ_TENSOR_FILL;
-        if (nodeData?.node_type === "Input") return getTorchVistaColor(nodeName, "#A855F7");
-        if (nodeData?.node_type === "Output") return getTorchVistaColor(nodeName, "#34D399");
-        if (nodeData?.node_type === "Constant") return getTorchVistaColor(nodeName, "#64748B");
-        if (nodeData?.node_type === "Parameter") return getTorchVistaColor(nodeName, "#3B82F6");
-        if (repeat_containers.has(nodeName)) return getTorchVistaColor(nodeName, REPEAT_CONTAINER_COLOR);
-        if (nodeData?.node_type === "Module" || collapsedContainers.has(nodeName)) return getTorchVistaColor(nodeName, "#14B8A6");
-        return getTorchVistaColor(nodeName, "#0EA5E9");
+        const colorKey = getArchitectureColorKey(nodeName);
+        if (isTensorVisualNode(nodeName)) {
+            return {
+                colorKey,
+                fill: GRAPHVIZ_TENSOR_FILL,
+                dotFill: GRAPHVIZ_TENSOR_FILL_HEX,
+                stroke: GRAPHVIZ_TENSOR_STROKE,
+                strokeWidth: 0.8
+            };
+        }
+
+        const fallbackColor = nodeData?.node_type === "Module" || collapsedContainers.has(nodeName) ? "#14B8A6" : "#0EA5E9";
+        const fill = architectureColorMap.get(colorKey) || fallbackColor;
+        return {
+            colorKey,
+            fill,
+            dotFill: fill,
+            stroke: "none",
+            strokeWidth: 0
+        };
     }
 
     let currentTooltip = null;
@@ -1568,17 +1613,7 @@ function ptoBuildColorMap(keys) {
 
     function generateDotFromProcessedData(topDown = false) {
         function getNodeColor(nodeName) {
-            if (adj_list_collapsed_nodes[nodeName]) {
-                const nodeData = adj_list_collapsed_nodes[nodeName];
-                if (GRAPHVIZ_TENSOR_NODE_TYPES.has(nodeData.node_type)) return GRAPHVIZ_TENSOR_FILL_HEX;
-                if (repeat_containers.has(nodeName)) return getTorchVistaColor(nodeName, REPEAT_CONTAINER_COLOR);
-                if (nodeData.node_type === "Module") return getTorchVistaColor(nodeName, "#14B8A6");
-                if (nodeData.node_type === "Operation") return getTorchVistaColor(nodeName, "#0EA5E9");
-            }
-            if (collapsedContainers.has(nodeName)) {
-                return getTorchVistaColor(nodeName, "#14B8A6");
-            }
-            return getTorchVistaColor(nodeName, "#0EA5E9");
+            return resolveNodeVisualStyle(nodeName).dotFill;
         }
 
         function getErrorColor(nodeName) {
@@ -1828,7 +1863,7 @@ function ptoBuildColorMap(keys) {
     // Updated generateDotSource function
     function generateDotSource() {
         processCollapsedGraph();
-        torchVistaColorMap = buildTorchVistaColorMap();
+        architectureColorMap = buildArchitectureColorMap();
         const dotSource = generateDotFromProcessedData(false);
         return dotSource;
     }
@@ -2130,7 +2165,7 @@ function ptoBuildColorMap(keys) {
 
             const hasFailedNodes = containersWithFailedNodes.has(clusterName);
             const isRepeat = isRepeatNode(clusterName);
-            const clusterColor = getTorchVistaColor(clusterName, isRepeat ? REPEAT_CONTAINER_COLOR : "#14B8A6");
+            const clusterColor = getArchitectureAreaColor(clusterName, isRepeat ? REPEAT_CONTAINER_COLOR : "#14B8A6");
             if (hasFailedNodes) {
                 group.classed("error_8738e552-e764-4a57-839a-6321bc3ae7d3", true);
             }
@@ -2426,7 +2461,7 @@ function ptoBuildColorMap(keys) {
         // Add shapes for nodes. Tensor nodes use rounded rectangles; modules and ops keep full-pill geometry.
         nodes.each(function([nodeName, nodeData]) {
             const nodeGroup = d3.select(this);
-            const fillColor = safeNodeColor(nodeName);
+            const visualStyle = resolveNodeVisualStyle(nodeName);
             const visualWidth = nodeData.width;
             const isTensor = isTensorVisualNode(nodeName);
             const cornerRadius = getNodeCornerRadius(nodeName, nodeData);
@@ -2443,10 +2478,11 @@ function ptoBuildColorMap(keys) {
                 if (isTensor) return "tensor_8738e552-e764-4a57-839a-6321bc3ae7d3";
                 return isModuleVisualNode(nodeName) ? "module_8738e552-e764-4a57-839a-6321bc3ae7d3" : "operation_8738e552-e764-4a57-839a-6321bc3ae7d3";
             })
-            .attr("fill", fillColor)
-            .attr("stroke", isTensor ? GRAPHVIZ_TENSOR_STROKE : "none")
-            .attr("stroke-width", isTensor ? 0.8 : 0)
-            .style("fill", fillColor);
+            .attr("data-color-key", visualStyle.colorKey)
+            .attr("fill", visualStyle.fill)
+            .attr("stroke", visualStyle.stroke)
+            .attr("stroke-width", visualStyle.strokeWidth)
+            .style("fill", visualStyle.fill);
         });
         
         // Add labels for nodes
