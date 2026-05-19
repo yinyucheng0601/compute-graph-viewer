@@ -1,0 +1,115 @@
+{
+  "id": "model-graphviz",
+  "name": "Model Graphviz",
+  "type": "svg",
+  "description": "Reusable SVG visual contract for TorchVista/Graphviz model architecture maps and report overlays. Captures the approved DeepSeek V3.2/V4 graph style: default depth-2 folding, pill module/op nodes, rounded-rect tensor nodes, parent cluster shells with 10% white expanded fill, white edges, centered type labels, normalized safe colormap at s=0.82/l=0.40, strict semantic module hierarchy, parent-to-child fill inheritance for op/module nodes, folded representative edge dedupe, stable expand/collapse viewport anchoring, centered report-priority container title pills, no-extra-border priority tags, right-center fold controls, right-inset expand controls, no graph shadows, and no-border clicked-operator preview cards with dark code surfaces.",
+  "source": {
+    "visualContract": [
+      "graphviz/torchvista_graphviz_deepseek_v4.html",
+      "graphviz/deepseek_v32_report_overlay_demo.html",
+      "patterns/model-graphviz/pattern.html",
+      "patterns/model-graphviz/pattern.css",
+      "patterns/model-graphviz/pattern.js"
+    ],
+    "patternHtml": "patterns/model-graphviz/pattern.html",
+    "patternCss": "patterns/model-graphviz/pattern.css",
+    "renderScript": "patterns/model-graphviz/pattern.js",
+    "originalModule": "graphviz/torchvista_graphviz_deepseek_v4.html",
+    "parityNote": "The pattern preview embeds the real DeepSeek V3.2/V4 Graphviz pages with iframes for parity and includes a rendered report-overlay sample from pattern.js. The original Graphviz pages still own DOT generation, Graphviz layout, D3 zoom, popup behavior, and expand/collapse graph reloads. New model graph pages should reuse this pattern contract for visual styling, report overlay placement, and renderer math."
+  },
+  "layoutContract": {
+    "dotGraphMargin": 0.22,
+    "dotGraphPad": 0.38,
+    "dotClusterMargin": 36,
+    "notes": "Graphviz source pages should add graph margin/pad and expanded-cluster margin before rendering so container title pills and left-side node priority tags have enough breathing room."
+  },
+  "reportOverlayContract": {
+    "priorityColors": {
+      "P0": "#FF2D7A",
+      "P1": "#FF9D00",
+      "P2": "#FFE600"
+    },
+    "containerTitlePill": [
+      "Use a filled pill for report-mapped container titles; do not add a second visible outline around the title.",
+      "Use the same fill as the priority tag: P0 red, P1 orange, P2 yellow.",
+      "Place the P0/P1/P2 tag inside the pill on the left of the title text.",
+      "Center the entire pill against the container bbox, clamp it within the container with an 8 graph-unit inset, and keep the pill above edge strokes in a root overlay layer.",
+      "Use SVG geometric text centering with dominant-baseline central for both tag and title text."
+    ],
+    "nodePriorityTag": [
+      "When a normal node carries priority metadata, put the tag to the left of the node label and expand/reserve pill space when needed instead of drawing a separate external ring.",
+      "Change the original node pill stroke when emphasis is needed; do not add an extra visible border overlay."
+    ],
+    "hitTarget": "Expanded containers may add an invisible wide stroke hit target for clickability, but that hit target must not create a visible border."
+  },
+  "variants": [
+    {
+      "id": "deepseek-v32-source",
+      "sourcePage": "graphviz/deepseek_v32_source_graph.html",
+      "defaultCollapseDepth": 2,
+      "notes": "Expands Transformer Core and Decoder Block by default, folds deeper semantic modules, uses tensor styling for hidden/block/output tensors, no shadows, normalized colormap s=0.82/l=0.40, right-center fold controls, graph margin/pad, cluster margin, and report-overlay priority title pills when the report page is loaded."
+    },
+    {
+      "id": "deepseek-v4-torchvista",
+      "sourcePage": "graphviz/torchvista_graphviz_deepseek_v4.html",
+      "defaultCollapseDepth": 2,
+      "notes": "Canonical TorchVista/Graphviz renderer template for model architecture pages using the same depth-2 folding, colormap, tensor, container, and fold-control rules."
+    },
+    {
+      "id": "deepseek-v32-report-overlay",
+      "sourcePage": "graphviz/deepseek_v32_report_overlay_demo.html",
+      "defaultCollapseDepth": 2,
+      "notes": "Infinite-canvas report overlay page using the source Graphviz iframe, transparent top header, right panel-shell inspector, Mapped Nodes graph focusing, red/orange/yellow priority fills, centered container title pills, and invisible-only enlarged border hit targets."
+    }
+  ],
+  "useWhen": [
+    "rendering model architecture graphs from Graphviz, TorchVista, or report-derived model nodes",
+    "showing collapsed module nodes with plus controls and expanded parent clusters without duplicate standalone parent nodes",
+    "keeping detail modules inside their semantic parent instead of drawing them as same-level peers",
+    "building graph previews where modules/ops use full-pill geometry and Input/Output/MTP tensor nodes use rounded rectangles",
+    "overlaying report diagnosis metadata on top of original Graphviz nodes without drawing separate visible rings",
+    "using an infinite-canvas graph with a transparent top header and right-side panel-shell inspector where mapped-node lists can focus the graph"
+  ],
+  "requiredApis": [
+      "window.PtoModelGraphvizPattern.render(container, graph, options)",
+      "window.PtoModelGraphvizPattern.buildColorMap(keys)",
+      "window.PtoModelGraphvizPattern.reportPriorityColors",
+      "window.PtoModelGraphvizPattern.defaultDotLayout"
+  ],
+  "allowedOverrides": [
+    "graph data: nodes, edges, clusters, labels, type labels, and fixed positions",
+    "node dimensions when the Graphviz layout requires wider labels",
+    "node semantic color keys, as long as colors are resolved through buildColorMap",
+    "node fill colors only; all non-node UI colors, typography, spacing, radii, borders, and code surfaces must stay token-derived",
+    "stage width, height, and viewport padding",
+    "collapsed and expanded state data",
+    "collapseDepth URL overrides, while the default remains depth 2",
+    "report priority values P0, P1, or P2, using the documented red/orange/yellow fills",
+    "right inspector content and mapped-node list data, as long as graph focus behavior is preserved"
+  ],
+  "forbiddenOverrides": [
+    "rendering Input, Output, MTP, Constant, or Parameter tensor nodes as ellipses or full-pill op nodes",
+    "changing module/op rect node radius away from height / 2 full-pill geometry",
+    "placing expand buttons outside the right edge or over text",
+    "adding border strokes to clicked-operator preview cards",
+    "using light code/editor surfaces inside operator preview cards",
+    "using a red/orange/semantic-green colormap instead of the pass-ir safe hue algorithm",
+    "changing the shared colormap saturation/lightness away from s=0.82/l=0.40 without updating this pattern first",
+    "adding drop-shadow/filter shadows to graph nodes, clusters, fold controls, or graph panels",
+    "using colored expanded-cluster backgrounds instead of 10% white fill for normal containers",
+    "placing expanded-cluster fold controls away from the right-center anchor",
+    "hard-coding non-node UI color, font, spacing, radius, border, or code-surface styles outside design-system tokens",
+    "breaking parent-to-child fill inheritance inside expanded clusters",
+    "rendering multiple parallel representative edges between the same folded source and target modules",
+    "recentering or refitting the whole graph after expand/collapse instead of preserving the clicked module's screen anchor",
+    "using dark edge strokes on the dark graph stage",
+    "reintroducing duplicate standalone parent nodes beside expanded clusters",
+    "placing report container title pills against the original label's left edge instead of the container bbox center",
+    "using blue for P2 report priority",
+    "using border-only color to distinguish report diagnosis cards or priority tags",
+    "drawing report priority as a separate visible outline around nodes or containers",
+    "letting a centered report title pill sit below edge strokes where the graph line crosses through the label",
+    "adding visible border styles to the panel-shell report inspector beyond the shared panel-shell token contract"
+  ],
+  "agentReuseRule": "Read this JSON first. For any model graph preview, use pattern.html as the parity preview because it iframes the real V3.2/V4 Graphviz pages and includes the shared report-overlay sample. For new lightweight rendered examples, load pattern.css and pattern.js, then call window.PtoModelGraphvizPattern.render with data. Treat this as a rendered SVG pattern: node geometry, depth-2 default folding, right-center fold placement, right-inset expand placement, parent/child color inheritance, 10% white expanded-cluster fill, Graphviz margin/pad, cluster margin, no-shadow graph rendering, centered report-priority container title pills, no-extra-border priority tags, invisible-only click hit targets, and normalized safe colormap generation stay in the shared renderer rather than page-local CSS."
+}

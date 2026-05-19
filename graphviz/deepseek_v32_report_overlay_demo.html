@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek V3.2 Source Graph Report Overlay</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has("preview")) {
+      document.documentElement.dataset.preview = "true";
+    }
+  </script>
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --report-p0: #ff2d7a;
+      --report-p1: #ff9d00;
+      --report-p2: #ffe600;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body.source-report-app {
+      margin: 0;
+      overflow: hidden;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+
+    .source-shell {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background:
+        linear-gradient(var(--border-subtle) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px),
+        var(--background);
+      background-size: 32px 32px;
+    }
+
+    .source-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+    }
+
+    .overlay-header {
+      position: absolute;
+      z-index: var(--z-overlay);
+      top: var(--space-4);
+      left: var(--space-4);
+      right: 432px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      pointer-events: none;
+    }
+
+    .overlay-header-left,
+    .overlay-header-right {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+      pointer-events: auto;
+    }
+
+    .report-home-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: var(--button-height-sm);
+      padding: 0 var(--button-padding-x-sm);
+      border: 1px solid var(--button-secondary-border);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--button-font);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .report-home-button:hover {
+      color: var(--foreground);
+      background: var(--button-ghost-bg-hover);
+    }
+
+    .overlay-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+      color: var(--foreground);
+      font: var(--text-body);
+      font-weight: var(--font-weight-semibold);
+      white-space: nowrap;
+    }
+
+    .overlay-brand-mark {
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--success);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent);
+    }
+
+    .overlay-source {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+    }
+
+    .segment-control {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--segmented-control-gap);
+      padding: var(--segmented-control-padding);
+      border: 1px solid var(--segmented-control-border);
+      border-radius: var(--segmented-control-radius);
+      background: color-mix(in srgb, var(--background) 56%, transparent);
+    }
+
+    .segment-control button,
+    .header-action {
+      height: var(--button-height-sm);
+      border: 0;
+      border-radius: var(--radius-md);
+      padding: 0 var(--button-padding-x-sm);
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: var(--button-font);
+      cursor: pointer;
+    }
+
+    .segment-control button:hover,
+    .header-action:hover {
+      color: var(--foreground);
+      background: var(--button-ghost-bg-hover);
+    }
+
+    .segment-control button.is-active {
+      color: var(--foreground);
+      background: var(--state-selected);
+    }
+
+    .header-action {
+      border: 1px solid var(--button-secondary-border);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+    }
+
+    .panel-shell.report-inspector {
+      position: absolute;
+      z-index: var(--z-overlay);
+      top: var(--space-4);
+      right: var(--space-4);
+      bottom: var(--space-4);
+      width: 400px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--panel-shell-border);
+      border-radius: var(--panel-shell-radius);
+      background: color-mix(in srgb, var(--panel-shell-bg) 96%, transparent);
+      box-shadow: var(--panel-shell-shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .panel-shell-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--panel-shell-header-padding);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .inspector-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .inspector-kicker {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .priority-badge,
+    .status-chip,
+    .node-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 100%;
+      min-height: var(--tag-height);
+      padding: 0 var(--tag-padding-x);
+      border: 1px solid var(--comp-tag-border);
+      border-radius: var(--tag-radius);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+
+    .priority-badge[data-priority="P0"] {
+      border-color: transparent;
+      color: var(--foreground);
+      background: var(--report-p0);
+    }
+
+    .priority-badge[data-priority="P1"] {
+      border-color: transparent;
+      color: var(--background);
+      background: var(--report-p1);
+    }
+
+    .priority-badge[data-priority="P2"] {
+      border-color: transparent;
+      color: var(--background);
+      background: var(--report-p2);
+    }
+
+    .status-chip {
+      flex: 0 0 auto;
+      color: var(--foreground-secondary);
+    }
+
+    .inspector-title {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+    }
+
+    .node-id {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      word-break: break-all;
+    }
+
+    .panel-shell-body {
+      min-height: 0;
+      overflow: auto;
+      padding: var(--panel-shell-body-padding);
+    }
+
+    .inspector-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--inspector-section-padding-y) 0;
+      border-bottom: 1px solid var(--inspector-section-divider);
+    }
+
+    .inspector-section:first-child {
+      padding-top: var(--space-2);
+    }
+
+    .inspector-section:last-child {
+      border-bottom: 0;
+    }
+
+    .section-title {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .section-copy {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-body-sm);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-2);
+    }
+
+    .metric-tile {
+      min-width: 0;
+      padding: var(--inspector-soft-card-padding);
+      border: 0;
+      border-radius: var(--inspector-soft-card-radius);
+      background: var(--inspector-soft-card-bg);
+    }
+
+    .metric-tile[data-tone="critical"] {
+      background: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
+    }
+
+    .metric-tile[data-tone="warning"] {
+      background: color-mix(in srgb, var(--warning) 20%, var(--surface-2));
+    }
+
+    .metric-tile[data-tone="info"] {
+      background: color-mix(in srgb, var(--primary) 18%, var(--surface-2));
+    }
+
+    .metric-tile[data-tone="success"] {
+      background: color-mix(in srgb, var(--success) 18%, var(--surface-2));
+    }
+
+    .metric-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .metric-value {
+      margin-top: var(--space-1);
+      color: var(--foreground);
+      font: var(--text-mono);
+      overflow-wrap: anywhere;
+    }
+
+    .metric-bar {
+      position: relative;
+      height: 4px;
+      margin-top: var(--space-2);
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--background) 46%, transparent);
+    }
+
+    .metric-bar span {
+      display: block;
+      width: var(--metric-bar-width);
+      height: 100%;
+      border-radius: inherit;
+      background: var(--foreground-muted);
+    }
+
+    .metric-tile[data-tone="critical"] .metric-bar span {
+      background: var(--danger);
+    }
+
+    .metric-tile[data-tone="warning"] .metric-bar span {
+      background: var(--warning);
+    }
+
+    .metric-tile[data-tone="info"] .metric-bar span {
+      background: var(--primary-hover);
+    }
+
+    .metric-tile[data-tone="success"] .metric-bar span {
+      background: var(--success);
+    }
+
+    .fact-list,
+    .action-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .fact-list li,
+    .action-list li {
+      position: relative;
+      padding-left: var(--space-4);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .fact-list li::before,
+    .action-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.72em;
+      width: 5px;
+      height: 5px;
+      border-radius: var(--radius-pill);
+      background: var(--foreground-muted);
+    }
+
+    .operator-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .operator-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-2);
+      align-items: center;
+      padding: var(--space-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+    }
+
+    .operator-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+
+    .operator-value {
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: nowrap;
+    }
+
+    .node-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .node-list button {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: var(--space-2);
+      align-items: center;
+      min-height: 36px;
+      padding: var(--space-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--foreground-secondary);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .node-list button:hover {
+      background: var(--state-hover);
+      color: var(--foreground);
+    }
+
+    .node-list button.is-active {
+      border-color: var(--border-default);
+      background: var(--state-selected);
+      color: var(--foreground);
+    }
+
+    .node-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: var(--text-body-sm);
+    }
+
+    .node-metric {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      padding: var(--space-4);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--inspector-soft-card-bg);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    @media (max-width: 980px) {
+      .overlay-header {
+        right: var(--space-4);
+        flex-wrap: wrap;
+      }
+
+      .panel-shell.report-inspector {
+        top: auto;
+        left: var(--space-4);
+        width: auto;
+        height: min(48vh, 520px);
+      }
+    }
+
+    @media (max-width: 680px) {
+      .overlay-header-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .overlay-source {
+        display: none;
+      }
+
+      .metric-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    :root[data-preview="true"] .overlay-header,
+    :root[data-preview="true"] .panel-shell.report-inspector {
+      display: none;
+    }
+
+    :root[data-preview="true"] .source-shell {
+      background: var(--background);
+    }
+  </style>
+</head>
+<body class="source-report-app">
+  <main class="source-shell">
+    <iframe
+      id="sourceFrame"
+      class="source-frame"
+      title="DeepSeek V3.2 Source Graph"
+      src="./deepseek_v32_source_graph.html"></iframe>
+
+    <header class="overlay-header" aria-label="Report overlay header">
+      <div class="overlay-header-left">
+        <a class="report-home-button" href="../launch.html" aria-label="Back to launch">Home</a>
+        <div class="overlay-brand">
+          <span class="overlay-brand-mark" aria-hidden="true"></span>
+          <span>DeepSeek V3.2 Report Overlay</span>
+        </div>
+        <span id="sourceStatus" class="overlay-source">source graph loading</span>
+      </div>
+      <div class="overlay-header-right">
+        <div class="segment-control" aria-label="priority filter">
+          <button type="button" data-filter="all" class="is-active">All</button>
+          <button type="button" data-filter="P0">P0</button>
+          <button type="button" data-filter="P1">P1</button>
+          <button type="button" data-filter="P2">P2</button>
+        </div>
+        <button id="refreshOverlay" class="header-action" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <aside class="panel-shell report-inspector" aria-label="report inspector">
+      <div class="panel-shell-header">
+        <div class="inspector-title-group">
+          <div class="inspector-kicker">
+            <span id="priorityBadge" class="priority-badge" data-priority="P0">P0</span>
+            <span id="reportDimension" class="status-chip">整体 Bound</span>
+          </div>
+          <h1 id="inspectorTitle" class="inspector-title">Decoder Block (repeated 27x)</h1>
+          <div id="inspectorNodeId" class="node-id">dsv32arch_block_0214b4b3</div>
+        </div>
+        <span id="overlayCount" class="status-chip">0 / 0</span>
+      </div>
+
+      <div class="panel-shell-body">
+        <section class="inspector-section">
+          <h2 class="section-title">Diagnosis</h2>
+          <p id="inspectorSummary" class="section-copy"></p>
+          <div id="metricGrid" class="metric-grid"></div>
+        </section>
+
+        <section class="inspector-section">
+          <h2 class="section-title">Evidence</h2>
+          <ul id="factList" class="fact-list"></ul>
+        </section>
+
+        <section class="inspector-section">
+          <h2 class="section-title">Operators</h2>
+          <div id="operatorList" class="operator-list"></div>
+        </section>
+
+        <section class="inspector-section">
+          <h2 class="section-title">Actions</h2>
+          <ul id="actionList" class="action-list"></ul>
+        </section>
+
+        <section class="inspector-section">
+          <h2 class="section-title">Mapped Nodes</h2>
+          <div id="nodeList" class="node-list"></div>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    (() => {
+      const NODE_CLASS = "node_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const BOUNDARY_CLASS = "boundary-box_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const LABEL_CLASS = "node-label_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const COLLAPSE_CLASS = "collapse-button_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const COLLAPSE_ICON_CLASS = "collapse-icon_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const POPUP_ID = "popup_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const SOURCE_STYLE_ID = "report-source-overlay-style";
+
+      const REPORTS = {
+        dsv32arch_transformer_9236e026: {
+          priority: "P0",
+          dimension: "整体 Bound",
+          title: "Transformer Core (27 layers)",
+          metricShort: "Free 34.4%",
+          summary: "正常步均值显示 HOST_BOUND：Free Time 34.4%，underfeed 32.1%，设备没有被持续喂满。",
+          metrics: [
+            ["free_ratio", "34.4%"],
+            ["underfeed", "32.1%"],
+            ["comm_not_overlap", "9.7%"],
+            ["normal stage", "22,569 us"]
+          ],
+          facts: [
+            "Step 11-19 正常步均值：Computing 55.9%，CommNO 9.7%，Free 34.4%。",
+            "主归因是 Host Dispatch / Device underfeed，Device memory bound 是次要瓶颈。",
+            "Host trace event 未展开，Host 根因仍是 soft attribution。"
+          ],
+          operators: [
+            ["GroupedMatmul", "29,903 us"],
+            ["MatMul", "17,347 us"],
+            ["QuantBatchMatmulV3", "15,285 us"]
+          ],
+          actions: [
+            "优先补 host events / launch 间隔证据，把 free time 拆到真实 host wait。",
+            "把这一层作为全图默认入口，向下钻到 MLA、MoE 和 logits 等节点。"
+          ]
+        },
+        dsv32arch_block_0214b4b3: {
+          priority: "P0",
+          dimension: "Decoder Block",
+          title: "Decoder Block (repeated 27x)",
+          metricShort: "HOST_BOUND",
+          summary: "Block.forward 对应主要耗时段：fused residual RMSNorm -> MLA -> FFN。整体瓶颈落在设备 underfeed 和 host dispatch。",
+          metrics: [
+            ["free_ratio", "34.4%"],
+            ["underfeed", "32.1%"],
+            ["comm_not_overlap", "9.7%"],
+            ["confidence", "medium"]
+          ],
+          facts: [
+            "报告维度判定为 HOST_BOUND / DEVICE_MEMORY_BOUND secondary。",
+            "预热步 Step 10 的 CommNO 68.7% 不纳入正常步均值。",
+            "正常步 stage 范围约 20.5-24.4 ms。"
+          ],
+          operators: [
+            ["GroupedMatmul", "21.84%"],
+            ["MatMul", "12.67%"],
+            ["QuantBatchMatmulV3", "11.16%"]
+          ],
+          actions: [
+            "对 Block 内 MLA 与 MoE 分别看 kernel 排名，避免只按全局 top 算子下结论。",
+            "把 Free Time 与 kernel busy union 对齐到同一 step 粒度。"
+          ]
+        },
+        dsv32arch_attention_call_612a5ae9: {
+          priority: "P1",
+          dimension: "MLA",
+          title: "MLA attention",
+          metricShort: "26.1%",
+          summary: "MLA 对应 QuantBatchMatmulV3、MlaPrologV3、KvQuantSparseFlashAttention 与 sparse indexer 路径。",
+          metrics: [
+            ["QBM total", "15,285 us"],
+            ["QBM ratio", "11.16%"],
+            ["KV sparse", "9,222 us"],
+            ["MlaPrologV3", "7,470 us"]
+          ],
+          facts: [
+            "QuantBatchMatmulV3 同时出现在 MIX_AIC 与 AI_CORE，合计在 top 算子中占比显著。",
+            "KvQuantSparseFlashAttention 在报告中判定正常，但仍是 attention 路径显著耗时。",
+            "MlaPrologV3 90 次，总耗时 7,470 us，平均 83.0 us。"
+          ],
+          operators: [
+            ["QuantBatchMatmulV3", "15,285 us"],
+            ["KvQuantSparseFlashAttention", "9,222 us"],
+            ["MlaPrologV3", "7,470 us"]
+          ],
+          actions: [
+            "分开观察 prefill/decode attention 的 sparse top-k 与 cache 访问。",
+            "关注 Q path 与 sparse attention 之间是否存在 host 下发碎片。"
+          ]
+        },
+        dsv32arch_sparse_attn_f5c98e92: {
+          priority: "P2",
+          dimension: "Sparse Attention",
+          title: "sparse prefill/decode attention",
+          metricShort: "6.74%",
+          summary: "KvQuantSparseFlashAttention 总耗时 9,222 us，占 top 算子 6.74%，报告标注为正常但仍是路径关键段。",
+          metrics: [
+            ["kernel", "KvQuantSparseFlashAttention"],
+            ["count", "90"],
+            ["total", "9,222 us"],
+            ["avg", "102.5 us"]
+          ],
+          facts: [
+            "核心类型是 MIX_AIC。",
+            "它连接 Indexer top-k 结果和 O projection，是 sparse attention 主计算段。",
+            "报告未将该 kernel 判定为异常热点。"
+          ],
+          operators: [
+            ["KvQuantSparseFlashAttention", "9,222 us"],
+            ["LightningIndexerQuant", "6,370 us"]
+          ],
+          actions: [
+            "保留为观察点，用于解释 attention 路径成本构成。",
+            "优先级低于全局 HOST_BOUND 和 logits wait anchor。"
+          ]
+        },
+        dsv32arch_q_path_b399f580: {
+          priority: "P1",
+          dimension: "Q Path",
+          title: "Q path -> 3072",
+          metricShort: "QBM 11.16%",
+          summary: "Q path 与 QuantBatchMatmulV3 对齐；MatMul 平均 cube_utilization 13.0%，需要区分小 shape 低利用率与真实异常。",
+          metrics: [
+            ["QBM MIX_AIC", "15,285 us"],
+            ["QBM AI_CORE", "8,604 us"],
+            ["MatMul", "17,347 us"],
+            ["avg cube util", "13.0%"]
+          ],
+          facts: [
+            "报告中 QuantBatchMatmulV3 MIX_AIC 270 次，平均 56.6 us。",
+            "QuantBatchMatmulV3 AI_CORE 90 次，平均 95.6 us，标注正常。",
+            "MatMul cube utilization 偏低，但 GroupedMatmul cube utilization 约 84-89%。"
+          ],
+          operators: [
+            ["QuantBatchMatmulV3", "11.16%"],
+            ["MatMul", "12.67%"]
+          ],
+          actions: [
+            "拆分 Q path projection 与后续 sparse attention 的贡献。",
+            "核对小 batch / token shape 下低 cube utilization 是否符合预期。"
+          ]
+        },
+        dsv32arch_indexer_dfa17da7: {
+          priority: "P2",
+          dimension: "Indexer",
+          title: "Indexer Q/K 64x128",
+          metricShort: "4.65%",
+          summary: "Indexer 与 LightningIndexerQuant 对齐，总耗时 6,370 us，占 4.65%，报告判定正常。",
+          metrics: [
+            ["kernel", "LightningIndexerQuant"],
+            ["count", "90"],
+            ["total", "6,370 us"],
+            ["avg", "70.8 us"]
+          ],
+          facts: [
+            "Indexer 负责生成 sparse attention 的 top-k index。",
+            "该段不是主要异常，但解释了 sparse attention 前置索引成本。",
+            "top-k index 上限在架构图中标注 <= 2048。"
+          ],
+          operators: [
+            ["LightningIndexerQuant", "6,370 us"]
+          ],
+          actions: [
+            "作为 sparse attention 子路径的辅助指标保留。",
+            "需要逐步 trace 时可和 dsv32arch_topk_e1fd5d33 联动观察。"
+          ]
+        },
+        dsv32arch_topk_e1fd5d33: {
+          priority: "P2",
+          dimension: "Sparse Index",
+          title: "top-k index <= 2048",
+          metricShort: "top-k",
+          summary: "top-k index 是 Indexer 到 sparse attention 的中间结果，报告里更适合作为路径锚点而不是单独瓶颈。",
+          metrics: [
+            ["source", "Indexer.forward"],
+            ["target", "sparse attention"],
+            ["limit", "<= 2048"],
+            ["priority", "P2"]
+          ],
+          facts: [
+            "架构图显示 Q path 的 qr 分支进入 Indexer，再产出 top-k index。",
+            "性能证据主要来自 LightningIndexerQuant 6,370 us。"
+          ],
+          operators: [
+            ["LightningIndexerQuant", "6,370 us"]
+          ],
+          actions: [
+            "和 Indexer 节点共享同一组报告证据。",
+            "用于解释 sparse attention 的输入依赖。"
+          ]
+        },
+        dsv32arch_dense_c8e834d8: {
+          priority: "P2",
+          dimension: "Dense FFN",
+          title: "Dense FFN (layer 0)",
+          metricShort: "812 us",
+          summary: "layer 0 使用 dense SwiGLU，报告里的 decoder layer dense 段约 812 us、34 个 kernel。",
+          metrics: [
+            ["layer", "0"],
+            ["duration", "812 us"],
+            ["kernel count", "34"],
+            ["inter_dim", "10944"]
+          ],
+          facts: [
+            "Dense FFN 只覆盖 layer 0，剩余 26 层使用 MoE。",
+            "对应 W1/W3 2048->10944 与 W2 10944->2048。"
+          ],
+          operators: [
+            ["MatMul", "17,347 us"],
+            ["QuantBatchMatmulV3", "15,285 us"]
+          ],
+          actions: [
+            "不要把 dense layer 与 MoE grouped matmul 混作同一类瓶颈。",
+            "需要更细定位时展开 W1/W3、activation、W2 子节点。"
+          ]
+        },
+        dsv32arch_moe_63e885ca: {
+          priority: "P1",
+          dimension: "MoE FFN",
+          title: "MoE FFN (layers 1-26)",
+          metricShort: "21.84%",
+          summary: "MoE 的 GroupedMatmul 是全局 top-1 算子，总耗时 29,903 us，占 21.84%，报告同时标注 MoE 正常。",
+          metrics: [
+            ["GroupedMatmul", "29,903 us"],
+            ["ratio", "21.84%"],
+            ["count", "120"],
+            ["avg", "249.2 us"]
+          ],
+          facts: [
+            "GroupedMatmul cube utilization 多数在 84-89%，报告判定正常。",
+            "MoE runtime decoder layer moe 约 1.1 ms、42 个 kernel。",
+            "MoE 正常并不代表成本低，只是它符合该模型路径的主计算特征。"
+          ],
+          operators: [
+            ["GroupedMatmul", "29,903 us"],
+            ["MoeDistributeDispatchV2", "2,972 us"],
+            ["MoeDistributeCombineV2", "15 us segment"]
+          ],
+          actions: [
+            "把 MoE 作为成本解释节点，而不是 P0 异常节点。",
+            "继续看 router dispatch 和 experts grouped matmul 的比例。"
+          ]
+        },
+        dsv32arch_router_77eb1db6: {
+          priority: "P2",
+          dimension: "MoE Router",
+          title: "Gate logits -> 64",
+          metricShort: "2.17%",
+          summary: "Router 对应 top-6 expert routing 与 MoeDistributeDispatchV2，总耗时 2,972 us，占 2.17%，报告判定正常。",
+          metrics: [
+            ["kernel", "MoeDistributeDispatchV2"],
+            ["count", "60"],
+            ["total", "2,972 us"],
+            ["avg", "49.5 us"]
+          ],
+          facts: [
+            "架构图中 Gate logits -> top-6 experts -> routed/shared experts。",
+            "Router 不是主瓶颈，但影响 experts 的输入组织和通信形态。"
+          ],
+          operators: [
+            ["MoeDistributeDispatchV2", "2,972 us"]
+          ],
+          actions: [
+            "和 experts 节点一起解释 MoE dispatch/compute/combine 三段。",
+            "若出现专家负载不均，再把 router 作为重点追踪。"
+          ]
+        },
+        dsv32arch_experts_cfbede3c: {
+          priority: "P1",
+          dimension: "Routed Experts",
+          title: "64 routed experts",
+          metricShort: "GM 29.9ms",
+          summary: "Routed experts 对齐 GroupedMatmul 主计算，报告显示总耗时最高但 cube utilization 正常。",
+          metrics: [
+            ["experts", "64"],
+            ["top-k", "6"],
+            ["GroupedMatmul", "29,903 us"],
+            ["cube util", "84-89%"]
+          ],
+          facts: [
+            "Expert inter_dim=1408。",
+            "GroupedMatmul input shape 样本为 512,7168;16,128,448,16,32。",
+            "该路径是 MoE 主成本，不是报告中的根因异常。"
+          ],
+          operators: [
+            ["GroupedMatmul", "21.84%"]
+          ],
+          actions: [
+            "用于解释 MoE 成本峰值来源。",
+            "如果要优化，优先验证 batch/token/expert 分布而不是单看 total us。"
+          ]
+        },
+        dsv32arch_shared_d18aac96: {
+          priority: "P2",
+          dimension: "Shared Experts",
+          title: "2 shared experts",
+          metricShort: "shared",
+          summary: "Shared experts 是 MoE 的常驻 FFN 分支，报告未给出独立异常，更多作为 routed experts 的对照路径。",
+          metrics: [
+            ["shared experts", "2"],
+            ["width", "2816"],
+            ["branch", "MoE"],
+            ["priority", "P2"]
+          ],
+          facts: [
+            "架构图中 shared experts 与 routed experts 一起进入 weighted routed + shared。",
+            "报告主要耗时仍归在 GroupedMatmul 和 dispatch。"
+          ],
+          operators: [
+            ["GroupedMatmul", "29,903 us"]
+          ],
+          actions: [
+            "展开 MoE 时保留该节点，避免把所有 FFN 成本都归给 routed experts。",
+            "若 shared 分支单独变慢，再补充 per-branch kernel 切分。"
+          ]
+        },
+        dsv32arch_lm_head_2b98b847: {
+          priority: "P2",
+          dimension: "LM Head",
+          title: "LM head -> vocab 102400",
+          metricShort: "192 us",
+          summary: "LM head 末端映射到 vocab-parallel logits，报告中对应小段约 192 us、7 个 kernel。",
+          metrics: [
+            ["duration", "192 us"],
+            ["kernel count", "7"],
+            ["vocab", "102400"],
+            ["dim", "2048"]
+          ],
+          facts: [
+            "该节点不是主要性能风险。",
+            "它连接 final RMSNorm 和 logits，适合作为输出阶段的边界。"
+          ],
+          operators: [
+            ["MatMul / head kernels", "192 us"]
+          ],
+          actions: [
+            "用于和 logits wait anchor 分离：head 计算本身不是报告中的 P2 假热点。",
+            "检查 logits 后处理和 speculative verify 时不要误归因到 lm_head。"
+          ]
+        },
+        dsv32arch_logits_c7d6c722: {
+          priority: "P2",
+          dimension: "Wait Anchor",
+          title: "logits [B,102400]",
+          metricShort: "wait 99.7%",
+          summary: "报告中的 WAIT_ANCHOR_FALSE_HOTSPOT 更接近 logits 后处理 / speculative verify 附近的等待锚点，而不是真实 compute hotspot。",
+          metrics: [
+            ["OnesLike wait", "99.7%"],
+            ["total_cost", "464.1 us"],
+            ["verify main", "5,523.75 us"],
+            ["verify mtp", "1,612.0 us"]
+          ],
+          facts: [
+            "aclnnInplaceOne_OnesLikeAiCore_OnesLike duration 约 1.4 us，但 wait 约 462.7 us。",
+            "spec_token_verify_main 含 45 个 kernel，dominant stream=47。",
+            "spec_token_verify_mtp 含 15 个 kernel，dominant stream=47。"
+          ],
+          operators: [
+            ["OnesLike", "wait_ratio 99.7%"],
+            ["spec_token_verify_main", "5.5 ms"],
+            ["spec_token_verify_mtp", "1.6 ms"]
+          ],
+          actions: [
+            "把 OnesLike 标为等待锚点，避免当作真实计算热点优化。",
+            "需要补 trace 依赖链，找到它等待的 Cast / communication / host launch 上游。"
+          ]
+        },
+        dsv32arch_embedding_2f81ba1b: {
+          priority: "P2",
+          dimension: "Embedding",
+          title: "ParallelEmbedding [102400,2048]",
+          metricShort: "46 us",
+          summary: "Embedding 段在报告中很小，约 46 us、10 个 kernel，主要用于说明输入边界和 all_reduce 恢复 hidden state。",
+          metrics: [
+            ["duration", "46 us"],
+            ["kernel count", "10"],
+            ["streams", "186 / 189 / None"],
+            ["vocab", "102400"]
+          ],
+          facts: [
+            "Vocabulary-parallel embedding 在 world_size > 1 时通过 all_reduce 恢复 hidden state。",
+            "该段不是主要性能风险。"
+          ],
+          operators: [
+            ["embedding segment", "46 us"]
+          ],
+          actions: [
+            "保留为输入阶段锚点。",
+            "不要把整体 underfeed 归因到 embedding。"
+          ]
+        }
+      };
+
+      const REPORT_ORDER = [
+        "dsv32arch_transformer_9236e026",
+        "dsv32arch_block_0214b4b3",
+        "dsv32arch_attention_call_612a5ae9",
+        "dsv32arch_q_path_b399f580",
+        "dsv32arch_sparse_attn_f5c98e92",
+        "dsv32arch_indexer_dfa17da7",
+        "dsv32arch_topk_e1fd5d33",
+        "dsv32arch_moe_63e885ca",
+        "dsv32arch_experts_cfbede3c",
+        "dsv32arch_router_77eb1db6",
+        "dsv32arch_shared_d18aac96",
+        "dsv32arch_dense_c8e834d8",
+        "dsv32arch_lm_head_2b98b847",
+        "dsv32arch_logits_c7d6c722",
+        "dsv32arch_embedding_2f81ba1b"
+      ];
+
+      const FOCUS_FALLBACKS = {
+        dsv32arch_q_path_b399f580: "dsv32arch_attention_call_612a5ae9",
+        dsv32arch_sparse_attn_f5c98e92: "dsv32arch_attention_call_612a5ae9",
+        dsv32arch_indexer_dfa17da7: "dsv32arch_attention_call_612a5ae9",
+        dsv32arch_topk_e1fd5d33: "dsv32arch_attention_call_612a5ae9",
+        dsv32arch_dense_c8e834d8: "dsv32arch_block_0214b4b3",
+        dsv32arch_moe_63e885ca: "dsv32arch_block_0214b4b3",
+        dsv32arch_experts_cfbede3c: "dsv32arch_moe_63e885ca",
+        dsv32arch_router_77eb1db6: "dsv32arch_moe_63e885ca",
+        dsv32arch_shared_d18aac96: "dsv32arch_moe_63e885ca"
+      };
+
+      const state = {
+        activeFilter: "all",
+        selectedNodeId: "dsv32arch_block_0214b4b3",
+        decorated: 0,
+        sourceNodes: 0,
+        sourceDoc: null,
+        observer: null,
+        decorateTimer: 0
+      };
+
+      const els = {
+        frame: document.getElementById("sourceFrame"),
+        sourceStatus: document.getElementById("sourceStatus"),
+        overlayCount: document.getElementById("overlayCount"),
+        priorityBadge: document.getElementById("priorityBadge"),
+        reportDimension: document.getElementById("reportDimension"),
+        inspectorTitle: document.getElementById("inspectorTitle"),
+        inspectorNodeId: document.getElementById("inspectorNodeId"),
+        inspectorSummary: document.getElementById("inspectorSummary"),
+        metricGrid: document.getElementById("metricGrid"),
+        factList: document.getElementById("factList"),
+        operatorList: document.getElementById("operatorList"),
+        actionList: document.getElementById("actionList"),
+        nodeList: document.getElementById("nodeList"),
+        refreshOverlay: document.getElementById("refreshOverlay")
+      };
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function isReportVisible(report) {
+        return state.activeFilter === "all" || report.priority === state.activeFilter;
+      }
+
+      function visibleReportIds() {
+        return REPORT_ORDER.filter((id) => isReportVisible(REPORTS[id]));
+      }
+
+      function renderList(container, items) {
+        container.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+      }
+
+      function metricTone(label, value, report) {
+        const text = `${label} ${value}`.toLowerCase();
+        if (/free|underfeed|wait|false|host_bound|total_cost/.test(text)) return "critical";
+        if (/comm|matmul|grouped|qbm|duration|kernel|count|ratio/.test(text)) return "warning";
+        if (/normal|cube util|success/.test(text)) return "success";
+        if (report.priority === "P0") return "critical";
+        if (report.priority === "P1") return "warning";
+        return "info";
+      }
+
+      function metricPercent(value) {
+        const match = String(value).match(/(\d+(?:\.\d+)?)\s*%/);
+        if (!match) return null;
+        return Math.max(0, Math.min(100, Number(match[1])));
+      }
+
+      function renderMetrics(report) {
+        els.metricGrid.innerHTML = report.metrics.map(([label, value]) => {
+          const tone = metricTone(label, value, report);
+          const percent = metricPercent(value);
+          const bar = percent == null
+            ? ""
+            : `<div class="metric-bar" style="--metric-bar-width:${percent}%"><span></span></div>`;
+          return `
+          <div class="metric-tile" data-tone="${tone}">
+            <div class="metric-label">${escapeHtml(label)}</div>
+            <div class="metric-value">${escapeHtml(value)}</div>
+            ${bar}
+          </div>
+        `;
+        }).join("");
+      }
+
+      function renderOperators(report) {
+        if (!report.operators.length) {
+          els.operatorList.innerHTML = `<div class="empty-state">No operator evidence.</div>`;
+          return;
+        }
+
+        els.operatorList.innerHTML = report.operators.map(([name, value]) => `
+          <div class="operator-row">
+            <div class="operator-name">${escapeHtml(name)}</div>
+            <div class="operator-value">${escapeHtml(value)}</div>
+          </div>
+        `).join("");
+      }
+
+      function renderNodeList() {
+        const ids = visibleReportIds();
+        els.nodeList.innerHTML = ids.map((id) => {
+          const report = REPORTS[id];
+          const activeClass = id === state.selectedNodeId ? " is-active" : "";
+          return `
+            <button type="button" class="${activeClass.trim()}" data-node-id="${escapeHtml(id)}">
+              <span class="priority-badge" data-priority="${escapeHtml(report.priority)}">${escapeHtml(report.priority)}</span>
+              <span class="node-name">${escapeHtml(report.title)}</span>
+              <span class="node-metric">${escapeHtml(report.metricShort)}</span>
+            </button>
+          `;
+        }).join("");
+      }
+
+      function renderInspector() {
+        let report = REPORTS[state.selectedNodeId];
+        if (!report || !isReportVisible(report)) {
+          state.selectedNodeId = visibleReportIds()[0] || REPORT_ORDER[0];
+          report = REPORTS[state.selectedNodeId];
+        }
+
+        els.priorityBadge.textContent = report.priority;
+        els.priorityBadge.dataset.priority = report.priority;
+        els.reportDimension.textContent = report.dimension;
+        els.inspectorTitle.textContent = report.title;
+        els.inspectorNodeId.textContent = state.selectedNodeId;
+        els.inspectorSummary.textContent = report.summary;
+        renderMetrics(report);
+        renderList(els.factList, report.facts);
+        renderOperators(report);
+        renderList(els.actionList, report.actions);
+        renderNodeList();
+        updateCounts();
+        applySelectedState();
+      }
+
+      function updateCounts() {
+        const visibleTotal = visibleReportIds().length;
+        els.overlayCount.textContent = `${state.decorated} / ${visibleTotal}`;
+        els.sourceStatus.textContent = state.sourceNodes
+          ? `source graph · ${state.sourceNodes} nodes · ${state.decorated} overlays`
+          : "source graph loading";
+      }
+
+      function nodeIdFromGroup(group) {
+        const data = group.__data__;
+        if (Array.isArray(data)) return data[0];
+        return group.dataset.reportNodeId || "";
+      }
+
+      function getNodeBox(group, nodeData) {
+        const rect = group.querySelector("rect");
+        const width = Number(rect && rect.getAttribute("width")) || Number(nodeData && nodeData.width) || 120;
+        const height = Number(rect && rect.getAttribute("height")) || Number(nodeData && nodeData.height) || 36;
+        const x = Number(rect && rect.getAttribute("x"));
+        const y = Number(rect && rect.getAttribute("y"));
+        return {
+          x: Number.isFinite(x) ? x : -width / 2,
+          y: Number.isFinite(y) ? y : -height / 2,
+          width,
+          height
+        };
+      }
+
+      function getClusterBox(clusterData) {
+        const parts = String(clusterData && clusterData.bb || "").split(",").map(Number);
+        if (parts.length === 4 && parts.every(Number.isFinite)) {
+          const [x1, y1, x2, y2] = parts;
+          return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+        }
+        return { x: 0, y: 0, width: 120, height: 48 };
+      }
+
+      function getElementBoxInGroup(element, group) {
+        const box = element.getBBox();
+        const svg = element.ownerSVGElement;
+        const elementMatrix = element.getCTM && element.getCTM();
+        const groupMatrix = group.getCTM && group.getCTM();
+        if (!svg || !elementMatrix || !groupMatrix) return box;
+
+        const matrix = groupMatrix.inverse().multiply(elementMatrix);
+        const corners = [
+          [box.x, box.y],
+          [box.x + box.width, box.y],
+          [box.x + box.width, box.y + box.height],
+          [box.x, box.y + box.height]
+        ].map(([x, y]) => {
+          const point = svg.createSVGPoint();
+          point.x = x;
+          point.y = y;
+          return point.matrixTransform(matrix);
+        });
+
+        const xs = corners.map((point) => point.x);
+        const ys = corners.map((point) => point.y);
+        const minX = Math.min(...xs);
+        const minY = Math.min(...ys);
+        return {
+          x: minX,
+          y: minY,
+          width: Math.max(...xs) - minX,
+          height: Math.max(...ys) - minY
+        };
+      }
+
+      function svgElement(doc, tagName, attrs = {}, text = "") {
+        const node = doc.createElementNS("http://www.w3.org/2000/svg", tagName);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        if (text) node.textContent = text;
+        return node;
+      }
+
+      function estimateTextWidth(text, minWidth, maxWidth) {
+        return Math.max(minWidth, Math.min(maxWidth, text.length * 5.8 + 18));
+      }
+
+      function overlaySignature(report, box) {
+        return [report.priority, Math.round(box.x), Math.round(box.width), Math.round(box.height), state.activeFilter].join("|");
+      }
+
+      function getBadgePlacement(group, bounds, badgeWidth) {
+        const label = group.querySelector(`.${LABEL_CLASS}`) || group.querySelector("text");
+        if (label && typeof label.getBBox === "function") {
+          try {
+            const labelBox = getElementBoxInGroup(label, group);
+            return {
+              x: Math.max(bounds.x + 8, labelBox.x - badgeWidth - 6),
+              y: labelBox.y + labelBox.height / 2 - 8
+            };
+          } catch (error) {
+            // SVG labels may be transient while Graphviz is rerendering.
+          }
+        }
+
+        return {
+          x: bounds.x + 8,
+          y: bounds.y + bounds.height / 2 - 8
+        };
+      }
+
+      function reserveBadgeSpace(group, report, box) {
+        const rect = group.querySelector("rect");
+        const label = group.querySelector(`.${LABEL_CLASS}`);
+        if (!rect || !label) return box;
+
+        try {
+          const badgeWidth = estimateTextWidth(report.priority, 30, 36);
+          const labelBox = getElementBoxInGroup(label, group);
+          const targetX = labelBox.x - badgeWidth - 6;
+          const minLeftPadding = 8;
+          const requiredRectX = targetX - minLeftPadding;
+          const rectX = Number(rect.getAttribute("x"));
+          const rectY = Number(rect.getAttribute("y"));
+          const rectWidth = Number(rect.getAttribute("width"));
+          const rectHeight = Number(rect.getAttribute("height"));
+          if (!Number.isFinite(rectX) || !Number.isFinite(rectWidth)) return box;
+
+          if (rectX > requiredRectX) {
+            const delta = rectX - requiredRectX;
+            if (!rect.dataset.reportOriginalX) {
+              rect.dataset.reportOriginalX = String(rectX);
+              rect.dataset.reportOriginalWidth = String(rectWidth);
+            }
+            rect.setAttribute("x", requiredRectX);
+            rect.setAttribute("width", rectWidth + delta);
+            return {
+              x: requiredRectX,
+              y: Number.isFinite(rectY) ? rectY : box.y,
+              width: rectWidth + delta,
+              height: Number.isFinite(rectHeight) ? rectHeight : box.height
+            };
+          }
+        } catch (error) {
+          return box;
+        }
+
+        return box;
+      }
+
+      function restoreBadgeSpace(group) {
+        const rect = group.querySelector("rect");
+        if (!rect || !rect.dataset.reportOriginalX) return;
+        rect.setAttribute("x", rect.dataset.reportOriginalX);
+        rect.setAttribute("width", rect.dataset.reportOriginalWidth);
+        delete rect.dataset.reportOriginalX;
+        delete rect.dataset.reportOriginalWidth;
+      }
+
+      function createPriorityBadge(doc, report, x, y, width) {
+        const badge = svgElement(doc, "g", {
+          class: `report-source-badge-group report-priority-${report.priority.toLowerCase()}`,
+          "pointer-events": "none"
+        });
+
+        badge.appendChild(svgElement(doc, "rect", {
+          class: "report-source-badge",
+          x,
+          y,
+          width,
+          height: 16,
+          rx: 8,
+          ry: 8
+        }));
+        badge.appendChild(svgElement(doc, "text", {
+          class: "report-source-badge-text",
+          x: x + width / 2,
+          y: y + 11.2,
+          "text-anchor": "middle"
+        }, report.priority));
+
+        return badge;
+      }
+
+      function getClusterSourceLabel(group) {
+        return Array.from(group.querySelectorAll("text"))
+          .find((text) => !text.classList.contains(COLLAPSE_ICON_CLASS) && text.textContent.trim());
+      }
+
+      function getRootOverlayLayer(doc) {
+        const inner = doc.querySelector("#graph_8738e552-e764-4a57-839a-6321bc3ae7d3 svg > g");
+        if (!inner) return null;
+
+        let layer = inner.querySelector(":scope > .report-root-overlay-layer");
+        if (!layer) {
+          layer = svgElement(doc, "g", {
+            class: "report-root-overlay-layer",
+            "pointer-events": "none"
+          });
+        }
+        if (inner.lastElementChild !== layer) inner.appendChild(layer);
+        return layer;
+      }
+
+      function removeRootOverlay(nodeId) {
+        if (!state.sourceDoc) return;
+        state.sourceDoc.querySelectorAll(`.report-root-overlay[data-report-node-id="${nodeId}"]`).forEach((overlay) => {
+          overlay.remove();
+        });
+      }
+
+      function restoreClusterLabel(group) {
+        group.querySelectorAll(".report-cluster-source-label").forEach((label) => {
+          label.classList.remove("report-cluster-source-label");
+        });
+      }
+
+      function createNodeOverlay(doc, group, report, box) {
+        const overlay = svgElement(doc, "g", {
+          class: "report-source-overlay",
+          "pointer-events": "none"
+        });
+        const badgeWidth = estimateTextWidth(report.priority, 30, 36);
+        const { x, y } = getBadgePlacement(group, box, badgeWidth);
+        overlay.appendChild(createPriorityBadge(doc, report, x, y, badgeWidth));
+        return overlay;
+      }
+
+      function createClusterOverlay(doc, group, report, box, nodeId) {
+        const overlay = svgElement(doc, "g", {
+          class: `report-source-overlay report-cluster-overlay report-priority-${report.priority.toLowerCase()}`
+        });
+        const radius = Math.min(24, Math.max(12, Math.min(box.width, box.height) * 0.08));
+        overlay.appendChild(svgElement(doc, "rect", {
+          class: "report-boundary-hit-target",
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          rx: radius,
+          ry: radius
+        }));
+
+        const sourceLabel = getClusterSourceLabel(group);
+        if (!sourceLabel) return overlay;
+
+        sourceLabel.classList.add("report-cluster-source-label");
+        const labelBox = getElementBoxInGroup(sourceLabel, group);
+        const labelText = sourceLabel.textContent.trim();
+        const tagWidth = estimateTextWidth(report.priority, 20, 24);
+        const tagHeight = 12;
+        const pillPaddingLeft = 6;
+        const pillPaddingRight = 12;
+        const tagGap = 8;
+        const height = 18;
+        const width = pillPaddingLeft + tagWidth + tagGap + labelBox.width + pillPaddingRight;
+        const centeredX = box.x + (box.width - width) / 2;
+        const minX = box.x + 8;
+        const maxX = box.x + box.width - width - 8;
+        const x = maxX >= minX ? Math.min(Math.max(centeredX, minX), maxX) : centeredX;
+        const centerY = box.y;
+        const tagX = x + pillPaddingLeft;
+
+        const titleGroup = svgElement(doc, "g", {
+          class: `report-root-overlay report-cluster-title report-priority-${report.priority.toLowerCase()}`,
+          "data-report-node-id": nodeId,
+          "pointer-events": "none"
+        });
+        titleGroup.appendChild(svgElement(doc, "rect", {
+          class: "report-cluster-title-pill",
+          x,
+          y: centerY - height / 2,
+          width,
+          height,
+          rx: height / 2,
+          ry: height / 2
+        }));
+        titleGroup.appendChild(svgElement(doc, "rect", {
+          class: "report-cluster-title-tag",
+          x: tagX,
+          y: centerY - tagHeight / 2,
+          width: tagWidth,
+          height: tagHeight,
+          rx: tagHeight / 2,
+          ry: tagHeight / 2
+        }));
+        titleGroup.appendChild(svgElement(doc, "text", {
+          class: "report-cluster-title-tag-text",
+          x: tagX + tagWidth / 2,
+          y: centerY,
+          "text-anchor": "middle",
+          "dominant-baseline": "central"
+        }, report.priority));
+        titleGroup.appendChild(svgElement(doc, "text", {
+          class: "report-cluster-title-text",
+          x: tagX + tagWidth + tagGap,
+          y: centerY,
+          "dominant-baseline": "central"
+        }, labelText));
+
+        const rootLayer = getRootOverlayLayer(doc);
+        removeRootOverlay(nodeId);
+        if (rootLayer) rootLayer.appendChild(titleGroup);
+        return overlay;
+      }
+
+      function hideSourcePopup() {
+        const popup = state.sourceDoc && state.sourceDoc.getElementById(POPUP_ID);
+        if (popup) popup.style.display = "none";
+      }
+
+      function onSourceNodeClick(event) {
+        const target = event.target;
+        if (target.closest && (target.closest(`.${COLLAPSE_CLASS}`) || target.closest(`.${COLLAPSE_ICON_CLASS}`))) {
+          return;
+        }
+
+        const group = event.currentTarget;
+        const nodeId = nodeIdFromGroup(group);
+        const report = REPORTS[nodeId];
+        if (!report || !isReportVisible(report)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        hideSourcePopup();
+        selectNode(nodeId);
+      }
+
+      function decorateSourceGraph() {
+        if (!state.sourceDoc) return;
+        getRootOverlayLayer(state.sourceDoc);
+        const groups = Array.from(state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`));
+        let decorated = 0;
+
+        groups.forEach((group) => {
+          const nodeId = nodeIdFromGroup(group);
+          const report = REPORTS[nodeId];
+          group.dataset.reportNodeId = nodeId;
+          group.removeEventListener("click", onSourceNodeClick, true);
+          group.addEventListener("click", onSourceNodeClick, true);
+
+          const shouldShow = Boolean(report && isReportVisible(report));
+          group.classList.remove("report-priority-p0", "report-priority-p1", "report-priority-p2");
+          group.classList.toggle("report-source-hit", shouldShow);
+          group.classList.toggle("report-source-selected", nodeId === state.selectedNodeId);
+          if (shouldShow) group.classList.add(`report-priority-${report.priority.toLowerCase()}`);
+
+          const oldOverlay = group.querySelector(".report-source-overlay");
+          if (!shouldShow) {
+            if (oldOverlay) oldOverlay.remove();
+            removeRootOverlay(nodeId);
+            if (group.classList.contains(BOUNDARY_CLASS)) {
+              restoreClusterLabel(group);
+            } else {
+              restoreBadgeSpace(group);
+            }
+            return;
+          }
+
+          decorated += 1;
+          const data = Array.isArray(group.__data__) ? group.__data__[1] : null;
+          const isCluster = group.classList.contains(BOUNDARY_CLASS);
+          const rawBox = isCluster ? getClusterBox(data) : getNodeBox(group, data);
+          const box = isCluster ? rawBox : reserveBadgeSpace(group, report, rawBox);
+          const signature = overlaySignature(report, box);
+          if (oldOverlay && oldOverlay.dataset.signature === signature) return;
+
+          if (oldOverlay) oldOverlay.remove();
+          if (isCluster) removeRootOverlay(nodeId);
+          const overlay = isCluster
+            ? createClusterOverlay(state.sourceDoc, group, report, box, nodeId)
+            : createNodeOverlay(state.sourceDoc, group, report, box);
+          if (overlay) {
+            overlay.dataset.signature = signature;
+            group.appendChild(overlay);
+          }
+        });
+
+        state.decorated = decorated;
+        state.sourceNodes = groups.length;
+        updateCounts();
+      }
+
+      function scheduleDecorate() {
+        window.clearTimeout(state.decorateTimer);
+        state.decorateTimer = window.setTimeout(decorateSourceGraph, 80);
+      }
+
+      function applySelectedState() {
+        if (!state.sourceDoc) return;
+        state.sourceDoc.querySelectorAll(`.${NODE_CLASS}.report-source-selected, .${BOUNDARY_CLASS}.report-source-selected`).forEach((group) => {
+          if (nodeIdFromGroup(group) !== state.selectedNodeId) group.classList.remove("report-source-selected");
+        });
+
+        state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`).forEach((group) => {
+          const isSelected = nodeIdFromGroup(group) === state.selectedNodeId;
+          group.classList.toggle("report-source-selected", isSelected);
+        });
+      }
+
+      function findSourceGroup(nodeId) {
+        if (!state.sourceDoc) return null;
+        return Array.from(state.sourceDoc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`))
+          .find((group) => nodeIdFromGroup(group) === nodeId) || null;
+      }
+
+      function getSourceTargetPoint(group) {
+        if (!group) return null;
+        const data = Array.isArray(group.__data__) ? group.__data__[1] : null;
+        if (group.classList.contains(BOUNDARY_CLASS)) {
+          const box = getClusterBox(data);
+          return {
+            x: box.x + box.width / 2,
+            y: box.y + box.height / 2
+          };
+        }
+
+        if (data && data.position && Number.isFinite(Number(data.position.x)) && Number.isFinite(Number(data.position.y))) {
+          return {
+            x: Number(data.position.x),
+            y: Number(data.position.y)
+          };
+        }
+
+        try {
+          const box = group.getBBox();
+          return {
+            x: box.x + box.width / 2,
+            y: box.y + box.height / 2
+          };
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function focusSourceNode(nodeId) {
+        if (!state.sourceDoc) return;
+
+        const group = findSourceGroup(nodeId) || findSourceGroup(FOCUS_FALLBACKS[nodeId]);
+        const point = getSourceTargetPoint(group);
+        const svg = state.sourceDoc.querySelector("#graph_8738e552-e764-4a57-839a-6321bc3ae7d3 svg");
+        const inner = svg && svg.querySelector(":scope > g");
+        const d3 = state.sourceDoc.defaultView && state.sourceDoc.defaultView.d3;
+        if (!group || !point || !svg || !inner || !d3) return;
+
+        const frameRect = els.frame.getBoundingClientRect();
+        const inspectorReserve = window.matchMedia("(max-width: 980px)").matches ? 0 : 416;
+        const availableWidth = Math.max(360, frameRect.width - inspectorReserve);
+        const current = svg.__zoom || d3.zoomTransform(svg);
+        const scale = Math.max(0.8, Math.min(1.7, Number(current.k) || 1.15));
+        const transform = d3.zoomIdentity
+          .translate(availableWidth / 2 - point.x * scale, frameRect.height / 2 - point.y * scale)
+          .scale(scale);
+
+        svg.__zoom = transform;
+        inner.setAttribute("transform", transform.toString());
+        applySelectedState();
+        group.classList.add("report-source-selected");
+      }
+
+      function injectSourceStyle(doc) {
+        if (doc.getElementById(SOURCE_STYLE_ID)) return;
+
+        const style = doc.createElement("style");
+        style.id = SOURCE_STYLE_ID;
+        style.textContent = `
+          :root {
+            --report-p0: #ff2d7a;
+            --report-p1: #ff9d00;
+            --report-p2: #ffe600;
+          }
+
+          html,
+          body {
+            margin: 0 !important;
+            background: transparent !important;
+          }
+
+          #graph-container_8738e552-e764-4a57-839a-6321bc3ae7d3 {
+            background: transparent !important;
+          }
+
+          .${NODE_CLASS}.report-source-hit {
+            cursor: pointer;
+          }
+
+          .${BOUNDARY_CLASS}.report-source-hit {
+            cursor: pointer;
+          }
+
+          .${BOUNDARY_CLASS}.report-source-hit > rect:first-of-type {
+            pointer-events: visibleStroke !important;
+          }
+
+          .${NODE_CLASS}.report-priority-p0 > rect:first-of-type {
+            stroke: var(--report-p0) !important;
+            stroke-width: 1.15px !important;
+          }
+
+          .${NODE_CLASS}.report-priority-p1 > rect:first-of-type {
+            stroke: var(--report-p1) !important;
+            stroke-width: 1.15px !important;
+          }
+
+          .${NODE_CLASS}.report-priority-p2 > rect:first-of-type {
+            stroke: var(--report-p2) !important;
+            stroke-width: 1.15px !important;
+          }
+
+          .${BOUNDARY_CLASS}.report-priority-p0 > rect:first-of-type {
+            stroke: var(--report-p0) !important;
+            stroke-width: 1.7px !important;
+          }
+
+          .${BOUNDARY_CLASS}.report-priority-p1 > rect:first-of-type {
+            stroke: var(--report-p1) !important;
+            stroke-width: 1.7px !important;
+          }
+
+          .${BOUNDARY_CLASS}.report-priority-p2 > rect:first-of-type {
+            stroke: var(--report-p2) !important;
+            stroke-width: 1.7px !important;
+          }
+
+          .${NODE_CLASS}.report-source-selected > rect:first-of-type {
+            stroke-width: 2px !important;
+          }
+
+          .${BOUNDARY_CLASS}.report-source-selected > rect:first-of-type {
+            stroke-width: 2.3px !important;
+          }
+
+          .report-source-overlay {
+            font-family: var(--font-sans);
+          }
+
+          .report-root-overlay-layer {
+            pointer-events: none;
+          }
+
+          .report-source-badge {
+            stroke: none;
+          }
+
+          .report-priority-p0 .report-source-badge {
+            fill: var(--report-p0);
+          }
+
+          .report-priority-p1 .report-source-badge {
+            fill: var(--report-p1);
+          }
+
+          .report-priority-p2 .report-source-badge {
+            fill: var(--report-p2);
+          }
+
+          .report-source-badge-text {
+            fill: var(--foreground);
+            font-size: 9.5px;
+            font-weight: var(--font-weight-bold);
+            letter-spacing: 0;
+          }
+
+          .report-priority-p1 .report-source-badge-text,
+          .report-priority-p2 .report-source-badge-text {
+            fill: var(--background);
+          }
+
+          .report-boundary-hit-target {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 18px;
+            pointer-events: stroke;
+          }
+
+          .report-cluster-source-label {
+            opacity: 0 !important;
+          }
+
+          .report-cluster-title {
+            font-family: var(--font-sans);
+            pointer-events: none;
+          }
+
+          .report-cluster-title-pill,
+          .report-cluster-title-tag {
+            stroke: none;
+          }
+
+          .report-priority-p0 .report-cluster-title-pill {
+            fill: var(--report-p0);
+          }
+
+          .report-priority-p1 .report-cluster-title-pill {
+            fill: var(--report-p1);
+          }
+
+          .report-priority-p2 .report-cluster-title-pill {
+            fill: var(--report-p2);
+          }
+
+          .report-cluster-title-tag {
+            fill: color-mix(in srgb, var(--background) 32%, transparent);
+          }
+
+          .report-cluster-title-text,
+          .report-cluster-title-tag-text {
+            fill: var(--foreground);
+            font-size: 7px;
+            font-weight: var(--font-weight-bold);
+            letter-spacing: 0;
+            dominant-baseline: central;
+            text-rendering: geometricPrecision;
+          }
+
+          .report-priority-p1 .report-cluster-title-text,
+          .report-priority-p1 .report-cluster-title-tag-text,
+          .report-priority-p2 .report-cluster-title-text,
+          .report-priority-p2 .report-cluster-title-tag-text {
+            fill: var(--background);
+          }
+        `;
+
+        (doc.head || doc.documentElement).appendChild(style);
+      }
+
+      function installSourceObserver(doc) {
+        if (state.observer) state.observer.disconnect();
+        state.observer = new MutationObserver(scheduleDecorate);
+        state.observer.observe(doc.body || doc.documentElement, {
+          childList: true,
+          subtree: true
+        });
+      }
+
+      function waitForSourceGraph(doc, attempt = 0) {
+        const nodes = doc.querySelectorAll(`.${NODE_CLASS}, .${BOUNDARY_CLASS}`);
+        if (nodes.length) {
+          state.sourceDoc = doc;
+          injectSourceStyle(doc);
+          decorateSourceGraph();
+          installSourceObserver(doc);
+          renderInspector();
+          return;
+        }
+
+        if (attempt > 120) {
+          els.sourceStatus.textContent = "source graph not ready";
+          return;
+        }
+
+        window.setTimeout(() => waitForSourceGraph(doc, attempt + 1), 120);
+      }
+
+      function handleFrameLoad() {
+        try {
+          const doc = els.frame.contentDocument || els.frame.contentWindow.document;
+          waitForSourceGraph(doc);
+        } catch (error) {
+          els.sourceStatus.textContent = "source graph access blocked";
+          console.error(error);
+        }
+      }
+
+      function selectNode(nodeId, options = {}) {
+        if (!REPORTS[nodeId]) return;
+        state.selectedNodeId = nodeId;
+        renderInspector();
+        hideSourcePopup();
+        if (options.focusSource) focusSourceNode(nodeId);
+      }
+
+      document.querySelectorAll("[data-filter]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.activeFilter = button.dataset.filter;
+          document.querySelectorAll("[data-filter]").forEach((item) => {
+            item.classList.toggle("is-active", item === button);
+          });
+          decorateSourceGraph();
+          renderInspector();
+        });
+      });
+
+      els.nodeList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-node-id]");
+        if (!button) return;
+        selectNode(button.dataset.nodeId, { focusSource: true });
+      });
+
+      els.refreshOverlay.addEventListener("click", () => {
+        decorateSourceGraph();
+        renderInspector();
+      });
+
+      els.frame.addEventListener("load", handleFrameLoad);
+      window.setTimeout(() => {
+        if (!state.sourceDoc && els.frame.contentDocument && els.frame.contentDocument.readyState !== "loading") {
+          handleFrameLoad();
+        }
+      }, 300);
+
+      renderInspector();
+    })();
+  </script>
+</body>
+</html>

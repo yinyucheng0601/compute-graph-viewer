@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Model Graphviz</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../design-system-share/tokens/foundation.css">
+  <link rel="stylesheet" href="../../design-system-share/tokens/semantic.css">
+  <link rel="stylesheet" href="../../design-system-share/tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-model-graphviz-pattern-page">
+  <main class="pto-model-graphviz-pattern-main">
+    <h1 class="pto-model-graphviz-pattern-title">Model Graphviz</h1>
+    <p class="pto-model-graphviz-pattern-subtitle">
+      Renderer-driven model graph visual contract extracted from <code>graphviz/torchvista_graphviz_deepseek_v4.html</code>.
+      The preview below embeds the real DeepSeek V4 and V3.2 graph pages directly so the design-system pattern is checked against the actual renderer, not a recreated sample.
+    </p>
+    <div class="pto-model-graphviz-pattern-meta">
+      <span class="pto-model-graphviz-pattern-badge">pattern id: model-graphviz</span>
+      <span class="pto-model-graphviz-pattern-badge">type: rendered SVG</span>
+      <span class="pto-model-graphviz-pattern-badge">source: graphviz renderer style</span>
+      <span class="pto-model-graphviz-pattern-badge">op radius: height / 2</span>
+      <span class="pto-model-graphviz-pattern-badge">tensor: rounded rect</span>
+      <span class="pto-model-graphviz-pattern-badge">default fold: depth 2</span>
+      <span class="pto-model-graphviz-pattern-badge">colormap: s=.82 l=.40</span>
+      <span class="pto-model-graphviz-pattern-badge">report priority: P0/P1/P2 red-orange-yellow</span>
+      <span class="pto-model-graphviz-pattern-badge">DOT layout: graph pad + cluster margin</span>
+    </div>
+
+    <section class="pto-model-graphviz-pattern-section">
+      <h2 class="pto-model-graphviz-pattern-section-title">Report Overlay Contract</h2>
+      <p class="pto-model-graphviz-pattern-section-note">
+        Rendered sample for report overlays on top of the model graph. Container titles use a centered same-fill pill with the priority tag on the left; labels use SVG geometric centering and the title overlay sits above graph edges without adding visible border strokes.
+      </p>
+      <div
+        id="ptoModelGraphvizOverlaySample"
+        class="pto-model-graphviz-stage pto-model-graphviz-report-stage"
+        aria-label="Model Graphviz report overlay sample"></div>
+    </section>
+
+    <section class="pto-model-graphviz-pattern-section">
+      <h2 class="pto-model-graphviz-pattern-section-title">DeepSeek V4 Source Page</h2>
+      <p class="pto-model-graphviz-pattern-section-note">
+        Direct iframe of <code>graphviz/torchvista_graphviz_deepseek_v4.html</code>. This is the canonical V4 Graphviz page, not a simplified preview graph.
+      </p>
+      <div class="pto-model-graphviz-iframe-stage pto-model-graphviz-iframe-stage-v4">
+        <iframe
+          class="pto-model-graphviz-source-frame"
+          src="../../graphviz/torchvista_graphviz_deepseek_v4.html"
+          title="DeepSeek V4 Graphviz Source Page"></iframe>
+      </div>
+    </section>
+
+    <section class="pto-model-graphviz-pattern-section">
+      <h2 class="pto-model-graphviz-pattern-section-title">DeepSeek V3.2 Source Page</h2>
+      <p class="pto-model-graphviz-pattern-section-note">
+        Direct iframe of <code>graphviz/deepseek_v32_source_graph.html</code>. This is the source-checked V3.2 architecture page with the approved default depth-2 opening state.
+      </p>
+      <div class="pto-model-graphviz-iframe-stage pto-model-graphviz-iframe-stage-v32">
+        <iframe
+          class="pto-model-graphviz-source-frame"
+          src="../../graphviz/deepseek_v32_source_graph.html"
+          title="DeepSeek V3.2 Graphviz Source Page"></iframe>
+      </div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderModelGraphvizPattern() {
+      const overlaySample = document.getElementById('ptoModelGraphvizOverlaySample');
+      if (overlaySample && window.PtoModelGraphvizPattern) {
+        window.PtoModelGraphvizPattern.render(overlaySample, null, {
+          ariaLabel: 'Model Graphviz report overlay contract sample',
+        });
+      }
+
+      const mainNode = document.querySelector('.pto-model-graphviz-pattern-main');
+      if (!mainNode) return;
+
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!isEmbedPreview || window.parent === window) return;
+
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        const nextHeight = Math.ceil(Math.max(
+          mainNode.scrollHeight,
+          mainNode.getBoundingClientRect().height
+        ));
+        if (nextHeight <= 0) return;
+        const resolvedHeight = nextHeight + 4;
+        if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+        lastReportedHeight = resolvedHeight;
+        if (window.frameElement) {
+          window.frameElement.style.height = `${resolvedHeight}px`;
+        }
+        window.parent.postMessage({
+          type: 'pto-pattern-preview-height',
+          pathname: window.location.pathname,
+          height: resolvedHeight,
+        }, '*');
+      };
+
+      if ('ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(mainNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>
