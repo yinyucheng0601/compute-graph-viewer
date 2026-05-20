@@ -505,8 +505,9 @@
       left: var(--space-4);
       right: 432px;
       bottom: var(--space-4);
-      height: min(34vh, 330px);
+      height: var(--timeline-panel-height, min(34vh, 330px));
       min-height: 260px;
+      max-height: calc(100vh - 96px);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -516,12 +517,46 @@
       color: var(--foreground);
     }
 
+    .timeline-resize-handle {
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 24px;
+      cursor: ns-resize;
+      touch-action: none;
+    }
+
+    .timeline-resize-handle::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 9px;
+      width: 104px;
+      height: 5px;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 24%, transparent);
+      transform: translateX(-50%);
+    }
+
+    .timeline-resize-handle:hover::before,
+    .timeline-resize-handle:focus-visible::before,
+    body.timeline-resizing .timeline-resize-handle::before {
+      background: color-mix(in srgb, var(--primary) 72%, transparent);
+    }
+
+    body.timeline-resizing {
+      cursor: ns-resize;
+      user-select: none;
+    }
+
     .timeline-panel-header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: var(--space-3);
-      padding: 12px 14px 8px;
+      padding: 24px 14px 8px;
       border-bottom: 1px solid var(--border-subtle);
     }
 
@@ -894,6 +929,139 @@
       box-shadow: 0 0 0 1px var(--danger);
     }
 
+    .stream-lane-chart {
+      display: grid;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+    }
+
+    .stream-lane-row {
+      display: grid;
+      grid-template-columns: 128px minmax(0, 1fr) 176px;
+      gap: var(--space-2);
+      align-items: center;
+      min-height: 82px;
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+    }
+
+    .stream-lane-cell {
+      min-width: 0;
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .stream-lane-track {
+      position: relative;
+      height: 22px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background:
+        linear-gradient(90deg, transparent 0 24%, color-mix(in srgb, var(--border-subtle) 78%, transparent) 24% 24.5%, transparent 24.5% 49%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 49% 49.5%, transparent 49.5% 74%,
+        color-mix(in srgb, var(--border-subtle) 78%, transparent) 74% 74.5%, transparent 74.5%),
+        color-mix(in srgb, var(--background) 48%, transparent);
+    }
+
+    .stream-lane-segment {
+      position: absolute;
+      top: 4px;
+      left: var(--lane-left);
+      width: var(--lane-width);
+      min-width: 3px;
+      height: 14px;
+      border-radius: var(--radius-pill);
+      background: var(--lane-color);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 12%, transparent);
+      cursor: pointer;
+    }
+
+    .stream-lane-segment[data-role="secondary"] {
+      top: 7px;
+      height: 8px;
+      opacity: 0.42;
+    }
+
+    .stream-lane-segment[data-hot="true"] {
+      box-shadow: 0 0 0 1px var(--danger);
+    }
+
+    .stream-lane-segment.is-active {
+      opacity: 1;
+      box-shadow:
+        0 0 0 2px var(--foreground),
+        0 0 0 6px color-mix(in srgb, var(--foreground) 12%, transparent);
+      }
+
+    .stream-lane-ops {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .stream-lane-op-chip {
+      max-width: 220px;
+      min-height: 20px;
+      padding: 0 7px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      font-size: 10px;
+      line-height: 18px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .stream-lane-op-chip[data-role="secondary"] {
+      opacity: 0.58;
+    }
+
+    .stream-lane-op-chip:hover,
+    .stream-lane-op-chip.is-active {
+      border-color: color-mix(in srgb, var(--primary) 64%, transparent);
+      color: var(--foreground);
+      background: color-mix(in srgb, var(--primary) 18%, var(--surface-2));
+    }
+
+    .stream-lane-summary {
+      min-width: 0;
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .stream-lane-meter {
+      display: flex;
+      height: 6px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--background) 48%, transparent);
+    }
+
+    .stream-lane-meter span:first-child {
+      width: var(--stream-work);
+      background: var(--success);
+    }
+
+    .stream-lane-meter span:last-child {
+      flex: 1;
+      background: var(--danger);
+      opacity: 0.82;
+    }
+
+    .stream-lane-values {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .module-values {
       display: flex;
       justify-content: flex-end;
@@ -1098,11 +1266,12 @@
       </div>
     </aside>
 
-    <section class="timeline-panel" aria-label="report timeline">
+    <section id="timelinePanel" class="timeline-panel" aria-label="report timeline">
+      <div id="timelineResizeHandle" class="timeline-resize-handle" role="separator" aria-orientation="horizontal" aria-label="Resize timeline panel" tabindex="0"></div>
       <div class="timeline-panel-header">
         <div class="timeline-title-group">
           <h2 class="timeline-title">Step / Stream Timeline</h2>
-          <p id="timelineCaption" class="timeline-caption">Step 15 playable wall-time lanes from ds3.2_report (9).html</p>
+          <p id="timelineCaption" class="timeline-caption">Step 15 fused operator segments and stream work/wait lanes</p>
         </div>
         <div class="timeline-tabs" aria-label="timeline view">
           <button type="button" data-timeline-tab="steps">Steps</button>
@@ -1727,6 +1896,8 @@
         actionList: document.getElementById("actionList"),
         nodeList: document.getElementById("nodeList"),
         refreshOverlay: document.getElementById("refreshOverlay"),
+        timelinePanel: document.getElementById("timelinePanel"),
+        timelineResizeHandle: document.getElementById("timelineResizeHandle"),
         timelineCaption: document.getElementById("timelineCaption"),
         stepTimelinePanel: document.getElementById("stepTimelinePanel"),
         streamTimelinePanel: document.getElementById("streamTimelinePanel"),
@@ -1859,6 +2030,80 @@
           return `${value >= 10 ? value.toFixed(1) : value.toFixed(2)} ms`;
         }
         return `${us < 10 ? us.toFixed(1) : us.toFixed(0)} us`;
+      }
+
+      function clampTimelineHeight(value) {
+        const max = Math.max(300, window.innerHeight - 96);
+        return Math.max(260, Math.min(max, value));
+      }
+
+      function setTimelineHeight(value) {
+        if (!els.timelinePanel) return;
+        const height = clampTimelineHeight(value);
+        els.timelinePanel.style.setProperty("--timeline-panel-height", `${Math.round(height)}px`);
+        els.timelineResizeHandle?.setAttribute("aria-valuenow", String(Math.round(height)));
+      }
+
+      function initTimelineResize() {
+        if (!els.timelinePanel || !els.timelineResizeHandle) return;
+        const initialHeight = Number(window.localStorage.getItem("dsv32-report-timeline-height"));
+        if (Number.isFinite(initialHeight) && initialHeight > 0) setTimelineHeight(initialHeight);
+
+        let startY = 0;
+        let startHeight = 0;
+
+        const resizeTo = (clientY) => {
+          setTimelineHeight(startHeight + (startY - clientY));
+        };
+
+        const stopResize = (event) => {
+          document.body.classList.remove("timeline-resizing");
+          window.removeEventListener("pointermove", onPointerMove);
+          window.removeEventListener("pointerup", stopResize);
+          window.removeEventListener("pointercancel", stopResize);
+          if (event && typeof els.timelineResizeHandle.releasePointerCapture === "function") {
+            try {
+              els.timelineResizeHandle.releasePointerCapture(event.pointerId);
+            } catch (_) {}
+          }
+          const height = Math.round(els.timelinePanel.getBoundingClientRect().height);
+          window.localStorage.setItem("dsv32-report-timeline-height", String(height));
+        };
+
+        const onPointerMove = (event) => {
+          resizeTo(event.clientY);
+        };
+
+        els.timelineResizeHandle.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          startY = event.clientY;
+          startHeight = els.timelinePanel.getBoundingClientRect().height;
+          document.body.classList.add("timeline-resizing");
+          if (typeof els.timelineResizeHandle.setPointerCapture === "function") {
+            els.timelineResizeHandle.setPointerCapture(event.pointerId);
+          }
+          window.addEventListener("pointermove", onPointerMove);
+          window.addEventListener("pointerup", stopResize, { once: true });
+          window.addEventListener("pointercancel", stopResize, { once: true });
+        });
+
+        els.timelineResizeHandle.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown" && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          const current = els.timelinePanel.getBoundingClientRect().height;
+          if (event.key === "ArrowUp") setTimelineHeight(current + 24);
+          if (event.key === "ArrowDown") setTimelineHeight(current - 24);
+          if (event.key === "Home") setTimelineHeight(260);
+          if (event.key === "End") setTimelineHeight(window.innerHeight - 96);
+          const height = Math.round(els.timelinePanel.getBoundingClientRect().height);
+          window.localStorage.setItem("dsv32-report-timeline-height", String(height));
+        });
+
+        window.addEventListener("resize", () => {
+          const height = els.timelinePanel.getBoundingClientRect().height;
+          setTimelineHeight(height);
+        });
       }
 
       function streamBounds() {
@@ -2059,48 +2304,62 @@
             `;
           }).join("");
 
-        const rows = MODULE_TIMELINE
+        const timelineSegments = MODULE_TIMELINE
           .map((item, index) => ({ ...item, index }))
-          .sort((a, b) => a.startUs - b.startUs)
-          .map((item) => {
-            const left = ((item.startUs - minStart) / span) * 100;
-            const width = Math.max(0.6, (item.wallUs / span) * 100);
-            const nodeAttr = item.nodeId ? ` data-node-id="${escapeHtml(item.nodeId)}"` : "";
-            const hot = item.waitUs > item.opUs;
-            return `
-              <div class="module-row"${nodeAttr} data-segment-index="${item.index}">
-                <div class="module-label">
-                  <span class="module-name">${escapeHtml(item.name)}</span>
-                  <span class="module-meta">dom ${escapeHtml(item.dominant)} · ${escapeHtml(item.streams.join("/"))}</span>
-                </div>
-                <div class="module-track">
-                  <span
-                    class="module-bar"
-                    data-category="${escapeHtml(item.category)}"
-                    data-hot="${hot ? "true" : "false"}"
-                    style="--bar-left:${left.toFixed(2)}%;--bar-width:${width.toFixed(2)}%;--bar-color:${escapeHtml(item.color)}"
-                    title="${escapeHtml(item.name)} · wall ${formatDuration(item.wallUs)} · wait ${formatDuration(item.waitUs)}"></span>
-                </div>
-                <div class="module-values">
-                  <span>${formatDuration(item.wallUs)}</span>
-                  <span>${item.kernels} kernels</span>
-                </div>
-              </div>
-            `;
-          }).join("");
+          .sort((a, b) => a.startUs - b.startUs);
 
-        const streams = STREAM_SUMMARY.map((item) => {
+        const streamLaneRows = STREAM_SUMMARY.map((item) => {
           const cost = item.opUs + item.waitUs;
           const workPct = cost ? Math.max(2, Math.min(100, item.opUs / cost * 100)) : 100;
           const widthPct = Math.max(8, Math.min(100, cost / maxStreamCost * 100));
+          const segments = timelineSegments
+            .filter((segment) => segment.streams.includes(item.stream) || segment.dominant === item.stream)
+            .map((segment) => {
+              const left = ((segment.startUs - minStart) / span) * 100;
+              const width = Math.max(0.6, (segment.wallUs / span) * 100);
+              const hot = segment.waitUs > segment.opUs;
+              const role = segment.dominant === item.stream ? "dominant" : "secondary";
+              return `
+                <span
+                  class="stream-lane-segment"
+                  data-segment-index="${segment.index}"
+                  data-role="${role}"
+                  data-hot="${hot ? "true" : "false"}"
+                  style="--lane-left:${left.toFixed(2)}%;--lane-width:${width.toFixed(2)}%;--lane-color:${escapeHtml(segment.color)}"
+                  title="${escapeHtml(segment.name)} · stream ${escapeHtml(item.stream)} · wall ${formatDuration(segment.wallUs)} · wait ${formatDuration(segment.waitUs)}"></span>
+              `;
+            }).join("");
+          const operatorNames = timelineSegments
+            .filter((segment) => segment.streams.includes(item.stream) || segment.dominant === item.stream)
+            .map((segment) => {
+              const role = segment.dominant === item.stream ? "dominant" : "secondary";
+              return `
+                <button
+                  type="button"
+                  class="stream-lane-op-chip"
+                  data-segment-index="${segment.index}"
+                  data-role="${role}"
+                  title="${escapeHtml(segment.name)} · stream ${escapeHtml(item.stream)}">
+                  ${escapeHtml(segment.name)}
+                </button>
+              `;
+            }).join("");
+
           return `
-            <div class="stream-summary-item">
+            <div class="stream-lane-row" data-stream="${escapeHtml(item.stream)}">
               <div class="stream-label">
                 <span class="stream-name">Stream ${escapeHtml(item.stream)}</span>
                 <span class="stream-meta">${item.ops} ops · ${formatDuration(cost)}</span>
               </div>
-              <div class="stream-meter" style="width:${widthPct.toFixed(1)}%;--stream-work:${workPct.toFixed(1)}%">
-                <span></span><span></span>
+              <div class="stream-lane-cell">
+                <div class="stream-lane-track">${segments}</div>
+                <div class="stream-lane-ops">${operatorNames}</div>
+              </div>
+              <div class="stream-lane-summary">
+                <div class="stream-lane-meter" style="width:${widthPct.toFixed(1)}%;--stream-work:${workPct.toFixed(1)}%">
+                  <span></span><span></span>
+                </div>
+                <div class="stream-lane-values">work ${formatDuration(item.opUs)} · wait ${formatDuration(item.waitUs)}</div>
               </div>
             </div>
           `;
@@ -2118,8 +2377,7 @@
             </div>
             <input id="streamScrubber" class="stream-scrubber" type="range" min="0" max="100" step="0.1" value="0" aria-label="stream timeline scrubber">
           </div>
-          <div class="module-timeline">${rows}</div>
-          <div class="stream-summary-list">${streams}</div>
+          <div class="stream-lane-chart">${streamLaneRows}</div>
         `;
         bindStreamPlayer();
       }
@@ -2191,7 +2449,7 @@
         if (tabName !== "streams") stopStreamPlayback();
         const captions = {
           steps: "Step 10-19 stage split from report (5).html",
-          streams: "Step 15 playable wall-time lanes from ds3.2_report (9).html",
+          streams: "Step 15 fused operator segments and stream work/wait lanes",
           coverage: "Coverage audit against both HTML reports"
         };
         document.querySelectorAll("[data-timeline-tab]").forEach((button) => {
@@ -3030,11 +3288,11 @@
       });
 
       els.streamTimelinePanel.addEventListener("click", (event) => {
-        const segmentRow = event.target.closest("[data-segment-index]");
-        if (segmentRow && segmentRow.classList.contains("module-row")) {
+        const segmentTarget = event.target.closest("[data-segment-index]");
+        if (segmentTarget) {
           const segment = MODULE_TIMELINE
             .map((item, index) => ({ ...item, index }))
-            .find((item) => item.index === Number(segmentRow.dataset.segmentIndex));
+            .find((item) => item.index === Number(segmentTarget.dataset.segmentIndex));
           if (segment) {
             const { minStart, span } = streamBounds();
             const midpoint = segment.startUs + segment.wallUs / 2;
@@ -3059,6 +3317,7 @@
         }
       }, 300);
 
+      initTimelineResize();
       renderTimelinePanels();
       renderInspector();
     })();
