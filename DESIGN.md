@@ -71,7 +71,38 @@ Characteristics:
 - token demonstrations
 - side-by-side comparisons
 
-## 3. Color Palette & Roles
+## 3. Pattern Sources
+
+PTO has reusable graph, timeline, hardware, and workbench visualization primitives that are more specific than base components. These are pattern sources, not decorative examples.
+
+The shared pattern registry is:
+
+- `patterns/patterns.json`
+
+Current pattern sources include:
+
+- `patterns/swimlane-task/pattern.json`
+- `patterns/memory-architecture/pattern.json`
+- `patterns/aic-core-object/pattern.json`
+- `patterns/aiv-core-object/pattern.json`
+- `patterns/model-graphviz/pattern.json`
+- `patterns/workbench-shell/pattern.json`
+
+Rules:
+
+- preview pages may wrap a pattern for layout, but must not redefine the pattern's internal classes
+- agents must read the pattern JSON before reusing a graph, hardware, timeline, or workbench primitive
+- every pattern must expose a stable consumer entry: CSS class names are enough for static visual primitives, while DOM/SVG/canvas generation, drag behavior, zoom, routing, persistence, or synchronized state must go through a `window.Pto*Pattern` or `window.Pto*` helper
+- allowed overrides must be explicit CSS variables, selectors, callbacks, or geometry fields documented by the pattern
+- forbidden overrides include internal radius, segment typography, divider shadows, drag handles, pointer handlers, and state rules unless the pattern source itself is updated
+
+For swimlane task bars, reuse pattern id `swimlane-task-bar`. The canonical source is the canvas renderer in `patterns/swimlane-task/pattern.js`; do not rebuild it with DOM/CSS or rewrite segment math locally.
+
+For memory hierarchy diagrams, reuse pattern id `memory-architecture-layout`. The canonical source is the hybrid renderer in `patterns/memory-architecture/pattern.js`; new hardware pages should extend the preset/config surface there instead of copying `mem_viewer/index.html` or redrawing route geometry in page-local code.
+
+For PTO split-pane page shells, reuse pattern id `workbench-shell`. The canonical source is `patterns/workbench-shell/pattern.css` plus the helpers in `patterns/workbench-shell/pattern.js`. New workbench pages should use `.workbench-shell-page`, `.workbench-frame-split`, `.workbench-frame-grid`, `.workbench-pane`, or `.panel-shell.panel-shell-quiet`, then call `window.PtoWorkbenchShell.initResizablePanes` or `initWorkbenchShell` for draggable split panes. If a page already owns custom split math, use `window.PtoWorkbenchShell.createSplitGutter` for the gutter element. Do not redefine page chrome, split gutters, pointer drag behavior, size persistence, or gutter focus/hover states locally.
+
+## 4. Color Palette & Roles
 
 ### Core UI Palette
 
@@ -109,7 +140,7 @@ These colors may be vivid, but only inside charts, graphs, chips, legends, and t
 
 Do not reuse visualization colors as generic panel backgrounds.
 
-## 4. Typography Rules
+## 5. Typography Rules
 
 ### Type Families
 
@@ -130,7 +161,7 @@ Do not reuse visualization colors as generic panel backgrounds.
 - Section label: quiet, uppercase or mono where appropriate
 - Metadata: muted, never low-contrast to the point of illegibility
 
-## 5. Component Stylings
+## 6. Component Stylings
 
 ### Buttons
 
@@ -175,7 +206,7 @@ They should read as editor surfaces:
 - predictable top chrome
 - quiet syntax colors
 
-## 6. Layout Principles
+## 7. Layout Principles
 
 ### Pane Logic
 
@@ -207,7 +238,7 @@ Repeated structures must align to visible grids:
 
 Misalignment is one of the fastest ways PTO looks inconsistent.
 
-## 7. Depth & Elevation
+## 8. Depth & Elevation
 
 Dark PTO should rely on:
 
@@ -224,7 +255,7 @@ Do not stack multiple styling tricks at once:
 
 Pick one emphasis mechanism, not four.
 
-## 8. Do’s and Don’ts
+## 9. Do’s and Don’ts
 
 ### Do
 
@@ -242,7 +273,7 @@ Pick one emphasis mechanism, not four.
 - use visualization colors as generic UI decoration
 - treat tokens as optional suggestions
 
-## 9. Responsive Behavior
+## 10. Responsive Behavior
 
 Desktop first, but responsive.
 
@@ -255,7 +286,7 @@ Rules:
 
 Do not solve narrow layouts by shrinking text until unreadable.
 
-## 10. Design System Governance
+## 11. Design System Governance
 
 ### Source of Truth
 
@@ -288,7 +319,7 @@ A module is not considered “design-system integrated” until:
 - it avoids unapproved hardcoded UI colors
 - its core UI patterns appear in preview or review material
 
-## 11. Prompt Guide For Agents
+## 12. Prompt Guide For Agents
 
 When asking an AI agent to build PTO UI, use directions like:
 

@@ -26,7 +26,6 @@ const floatingToggle = document.getElementById('floating-toggle');
 const floatingCollapsedBtn = document.getElementById('floating-collapsed-btn');
 const floatingCollapsedIcon = document.getElementById('floating-collapsed-icon');
 const mainEl = document.getElementById('main');
-const panelResizer = document.getElementById('panel-resizer');
 const colorPanel = document.getElementById('mv-color-panel');
 const colorPanelToggle = document.getElementById('mv-color-toggle');
 
@@ -54,37 +53,17 @@ function syncFloatingToolbarState() {
   floatingCollapsedIcon.innerHTML = playing ? '&#10074;&#10074;' : '&#9654;';
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function setTopPanelRatio(ratio) {
-  const next = clamp(ratio, 34, 72);
-  document.documentElement.style.setProperty('--top-panel-ratio', String(next));
-}
-
 function initPanelResizer() {
-  if (!mainEl || !panelResizer) return;
-
-  const onPointerMove = (e) => {
-    const rect = mainEl.getBoundingClientRect();
-    const ratio = ((e.clientX - rect.left) / Math.max(rect.width, 1)) * 100;
-    setTopPanelRatio(ratio);
-  };
-
-  const stopDragging = () => {
-    panelResizer.classList.remove('is-dragging');
-    document.body.style.userSelect = '';
-    window.removeEventListener('pointermove', onPointerMove);
-    window.removeEventListener('pointerup', stopDragging);
-  };
-
-  panelResizer.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    panelResizer.classList.add('is-dragging');
-    document.body.style.userSelect = 'none';
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', stopDragging);
+  const helper = window.PtoWorkbenchShell;
+  if (!mainEl || !helper?.initResizablePanes) return;
+  helper.initResizablePanes({
+    root: mainEl,
+    panes: ['#top-panel', '#bottom-panel'],
+    sizes: [50, 50],
+    minSize: [360, 340],
+    gutterSize: 14,
+    storageKey: 'mem_viewer_v2_main_split_v1',
+    gutterLabel: 'Resize graph and memory panels',
   });
 }
 

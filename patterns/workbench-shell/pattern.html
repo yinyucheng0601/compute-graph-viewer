@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Workbench Shell</title>
+  <script>
+    if (new URLSearchParams(window.location.search).has('embed')) {
+      document.documentElement.dataset.embedPreview = 'true';
+    }
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css?v=borderless-pane-cards-20260519">
+</head>
+<body class="pto-workbench-shell__page">
+  <main class="pto-workbench-shell__main">
+    <h1 class="pto-workbench-shell__title">Workbench Shell Pattern</h1>
+    <p class="pto-workbench-shell__subtitle">
+      Topbar + resizable three-pane layout + canvas zoom controls. Product pages pass pane selectors,
+      min sizes, storage keys, and renderer callbacks instead of reimplementing Split.js and zoom state.
+    </p>
+    <div class="pto-workbench-shell__meta">
+      <span class="pto-workbench-shell__badge">pattern id: workbench-shell</span>
+      <span class="pto-workbench-shell__badge">layout: topbar + source + canvas + inspector</span>
+      <span class="pto-workbench-shell__badge">zoom: 40%-120%, 10% step</span>
+    </div>
+
+    <section class="pto-workbench-shell" data-workbench-shell>
+      <header class="pto-workbench-shell__topbar">
+        <div class="pto-workbench-shell__brand">
+          <span>Operator Workbench</span>
+          <span class="pto-workbench-shell__brand-sub">shared shell</span>
+        </div>
+        <div class="pto-workbench-shell__top-actions">
+          <button type="button" class="pto-workbench-shell__control is-active">910B</button>
+          <button type="button" class="pto-workbench-shell__control">950</button>
+        </div>
+      </header>
+
+      <div class="pto-workbench-shell__panes">
+        <aside class="pto-workbench-shell__pane" data-pane="source">
+          <div class="pto-workbench-shell__pane-head">
+            <h2 class="pto-workbench-shell__pane-title">Source</h2>
+            <span class="pto-workbench-shell__pane-kicker">left</span>
+          </div>
+          <div class="pto-workbench-shell__pane-body">
+            <ul class="pto-workbench-shell__list">
+              <li class="pto-workbench-shell__list-item">
+                <span class="pto-workbench-shell__list-title">Kernel selection</span>
+                <span class="pto-workbench-shell__list-sub">Fixed utility rail or filter list.</span>
+              </li>
+              <li class="pto-workbench-shell__list-item">
+                <span class="pto-workbench-shell__list-title">Architecture tags</span>
+                <span class="pto-workbench-shell__list-sub">Use compact state badges, not large cards.</span>
+              </li>
+              <li class="pto-workbench-shell__list-item">
+                <span class="pto-workbench-shell__list-title">Inputs</span>
+                <span class="pto-workbench-shell__list-sub">The pane remembers user width via storageKey.</span>
+              </li>
+            </ul>
+          </div>
+        </aside>
+
+        <section class="pto-workbench-shell__pane pto-workbench-shell__canvas-pane" data-pane="canvas">
+          <div class="pto-workbench-shell__pane-head">
+            <h2 class="pto-workbench-shell__pane-title">Canvas</h2>
+            <span class="pto-workbench-shell__pane-kicker">primary</span>
+          </div>
+          <div class="pto-workbench-shell__pane-body">
+            <div class="pto-workbench-shell__canvas-toolbar" aria-label="Canvas controls">
+              <button type="button" class="pto-workbench-shell__control" id="demo-detail-toggle" aria-pressed="true">细节开</button>
+              <button type="button" class="pto-workbench-shell__control" id="demo-zoom-out" aria-label="缩小">−</button>
+              <button type="button" class="pto-workbench-shell__control pto-workbench-shell__zoom-readout" id="demo-zoom-reset" aria-label="重置缩放">80%</button>
+              <button type="button" class="pto-workbench-shell__control" id="demo-zoom-in" aria-label="放大">+</button>
+            </div>
+            <div class="pto-workbench-shell__canvas-scroll">
+              <div class="pto-workbench-shell__demo-stage" id="demo-stage">
+                <div class="pto-workbench-shell__demo-grid">
+                  <div class="pto-workbench-shell__demo-node">
+                    <span class="pto-workbench-shell__demo-node-title">GM</span>
+                    <span class="pto-workbench-shell__demo-node-meta">global residency</span>
+                  </div>
+                  <div class="pto-workbench-shell__demo-link"></div>
+                  <div class="pto-workbench-shell__demo-node is-primary">
+                    <span class="pto-workbench-shell__demo-node-title">Canvas renderer</span>
+                    <span class="pto-workbench-shell__demo-node-meta">memory graph / IR graph / timeline</span>
+                  </div>
+                  <div class="pto-workbench-shell__demo-node pto-workbench-shell__demo-detail">
+                    <span class="pto-workbench-shell__demo-node-title">L2</span>
+                    <span class="pto-workbench-shell__demo-node-meta">details hide with the shared toggle</span>
+                  </div>
+                  <div class="pto-workbench-shell__demo-link pto-workbench-shell__demo-detail"></div>
+                  <div class="pto-workbench-shell__demo-node pto-workbench-shell__demo-detail">
+                    <span class="pto-workbench-shell__demo-node-title">Inspector anchor</span>
+                    <span class="pto-workbench-shell__demo-node-meta">tooltips and route overlays scale with the canvas callback</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="pto-workbench-shell__pane" data-pane="inspector">
+          <div class="pto-workbench-shell__pane-head">
+            <h2 class="pto-workbench-shell__pane-title">Inspector</h2>
+            <span class="pto-workbench-shell__pane-kicker">right</span>
+          </div>
+          <div class="pto-workbench-shell__pane-body">
+            <ul class="pto-workbench-shell__list">
+              <li class="pto-workbench-shell__list-item">
+                <span class="pto-workbench-shell__list-title">Selected object</span>
+                <span class="pto-workbench-shell__list-sub">Use inspector sections and soft cards.</span>
+              </li>
+              <li class="pto-workbench-shell__list-item">
+                <span class="pto-workbench-shell__list-title">Metrics</span>
+                <span class="pto-workbench-shell__list-sub">Keep dense, aligned, and scrollable.</span>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderWorkbenchShellPattern() {
+      const helper = window.PtoWorkbenchShell;
+      const shell = document.querySelector('[data-workbench-shell]');
+      const stage = document.getElementById('demo-stage');
+      const details = Array.from(document.querySelectorAll('.pto-workbench-shell__demo-detail'));
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!helper || !shell || !stage) return;
+
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(document.body.getBoundingClientRect().height);
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 4;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      helper.initWorkbenchShell({
+        root: shell,
+        panes: ['[data-pane="source"]', '[data-pane="canvas"]', '[data-pane="inspector"]'],
+        storageKey: 'pto-workbench-shell-preview-sizes-v1',
+        sizes: [24, 52, 24],
+        minSize: [220, 420, 240],
+        gutterSize: 12,
+        observeResize: true,
+        onLayout: syncFrameHeight,
+        canvasControls: {
+          detailToggle: '#demo-detail-toggle',
+          zoomOut: '#demo-zoom-out',
+          zoomReset: '#demo-zoom-reset',
+          zoomIn: '#demo-zoom-in',
+          min: 0.4,
+          max: 1.2,
+          step: 0.1,
+          defaultZoom: 0.8,
+          onZoomChange: (zoom) => {
+            stage.style.transform = `scale(${zoom})`;
+            syncFrameHeight();
+          },
+          onDetailChange: (visible) => {
+            details.forEach((node) => {
+              node.hidden = !visible;
+            });
+            syncFrameHeight();
+          },
+        },
+      });
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.setTimeout(syncFrameHeight, 160);
+    })();
+  </script>
+</body>
+</html>
