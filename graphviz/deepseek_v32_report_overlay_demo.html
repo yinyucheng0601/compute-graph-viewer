@@ -1942,20 +1942,45 @@
         });
       }
 
+      // The selected node may live inside a collapsed container and not be
+      // rendered. Fall back to the nearest rendered ancestor so the group
+      // (and its visible children) still highlights during stream playback.
+      function selectedSourceRootId() {
+        const nodeId = state.selectedNodeId;
+        if (!nodeId || findSourceGroup(nodeId)) return nodeId;
+
+        const ancestors = Object.keys(DESCENDANT_NODE_IDS)
+          .filter((key) => (DESCENDANT_NODE_IDS[key] || []).includes(nodeId))
+          .sort((a, b) => DESCENDANT_NODE_IDS[a].length - DESCENDANT_NODE_IDS[b].length);
+        for (const ancestor of ancestors) {
+          if (findSourceGroup(ancestor)) return ancestor;
+        }
+
+        const guard = new Set();
+        let current = FOCUS_FALLBACKS[nodeId];
+        while (current && !guard.has(current)) {
+          guard.add(current);
+          if (findSourceGroup(current)) return current;
+          current = FOCUS_FALLBACKS[current];
+        }
+        return nodeId;
+      }
+
       function selectedSourceIds() {
         const ids = new Set();
-        if (!isReportOverlayEnabled() || !state.selectedNodeId) return ids;
-        ids.add(state.selectedNodeId);
-        collectRenderedDescendantIds(state.selectedNodeId, ids);
+        const rootId = selectedSourceRootId();
+        if (!isReportOverlayEnabled() || !rootId) return ids;
+        ids.add(rootId);
+        collectRenderedDescendantIds(rootId, ids);
         Array.from(ids).forEach((id) => {
           if (id.endsWith("::visited")) ids.delete(id);
         });
-        (DESCENDANT_NODE_IDS[state.selectedNodeId] || []).forEach((id) => ids.add(id));
+        (DESCENDANT_NODE_IDS[rootId] || []).forEach((id) => ids.add(id));
         return ids;
       }
 
       function isPrimarySelectedSource(nodeId) {
-        return isReportOverlayEnabled() && nodeId === state.selectedNodeId;
+        return isReportOverlayEnabled() && nodeId === selectedSourceRootId();
       }
 
       function renderList(container, items) {
@@ -2890,14 +2915,23 @@
       function groupBounds(group) {
         if (!group || typeof group.getBBox !== "function") return null;
         try {
-          return group.getBBox();
+          const box = group.getBBox();
+          const transform = group.transform && group.transform.baseVal.consolidate();
+          if (!transform) return box;
+          const matrix = transform.matrix;
+          return {
+            x: box.x + matrix.e,
+            y: box.y + matrix.f,
+            width: box.width,
+            height: box.height
+          };
         } catch (error) {
           return null;
         }
       }
 
       function selectedBoundaryBounds() {
-        const group = findSourceGroup(state.selectedNodeId);
+        const group = findSourceGroup(selectedSourceRootId());
         if (!group || !group.classList.contains(BOUNDARY_CLASS)) return null;
         return groupBounds(group);
       }
@@ -3053,7 +3087,6 @@
           }
 
           html.report-has-selection .${NODE_CLASS}.report-source-context-selected > rect:first-of-type {
-            fill: color-mix(in srgb, var(--foreground) 18%, var(--graphviz-node-fill, #263341)) !important;
             stroke: color-mix(in srgb, var(--foreground) 72%, transparent) !important;
             stroke-width: 1.8px !important;
             fill-opacity: 1 !important;
