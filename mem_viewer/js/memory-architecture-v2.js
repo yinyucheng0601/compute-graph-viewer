@@ -19,6 +19,9 @@ let hover = null;
 let resizeObserver = null;
 let currentStep = 0;
 let fitFrame = 0;
+let lastResizeWidth = 0;
+let lastFitWidth = 0;
+let lastAppliedScale = 0;
 
 function hexToRgba(hex, alpha) {
   if (!hex || hex.startsWith('rgb')) return hex || `rgba(255,255,255,${alpha})`;
@@ -268,26 +271,61 @@ function initTensorTooltip() {
   });
 }
 
-function fitArchitecture() {
+function getArchitectureAvailableWidth() {
+  const panel = document.getElementById('bottom-panel');
+  const shell = document.getElementById('arch-diagram');
+  const target = panel || shell;
+  if (!target) return 360;
+  const rect = target.getBoundingClientRect();
+  const styles = window.getComputedStyle(target);
+  const paddingX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+  return Math.max(360, Math.round(rect.width - paddingX - 24));
+}
+
+function fitArchitecture(force = false) {
   const archRoot = root();
   const shell = document.getElementById('arch-diagram');
   if (!helper || !stageEl || !archRoot || !shell) return;
-  const availableWidth = Math.max(360, shell.clientWidth - 24);
+  const availableWidth = getArchitectureAvailableWidth();
   const naturalWidth = Math.max(1, archRoot.offsetWidth || archRoot.getBoundingClientRect().width);
   const scale = Math.max(0.42, Math.min(0.84, availableWidth / naturalWidth));
-  helper.applyCanvasScale(stageEl, scale);
-  overlay?.update?.();
+  const widthChanged = Math.abs(availableWidth - lastFitWidth) >= 2;
+  const scaleChanged = Math.abs(scale - lastAppliedScale) >= 0.005;
+
+  if (force || widthChanged || scaleChanged) {
+    helper.applyCanvasScale(stageEl, scale);
+    lastFitWidth = availableWidth;
+    lastAppliedScale = scale;
+    overlay?.update?.();
+  }
 
   const readout = document.getElementById('arch-fit-readout');
   if (readout) readout.textContent = `fit ${Math.round(scale * 100)}%`;
 }
 
-function scheduleFit() {
+function scheduleFit(force = false) {
   window.cancelAnimationFrame(fitFrame);
   fitFrame = window.requestAnimationFrame(() => {
-    fitArchitecture();
-    renderActivity(currentStep);
+    fitArchitecture(force);
   });
+}
+
+function scheduleFitForResize(entries) {
+  const entry = entries?.[0];
+  const inlineSize = entry?.borderBoxSize?.[0]?.inlineSize
+    ?? entry?.borderBoxSize?.inlineSize
+    ?? entry?.target?.getBoundingClientRect?.().width
+    ?? entry?.contentRect?.width
+    ?? document.getElementById('bottom-panel')?.clientWidth
+    ?? 0;
+  const nextWidth = Math.round(inlineSize);
+  if (!nextWidth) {
+    scheduleFit();
+    return;
+  }
+  if (lastResizeWidth && Math.abs(nextWidth - lastResizeWidth) < 2) return;
+  lastResizeWidth = nextWidth;
+  scheduleFit(true);
 }
 
 function showMissingRenderer() {
@@ -306,6 +344,9 @@ export function initMemoryArchitectureV2() {
   hover?.destroy?.();
   overlay?.destroy?.();
   resizeObserver?.disconnect?.();
+  lastResizeWidth = 0;
+  lastFitWidth = 0;
+  lastAppliedScale = 0;
 
   helper.renderArchitecture(stageEl, ARCH_PRESET);
   stageEl.classList.add('mv-v2-memory-arch');
@@ -315,16 +356,15 @@ export function initMemoryArchitectureV2() {
   ensureBufferChrome();
   initTensorTooltip();
 
+  const resizeTarget = document.getElementById('bottom-panel');
   resizeObserver = typeof ResizeObserver === 'function'
-    ? new ResizeObserver(scheduleFit)
+    ? new ResizeObserver(scheduleFitForResize)
     : null;
-  if (resizeObserver) {
-    resizeObserver.observe(document.getElementById('bottom-panel'));
-  }
+  if (resizeObserver && resizeTarget) resizeObserver.observe(resizeTarget);
 
   window.requestAnimationFrame(() => {
     overlay?.render?.();
-    fitArchitecture();
+    fitArchitecture(true);
     renderMemoryArchitectureV2(currentStep);
   });
 }
