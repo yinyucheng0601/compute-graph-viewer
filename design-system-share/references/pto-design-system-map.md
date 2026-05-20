@@ -14,7 +14,7 @@ Use this as the default classification when building a new module.
 - `Graph Node Pattern`
 - `Swimlane Event Pattern`
 
-The source of truth for target appearance is `/Users/yin/pto/design-system-preview.html`.
+The source of truth for target appearance is `design-system-preview.html`.
 
 ## Matching guidance
 

@@ -1,12 +1,12 @@
 # Ascend C 算子开发 Tiling 入门
 
-本文面向刚开始写 Ascend C 自定义算子的开发者，基于本机两个仓库中的实际文件说明：哪里有 tiling 代码、tiling 到底解决什么问题、Host 侧和 Kernel 侧各写什么，以及看代码时应该抓住哪些关键点。
+本文面向刚开始写 Ascend C 自定义算子的开发者，基于两个参考仓库中的实际文件说明：哪里有 tiling 代码、tiling 到底解决什么问题、Host 侧和 Kernel 侧各写什么，以及看代码时应该抓住哪些关键点。
 
 ## 结论：这两个目录里有 tiling 文件吗
 
 有。
 
-`/Users/yin/gitcode/cann-recipes-infer-master` 里有较多真实算子的 tiling 实现，主要在：
+`cann-recipes-infer-master` 里有较多真实算子的 tiling 实现，主要在：
 
 - `ops/ascendc/src/*/op_host/*_tiling.cpp`
 - `ops/ascendc/src/*/op_host/*_tiling.h`
@@ -21,7 +21,7 @@
 - `cann-recipes-infer-master/ops/pypto/src/deepseek_indexer_attention/op_host/deepseek_indexer_attention_tiling.cpp`
 - `cann-recipes-infer-master/ops/pypto/src/lightning_indexer_pto/op_host/lightning_indexer_tiling.cpp`
 
-`/Users/yin/gitcode/asc-devkit-master` 里有官方开发套件、API、文档和样例，适合入门：
+`asc-devkit-master` 里有官方开发套件、API、文档和样例，适合入门：
 
 - `examples/01_simd_cpp_api/02_features/00_compilation/custom_op/op_host/add_custom/add_custom_host.cpp`
 - `examples/01_simd_cpp_api/02_features/00_compilation/custom_op/op_kernel/add_custom/add_custom_tiling.h`
@@ -413,7 +413,7 @@ REGISTER_TILING_DATA_CLASS(MyOp, MyTilingData)
 
 ## 与可视化结合的初步设计
 
-这个文档可以和 `/Users/yin/pto/ascend-950-workbench-demo` 的现有可视化工作台结合起来，目标不是把 tiling 解释成一篇静态教程，而是把它变成可点、可调、可追溯的执行计划视图。
+这个文档可以和 `ascend-950-workbench-demo/` 的现有可视化工作台结合起来，目标不是把 tiling 解释成一篇静态教程，而是把它变成可点、可调、可追溯的执行计划视图。
 
 现有 workbench 已经有三块基础能力：
 

@@ -20,8 +20,8 @@ Every preview must show:
 
 Preferred order:
 
-1. `/Users/yin/pto/<module>/component-preview.html`
-2. `/Users/yin/pto/design-system-preview.html` when the pattern should become shared system UI
+1. `<module>/component-preview.html`
+2. `design-system-preview.html` when the pattern should become shared system UI
 
 ## Approval rule
 

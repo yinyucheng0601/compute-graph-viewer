@@ -151,7 +151,7 @@ Inspector 规则：
 
 ## 设计系统复用
 
-来源：`/Users/yin/pto/design-system-share`。
+来源：`design-system-share/`。
 
 复用的系统组件：
 

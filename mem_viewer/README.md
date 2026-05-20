@@ -65,7 +65,7 @@ playback.js  ←  constants.js  ←  ops.js
 
 ## 从原型集成到 PTO 工程：最佳实践
 
-本节记录 mem_viewer 从单文件低保真原型（`mem_viewer.html`）演化为当前模块化工程的完整经验，供后续模块集成参考。
+本节记录 mem_viewer 从单文件低保真原型（现归档为 `archive/legacy-pages/mem_viewer.html`）演化为当前模块化工程的完整经验，供后续模块集成参考。
 
 ### 原型 vs 工程的典型差距
 
