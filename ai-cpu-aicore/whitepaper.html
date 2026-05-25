@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI CPU 与 AI Core：算子开发初学者的产品视角白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">AI CPU × AI Core · 算子开发心智模型</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">导览</a>
+      <a href="#roles">五个角色</a>
+      <a href="#e2e-link">端到端链路</a>
+      <a href="#three-layer">三层结构</a>
+      <a href="#what-transfers">传了什么</a>
+      <a href="#aicore-pipelines">指令流水</a>
+      <a href="#mental-model">心智模型</a>
+      <a href="#aicpu-role">控制面</a>
+      <a href="#framework">框架总结</a>
+      <a href="#findings">结论</a>
+      <a href="#product-prd">产品化</a>
+      <a href="#product-scenarios">场景</a>
+      <a href="#visual-workbench">工作台</a>
+      <a href="#linkage-model">联动</a>
+      <a href="#scope-contract">范围契约</a>
+      <a href="#metrics-acceptance">验收</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <!-- ============ COVER ============ -->
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026 · 昇腾算子开发入门</div>
+    <h1>AI CPU 与 AI Core 不是“逐条遥控”，<br>而是“控制面下单、数据面执行”</h1>
+    <p class="lead">这份报告把一份产品视角的开发笔记整理成可落地的心智模型：在昇腾 CANN / Ascend C 体系里，<b>谁负责决策、谁负责搬数据、谁负责计算</b>，AI CPU 和 AI Core 究竟靠什么协同。报告最后进一步把这套洞察收敛成一个可执行的<b>指令可视化系统 PRD</b>。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>2</strong><span>本地参考仓库：asc-devkit 与 cann-recipes-infer</span></div>
+      <div class="card metric"><strong>3</strong><span>核心角色：控制面 CPU、数据面 AI Core、协同协议内存</span></div>
+      <div class="card metric"><strong>8</strong><span>初学者最易混淆、必须拆清的概念点</span></div>
+      <div class="card metric"><strong>1</strong><span>产品形态：源码、硬件架构图、Inspector 联动工作台</span></div>
+    </div>
+    <div class="callout"><b>一句话结论：</b>AI CPU/Host CPU 准备“任务和参数”，AI Core 执行“已经编译成设备指令的 kernel”——两者通过 stream、GM、tiling、workspace 和同步资源协同，而不是函数调用栈或逐元素指令遥控。</div>
+  </section>
+
+  <!-- ============ OVERVIEW ============ -->
+  <section class="floor" id="overview">
+    <div class="kicker">Overview · 阅读路径</div>
+    <h2>先给读者一张地图</h2>
+    <p class="lead">报告分三段推进：先建立“谁是谁”的角色认知，再沿一次真实调用走完端到端链路，最后落到代码结构、指令流水与开发者行动建议。</p>
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 角色</div>
+      <div class="jm-head">02 链路</div>
+      <div class="jm-head">03 结构</div>
+      <div class="jm-head">04 指令</div>
+      <div class="jm-head">05 控制面</div>
+      <div class="jm-head">06 行动</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell hot">谁负责决策、搬数据、计算？</div>
+      <div class="jm-cell">一次算子调用从 Python 到硬件怎么走？</div>
+      <div class="jm-cell">一个算子在代码里被拆成几块？</div>
+      <div class="jm-cell">AI Core 内部真正跑的是什么指令？</div>
+      <div class="jm-cell">AI CPU 到底是不是 AI Core 的“老板”？</div>
+      <div class="jm-cell hot">初学者该按什么顺序读、避哪些坑？</div>
+
+      <div class="jm-label">本页内容</div>
+      <div class="jm-cell">五个角色职责矩阵</div>
+      <div class="jm-cell">端到端链路图 + 两层指令</div>
+      <div class="jm-cell">op_host / op_kernel / 框架接入</div>
+      <div class="jm-cell">七类流水 + 高性能三要素</div>
+      <div class="jm-cell">控制面 vs 数据面 + PTO/KFC</div>
+      <div class="jm-cell">读码顺序、判断表、8 个易混点</div>
+
+      <div class="jm-label">对应楼层</div>
+      <div class="jm-cell">五个角色</div>
+      <div class="jm-cell">端到端链路</div>
+      <div class="jm-cell">三层结构 / 传了什么</div>
+      <div class="jm-cell">指令流水 / 心智模型</div>
+      <div class="jm-cell">控制面</div>
+      <div class="jm-cell">框架总结 / 结论</div>
+    </div>
+    <div class="callout"><b>核心判断：</b>不要一上来钻 kernel 优化。先认清“控制面准备订单、数据面执行 kernel”的分工，再去读 tiling 与流水细节，学习曲线会平很多。</div>
+  </section>
+
+  <!-- ============ ROLES ============ -->
+  <section class="floor" id="roles">
+    <div class="kicker">Concept 01 · 角色分工</div>
+    <h2>把昇腾算子系统当成一个产品系统看</h2>
+    <p class="lead">五个角色各司其职：CPU 侧做编排、AI Core 做高吞吐计算、内存与调度资源做协同载体。把它类比成一套 App 服务体系，分工立刻清晰。</p>
+    <table>
+      <thead>
+        <tr><th style="width:13%">角色</th><th style="width:17%">产品类比</th><th>主要职责</th><th style="width:27%">代码里的典型位置</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="ph-name">Host CPU</div></td>
+          <td>App 服务端 / 调用入口</td>
+          <td>Python、PyTorch、ACL 发起调用，管理 device、stream、内存</td>
+          <td><code>torch_ops_extension/custom_ops/csrc/*.cpp</code>、示例里的 <code>aclrt*</code></td>
+        </tr>
+        <tr>
+          <td><div class="ph-name">AI CPU</div></td>
+          <td>设备侧调度 / 控制协处理器</td>
+          <td>部分 shape/tiling/控制类任务、AI CPU 算子、复杂图或 PTO/KFC 类编排</td>
+          <td><code>op_host/*_tiling.cpp</code>、PTO 里的 <code>SetAttachedStreamInfos</code></td>
+        </tr>
+        <tr>
+          <td><div class="ph-name">AI Core</div></td>
+          <td>执行引擎</td>
+          <td>运行 <code>__aicore__</code> kernel，执行 vector / cube / data-copy 指令</td>
+          <td><code>op_kernel/*.cpp</code>、<code>.asc</code> kernel</td>
+        </tr>
+        <tr>
+          <td><div class="ph-name">GM</div></td>
+          <td>共享货架</td>
+          <td>输入输出 tensor、workspace、tiling 数据所在的全局内存</td>
+          <td><code>GM_ADDR</code>、<code>GlobalTensor</code></td>
+        </tr>
+        <tr>
+          <td><div class="ph-name">UB / L1 / L0</div></td>
+          <td>AI Core 内部工作台</td>
+          <td>单核内部的搬入、计算、搬出</td>
+          <td><code>TPipe</code>、<code>TQue</code>、<code>LocalTensor</code>、<code>__ubuf__</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>关键边界：</b>CPU 侧（Host CPU / AI CPU / CANN Runtime）做<b>编排</b>——识别算子、检查 shape/dtype、选实现、算 tiling、备 workspace、生成任务描述并投递到 stream；AI Core 做<b>高吞吐计算</b>——读输入 GM 地址与 tiling，按 block/task 并行执行已编译好的 kernel 指令。</div>
+  </section>
+
+  <!-- ============ E2E LINK ============ -->
+  <section class="floor" id="e2e-link">
+    <div class="kicker">Concept 02 · 端到端链路</div>
+    <h2>一次算子调用，从 Python 走到硬件流水</h2>
+    <p class="lead">最关键的一点：AI CPU/Host CPU 准备“任务和参数”，AI Core 执行“已经编译成设备指令的 kernel”。CPU 侧不会在运行时逐元素指挥 AI Core。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>端到端链路 · 控制面下单 → 数据面执行</div>
+      <div class="shotbody flush" style="padding:20px 14px;background:#fff">
+        <svg viewBox="0 0 1200 560" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">
+          <defs>
+            <marker id="ar" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+            </marker>
+            <marker id="arg" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+            </marker>
+          </defs>
+
+          <!-- plane labels -->
+          <rect x="20" y="20" width="200" height="200" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="120" y="48" text-anchor="middle" font-size="15" font-weight="800" fill="#1d4ed8">控制面 · CPU 侧</text>
+          <text x="120" y="70" text-anchor="middle" font-size="12" fill="#64748b">准备任务与参数</text>
+
+          <rect x="20" y="250" width="200" height="170" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+          <text x="120" y="278" text-anchor="middle" font-size="15" font-weight="800" fill="#047857">数据面 · AI Core</text>
+          <text x="120" y="300" text-anchor="middle" font-size="12" fill="#64748b">执行编译好的 kernel</text>
+
+          <rect x="20" y="450" width="200" height="90" rx="8" fill="#fffbeb" stroke="#fde68a"/>
+          <text x="120" y="490" text-anchor="middle" font-size="15" font-weight="800" fill="#92400e">协同载体 · 内存与调度</text>
+          <text x="120" y="510" text-anchor="middle" font-size="12" fill="#64748b">GM / tiling / stream</text>
+
+          <!-- control plane boxes -->
+          <g font-size="13" font-weight="700" fill="#0f172a">
+            <rect x="250" y="40" width="180" height="62" rx="8" fill="#fff" stroke="#3b82f6" stroke-width="2"/>
+            <text x="340" y="66" text-anchor="middle">Python / PyTorch</text>
+            <text x="340" y="86" text-anchor="middle" font-size="11" font-weight="500" fill="#64748b">torch.ops.custom.xxx(...)</text>
+
+            <rect x="470" y="40" width="180" height="62" rx="8" fill="#fff" stroke="#3b82f6" stroke-width="2"/>
+            <text x="560" y="66" text-anchor="middle">torch_ops_ext C++</text>
+            <text x="560" y="86" text-anchor="middle" font-size="11" font-weight="500" fill="#64748b">EXEC_NPU_CMD_V1</text>
+
+            <rect x="690" y="40" width="190" height="62" rx="8" fill="#fff" stroke="#3b82f6" stroke-width="2"/>
+            <text x="785" y="66" text-anchor="middle">CANN Runtime / GE</text>
+            <text x="785" y="86" text-anchor="middle" font-size="11" font-weight="500" fill="#64748b">查 OPP 信息库 / ACLNN</text>
+
+            <rect x="920" y="40" width="240" height="62" rx="8" fill="#fff" stroke="#3b82f6" stroke-width="2"/>
+            <text x="1040" y="62" text-anchor="middle">Host CPU / AI CPU 控制侧</text>
+            <text x="1040" y="84" text-anchor="middle" font-size="11" font-weight="500" fill="#64748b">InferShape · Tiling · 选 kernel</text>
+          </g>
+
+          <!-- arrows control plane -->
+          <g stroke="#3b82f6" stroke-width="2" fill="none">
+            <line x1="430" y1="71" x2="466" y2="71" marker-end="url(#ar)"/>
+            <line x1="650" y1="71" x2="686" y2="71" marker-end="url(#ar)"/>
+            <line x1="880" y1="71" x2="916" y2="71" marker-end="url(#ar)"/>
+          </g>
+
+          <!-- main highlighted line: control -> shared memory -->
+          <path d="M1040 102 L1040 200 L640 200 L640 478" stroke="#f59e0b" stroke-width="3" fill="none" marker-end="url(#ar)" stroke-dasharray="0"/>
+          <rect x="700" y="182" width="300" height="34" rx="6" fill="#fffbeb" stroke="#f59e0b"/>
+          <text x="850" y="204" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">写入 tilingData / workspace / GM 地址元数据</text>
+
+          <!-- shared memory bar -->
+          <rect x="250" y="478" width="910" height="50" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="705" y="500" text-anchor="middle" font-size="13" font-weight="800" fill="#92400e">Device GM · tilingData · workspace · 输入/输出 tensor 地址</text>
+          <text x="705" y="518" text-anchor="middle" font-size="11" fill="#a16207">stream 任务队列 · event / notify 同步资源 · OPP 算子信息库</text>
+
+          <!-- data plane: AI Core kernel -->
+          <rect x="250" y="280" width="500" height="110" rx="8" fill="#ecfdf3" stroke="#059669" stroke-width="2"/>
+          <text x="500" y="306" text-anchor="middle" font-size="14" font-weight="800" fill="#047857">AI Core kernel · 多 block 并行</text>
+          <g font-size="11.5" font-weight="600" fill="#065f46">
+            <rect x="270" y="320" width="140" height="52" rx="6" fill="#fff" stroke="#86efac"/>
+            <text x="340" y="342" text-anchor="middle">CopyIn</text>
+            <text x="340" y="360" text-anchor="middle" font-size="10" fill="#64748b">GM → UB · MTE2</text>
+            <rect x="430" y="320" width="140" height="52" rx="6" fill="#fff" stroke="#86efac"/>
+            <text x="500" y="342" text-anchor="middle">Compute</text>
+            <text x="500" y="360" text-anchor="middle" font-size="10" fill="#64748b">Vector / Cube</text>
+            <rect x="590" y="320" width="140" height="52" rx="6" fill="#fff" stroke="#86efac"/>
+            <text x="660" y="342" text-anchor="middle">CopyOut</text>
+            <text x="660" y="360" text-anchor="middle" font-size="10" fill="#64748b">UB → GM · MTE3</text>
+          </g>
+
+          <!-- runtime launch arrow -->
+          <path d="M785 102 L785 150 L500 150 L500 274" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+          <rect x="540" y="133" width="210" height="30" rx="6" fill="#eff6ff" stroke="#3b82f6"/>
+          <text x="645" y="153" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d4ed8">stream 上 launch kernel 任务</text>
+
+          <!-- AI core reads GM -->
+          <path d="M790 478 L790 420 L760 420 L760 392" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arg)"/>
+          <text x="900" y="445" text-anchor="middle" font-size="11" fill="#64748b">读取 GM_ADDR + tiling</text>
+
+          <!-- write back -->
+          <path d="M500 392 L500 440 L300 440 L300 474" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arg)"/>
+          <text x="380" y="460" text-anchor="middle" font-size="11" fill="#64748b">写回输出 tensor</text>
+
+          <!-- return -->
+          <path d="M1100 478 L1100 71 L1166 71" stroke="#94a3b8" stroke-width="1.6" fill="none" stroke-dasharray="5 4"/>
+          <text x="1095" y="300" text-anchor="middle" font-size="11" fill="#94a3b8" transform="rotate(90 1095 300)">stream 同步 / 异步返回</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">蓝线是控制面调用链（Python → C++ → Runtime → CPU 控制侧）；橙色主线是 CPU 把“订单”写入共享内存；绿色是 AI Core 在 stream 上被拉起后独立执行 kernel。CPU 侧不会进入绿色框逐条指挥。</div>
+    </div>
+
+    <div class="callout"><b>两层“指令”要分清：</b><b>调度指令</b>（Runtime/CPU 侧可见）说的是“启动哪个 kernel、多少核、在哪个 stream、依赖谁”；<b>AI Core 指令</b>（设备 kernel 内部）才是“MTE2 搬入、Vector/Cube 计算、MTE3 搬出、SetFlag/WaitFlag 同步”。</div>
+  </section>
+
+  <!-- ============ THREE LAYER ============ -->
+  <section class="floor" id="three-layer">
+    <div class="kicker">Concept 03 · 代码结构</div>
+    <h2>一个算子，在代码里被拆成三层</h2>
+    <p class="lead">在 <code>cann-recipes-infer-master/ops/ascendc</code> 下，一个融合算子通常拆成 op_host（控制面）、op_kernel（数据面）和 torch_ops_extension（框架接入）三块。这不是炫技，而是同时服务易用性、正确性和性能。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">框架接入</div>
+        <div class="arch-boxes">
+          <div class="arch-box">csrc/ · PyTorch NPU 实现注册，调用 ACLNN</div>
+          <div class="arch-box">converter/ · torch.compile 图模式转 GE custom_op</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">op_host 控制面</div>
+        <div class="arch-boxes">
+          <div class="arch-box">算子注册 / 声明输入输出 attr</div>
+          <div class="arch-box">InferShape 输出形状推导</div>
+          <div class="arch-box">Tiling 切分 + 平台信息读取</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">op_kernel 数据面</div>
+        <div class="arch-boxes">
+          <div class="arch-box">__global__ __aicore__ kernel 入口</div>
+          <div class="arch-box">GET_TILING_DATA 读取切分参数</div>
+          <div class="arch-box">CopyIn / Compute / CopyOut 实现</div>
+        </div>
+      </div>
+      <div class="arch-note">以 <code>RmsNormDynamicQuant</code> 为例：<code>rms_norm_dynamic_quant_def.cpp</code> 声明输入输出并用 <code>AICore().AddConfig("ascend910b")</code> 声明这是 AI Core 算子；<code>..._tiling.cpp</code> 读 shape/dtype/UB 大小/核数，调用 <code>SetBlockDim</code>、<code>SetTilingKey</code> 并把 tiling 存入 raw buffer；<code>..._kernel.cpp</code> 里 kernel 通过 <code>GET_TILING_DATA</code> 与 <code>TILING_KEY_IS(1/2/3)</code> 选择实现分支。</div>
+    </div>
+
+    <table>
+      <thead><tr><th style="width:14%">阶段</th><th>解决的问题</th><th style="width:38%">交付物</th></tr></thead>
+      <tbody>
+        <tr><td><b>注册</b></td><td>“这个产品叫什么，支持什么输入输出？”</td><td>op type、dtype、format、attr、SoC 支持</td></tr>
+        <tr><td><b>InferShape</b></td><td>“用户给了这些输入，输出长什么样？”</td><td>输出 shape / dtype</td></tr>
+        <tr><td><b>Tiling</b></td><td>“这次请求怎么切，多少核跑，每核跑多少？”</td><td>blockDim、tilingKey、tilingData、workspace size</td></tr>
+        <tr><td><b>Kernel</b></td><td>“每个 AI Core 拿到一块活后怎么干？”</td><td>AI Core 指令流水</td></tr>
+        <tr><td><b>Framework 接入</b></td><td>“PyTorch 用户怎么调到它？”</td><td><code>torch.ops.custom.xxx</code>、converter、ACLNN 调用</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ WHAT TRANSFERS ============ -->
+  <section class="floor" id="what-transfers">
+    <div class="kicker">Concept 04 · 传递内容</div>
+    <h2>AI CPU 到 AI Core，到底传了什么</h2>
+    <p class="lead">CPU 侧没有直接传“VADD 指令”给 AI Core。它传的是一份 kernel 任务的“订单”——七类参数共同描述这次任务该怎么跑。AI Core 拿到订单后，按 kernel 代码和 tiling 参数独立执行。</p>
+    <table>
+      <thead><tr><th style="width:18%">传递内容</th><th>作用</th><th style="width:34%">代码信号</th></tr></thead>
+      <tbody>
+        <tr><td><b>kernel 选择</b></td><td>选哪个 op、哪个 SoC、哪个 binary / 实现</td><td><code>AICore().AddConfig(...)</code>、OPP 包</td></tr>
+        <tr><td><b>blockDim</b></td><td>启动多少个 AI Core block</td><td><code>SetBlockDim(...)</code>、kernel 里 <code>GetBlockIdx()</code></td></tr>
+        <tr><td><b>tilingKey</b></td><td>选择 kernel 内哪条实现分支</td><td><code>SetTilingKey(...)</code>、<code>TILING_KEY_IS(...)</code></td></tr>
+        <tr><td><b>tilingData</b></td><td>每核 / 每循环 / 每 tile 的切分参数</td><td><code>SaveToBuffer(...)</code>、<code>GET_TILING_DATA(...)</code></td></tr>
+        <tr><td><b>workspace size</b></td><td>临时内存需求</td><td><code>GetWorkspaceSizes(...)</code></td></tr>
+        <tr><td><b>tensor 地址</b></td><td>输入输出的 GM 地址</td><td><code>GM_ADDR</code>、<code>GlobalTensor.SetGlobalBuffer(...)</code></td></tr>
+        <tr><td><b>stream / event / notify</b></td><td>调度顺序和跨任务同步</td><td><code>aclrtStream</code>、<code>SetAttachedStreamInfos</code> / <code>SetSyncResInfos</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>把它当一张订单看：</b>kernel 选择 = 选哪条产线，blockDim = 开几条流水线，tilingKey = 走哪个工艺分支，tilingData = 每批做多少，workspace = 备料区，tensor 地址 = 原料和成品货位，stream/event = 排产与交接顺序。</div>
+  </section>
+
+  <!-- ============ AICORE PIPELINES ============ -->
+  <section class="floor" id="aicore-pipelines">
+    <div class="kicker">Concept 05 · 硬件流水</div>
+    <h2>AI Core 内部真正执行的是什么指令</h2>
+    <p class="lead"><code>asc-devkit</code> 文档把 AI Core 上的流水分成多类。C API 是指令层 API，直接对应一条或多条硬件指令——<code>asc_copy_gm2ub_sync</code> 走 MTE2、<code>asc_add_sync</code> 走 V、<code>asc_copy_ub2gm_sync</code> 走 MTE3。</p>
+    <div class="matrix">
+      <div class="ok"><b>PIPE_S</b><br>标量 / 控制流水 · 标量计算、控制类操作</div>
+      <div class="ok"><b>PIPE_V</b><br>Vector 流水 · Add / Mul / Exp / Reduce</div>
+      <div class="ok"><b>PIPE_M</b><br>Cube / 矩阵流水 · Matmul / MMAD</div>
+      <div class="warn"><b>PIPE_MTE2</b><br>搬入流水 · GM → UB / L1 / L0</div>
+      <div class="warn"><b>PIPE_MTE3</b><br>搬出流水 · UB / L1 → GM</div>
+      <div class="warn"><b>PIPE_MTE1</b><br>内部搬运 · L1 → L0A / L0B / UB</div>
+      <div class="ok"><b>PIPE_FIX</b><br>Fixpipe · Cube 结果搬出 / 格式处理</div>
+      <div><b>计算流水</b><br>S / V / M / FIX 负责“算”</div>
+      <div><b>搬运流水</b><br>MTE1 / 2 / 3 负责“搬”</div>
+    </div>
+    <h3 style="margin-top:26px">AI Core 高性能来自三件事</h3>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>多核并行</h3>
+        <p><code>blockDim</code> 决定启动多少个 block，kernel 内用 <code>GetBlockIdx()</code> 找到当前核处理的数据范围。</p>
+      </div>
+      <div class="card">
+        <h3>核内流水并行</h3>
+        <p>CopyIn、Compute、CopyOut 可分别走 MTE2、V/Cube、MTE3，互不阻塞地流水起来。</p>
+      </div>
+      <div class="card">
+        <h3>局部内存复用</h3>
+        <p>数据从 GM 搬到 UB / L1 / L0 后，在 AI Core 内部高带宽处理，最后再写回 GM。</p>
+      </div>
+    </div>
+    <div class="callout"><b>开发者写的是抽象形式：</b><code>DataCopy</code>、<code>Add</code>、<code>TPipe/TQue</code>、<code>asc_add</code>、<code>asc_sync</code>。编译器和 CANN 工具链把它们变成 AI Core 能执行的设备指令。</div>
+  </section>
+
+  <!-- ============ MENTAL MODEL ============ -->
+  <section class="floor" id="mental-model">
+    <div class="kicker">Concept 06 · 最小心智模型</div>
+    <h2>CopyIn → Compute → CopyOut</h2>
+    <p class="lead">Ascend C 入门 Add 示例的核心逻辑就是这条三步链。绝大多数 AI Core 算子都是它的扩展——复杂算子只是把它扩成更多 tile、更多 pipeline、更多分支、更多临时 buffer。</p>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">AI Core 算子底层套路</span></div>
+      <div class="mb">  Global Memory 输入 x / y
+          <span class="purple">|</span>
+          <span class="hint">| CopyIn : MTE2 搬入</span>
+          <span class="purple">v</span>
+  Local Memory / UB
+          <span class="purple">|</span>
+          <span class="hint">| Compute : Vector 或 Cube 计算</span>
+          <span class="purple">v</span>
+  Local Memory / UB
+          <span class="purple">|</span>
+          <span class="hint">| CopyOut : MTE3 搬出</span>
+          <span class="purple">v</span>
+  Global Memory 输出 z</div>
+    </div>
+    <div class="callout"><b>Tiling 解决的核心体验问题：</b>用户希望“输入一个大 tensor、拿到一个结果”；硬件实际需要把大 tensor 拆成很多小块，让多个 AI Core 并行搬、算、写。<b>Tiling 就是把“用户视角的大任务”转成“硬件视角的可执行任务包”。</b></div>
+  </section>
+
+  <!-- ============ AICPU ROLE ============ -->
+  <section class="floor" id="aicpu-role">
+    <div class="kicker">Concept 07 · 控制面定位</div>
+    <h2>AI CPU 是控制面，不是主算力面</h2>
+    <p class="lead">初学者容易把 AI CPU 理解成“AI Core 的老板，实时下发每条计算指令”。这不准确。更好的说法是：AI CPU 偏控制面，AI Core 偏数据面。</p>
+    <div class="tension">
+      <div><b>AI CPU 偏控制面</b><span>适合分支多、控制复杂、shape / tiling / 同步 / 调度类工作，或执行 AI CPU 算子。</span></div>
+      <div><b>AI Core 偏数据面</b><span>适合高吞吐、规则化、批量的 tensor 计算。核心向量 / 矩阵算力都落在这里。</span></div>
+      <div><b>分工是工具链层面的</b><span><code>opbuild</code> 提供 <code>--aicpu</code>、<code>--aicore</code>、<code>--hostcpu</code> 三种生成模式，CANN 把它们视为不同执行后端。</span></div>
+    </div>
+    <p style="margin-top:20px"><code>op_proto_generator.cpp</code> 里出现了 <code>TILING_ON_HOST</code> 和 <code>TILING_ON_AICPU</code> 的 placement 生成逻辑——说明 tiling 可以有 Host / AI CPU 侧的位置差异。普通融合算子里 tiling 常在 CPU 侧准备参数；图模式或设备侧编排场景下，tiling/control 可能放到 AI CPU 上。</p>
+
+    <h3 style="margin-top:24px">PTO / KFC：AI CPU 参与编排的更明显信号</h3>
+    <p><code>ops/pypto</code> 的 PTO 算子比普通 Ascend C 算子更能看到 AI CPU 参与控制的痕迹。例如 <code>lightning_indexer_pto/op_host/lightning_indexer_proto.cpp</code> 里设置了 attached stream 名称 <code>pto aicpu kfc server</code>、reuse key <code>pto kfc_stream</code>、sync resource <code>SYNC_RES_NOTIFY</code>。</p>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">普通算子 vs PTO/KFC 类复杂图算子</span></div>
+      <div class="mb"><span class="green">普通 AI Core 算子：</span>
+  CPU 侧算好 tiling ──▶ stream 上启动 AI Core kernel ──▶ AI Core 写回输出
+
+<span class="yellow">PTO / KFC 类复杂图算子：</span>
+  需要一个设备侧控制服务 / 附加 stream
+  协调多个 kernel、同步资源、动态 tile 或多阶段执行
+  <span class="hint">→ AI CPU 更像“设备侧执行协调员”</span></div>
+    </div>
+    <div class="callout"><b>边界要记住：</b>这类场景中 AI CPU 参与调度和同步，但核心矩阵 / 向量吞吐<b>仍主要落在 AI Core kernel 上</b>。它是协调员，不是算力主力。</div>
+  </section>
+
+  <!-- ============ FRAMEWORK ============ -->
+  <section class="floor" id="framework">
+    <div class="kicker">Framework · 上手框架</div>
+    <h2>读代码顺序 · 控制面/数据面判断 · 易混点</h2>
+    <p class="lead">把前面的概念收成三件可直接用的工具：一条读码路径、一张代码归属判断表、八个必须拆清的易混点。</p>
+
+    <h3>建议初学者按这条路径读代码</h3>
+    <div class="journey">
+      <div class="stage"><b>1 docs/*.md</b><span>确认算子功能、输入输出、约束</span></div>
+      <div class="stage"><b>2 csrc/&lt;op&gt;.cpp</b><span>看 Python 用户怎么调、输出 tensor 怎么构造</span></div>
+      <div class="stage"><b>3 op_host/&lt;op&gt;_def.cpp</b><span>看 op type、dtype、format、SoC 支持</span></div>
+      <div class="stage"><b>4 op_host/&lt;op&gt;_tiling.cpp</b><span>看 shape 如何转成 blockDim / tilingKey / tilingData / workspace</span></div>
+      <div class="stage"><b>5 op_kernel/&lt;op&gt;.cpp</b><span>看每个 block 如何 CopyIn / Compute / CopyOut</span></div>
+      <div class="stage"><b>原则</b><span>不要一上来就钻 kernel 优化</span></div>
+    </div>
+
+    <h3 style="margin-top:26px">一个实用判断：这段代码属于控制面还是数据面</h3>
+    <table>
+      <thead><tr><th>你看到的代码</th><th style="width:40%">多半属于</th></tr></thead>
+      <tbody>
+        <tr><td><code>REG_OP</code>、<code>OpDef</code>、<code>InferShape</code>、<code>InferDataType</code></td><td>控制面</td></tr>
+        <tr><td><code>SetBlockDim</code>、<code>SetTilingKey</code>、<code>SaveToBuffer</code></td><td>控制面到数据面的参数桥</td></tr>
+        <tr><td><code>extern "C" __global__ __aicore__</code></td><td>数据面入口</td></tr>
+        <tr><td><code>GET_TILING_DATA</code>、<code>TILING_KEY_IS</code></td><td>数据面读取控制面参数</td></tr>
+        <tr><td><code>DataCopy</code>、<code>TPipe</code>、<code>TQue</code>、<code>LocalTensor</code></td><td>AI Core 核内数据流</td></tr>
+        <tr><td><code>asc_add</code>、<code>asc_mmad</code>、<code>SetFlag</code> / <code>WaitFlag</code></td><td>AI Core 指令抽象</td></tr>
+        <tr><td><code>EXEC_NPU_CMD_V1(aclnn...)</code></td><td>框架到 CANN runtime 的调用桥</td></tr>
+        <tr><td><code>torchair.ge.custom_op(...)</code></td><td>图模式 converter</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:26px">初学者最容易混淆的 8 个点</h3>
+    <div class="dense-grid">
+      <div class="dense-card"><h4>1 · op_host ≠ 独占某 CPU</h4><p>它是“算子控制面代码”的目录名，运行位置取决于图执行、tiling placement 和算子类型。</p></div>
+      <div class="dense-card"><h4>2 · AI CPU 不做高吞吐计算</h4><p>核心逻辑是大规模向量 / 矩阵计算时，目标应是 AI Core。</p></div>
+      <div class="dense-card"><h4>3 · AddConfig 是声明后端</h4><p><code>AICore().AddConfig(...)</code> 告诉 CANN 这个 op 有 AI Core 实现并支持哪些 SoC。</p></div>
+      <div class="dense-card"><h4>4 · blockDim ≠ tensor shape</h4><p>shape 是用户数据形状，blockDim 是这次任务启用多少个 AI Core block。</p></div>
+      <div class="dense-card"><h4>5 · tilingKey 是分支选择器</h4><p>常用来区分 normal、single row、slice D 等实现路径。</p></div>
+      <div class="dense-card"><h4>6 · GM 不是高速工作区</h4><p>GM 是全局内存；高性能通常要求把数据搬到 UB / L1 / L0 再算。</p></div>
+      <div class="dense-card"><h4>7 · 同步不是默认全自动</h4><p><code>TQue/TPipe</code> 简化队列同步；低层或手写 pipeline 仍要懂 <code>MTE2_V</code>、<code>V_MTE3</code>、<code>PipeBarrier</code>。</p></div>
+      <div class="dense-card"><h4>8 · 框架调通 ≠ kernel 高效</h4><p>PyTorch 自定义 op 和 AI Core kernel 是两层交付物；kernel 高效还需注册、converter、安装 OPP/whl。</p></div>
+    </div>
+  </section>
+
+  <!-- ============ FINDINGS ============ -->
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 最终判断</div>
+    <h2>结论与给初学者的行动建议</h2>
+    <p class="lead">同一个算子被拆成很多层，不是复杂炫技，而是 CANN/Ascend C 在同时平衡三类用户诉求：算法开发者想快、算子开发者想稳、性能工程师想榨干硬件。</p>
+    <div class="tension">
+      <div><b>核心张力</b><span>用户要的是“一个大 tensor 进、一个结果出”；硬件要的是切块、多核并行、局部内存复用。中间靠 tiling 与控制面把两种视角对齐。</span></div>
+      <div><b>优化方向</b><span>先建立“控制面下单、数据面执行”的分工认知，再按 docs → csrc → def → tiling → kernel 的顺序读码，最后才进 kernel 性能优化。</span></div>
+      <div><b>局限性</b><span>AI CPU 始终是控制 / 协调角色，无法替代 AI Core 承担高吞吐算力；PTO/KFC 编排能力强，但矩阵向量吞吐仍压在 AI Core 上。</span></div>
+    </div>
+    <div class="rec-grid" style="margin-top:22px">
+      <div class="rec-panel">
+        <h3>上手阶段建议</h3>
+        <div class="rec-item"><div class="rec-num">01</div><div><b>先认角色，再认代码</b><span>记住 CPU 编排 / AI Core 计算 / 内存调度协同的三分，再去看目录。</span></div></div>
+        <div class="rec-item"><div class="rec-num">02</div><div><b>用判断表给代码归类</b><span>看到一段代码先判断它属控制面、参数桥还是数据面，定位会快很多。</span></div></div>
+        <div class="rec-item"><div class="rec-num">03</div><div><b>从 Add 示例吃透三步链</b><span>CopyIn → Compute → CopyOut 是几乎所有算子的骨架。</span></div></div>
+      </div>
+      <div class="rec-panel">
+        <h3>进阶阶段方向</h3>
+        <div class="rec-item"><div class="rec-num">04</div><div><b>理解 tiling 是任务翻译器</b><span>把用户大 tensor 切成 AI Core 可消费的任务包，是性能起点。</span></div></div>
+        <div class="rec-item"><div class="rec-num">05</div><div><b>掌握流水与同步</b><span>多核并行、核内流水、局部内存复用三件事决定 AI Core 性能上限。</span></div></div>
+        <div class="rec-item"><div class="rec-num">06</div><div><b>读 PTO/KFC 看设备侧编排</b><span>attached stream、sync notify 是 AI CPU 参与调度的明显信号。</span></div></div>
+      </div>
+    </div>
+    <div class="callout"><b>只记一句话：</b>AI CPU 和 AI Core 的关系不是“逐条指令遥控”，而是“控制面准备任务、数据面执行 kernel；通过 stream、GM、tiling、workspace 和同步资源协同”。</div>
+  </section>
+
+  <!-- ============ PRODUCT PRD ============ -->
+  <section class="floor" id="product-prd">
+    <div class="kicker">Product Definition · 指令可视化系统</div>
+    <h2>把心智模型做成一个可操作的工作台</h2>
+    <p class="lead">前面的白皮书解决“AI CPU 与 AI Core 怎么协同”的认知问题；产品化的下一步，是把这套认知转成一个联动可视化系统，让用户从 kernel 源码出发，看见控制面任务订单、AI Core 指令流水和芯片架构路径之间的关系。</p>
+
+    <div class="callout"><b>产品定义：</b>指令可视化系统是一个面向昇腾算子开发与性能优化的工作台。它把 kernel 源代码、CANN 控制面任务参数、AI Core 指令流水、芯片架构图放到同一个界面里，让用户点击一行代码，就能同步看到这行代码落在哪条硬件路径、使用哪些流水单元、依赖哪些 tiling / stream / GM / workspace 参数，以及下一步应该如何优化。</div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>产品目标</h3>
+        <p>在 30 秒内理解一个 kernel 的关键执行路径，在 2 分钟内从一行源码定位到对应硬件路径和性能风险，在 10 分钟内完成一次初步瓶颈判断。</p>
+      </div>
+      <div class="card">
+        <h3>业务目标</h3>
+        <p>降低 Ascend C / CANN 算子开发入门门槛，提升 910B 到 950 / 950B 迁移解释能力，把 kernel 优化从专家经验推进到源码、架构、tiling、pipeline 的证据联动。</p>
+      </div>
+      <div class="card">
+        <h3>产品原则</h3>
+        <p>源码是入口，架构图常驻，联动优先于堆指标；控制面和数据面必须同时可见，优化建议必须先给解释和证据。</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:26px">用户定义</h3>
+    <table>
+      <thead><tr><th style="width:20%">用户</th><th style="width:22%">典型水平</th><th>核心问题</th><th style="width:28%">产品价值</th></tr></thead>
+      <tbody>
+        <tr><td><b>算子开发初学者</b></td><td>刚开始读 Ascend C / CANN</td><td><code>op_host</code>、<code>op_kernel</code>、AI CPU、AI Core 到底怎么分工？</td><td>建立可落地心智模型，知道按什么顺序读代码。</td></tr>
+        <tr><td><b>Kernel 开发工程师</b></td><td>能写 kernel，但调优经验有限</td><td>这行 <code>DataCopy</code> / <code>Add</code> / <code>Mmad</code> 在硬件上怎么跑？</td><td>把源码行映射到指令流水和硬件路径。</td></tr>
+        <tr><td><b>性能优化工程师</b></td><td>关注 cycle、带宽、pipeline overlap</td><td>瓶颈在搬运、计算、同步、tiling 还是 tail 分支？</td><td>给出瓶颈归因、what-if 调参和优化建议。</td></tr>
+        <tr><td><b>编译器 / 工具链工程师</b></td><td>关注 lowering、intrinsic、profile 对齐</td><td>静态分析、编译结果、profile 是否一致？</td><td>提供 source-inferred、compiled、profiled 多层证据。</td></tr>
+        <tr><td><b>架构评估用户</b></td><td>不一定改代码，但要解释芯片收益</td><td>950 相比 910B 为什么更快，硬件路径差异在哪里？</td><td>用同一段 kernel 展示两代芯片路径和 cycle 差异。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ PRODUCT SCENARIOS ============ -->
+  <section class="floor" id="product-scenarios">
+    <div class="kicker">Product Scenarios · 核心使用场景</div>
+    <h2>用户不是来看架构图，而是来回答具体问题</h2>
+    <p class="lead">指令可视化系统要服务的是 kernel 研发和调优现场。每个场景都必须把“用户要问的问题”落到源码、控制面参数、硬件路径和 Inspector 证据上。</p>
+
+    <div class="journey">
+      <div class="stage"><b>S1 源码到指令路径</b><span>点击 <code>DataCopy</code>、<code>Add</code>、<code>Mmad</code>、<code>PipeBarrier</code>，看到 memory / compute / control 分类和对应流水。</span></div>
+      <div class="stage"><b>S2 控制面任务订单</b><span>从 <code>SetBlockDim</code>、<code>SetTilingKey</code>、workspace、stream、event / notify 理解 CPU 侧传给 AI Core 的“订单”。</span></div>
+      <div class="stage"><b>S3 性能结构诊断</b><span>围绕 CopyIn → Compute → CopyOut 查看 tile、block、GM / UB / L1 / L0 数据路径和 pipeline bubble。</span></div>
+      <div class="stage"><b>S4 910B / 950 对比</b><span>同一行源码在两代芯片上走不同 selectors / routes，Inspector 给出 cycle 差异和路径退化说明。</span></div>
+      <div class="stage"><b>S5 PTO / KFC 编排</b><span>识别 attached stream、sync resource、notify，把它们归入设备侧控制编排，而不是普通 AI Core 计算。</span></div>
+      <div class="stage"><b>S6 Review 报告</b><span>导出源码片段、硬件路径、tiling、pipeline、建议和证据，供 code review 或教学复盘。</span></div>
+    </div>
+
+    <div class="callout"><b>场景边界：</b>这个系统不替代 IDE，也不在 P0 自动改代码。它负责把“为什么这样跑、瓶颈在哪里、下一步怎么查”解释清楚，并把证据留给 reviewer。</div>
+  </section>
+
+  <!-- ============ VISUAL WORKBENCH ============ -->
+  <section class="floor" id="visual-workbench">
+    <div class="kicker">Product Shape · 三栏联动工作台</div>
+    <h2>首屏必须是可操作工作台，不是说明页</h2>
+    <p class="lead">参考 Ascend 950 Workbench Demo，产品形态采用三栏联动：左侧源码，中间硬件架构图，右侧 Inspector。用户的主动作是点击源码行，系统同步刷新硬件路径与解释。</p>
+
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>指令路径工作台 · 首屏结构</div>
+      <div class="shotbody">
+        <div class="mt">
+          <div class="mtbar"><div class="mdt"></div><span class="mtt">Workbench Layout</span></div>
+          <div class="mb">顶部上下文栏
+当前 kernel / 芯片架构 / 分析层级 / 当前结论 / 导出
+
+┌──────────────────────┬──────────────────────────────┬──────────────────────┐
+│ Kernel 源代码         │ 芯片架构图                     │ Inspector             │
+│ Source View           │ Hardware Architecture Map      │ Instruction Inspector │
+│                      │                              │                      │
+│ 行号 / 语法高亮        │ AIC / AIV / GM / L2 / UB       │ 当前行解释             │
+│ memory / compute 标签 │ selectors / routes 高亮         │ 任务订单 / tiling       │
+│ 文件切换 / 搜索        │ 910B / 950 compare             │ pipeline / 建议 / 证据  │
+└──────────────────────┴──────────────────────────────┴──────────────────────┘</div>
+        </div>
+      </div>
+      <div class="evidence-caption">架构图是主工作区，不能藏到 drawer、tooltip 或二级页面；它必须随源码行和 Inspector 常驻联动。</div>
+    </div>
+
+    <h3 style="margin-top:26px">Inspector 信息架构</h3>
+    <table>
+      <thead><tr><th style="width:18%">区段</th><th style="width:24%">用户问题</th><th>P0 内容</th></tr></thead>
+      <tbody>
+        <tr><td><b>A 当前对象</b></td><td>我在看哪行 / 哪个 kernel？</td><td>文件、行号、代码片段、kind、tag。</td></tr>
+        <tr><td><b>B 一句话解释</b></td><td>这行在硬件上做什么？</td><td>指令语义、控制面 / 数据面分类、路径摘要。</td></tr>
+        <tr><td><b>C 硬件路径</b></td><td>它经过哪些节点？</td><td>selectors、routes、路径 chip、910B / 950 差异。</td></tr>
+        <tr><td><b>D 指令流水</b></td><td>它占用哪条 pipeline？</td><td>MTE2 / MTE1 / Cube / Vector / Scalar / FixPipe / MTE3。</td></tr>
+        <tr><td><b>E 任务订单</b></td><td>CPU 侧传了什么？</td><td>kernel 选择、blockDim、tilingKey、tilingData、workspace、stream / event。</td></tr>
+        <tr><td><b>F Tiling</b></td><td>这次任务怎么切？</td><td>tile shape、tile count、per-block range、UB / L1 / L0 占用。</td></tr>
+        <tr><td><b>G Pipeline</b></td><td>它怎么排队执行？</td><td>泳道图、bubble、critical path、overlap。</td></tr>
+        <tr><td><b>H 建议与证据</b></td><td>我该做什么，凭什么？</td><td>对齐、double buffer、分支拆分、tile 调整、同步收窄；附规则命中、源码证据、profile 证据。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ LINKAGE MODEL ============ -->
+  <section class="floor" id="linkage-model">
+    <div class="kicker">Linkage Model · 源码到硬件路径</div>
+    <h2>联动主线：源码行 → 硬件路径 → Pipeline → 建议</h2>
+    <p class="lead">系统的核心不是做静态标注，而是建立一条可复核的证据链。每个指标、建议、路径高亮，都必须能回到源码行、控制面参数或架构节点。</p>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">输入</div>
+        <div class="arch-boxes">
+          <div class="arch-box">kernel 源码行</div>
+          <div class="arch-box">op_host / launch 参数</div>
+          <div class="arch-box">芯片架构 preset</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">分析</div>
+        <div class="arch-boxes">
+          <div class="arch-box">语义识别</div>
+          <div class="arch-box">控制面 / 数据面分类</div>
+          <div class="arch-box">selectors / routes 映射</div>
+          <div class="arch-box">pipeline lane 归因</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">输出</div>
+        <div class="arch-boxes">
+          <div class="arch-box">硬件图高亮</div>
+          <div class="arch-box">Tiling 与 Pipeline</div>
+          <div class="arch-box">Inspector 解释</div>
+          <div class="arch-box">优化建议与证据</div>
+        </div>
+      </div>
+      <div class="arch-note">正向链路用于“点代码看路径”；反向链路用于“点硬件节点查相关源码行”。</div>
+    </div>
+
+    <table>
+      <thead><tr><th style="width:25%">源码信号</th><th style="width:18%">分类</th><th style="width:30%">硬件映射</th><th>Inspector 解释</th></tr></thead>
+      <tbody>
+        <tr><td><code>DataCopy(aL1, aGM + tileOffset, ...)</code></td><td>memory</td><td>GM → L2 → MTE2 → AIC L1</td><td>预取输入 tile，关注 GM 连续读、L1 复用窗口。</td></tr>
+        <tr><td><code>MmadFp8(cL0C, aL0A, bL0B, ...)</code></td><td>compute</td><td>L1 → L0A / L0B → Cube → L0C</td><td>Cube 友好矩阵片段，关注 L0 容量和 repeat shape。</td></tr>
+        <tr><td><code>PipeBarrier&lt;PIPE_FIX&gt;()</code></td><td>control / sync</td><td>L0C → FixPipe → AIV UB</td><td>Cube 到 Vector epilogue 的顺序保护。</td></tr>
+        <tr><td><code>Add(outUb, cUb, biasUb, ...)</code></td><td>compute</td><td>AIV UB → SIMD → Vector</td><td>稠密向量计算，关注 UB 驻留和对齐。</td></tr>
+        <tr><td><code>if (mask[k])</code></td><td>control / SIMT</td><td>Scalar → SIMT scheduler → Vector</td><td>mask 依赖元素，可能形成 SIMT island。</td></tr>
+        <tr><td><code>SetBlockDim(...)</code></td><td>control plane</td><td>Kernel Launch / Block Scheduler</td><td>定义 AI Core block 并行度。</td></tr>
+        <tr><td><code>SetTilingKey(...)</code></td><td>parameter bridge</td><td>Kernel branch selector</td><td>决定 kernel 内 <code>TILING_KEY_IS</code> 分支。</td></tr>
+        <tr><td><code>SetAttachedStreamInfos(...)</code></td><td>device orchestration</td><td>stream / notify</td><td>PTO / KFC 设备侧编排信号。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ SCOPE CONTRACT ============ -->
+  <section class="floor" id="scope-contract">
+    <div class="kicker">MVP Scope · 功能范围与数据契约</div>
+    <h2>P0 先打通一条可信链路</h2>
+    <p class="lead">P0 的目标不是做全自动优化器，而是让用户点击关键源码行时，能够看到硬件路径、指令流水、任务订单、tiling、pipeline 和证据。只要这条链路可信，后续 profile、编译产物、IDE 插件才能接进来。</p>
+
+    <table>
+      <thead><tr><th style="width:18%">功能</th><th>描述</th><th style="width:34%">验收标准</th></tr></thead>
+      <tbody>
+        <tr><td><b>Kernel 项目载入</b></td><td>载入一个 kernel 示例，包含源码、架构 preset、标注数据。</td><td>可打开 Vector Add、GELU、FP8 MMAD 三类示例。</td></tr>
+        <tr><td><b>源码行级标注</b></td><td>标出 memory、compute、control、scalar、loop。</td><td>关键行点击后 Inspector 与硬件图同步刷新。</td></tr>
+        <tr><td><b>硬件路径高亮</b></td><td>根据 <code>selectors</code> 和 <code>routes</code> 高亮架构图节点与连线。</td><td>点击 <code>DataCopy</code> 能看到 GM / L2 / UB 或 L1 路径。</td></tr>
+        <tr><td><b>指令解释卡</b></td><td>展示当前行的语义、流水、原因、建议。</td><td>每个关键行必须有一句中文解释和至少一个 evidence。</td></tr>
+        <tr><td><b>控制面任务订单</b></td><td>汇总 kernel 选择、blockDim、tilingKey、tilingData、workspace、stream / event。</td><td><code>op_host</code> 与 launch 行能被归入任务订单。</td></tr>
+        <tr><td><b>Tiling 可视化</b></td><td>展示 tile shape、tile count、per-block range、片上内存占用。</td><td>调整主 tile 参数时，下游卡片刷新。</td></tr>
+        <tr><td><b>Pipeline 泳道图</b></td><td>展示 MTE / Vector / Cube / Scalar / FixPipe 时间线。</td><td>能标出 critical path 和 bubble。</td></tr>
+        <tr><td><b>910B / 950 对比</b></td><td>同一源码行在两代芯片中映射不同路径。</td><td>Compare 模式有一句明确差异结论。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:26px">输入数据与行级标注契约</h3>
+    <div class="grid cols-2">
+      <table>
+        <thead><tr><th>数据</th><th>来源</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>源码文件</td><td>用户项目 / 示例目录</td><td><code>.cpp</code>、<code>.h</code>、<code>.asc</code>、<code>.tik</code>、<code>.py</code></td></tr>
+          <tr><td>架构 preset</td><td>产品内置 / pattern</td><td>芯片节点、route、容量、显示层级。</td></tr>
+          <tr><td>行级标注</td><td>静态规则 / 人工补充 / 编译器输出</td><td>源码行到硬件路径的桥。</td></tr>
+          <tr><td>Tiling 数据</td><td><code>op_host</code> 解析 / 用户输入</td><td>blockDim、tile shape、tilingKey、workspace。</td></tr>
+          <tr><td>Profile 数据</td><td>profiler / trace</td><td>P1 消费 cycle、stall、带宽、利用率。</td></tr>
+          <tr><td>编译产物</td><td>compiler IR / lowering report</td><td>P2 展示高阶 API 到真实指令映射。</td></tr>
+        </tbody>
+      </table>
+      <div class="mt">
+        <div class="mtbar"><div class="mdt"></div><span class="mtt">line-annotation.json</span></div>
+        <div class="mb">{
+  "id": "l48",
+  "file": "op_kernel/fp8_mmad_masked_reduce.cpp",
+  "line": 48,
+  "kind": "compute",
+  "tag": "SIMD / Cube",
+  "plane": "data",
+  "instruction": {
+    "api": "MmadFp8",
+    "pipeline": ["MTE1", "Cube"]
+  },
+  "hardware": {
+    "selectors": ["#aic [data-aic-node=\"buffer:L1\"]"],
+    "routes": ["l1-to-l0", "l0-to-cube"]
+  },
+  "tiling": {
+    "tileShape": "M128 x N128 x K64",
+    "blockDim": 8,
+    "tilingKey": 2
+  },
+  "evidence": ["Cube friendly shape", "stride aligned"],
+  "recommendation": {
+    "title": "验证 L0 容量与 repeat shape",
+    "expectedImpact": "reduce compute bubble"
+  }
+}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ METRICS ACCEPTANCE ============ -->
+  <section class="floor" id="metrics-acceptance">
+    <div class="kicker">Metrics · 成功指标与验收</div>
+    <h2>产品是否有用，取决于解释是否能被复核</h2>
+    <p class="lead">指令可视化系统的成功不只是“图能亮”，而是用户能更快完成一次可信的 kernel 判断，并且每条建议都能回溯到源码、控制面参数或硬件证据。</p>
+
+    <div class="grid cols-3">
+      <div class="card metric"><strong>30s</strong><span>用户导入 kernel 后看到第一条源码到硬件路径联动</span></div>
+      <div class="card metric"><strong>10min</strong><span>新用户能说清 control plane / data plane 分工并完成初步诊断</span></div>
+      <div class="card metric"><strong>90%</strong><span>P0 示例 kernel 的 memory / compute / control 关键行覆盖率</span></div>
+    </div>
+
+    <h3 style="margin-top:26px">P0 验收清单</h3>
+    <table>
+      <thead><tr><th style="width:34%">验收项</th><th>通过标准</th></tr></thead>
+      <tbody>
+        <tr><td>首屏形态</td><td>打开产品后，同时看到源码、芯片架构图、Inspector。</td></tr>
+        <tr><td>访存路径联动</td><td>点击 <code>DataCopy</code> 行，硬件图高亮 GM / L2 / UB 或 L1 路径，Inspector 显示 MTE2 / MTE3 解释。</td></tr>
+        <tr><td>计算路径联动</td><td>点击 <code>Add</code> / <code>Mmad</code> 行，硬件图高亮 Vector 或 Cube 路径，Inspector 显示 compute pipeline。</td></tr>
+        <tr><td>控制面识别</td><td>点击 <code>SetBlockDim</code> / <code>SetTilingKey</code> 行，Inspector 将其归入控制面任务订单，而不是 AI Core 计算指令。</td></tr>
+        <tr><td>芯片对比</td><td>Compare 模式能展示同一行在 910B 与 950 的路径差异，并给出一句明确差异结论。</td></tr>
+        <tr><td>证据完整</td><td>每个关键行至少有 <code>kind</code>、<code>tag</code>、<code>path</code>、<code>pipeline</code>、<code>evidence</code>。</td></tr>
+        <tr><td>空态清晰</td><td>无路径、无 profile 或架构节点缺失时，有明确说明，不出现空白面板。</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tension" style="margin-top:22px">
+      <div><b>非目标</b><span>P0 不做真实 profile 采集，不自动改写 kernel，不替代 IDE，也不做完整 CANN 文档搜索系统。</span></div>
+      <div><b>主要风险</b><span>高阶 API、宏、模板、自定义封装可能让静态解析漏判；profile 缺失时只能给 source-inferred 估算。</span></div>
+      <div><b>产品结论</b><span>它不是把白皮书做成网页，而是把“控制面下单、数据面执行”的洞察做成可交互的工程工具。</span></div>
+    </div>
+  </section>
+
+  <!-- ============ TERMS ============ -->
+  <section class="floor" id="terms">
+    <div class="kicker">Appendix · 术语表</div>
+    <h2>术语表</h2>
+    <p class="lead">报告中出现的关键术语、定义与首次出现的楼层。专有名词保留英文。</p>
+    <table>
+      <thead><tr><th style="width:20%">术语</th><th>定义</th><th style="width:16%">位置</th></tr></thead>
+      <tbody>
+        <tr><td>Host CPU</td><td>发起调用的主机 CPU，运行 Python / PyTorch / ACL，管理 device、stream、内存</td><td>五个角色</td></tr>
+        <tr><td>AI CPU</td><td>设备侧调度 / 控制协处理器，承担部分 shape/tiling/同步/调度类任务及 AI CPU 算子</td><td>五个角色 / 控制面</td></tr>
+        <tr><td>AI Core</td><td>设备执行引擎，运行 <code>__aicore__</code> kernel，做高吞吐向量 / 矩阵计算</td><td>五个角色</td></tr>
+        <tr><td>CANN Runtime / GE</td><td>负责查 OPP 信息库、InferShape、Tiling、选 kernel 并在 stream 上下发任务的运行时</td><td>端到端链路</td></tr>
+        <tr><td>GM</td><td>Global Memory，全局内存，存放输入输出 tensor、workspace、tiling 数据</td><td>五个角色</td></tr>
+        <tr><td>UB / L1 / L0</td><td>AI Core 内部的局部高带宽工作区，单核搬入、计算、搬出在此完成</td><td>五个角色</td></tr>
+        <tr><td>op_host</td><td>算子控制面代码目录：注册、InferShape、Tiling、平台信息读取</td><td>三层结构</td></tr>
+        <tr><td>op_kernel</td><td>算子数据面代码目录：AI Core kernel 的真正计算实现</td><td>三层结构</td></tr>
+        <tr><td>Tiling</td><td>把用户视角的大 tensor 任务切成硬件可执行的小任务包的过程</td><td>心智模型</td></tr>
+        <tr><td>blockDim</td><td>本次任务启动的 AI Core block 数量，即并行度（≠ tensor shape）</td><td>传了什么</td></tr>
+        <tr><td>tilingKey</td><td>kernel 内部实现分支选择器，区分 normal / single row / slice D 等路径</td><td>传了什么</td></tr>
+        <tr><td>tilingData</td><td>每核 / 每循环 / 每 tile 的切分参数，存入 raw tiling buffer</td><td>传了什么</td></tr>
+        <tr><td>workspace</td><td>kernel 执行所需的临时内存，大小由 <code>GetWorkspaceSizes</code> 给出</td><td>传了什么</td></tr>
+        <tr><td>stream</td><td>任务队列，决定 kernel 任务的调度顺序</td><td>端到端链路</td></tr>
+        <tr><td>event / notify</td><td>跨任务同步资源，PTO 中以 <code>SYNC_RES_NOTIFY</code> 等形式出现</td><td>控制面</td></tr>
+        <tr><td>PIPE_V / PIPE_M / PIPE_S</td><td>AI Core 上的 Vector / Cube 矩阵 / 标量计算流水</td><td>指令流水</td></tr>
+        <tr><td>MTE1 / MTE2 / MTE3</td><td>AI Core 上的内部搬运 / 搬入（GM→UB）/ 搬出（UB→GM）流水</td><td>指令流水</td></tr>
+        <tr><td>CopyIn / Compute / CopyOut</td><td>AI Core 算子的最小三步链：搬入 → 计算 → 搬出</td><td>心智模型</td></tr>
+        <tr><td>OPP</td><td>算子信息库 / 算子包，CANN 据此查找算子注册信息与 binary 实现</td><td>端到端链路</td></tr>
+        <tr><td>PTO / KFC</td><td>需要设备侧控制服务、附加 stream 协调多 kernel 的复杂图算子编排场景</td><td>控制面</td></tr>
+        <tr><td>ACLNN</td><td>CANN 提供的算子调用封装层，<code>EXEC_NPU_CMD_V1(aclnnXxx, ...)</code> 经此发起</td><td>端到端链路</td></tr>
+        <tr><td>converter</td><td>torch.compile / 图模式下把 PyTorch op 转成 GE custom_op 的转换器</td><td>三层结构</td></tr>
+        <tr><td>Instruction Visualizer</td><td>指令路径工作台，把 kernel 源码、控制面任务参数、AI Core 指令流水和芯片架构图联动展示</td><td>产品化</td></tr>
+        <tr><td>Inspector</td><td>右侧解释面板，围绕当前源码行或当前 kernel 展示硬件路径、指令流水、任务订单、tiling、pipeline、建议和证据</td><td>工作台</td></tr>
+        <tr><td>selectors / routes</td><td>源码行标注映射到架构图的节点选择器和路径 id，是源码与硬件图联动的稳定契约</td><td>联动模型</td></tr>
+        <tr><td>source-inferred</td><td>仅基于源码和静态规则推断的解释层级；无 profile 数据时可以使用，但不能给强性能结论</td><td>指标与验收</td></tr>
+      </tbody>
+    </table>
+    <div class="source-card">
+      <b>本地参考入口</b>
+      <ul class="source-list" style="margin:0;padding-left:20px">
+        <li><code>asc-devkit-master/docs/asc_how_to_choose_api.md</code> — Ascend C API 层级选择</li>
+        <li><code>asc-devkit-master/docs/asc_c_api_contributing.md</code> — C API 指令层说明</li>
+        <li><code>asc-devkit-master/docs/api/c_api/README.md</code> — C API 流水类型</li>
+        <li><code>asc-devkit-master/docs/guide/入门教程/快速入门/基于SIMD编程/Add自定义算子开发.md</code> — Ascend C Add 入门</li>
+        <li><code>cann-recipes-infer-master/ops/ascendc/src/rms_norm_dynamic_quant/</code> — RMSNormDynamicQuant 三层示例</li>
+        <li><code>cann-recipes-infer-master/ops/pypto/src/lightning_indexer_pto/</code> — PTO/KFC 调度信号</li>
+        <li><code>ai-cpu-aicore/INSTRUCTION_VISUALIZATION_PRD.md</code> — 指令可视化系统 PRD</li>
+        <li><code>ascend-950-workbench-demo/index.html</code> — 三栏联动工作台参考原型</li>
+      </ul>
+    </div>
+  </section>
+</body>
+</html>

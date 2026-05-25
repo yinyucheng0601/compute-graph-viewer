@@ -1,0 +1,2505 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>指令路径工作台 Demo</title>
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../patterns/floating-playback-control/pattern.css">
+  <link rel="stylesheet" href="../patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../patterns/memory-architecture/pattern.css">
+  <style>
+    :root {
+      --pto-aiv-core-shadow: none;
+      --pto-aic-core-shadow: none;
+      --pto-aiv-panel-highlight: none;
+      --pto-aic-panel-highlight: none;
+      --floating-playback-shadow: none;
+      --floating-playback-inner-highlight: none;
+      --floating-playback-scrubber-thumb-shadow: none;
+    }
+
+    body {
+      min-width: 1440px;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+
+    * {
+      scrollbar-color: color-mix(in srgb, var(--surface-4) 82%, transparent) color-mix(in srgb, var(--surface-1) 72%, transparent);
+      scrollbar-width: thin;
+    }
+
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+      border-radius: var(--radius-pill);
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--surface-4) 82%, transparent);
+      border: 2px solid color-mix(in srgb, var(--surface-1) 72%, transparent);
+      border-radius: var(--radius-pill);
+    }
+
+    .iv-page {
+      --iv-page-inset-x: 8px;
+      --iv-page-inset-top: 8px;
+      --iv-page-inset-bottom: 8px;
+      --iv-pane-gap: 8px;
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 58px minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .workbench-shell-header {
+      min-height: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 12px;
+      background: color-mix(in srgb, var(--background) 94%, transparent);
+      border-bottom: 0;
+      backdrop-filter: blur(14px);
+    }
+
+    .layout-header-left,
+    .layout-header-right {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .layout-header-left {
+      flex: 1 1 auto;
+      overflow: hidden;
+    }
+
+    .layout-header-right {
+      flex: 0 0 auto;
+      margin-left: auto;
+      justify-content: flex-end;
+    }
+
+    .iv-brand {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .iv-home-btn {
+      flex: 0 0 auto;
+      text-decoration: none;
+    }
+
+    .iv-title {
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .iv-subtitle {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .iv-main {
+      --pto-workbench-shell-gutter: var(--iv-pane-gap);
+      min-height: 0;
+      width: 100%;
+      padding: var(--iv-page-inset-top) var(--iv-page-inset-x) var(--iv-page-inset-bottom);
+      box-sizing: border-box;
+      flex-direction: row;
+      align-items: stretch;
+    }
+
+    #sourcePane,
+    #rightPane,
+    #rightSplit,
+    #archPane,
+    #execPane {
+      margin: 0;
+    }
+
+    #sourcePane,
+    #rightPane {
+      height: 100%;
+    }
+
+    #mainSplit > .pto-workbench-shell__split-gutter {
+      flex-basis: var(--iv-pane-gap);
+      min-width: var(--iv-pane-gap);
+      cursor: col-resize;
+    }
+
+    #mainSplit > .pto-workbench-shell__split-gutter::before {
+      width: 3px;
+      height: 44px;
+    }
+
+    .iv-right-split {
+      min-width: 0;
+      min-height: 0;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #rightSplit {
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      padding: 0 !important;
+      background: transparent;
+      gap: 0;
+    }
+
+    #rightPane {
+      background: transparent;
+      border-radius: 0;
+    }
+
+    #rightSplit > .iv-panel {
+      width: 100% !important;
+      max-width: none;
+      box-sizing: border-box;
+    }
+
+    #rightSplit > .pto-workbench-shell__split-gutter {
+      flex-basis: var(--iv-pane-gap);
+      width: 100%;
+      min-width: 0;
+      min-height: var(--iv-pane-gap);
+      cursor: row-resize;
+    }
+
+    #rightSplit > .pto-workbench-shell__split-gutter::before {
+      width: 44px;
+      height: 3px;
+    }
+
+    .iv-panel {
+      flex: 0 0 auto;
+    }
+
+    .iv-header-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .iv-panel-kicker {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .iv-chip,
+    .mode-tag,
+    .reason-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: var(--tag-height);
+      padding: 0 var(--space-2);
+      border-radius: var(--tag-radius);
+      border: 1px solid var(--comp-tag-border);
+      background: var(--comp-tag-bg);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .iv-chip strong {
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    #selectedPathChip {
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .panel-shell-meta .toolbar-control {
+      flex: 0 0 auto;
+    }
+
+    .iv-chip.is-control {
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+      background: color-mix(in srgb, var(--warning) 10%, transparent);
+    }
+
+    .iv-chip.is-data {
+      color: var(--success);
+      border-color: color-mix(in srgb, var(--success) 26%, transparent);
+      background: color-mix(in srgb, var(--success) 9%, transparent);
+    }
+
+    .kernel-select-wrap {
+      min-width: 0;
+      position: relative;
+    }
+
+    .kernel-select {
+      width: min(100%, 330px);
+      min-height: 30px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+      padding: 0 34px 0 var(--space-2);
+      appearance: none;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kernel-select-wrap::after {
+      content: "⌄";
+      position: absolute;
+      right: var(--space-2);
+      top: 50%;
+      transform: translateY(-52%);
+      color: var(--foreground-muted);
+      pointer-events: none;
+      font: 700 14px / 1 var(--font-sans);
+    }
+
+    .kernel-source-link {
+      width: fit-content;
+      max-width: 100%;
+      color: var(--primary-hover);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kernel-source-link:hover {
+      text-decoration: underline;
+    }
+
+    .wb-source-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-3) 0;
+    }
+
+    .source-line {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) auto;
+      gap: var(--space-3);
+      padding: 1px 0;
+      position: relative;
+      align-items: baseline;
+    }
+
+    .source-line-tag {
+      align-self: center;
+      margin-right: var(--space-3);
+    }
+
+    .source-line-tag-empty {
+      min-width: 1px;
+    }
+
+    .tk-comment { color: var(--foreground-muted); font-style: italic; }
+    .tk-keyword { color: color-mix(in srgb, var(--primary-hover) 80%, var(--foreground)); }
+    .tk-type { color: color-mix(in srgb, var(--accent) 78%, var(--foreground)); }
+    .tk-string { color: color-mix(in srgb, var(--success) 78%, var(--foreground)); }
+    .tk-number { color: color-mix(in srgb, var(--warning) 78%, var(--foreground)); }
+    .tk-fn { color: color-mix(in srgb, var(--primary-hover) 72%, var(--foreground)); }
+
+    .source-line-no {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      text-align: right;
+      user-select: none;
+      padding-right: var(--space-2);
+      opacity: 0.55;
+    }
+
+    .source-line-code {
+      color: color-mix(in srgb, var(--foreground) 88%, transparent);
+      font: 500 12px / 1.5 var(--font-mono);
+      white-space: pre;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: var(--space-3);
+    }
+
+    .source-line.is-key {
+      cursor: pointer;
+    }
+
+    .source-line.is-key::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--surface-4);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .source-line.is-key:hover {
+      background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+    }
+
+    .source-line.is-key.is-compute::before,
+    .mode-tag.is-compute {
+      color: var(--success);
+      border-color: color-mix(in srgb, var(--success) 26%, transparent);
+      background: color-mix(in srgb, var(--success) 9%, transparent);
+    }
+
+    .source-line.is-key.is-memory::before,
+    .mode-tag.is-memory {
+      color: var(--primary-hover);
+      border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+      background: color-mix(in srgb, var(--primary) 12%, transparent);
+    }
+
+    .source-line.is-key.is-control::before,
+    .mode-tag.is-control {
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+      background: color-mix(in srgb, var(--warning) 10%, transparent);
+    }
+
+    .source-line.is-key.is-compute::before { background: var(--success); }
+    .source-line.is-key.is-memory::before { background: var(--primary-hover); }
+    .source-line.is-key.is-control::before { background: var(--warning); }
+
+    .source-line.is-key .source-line-no {
+      opacity: 1;
+      color: var(--foreground-secondary);
+      font-weight: 600;
+    }
+
+    .source-line.is-key.is-selected {
+      background: color-mix(in srgb, var(--primary) 14%, transparent);
+    }
+
+    .source-line.is-key.is-selected .source-line-code {
+      color: var(--foreground);
+    }
+
+    .line-detail,
+    .line-ai-note {
+      margin: 2px var(--space-3) var(--space-3) 56px;
+    }
+
+    .line-detail-card {
+      min-width: 0;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+      padding: var(--space-3);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-3);
+      cursor: pointer;
+      transition: background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
+    }
+
+    .line-detail-card:hover {
+      background: var(--surface-1);
+      border-color: var(--border-default);
+    }
+
+    .line-detail.is-open .line-detail-card {
+      background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--primary) 60%, var(--border-default));
+    }
+
+    .line-detail-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .line-detail-head {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .line-detail-title {
+      min-width: 0;
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      line-height: 1.45;
+    }
+
+    .line-detail-path {
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      letter-spacing: 0;
+      line-height: 1.4;
+    }
+
+    .line-detail-expanded {
+      display: none;
+      gap: var(--space-2);
+    }
+
+    .line-detail.is-open .line-detail-expanded {
+      display: grid;
+    }
+
+    .reason-list {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .rewrite-code {
+      margin: 0;
+      padding: var(--space-2);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: pre-wrap;
+    }
+
+    .line-detail-metrics {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
+    .line-mini-metric {
+      min-width: 74px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+      padding: 6px var(--space-2);
+      display: grid;
+      gap: 2px;
+    }
+
+    .line-mini-metric span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .line-mini-metric strong {
+      color: var(--foreground);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .line-ai-card {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      padding: 1px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--primary-hover) 82%, transparent), color-mix(in srgb, var(--success) 58%, transparent) 48%, color-mix(in srgb, var(--warning) 62%, transparent));
+    }
+
+    .line-ai-card::before {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border-radius: calc(var(--radius-md) - 1px);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface-2)), color-mix(in srgb, var(--surface-1) 88%, transparent));
+      pointer-events: none;
+    }
+
+    .line-ai-card-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      border-radius: calc(var(--radius-md) - 1px);
+      background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+    }
+
+    .line-ai-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+
+    .line-ai-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--primary) 18%, transparent);
+      color: var(--primary-foreground);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .line-ai-title {
+      min-width: 0;
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+      line-height: 1.45;
+    }
+
+    .line-ai-text {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.55;
+    }
+
+    .arch-body {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      padding: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .arch-stage {
+      position: relative;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-4);
+      background: color-mix(in srgb, var(--surface-1) 86%, transparent);
+    }
+
+    .arch-host {
+      position: relative;
+      width: max-content;
+      min-width: 100%;
+      transform-origin: top left;
+    }
+
+    .iv-arch-shell {
+      min-width: 1320px;
+    }
+
+    .iv-arch-shell .pto-mem950 {
+      padding-top: 190px;
+    }
+
+    .iv-arch-shell .pto-mem950__rail,
+    .iv-arch-shell .pto-mem950__rail-cell.is-hex,
+    .iv-arch-shell .pto-mem950__rail-cell.is-dot::before,
+    .iv-arch-shell .pto-aiv-core,
+    .iv-arch-shell .pto-aic-core,
+    .iv-arch-shell [class*="__panel"],
+    .iv-arch-shell [class*="__buffer"],
+    .iv-arch-shell [class*="__cache"] {
+      box-shadow: none;
+    }
+
+    .iv-control-plane {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      min-width: 1320px;
+      height: 174px;
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    .iv-control-node {
+      position: absolute;
+      min-width: 126px;
+      max-width: none;
+      width: 180px;
+      min-height: 60px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+      box-shadow: none;
+      padding: var(--space-2);
+      display: grid;
+      gap: 4px;
+      pointer-events: auto;
+    }
+
+    .iv-control-node strong {
+      color: var(--foreground);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .iv-control-node span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      line-height: 1.3;
+    }
+
+    .iv-control-node.is-aicpu {
+      top: 4px;
+      left: 242px;
+      width: 336px;
+      min-height: 160px;
+      border-radius: 30px;
+      border-color: transparent;
+      background: #343434;
+      padding: 18px 20px 20px;
+      align-content: center;
+      justify-items: center;
+      gap: 14px;
+    }
+
+    .iv-control-node.is-aicpu strong {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .iv-control-node.is-aicpu span {
+      color: #ffffff;
+    }
+
+    .iv-aicpu-body {
+      display: flex;
+      align-items: stretch;
+      gap: 14px;
+    }
+
+    .iv-aicpu-buffer {
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 9px 10px;
+      border-radius: 14px;
+      background: rgba(77, 151, 255, 0.16);
+      border: 1px solid rgba(77, 151, 255, 0.34);
+    }
+
+    .iv-control-node.is-aicpu .iv-aicpu-buffer-label {
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+      text-align: left;
+    }
+
+    .iv-aicpu-grid-cells {
+      display: grid;
+      grid-template-columns: repeat(15, 8px);
+      grid-auto-rows: 8px;
+      gap: 2px;
+    }
+
+    .iv-aicpu-cell {
+      display: block;
+      border-radius: 1px;
+      background: #2d75df;
+      box-shadow: inset 0 0 0 1px rgba(192, 232, 255, 0.72);
+    }
+
+    .iv-aicpu-cube {
+      box-sizing: border-box;
+      flex: 0 0 84px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      background: rgba(41, 199, 166, 0.94);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .iv-control-node.is-aicpu .iv-aicpu-cube-label {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .iv-control-node.is-host,
+    .iv-control-node.is-queue,
+    .iv-control-node.is-workspace {
+      border-color: transparent;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+      gap: 6px;
+    }
+
+    .iv-control-node.is-host strong,
+    .iv-control-node.is-queue strong,
+    .iv-control-node.is-workspace strong {
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .iv-control-node.is-host span,
+    .iv-control-node.is-queue span,
+    .iv-control-node.is-workspace span {
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .iv-control-node.is-host {
+      top: 42px;
+      left: 8px;
+      width: 198px;
+      background: #555b64;
+    }
+
+    .iv-control-node.is-queue {
+      top: 22px;
+      left: 632px;
+      width: 242px;
+      background: #c77925;
+    }
+
+    .iv-control-node.is-workspace {
+      top: 104px;
+      left: 632px;
+      width: 242px;
+      background: #2d75df;
+    }
+
+    .iv-control-node.is-scheduler {
+      top: 42px;
+      left: 954px;
+      width: 270px;
+      border-color: transparent;
+      background: #29c7a6;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .iv-control-node.is-scheduler strong {
+      color: #ffffff;
+    }
+
+    .iv-control-node.is-scheduler span {
+      color: #ffffff;
+    }
+
+    .iv-control-overlay {
+      position: absolute;
+      inset: 0;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 8;
+    }
+
+    .iv-control-overlay path {
+      fill: none;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.72;
+    }
+
+    .iv-route-control {
+      stroke: var(--warning);
+      stroke-dasharray: 6 5;
+    }
+
+    .iv-route-sync {
+      stroke: var(--accent);
+      stroke-dasharray: 2 5;
+    }
+
+    .iv-route-compute {
+      stroke: var(--success);
+      stroke-dasharray: 6 5;
+    }
+
+    .iv-route-data {
+      stroke: var(--primary-hover);
+    }
+
+    .iv-route-label {
+      fill: var(--foreground-secondary);
+      font: 700 10px / 1 var(--font-sans);
+      letter-spacing: 0;
+    }
+
+    .arch-stage.is-focused [data-mem950-node],
+    .arch-stage.is-focused [data-aiv-node],
+    .arch-stage.is-focused [data-aic-node],
+    .arch-stage.is-focused .pto-aic-core__transport-pill,
+    .arch-stage.is-focused [data-control-node] {
+      opacity: 0.28;
+      transition: opacity 120ms ease, filter 120ms ease;
+    }
+
+    .arch-stage.is-focused [data-route-id],
+    .arch-stage.is-focused [data-control-route] {
+      opacity: 0.12;
+      transition: opacity 120ms ease;
+    }
+
+    .arch-stage.is-focused .is-focus-node,
+    .arch-stage.is-focused [data-route-id].is-active-route,
+    .arch-stage.is-focused [data-control-route].is-active-route {
+      opacity: 1;
+      filter: none;
+    }
+
+    .arch-stage.is-focused [data-control-route].is-active-route {
+      filter: none;
+    }
+
+    .arch-status {
+      position: relative;
+      z-index: 12;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      min-height: 36px;
+      padding: 6px var(--space-4);
+      border-top: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+      overflow: hidden;
+    }
+
+    .arch-status .iv-chip {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .exec-body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(350px, 0.95fr) minmax(520px, 1.25fr);
+      gap: var(--space-3);
+      overflow: hidden;
+    }
+
+    .exec-column {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      gap: var(--space-3);
+      overflow: auto;
+    }
+
+    .viz-card {
+      min-width: 0;
+      min-height: auto;
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: var(--space-3);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+      padding: var(--space-3);
+      overflow: visible;
+    }
+
+    .viz-card-head {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+
+    .viz-card-title {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0;
+    }
+
+    .viz-card-meta {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .tile-grid-shell {
+      display: grid;
+      grid-template-columns: 56px minmax(250px, 1fr);
+      gap: 6px 8px;
+      align-content: start;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .tile-core-label {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .tile-core-row {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .tile-cell {
+      min-height: 30px;
+      border-radius: var(--radius-sm);
+      border: 1px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+      background: color-mix(in srgb, var(--surface-3) 44%, transparent);
+      color: var(--foreground-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: var(--text-label);
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .tile-cell.is-owned {
+      border-color: color-mix(in srgb, var(--primary) 28%, var(--border-default));
+      background: color-mix(in srgb, var(--primary) 13%, var(--surface-3));
+      color: var(--foreground-secondary);
+    }
+
+    .tile-cell.is-active {
+      color: var(--background);
+      background: linear-gradient(135deg, var(--primary), var(--success));
+      border-color: transparent;
+      transform: translateY(-1px);
+    }
+
+    .tile-cell.is-tail {
+      color: var(--background);
+      background: var(--warning);
+      border-color: transparent;
+    }
+
+    .buffer-lanes {
+      display: grid;
+      gap: 9px;
+      align-content: start;
+    }
+
+    .buffer-lane {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr) 58px;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .buffer-name,
+    .buffer-size {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .buffer-size {
+      text-align: right;
+    }
+
+    .buffer-bar {
+      position: relative;
+      height: 22px;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-4) 35%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border-default) 68%, transparent);
+    }
+
+    .buffer-bar::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: var(--fill, 0%);
+      border-radius: inherit;
+      background: color-mix(in srgb, var(--primary) 56%, var(--surface-4));
+      transition: width 180ms ease;
+    }
+
+    .buffer-bar.is-double::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 49%;
+      width: 2px;
+      background: color-mix(in srgb, var(--background) 78%, transparent);
+    }
+
+    .buffer-bar.is-hot::before {
+      background: linear-gradient(90deg, var(--primary), var(--warning));
+    }
+
+    .step-card {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .step-kicker {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .step-heading {
+      color: var(--foreground);
+      font: var(--text-title-2);
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .step-summary,
+    .buffer-caption {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.45;
+    }
+
+    .step-actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .step-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: var(--space-2);
+    }
+
+    .step-tab {
+      min-width: 0;
+      min-height: 38px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+      color: var(--foreground-secondary);
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--space-2);
+      align-items: center;
+      padding: 0 var(--space-2);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .step-tab.is-active {
+      color: var(--foreground);
+      border-color: color-mix(in srgb, var(--primary) 58%, var(--border-default));
+      background: color-mix(in srgb, var(--primary) 13%, var(--surface-2));
+    }
+
+    .step-tab strong {
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+
+    .step-tab span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .queue-panel {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: var(--space-3);
+    }
+
+    .queue-axis {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr);
+      gap: var(--space-2);
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .queue-ticks {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .queue-lanes {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .queue-lane {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr);
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .queue-unit {
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+
+    .queue-track {
+      position: relative;
+      height: 28px;
+      border-radius: var(--radius-pill);
+      overflow: hidden;
+      background: var(--surface-1);
+    }
+
+    .queue-segment {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      left: var(--seg-left);
+      width: var(--seg-width);
+      border: 0;
+      border-radius: var(--radius-pill);
+      background: var(--seg-color, var(--primary));
+      color: #ffffff;
+      font: 700 10px / 1 var(--font-sans);
+      letter-spacing: 0;
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding-inline: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .queue-segment.is-control { --seg-color: var(--warning); }
+    .queue-segment.is-mte { --seg-color: var(--primary-hover); }
+    .queue-segment.is-cube { --seg-color: color-mix(in srgb, var(--success) 72%, var(--primary)); }
+    .queue-segment.is-vector { --seg-color: var(--success); }
+    .queue-segment.is-mte3 { --seg-color: var(--accent); color: #ffffff; }
+    .queue-segment.is-bubble {
+      color: var(--warning);
+      background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warning) 48%, transparent) 0 3px, transparent 3px 6px);
+      outline: 1px solid color-mix(in srgb, var(--warning) 58%, transparent);
+      outline-offset: -1px;
+    }
+
+    .queue-segment.is-active {
+      box-shadow: none;
+      outline: 2px solid color-mix(in srgb, var(--foreground) 48%, transparent);
+      outline-offset: -2px;
+      transform: translateY(-1px);
+    }
+
+    .queue-note {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.45;
+    }
+
+    .queue-legend {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .queue-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .queue-legend span::before {
+      content: "";
+      width: 14px;
+      height: 7px;
+      border-radius: var(--radius-pill);
+      background: var(--primary);
+    }
+
+    .queue-legend .is-control::before { background: var(--warning); }
+    .queue-legend .is-mte::before { background: var(--primary-hover); }
+    .queue-legend .is-cube::before { background: color-mix(in srgb, var(--success) 72%, var(--primary)); }
+    .queue-legend .is-vector::before { background: var(--success); }
+    .queue-legend .is-bubble::before {
+      background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warning) 58%, transparent) 0 3px, transparent 3px 6px);
+      outline: 1px solid color-mix(in srgb, var(--warning) 58%, transparent);
+      outline-offset: -1px;
+    }
+
+    .inspector-drawer {
+      position: fixed;
+      top: 58px;
+      right: 0;
+      bottom: 0;
+      width: min(420px, 34vw);
+      z-index: 40;
+      transform: translateX(102%);
+      transition: transform 180ms var(--easing-default);
+      border-left: 1px solid var(--border-subtle);
+      background: var(--background-elevated);
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .inspector-drawer.is-open {
+      transform: translateX(0);
+    }
+
+    .inspector-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      padding: 0 var(--space-4) var(--space-4);
+    }
+
+    .inspector-section {
+      padding: var(--space-4) 0;
+      border-top: 1px solid var(--border-subtle);
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .inspector-section:first-child {
+      border-top: 0;
+    }
+
+    .inspector-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+
+    .inspector-section-title {
+      color: var(--foreground);
+      font: var(--text-label);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0;
+    }
+
+    .inspector-soft-card {
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+      padding: var(--space-3);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.5;
+    }
+
+    .fact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-2);
+    }
+
+    .fact {
+      min-width: 0;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+      padding: var(--space-2);
+      display: grid;
+      gap: 3px;
+    }
+
+    .fact span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .fact strong {
+      color: var(--foreground);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="iv-page">
+    <header class="layout-header layout-header-filled workbench-shell-header">
+      <div class="layout-header-left">
+        <a class="btn btn-sm btn-ghost iv-home-btn" href="../launch.html" aria-label="返回 Home">Home</a>
+        <div class="iv-brand">
+          <div class="iv-title">Kernel Instruction Visualizer</div>
+          <div class="iv-subtitle">源码、AICPU 控制面、AI Core 指令队列、芯片架构图联动</div>
+        </div>
+      </div>
+      <div class="layout-header-right">
+        <span class="iv-chip is-control">AICPU control plane</span>
+        <span class="iv-chip is-data">AI Core data plane</span>
+        <button class="btn btn-sm" type="button" id="openInspectorBtn">打开 Inspector</button>
+      </div>
+    </header>
+
+    <main class="workbench-frame workbench-frame-split iv-main" id="mainSplit">
+      <section class="panel-shell panel-shell-quiet workbench-pane iv-panel" id="sourcePane" aria-label="Kernel source" data-split-pane>
+        <header class="panel-shell-header">
+          <div class="iv-header-copy">
+            <span class="iv-panel-kicker">Kernel Source View</span>
+            <div class="kernel-select-wrap">
+              <select class="kernel-select" id="kernelSelect" aria-label="选择 kernel"></select>
+            </div>
+            <a class="kernel-source-link" id="kernelSourceLink" href="#" target="_blank" rel="noreferrer"></a>
+          </div>
+          <div class="panel-shell-meta">
+            <span class="iv-chip" id="sourceLineCount">0 行</span>
+            <button class="btn btn-sm btn-ghost" type="button" id="sourceMarkToggle" aria-pressed="true">隐藏标注</button>
+          </div>
+        </header>
+        <div class="wb-source-body layout-surface-fill-strong" id="sourceBody" role="listbox" aria-label="Kernel source lines"></div>
+      </section>
+
+      <section class="workbench-pane iv-right-split" id="rightPane" data-split-pane>
+        <div class="workbench-frame workbench-frame-split iv-right-split" id="rightSplit">
+          <section class="panel-shell panel-shell-quiet workbench-pane iv-panel" id="archPane" aria-label="Architecture map" data-split-pane>
+            <header class="panel-shell-header">
+              <div class="iv-header-copy">
+                <span class="iv-panel-kicker">Architecture Map</span>
+                <div class="kernel-select-wrap">
+                  <select class="kernel-select" id="archSelect" aria-label="选择架构视图">
+                    <option value="ascend950b" selected>Ascend 950B · 内置架构图</option>
+                    <option value="ascend910b">Ascend 910B · 控制面抽象</option>
+                  </select>
+                </div>
+              </div>
+              <div class="panel-shell-meta">
+                <span class="iv-chip">无 iframe</span>
+                <div class="toolbar-control" aria-label="架构图缩放控制">
+                  <button class="btn btn-sm btn-ghost" type="button" id="archZoomOutBtn" aria-label="缩小架构图">-</button>
+                  <button class="btn btn-sm btn-ghost" type="button" id="archFitBtn">适配</button>
+                  <button class="btn btn-sm btn-ghost" type="button" id="archActualBtn">1:1</button>
+                  <span class="toolbar-readout" id="archZoomReadout">76%</span>
+                  <button class="btn btn-sm btn-ghost" type="button" id="archZoomInBtn" aria-label="放大架构图">+</button>
+                </div>
+                <span class="iv-chip" id="selectedPathChip">等待选择源码行</span>
+              </div>
+            </header>
+            <div class="panel-shell-body arch-body">
+              <div class="arch-stage layout-surface-fill" id="archStage">
+                <div class="arch-host iv-arch-shell" id="archHost"></div>
+              </div>
+              <div class="arch-status" id="pathChips"></div>
+            </div>
+          </section>
+
+          <section class="panel-shell panel-shell-quiet workbench-pane iv-panel" id="execPane" aria-label="Tiling and instruction queue" data-split-pane>
+            <header class="panel-shell-header">
+              <div class="iv-header-copy">
+                <span class="iv-panel-kicker">Tiling + Instruction Queue</span>
+                <h2 class="panel-shell-title">Host 任务订单如何进入 AI Core 队列</h2>
+              </div>
+              <div class="panel-shell-meta">
+                <span class="iv-chip" id="stepMeta">Step 1 / 8</span>
+              </div>
+            </header>
+            <div class="panel-shell-body exec-body layout-surface-fill">
+              <div class="exec-column">
+                <section class="viz-card">
+                  <div class="viz-card-head">
+                    <div class="viz-card-title">Logical Tile Map</div>
+                    <div class="viz-card-meta" id="cursorMeta">core0 / tile0</div>
+                  </div>
+                  <div class="tile-grid-shell" id="tileGrid"></div>
+                </section>
+
+                <section class="viz-card">
+                  <div class="viz-card-head">
+                    <div class="viz-card-title">UB Buffer Residency</div>
+                    <div class="viz-card-meta">当前 tile 驻留</div>
+                  </div>
+                  <div class="buffer-lanes" id="bufferLanes"></div>
+                </section>
+              </div>
+
+              <div class="exec-column">
+                <section class="viz-card step-card">
+                  <div class="viz-card-head">
+                    <div>
+                      <div class="step-kicker" id="stepKicker">先看控制面</div>
+                      <div class="step-heading" id="stepTitle">AICPU 准备任务订单，AI Core 执行 kernel</div>
+                    </div>
+                    <span class="iv-chip" id="stepPhase">AICPU</span>
+                  </div>
+                  <div class="step-summary" id="stepSummary"></div>
+                  <div class="step-tabs" id="stepTabs"></div>
+                </section>
+
+                <section class="viz-card queue-panel">
+                  <div class="viz-card-head">
+                    <div class="viz-card-title">Instruction Queue</div>
+                    <div class="viz-card-meta">tile 级排队 / overlap / bubble</div>
+                  </div>
+                  <div class="queue-axis">
+                    <span>cycle</span>
+                    <div class="queue-ticks"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div>
+                  </div>
+                  <div class="queue-lanes" id="queueLanes"></div>
+                  <p class="queue-note" id="queueNote"></p>
+                  <div class="queue-legend">
+                    <span class="is-control">AICPU order</span>
+                    <span class="is-mte">MTE2 / MTE3</span>
+                    <span class="is-cube">Cube</span>
+                    <span class="is-vector">Vector</span>
+                    <span class="is-bubble">sync bubble</span>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <aside class="inspector-drawer" id="inspectorDrawer" aria-label="Inspector" aria-hidden="true">
+      <header class="panel-shell-header">
+        <div class="iv-header-copy">
+          <span class="iv-panel-kicker">Instruction Inspector</span>
+          <h2 class="panel-shell-title" id="inspectorTitle">等待选择</h2>
+        </div>
+        <button class="btn btn-sm btn-ghost" type="button" id="closeInspectorBtn">关闭</button>
+      </header>
+      <div class="inspector-body" id="inspectorBody"></div>
+    </aside>
+    <div id="floatingPlaybackMount" aria-label="任务链路播放控制"></div>
+  </div>
+
+  <script src="../ascend-950-workbench-demo/kernels/registry.js"></script>
+  <script src="../ascend-950-workbench-demo/kernels/c_api_add.js"></script>
+  <script src="../ascend-950-workbench-demo/kernels/fp8_mmad_masked_reduce.js"></script>
+  <script src="../patterns/workbench-shell/pattern.js"></script>
+  <script src="../patterns/floating-playback-control/pattern.js"></script>
+  <script src="../patterns/aiv-core-object/pattern.js"></script>
+  <script src="../patterns/aic-core-object/pattern.js"></script>
+  <script src="../patterns/memory-architecture/pattern.js"></script>
+  <script>
+    (function initInstructionVisualizerDemo() {
+      'use strict';
+
+      const qs = (selector, root = document) => root.querySelector(selector);
+      const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+      const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+      const kernels = (window.WB_KERNELS || []).filter((kernel) => (
+        kernel.id === 'c_api_add' || kernel.id === 'fp8_mmad_masked_reduce'
+      ));
+
+      const state = {
+        selectedKernelId: 'fp8_mmad_masked_reduce',
+        selectedLineId: 'l42',
+        annotationsVisible: true,
+        activeStep: 0,
+        inspectorOpen: false,
+        archOverlay: null,
+        controlOverlay: null,
+        archScaleIndex: 1,
+        playbackTimer: 0,
+        playbackControl: null,
+        scrubberHover: null,
+      };
+
+      const archZoomLevels = [0.56, 0.66, 0.76, 0.9, 1];
+
+      const lanes = [
+        { key: 'x0', name: 'x0 queue', size: '32KB', double: true },
+        { key: 'x1', name: 'x1 queue', size: '32KB', double: true },
+        { key: 'y', name: 'y queue', size: '32KB', double: true },
+        { key: 'tmp', name: 'temp', size: '24KB', double: false },
+      ];
+
+      const steps = [
+        {
+          phase: 'AICPU',
+          short: 'order',
+          kicker: '控制面准备任务',
+          title: 'AICPU / Runtime 生成 kernel 任务订单',
+          summary: '控制面准备 kernel_id、blockDim、tilingKey、tilingData、workspace、stream/event/notify。它不是逐条发送 DataCopy 或 Mmad，而是把一次 kernel 执行需要的“订单”写入任务队列。',
+          selectors: ['[data-control-node="host"]', '[data-control-node="aicpu"]', '[data-control-node="task-queue"]', '[data-control-node="workspace"]'],
+          controlRoutes: ['host-aicpu', 'aicpu-queue', 'aicpu-workspace'],
+          sourceId: 'add-l79',
+          queueIds: ['order-launch', 'order-tiling'],
+          cursor: { core: 0, tile: 0 },
+          tileMode: 'planned',
+          bufferMode: 'empty',
+        },
+        {
+          phase: 'Stream',
+          short: 'enqueue',
+          kicker: '进入 stream 队列',
+          title: '任务队列把 block 调度给 AI Core',
+          summary: 'stream/event/notify 决定任务顺序和依赖边界，Block Scheduler 根据 blockDim 分发到 AIC/AIV。这里是控制面到数据面的边界。',
+          selectors: ['[data-control-node="task-queue"]', '[data-control-node="scheduler"]', '#mem950-aiv1', '#mem950-aic'],
+          controlRoutes: ['queue-scheduler', 'scheduler-aiv', 'scheduler-aic'],
+          sourceId: 'add-l79',
+          queueIds: ['order-enqueue'],
+          cursor: { core: 0, tile: 0 },
+          tileMode: 'owned',
+          bufferMode: 'empty',
+        },
+        {
+          phase: 'Tiling',
+          short: 'tile map',
+          kicker: 'tilingData 变成循环边界',
+          title: 'tilingData 决定 core/tile 的逻辑工作格子',
+          summary: '逻辑 tile 是任务表，不是 UB 里的物理格子。每个 core 只拿到自己负责的 tile 范围，然后在 kernel 内循环。',
+          selectors: ['[data-control-node="workspace"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="scalar:Scalar"]'],
+          controlRoutes: ['workspace-gm'],
+          sourceId: 'add-l32',
+          queueIds: ['scalar-tiling'],
+          cursor: { core: 1, tile: 2 },
+          tileMode: 'active',
+          bufferMode: 'resident',
+        },
+        {
+          phase: 'CopyIn',
+          short: 'MTE2',
+          kicker: 'AI Core 发起搬入',
+          title: 'CopyIn 进入 MTE2 队列，把 GM/L2 数据搬到 UB 或 L1',
+          summary: '这里开始是 AI Core 数据面。DataCopy 映射到 MTE2，不需要 AICPU 逐条遥控。',
+          selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aic [data-aic-node="buffer:L1"]'],
+          routes: ['l2-to-aiv1', 'l2-to-aic'],
+          sourceId: 'l42',
+          queueIds: ['mte2-tile0', 'mte2-tile1'],
+          cursor: { core: 1, tile: 2 },
+          tileMode: 'active',
+          bufferMode: 'copyin',
+        },
+        {
+          phase: 'Compute',
+          short: 'Cube',
+          kicker: '矩阵计算队列',
+          title: 'MmadFp8 占用 Cube 队列，输入来自 L1/L0A/L0B',
+          summary: 'Cube 计算在 AI Core 内部排队执行。它消耗 L0A/L0B，产生 L0C，不经过 AICPU。',
+          selectors: ['#mem950-aic [data-aic-node="buffer:L1"]', '#mem950-aic [data-aic-node="buffer:L0A"]', '#mem950-aic [data-aic-node="buffer:L0B"]', '#mem950-aic [data-aic-node="cube:CUBE"]', '#mem950-aic [data-aic-node="buffer:L0C"]'],
+          routes: ['l2-to-aic'],
+          sourceId: 'l48',
+          queueIds: ['cube-tile0'],
+          cursor: { core: 1, tile: 2 },
+          tileMode: 'active',
+          bufferMode: 'compute',
+        },
+        {
+          phase: 'Barrier',
+          short: 'FixPipe',
+          kicker: '跨域交接',
+          title: 'PipeBarrier 保护 Cube 到 Vector epilogue 的顺序',
+          summary: 'FixPipe / barrier 是 AI Core 内部同步点。它可能形成 bubble，但不是 AICPU 在中途干预。',
+          selectors: ['#mem950-aic [data-aic-node="buffer:L0C"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'],
+          routes: ['aic-to-aiv1'],
+          sourceId: 'l57',
+          queueIds: ['fix-bubble'],
+          cursor: { core: 1, tile: 2 },
+          tileMode: 'active',
+          bufferMode: 'resident',
+        },
+        {
+          phase: 'Vector',
+          short: 'SIMD',
+          kicker: '向量队列消费 UB',
+          title: 'Vector 从 UB 读取当前 tile 并执行 Add / SIMT 分支',
+          summary: '稠密 Add 落在 Vector/SIMD；mask 分支会形成 SIMT 区域。队列视图会展示它们和 CopyIn/CopyOut 的 overlap。',
+          selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'],
+          routes: ['aic-to-aiv1'],
+          sourceId: 'l73',
+          queueIds: ['vector-add', 'vector-simt'],
+          cursor: { core: 1, tile: 2 },
+          tileMode: 'active',
+          bufferMode: 'compute',
+        },
+        {
+          phase: 'CopyOut',
+          short: 'MTE3',
+          kicker: '写回并复用 UB',
+          title: 'CopyOut 进入 MTE3 队列，结果写回 L2 / GM',
+          summary: '写回后，当前 tile 占用的 UB queue 会被下一轮 tile 复用。关键路径可能来自 MTE3 drain 或前面的 barrier。',
+          selectors: ['#mem950-aiv2 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]', '[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'],
+          routes: ['aiv1-to-l2', 'aiv2-to-l2'],
+          sourceId: 'l96',
+          queueIds: ['mte3-tile0'],
+          cursor: { core: 1, tile: 3 },
+          tileMode: 'active',
+          bufferMode: 'copyout',
+        },
+      ];
+
+      const queueLanes = [
+        {
+          unit: 'AICPU',
+          events: [
+            { id: 'order-launch', label: 'launch order', short: 'launch', kind: 'control', left: 0, width: 10, line: 'add-l79' },
+            { id: 'order-tiling', label: 'tilingData package', short: 'tiling', kind: 'control', left: 12, width: 10, line: 'add-l32' },
+            { id: 'order-enqueue', label: 'stream task enqueue', short: 'enqueue', kind: 'control', left: 24, width: 12, line: 'add-l79' },
+          ],
+        },
+        {
+          unit: 'Scalar',
+          events: [
+            { id: 'scalar-tiling', label: 'scalar reads tilingData', short: 'params', kind: 'control', left: 38, width: 8, line: 'add-l32' },
+          ],
+        },
+        {
+          unit: 'MTE2',
+          events: [
+            { id: 'mte2-tile0', label: 'tile0 CopyIn', short: 'tile0', kind: 'mte', left: 42, width: 16, line: 'l42' },
+            { id: 'mte2-tile1', label: 'tile1 prefetch', short: 'tile1', kind: 'mte', left: 58, width: 14, line: 'l42' },
+          ],
+        },
+        {
+          unit: 'Cube',
+          events: [
+            { id: 'cube-tile0', label: 'MmadFp8', short: 'MMAD', kind: 'cube', left: 56, width: 16, line: 'l48' },
+          ],
+        },
+        {
+          unit: 'Barrier',
+          events: [
+            { id: 'fix-bubble', label: 'FixPipe wait', short: 'wait', kind: 'bubble', left: 72, width: 6, line: 'l57' },
+          ],
+        },
+        {
+          unit: 'Vector',
+          events: [
+            { id: 'vector-add', label: 'Vector Add', short: 'Add', kind: 'vector', left: 78, width: 10, line: 'l73' },
+            { id: 'vector-simt', label: 'SIMT island', short: 'SIMT', kind: 'vector', left: 88, width: 8, line: 'l82' },
+          ],
+        },
+        {
+          unit: 'MTE3',
+          events: [
+            { id: 'mte3-tile0', label: 'CopyOut', short: 'out', kind: 'mte3', left: 92, width: 8, line: 'l96' },
+          ],
+        },
+      ];
+
+      const CPP_KEYWORDS = new Set([
+        'include', 'using', 'namespace', 'template', 'typename', 'class', 'struct', 'public', 'private', 'protected',
+        'inline', 'const', 'constexpr', 'static', 'auto', 'for', 'if', 'else', 'return', 'void', 'default', 'sizeof',
+        'new', 'delete', 'this', 'true', 'false', 'nullptr', '__aicore__', '__vector__', '__global__', '__gm__', '__ubuf__'
+      ]);
+      const CPP_TYPES = new Set([
+        'int', 'int32_t', 'int64_t', 'uint8_t', 'uint32_t', 'uint64_t', 'bool', 'float', 'double', 'char', 'size_t',
+        'LocalTensor', 'GM_ADDR', 'DataT', 'AccT', 'aclrtStream', 'std', 'vector',
+        'PIPE_FIX', 'PIPE_V', 'PIPE_M', 'PIPE_MTE2', 'PIPE_MTE3', 'BLOCK_M', 'BLOCK_N', 'BLOCK_K', 'VECTOR_ELEMS'
+      ]);
+
+      function currentKernel() {
+        return kernels.find((kernel) => kernel.id === state.selectedKernelId) || kernels[0];
+      }
+
+      function currentAnnotations() {
+        return currentKernel()?.annotations || [];
+      }
+
+      function selectedAnnotation() {
+        return currentAnnotations().find((line) => line.id === state.selectedLineId)
+          || currentAnnotations().find((line) => !line.tagOnly)
+          || null;
+      }
+
+      function tagClass(kind) {
+        if (kind === 'compute') return 'is-compute';
+        if (kind === 'memory') return 'is-memory';
+        return 'is-control';
+      }
+
+      function highlightCpp(code) {
+        const escaped = escapeHtml(code);
+        const re = /(\/\/.*$)|(&quot;[^&]*?&quot;)|(\b\d+\b)|([A-Za-z_][A-Za-z0-9_]*)/g;
+        let out = '';
+        let last = 0;
+        let match;
+        while ((match = re.exec(escaped)) !== null) {
+          if (match.index > last) out += escaped.slice(last, match.index);
+          if (match[1]) out += `<span class="tk-comment">${match[1]}</span>`;
+          else if (match[2]) out += `<span class="tk-string">${match[2]}</span>`;
+          else if (match[3]) out += `<span class="tk-number">${match[3]}</span>`;
+          else if (match[4]) {
+            const id = match[4];
+            const next = escaped[re.lastIndex];
+            if (CPP_KEYWORDS.has(id)) out += `<span class="tk-keyword">${id}</span>`;
+            else if (CPP_TYPES.has(id)) out += `<span class="tk-type">${id}</span>`;
+            else if (next === '(') out += `<span class="tk-fn">${id}</span>`;
+            else out += id;
+          }
+          last = re.lastIndex;
+        }
+        if (last < escaped.length) out += escaped.slice(last);
+        return out;
+      }
+
+      function enhancedLine(line) {
+        if (!line) return null;
+        const next = { ...line };
+        if (line.id === 'add-l79') {
+          next.selectors = ['[data-control-node="host"]', '[data-control-node="aicpu"]', '[data-control-node="task-queue"]', '[data-control-node="scheduler"]', '#mem950-aiv1', '#mem950-aic'];
+          next.controlRoutes = ['host-aicpu', 'aicpu-queue', 'queue-scheduler', 'scheduler-aiv', 'scheduler-aic'];
+          next.path = 'Host Runtime → AICPU / Device CPU → Stream Task Queue → AI Core Block Scheduler';
+          next.short = 'Host launch 形成任务订单；AICPU/Runtime 准备控制面参数，AI Core 接收任务后执行 kernel。';
+        }
+        if (line.id === 'add-l32') {
+          next.selectors = ['[data-control-node="aicpu"]', '[data-control-node="workspace"]', '#mem950-aiv1 [data-aiv-node="scalar:Scalar"]'];
+          next.controlRoutes = ['aicpu-workspace', 'workspace-gm'];
+          next.path = 'AICPU / Host tiling → TilingData / Workspace → Kernel scalar parameters';
+        }
+        return next;
+      }
+
+      function lineById(id) {
+        for (const kernel of kernels) {
+          const found = (kernel.annotations || []).find((line) => line.id === id);
+          if (found && !found.tagOnly) return { kernel, line: enhancedLine(found) };
+        }
+        return { kernel: currentKernel(), line: enhancedLine(selectedAnnotation()) };
+      }
+
+      function activeStep() {
+        return steps[state.activeStep] || steps[0];
+      }
+
+      function sourceAiRecommendations(line) {
+        if (!line || line.tagOnly) return [];
+        if (line.id === 'add-l79') {
+          return [['AICPU 边界提醒', '这里不是 AI Core 指令本体，而是 runtime/stream/task queue 形成 kernel 任务订单的位置。']];
+        }
+        if (line.kind === 'memory') {
+          return [['队列解释', '这类源码行会进入 MTE2/MTE3 搬运队列，队列图会显示它和 compute 是否重叠。']];
+        }
+        if (line.id === 'l57') {
+          return [['同步风险', 'FixPipe / Barrier 可能形成 bubble，应检查是否能用更窄的 set/wait flag 收敛等待范围。']];
+        }
+        return [];
+      }
+
+      function renderAiRecommendationCard(items) {
+        if (!items.length) return '';
+        return `
+          <div class="line-ai-note">
+            <article class="line-ai-card">
+              <div class="line-ai-card-inner">
+                ${items.map((item, index) => `
+                  <div>
+                    <div class="line-ai-head">
+                      <strong class="line-ai-title">${escapeHtml(item[0])}</strong>
+                      ${index === 0 ? '<span class="line-ai-badge">联动解释</span>' : ''}
+                    </div>
+                    <p class="line-ai-text">${escapeHtml(item[1])}</p>
+                  </div>
+                `).join('')}
+              </div>
+            </article>
+          </div>
+        `;
+      }
+
+      function renderLineDetail(line) {
+        const reasons = line.reasons || ['source-inferred', 'architecture-linked'];
+        const metrics = line.metrics || { confidence: 'source', cycles: 'n/a', pressure: line.kind };
+        return `
+          <div class="line-detail-card">
+            <div class="line-detail-main">
+              <div class="line-detail-head">
+                <span class="mode-tag ${tagClass(line.kind)}">${escapeHtml(line.tag)}</span>
+                <strong class="line-detail-title">${escapeHtml(line.short || line.verdict || line.code)}</strong>
+              </div>
+              <div class="line-detail-path">${escapeHtml(line.path || '等待路径映射')}</div>
+              <div class="line-detail-expanded">
+                <div class="reason-list">
+                  ${reasons.map((reason) => `<span class="reason-pill">${escapeHtml(reason)}</span>`).join('')}
+                </div>
+                <pre class="rewrite-code">${highlightCpp(line.rewrite || line.code || '')}</pre>
+              </div>
+            </div>
+            <div class="line-detail-metrics">
+              <span class="line-mini-metric"><span>conf</span><strong>${escapeHtml(metrics.confidence)}</strong></span>
+              <span class="line-mini-metric"><span>cycles</span><strong>${escapeHtml(metrics.cycles)}</strong></span>
+              <span class="line-mini-metric"><span>pressure</span><strong>${escapeHtml(metrics.pressure)}</strong></span>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderKernelSelector() {
+        const select = qs('#kernelSelect');
+        select.innerHTML = kernels.map((kernel) => (
+          `<option value="${kernel.id}" ${kernel.id === state.selectedKernelId ? 'selected' : ''}>${escapeHtml(kernel.name)}</option>`
+        )).join('');
+        select.value = state.selectedKernelId;
+        select.addEventListener('change', () => {
+          state.selectedKernelId = select.value;
+          const kernel = currentKernel();
+          state.selectedLineId = kernel.selectedId || kernel.annotations?.find((line) => !line.tagOnly)?.id;
+          renderAll();
+        });
+      }
+
+      function renderSource() {
+        const kernel = currentKernel();
+        const body = qs('#sourceBody');
+        const annotations = currentAnnotations();
+        const lineByNumber = new Map(annotations.map((line) => [line.line, line]));
+        qs('#sourceLineCount').textContent = `${kernel.sourceLines.length} 行`;
+        qs('#kernelSourceLink').href = kernel.sourceUrl || '#';
+        qs('#kernelSourceLink').textContent = kernel.path || kernel.name;
+        qs('#sourceMarkToggle').textContent = state.annotationsVisible ? '隐藏标注' : '显示标注';
+        qs('#sourceMarkToggle').setAttribute('aria-pressed', state.annotationsVisible ? 'true' : 'false');
+        body.innerHTML = '';
+
+        kernel.sourceLines.forEach((code, index) => {
+          const lineNo = index + 1;
+          const rawLine = state.annotationsVisible ? lineByNumber.get(lineNo) : null;
+          const line = rawLine ? enhancedLine(rawLine) : null;
+          const isCard = line && !line.tagOnly;
+          const row = document.createElement('div');
+          row.className = [
+            'source-line',
+            isCard ? 'is-key' : '',
+            isCard ? tagClass(line.kind) : '',
+            isCard && line.id === state.selectedLineId ? 'is-selected' : ''
+          ].filter(Boolean).join(' ');
+          row.dataset.lineNo = String(lineNo);
+          row.setAttribute('role', isCard ? 'option' : 'presentation');
+          if (isCard) {
+            row.dataset.lineId = line.id;
+            row.tabIndex = 0;
+            row.setAttribute('aria-selected', line.id === state.selectedLineId ? 'true' : 'false');
+            row.addEventListener('click', () => selectLine(line.id, { syncStep: true }));
+            row.addEventListener('keydown', (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              selectLine(line.id, { syncStep: true });
+            });
+          }
+          const tagHtml = line
+            ? `<span class="mode-tag source-line-tag ${tagClass(line.kind)}">${escapeHtml(line.tag)}</span>`
+            : '<span class="source-line-tag source-line-tag-empty"></span>';
+          row.innerHTML = `<span class="source-line-no">${lineNo}</span><span class="source-line-code">${highlightCpp(code)}</span>${tagHtml}`;
+          body.appendChild(row);
+
+          if (isCard) {
+            const detail = document.createElement('div');
+            detail.className = `line-detail ${line.id === state.selectedLineId ? 'is-open' : ''}`;
+            detail.dataset.lineId = line.id;
+            detail.innerHTML = renderLineDetail(line);
+            detail.addEventListener('click', () => selectLine(line.id, { syncStep: true }));
+            body.appendChild(detail);
+          }
+
+          const aiRecommendations = line ? sourceAiRecommendations(line) : [];
+          if (state.annotationsVisible && aiRecommendations.length) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = renderAiRecommendationCard(aiRecommendations);
+            body.appendChild(tmp.firstElementChild);
+          }
+        });
+        const selectedRow = body.querySelector('.source-line.is-selected');
+        if (selectedRow) {
+          const offset = selectedRow.offsetTop - body.clientHeight / 2 + selectedRow.offsetHeight / 2;
+          body.scrollTop = Math.max(0, offset);
+        }
+      }
+
+      function renderArchitecture() {
+        const helper = window.PtoMemoryArchitecturePattern;
+        const host = qs('#archHost');
+        if (!helper || !host) return;
+        const scale = archZoomLevels[state.archScaleIndex] || 0.66;
+        host.style.transform = `scale(${scale})`;
+        host.style.marginBottom = `${Math.max(0, (scale - 1) * 480)}px`;
+        const readout = qs('#archZoomReadout');
+        if (readout) readout.textContent = `${Math.round(scale * 100)}%`;
+        helper.renderArchitecture(host, 'ascend950b');
+        injectControlPlane(host);
+        state.archOverlay?.destroy?.();
+        state.archOverlay = helper.createRouteOverlay(host, 'ascend950b');
+        state.archOverlay?.render?.();
+        window.requestAnimationFrame(() => {
+          renderControlOverlay();
+          applyArchitectureFocus();
+        });
+      }
+
+      function injectControlPlane(host) {
+        const root = host.querySelector('.pto-mem950');
+        if (!root) return;
+        const plane = document.createElement('div');
+        plane.className = 'iv-control-plane';
+        const aicpuCells = Array.from({ length: 75 }, () => '<i class="iv-aicpu-cell"></i>').join('');
+        plane.innerHTML = `
+          <div class="iv-control-node is-host" data-control-node="host"><strong>Host CPU / Runtime</strong><span>ACL / Framework launch</span></div>
+          <div class="iv-control-node is-aicpu" data-control-node="aicpu">
+            <strong>AICPU / Device CPU</strong>
+            <div class="iv-aicpu-body">
+              <div class="iv-aicpu-buffer" aria-label="L3 buffer">
+                <span class="iv-aicpu-buffer-label">L3 buffer</span>
+                <div class="iv-aicpu-grid-cells" aria-hidden="true">${aicpuCells}</div>
+              </div>
+              <div class="iv-aicpu-cube" aria-label="Linx816 计算单元">
+                <span class="iv-aicpu-cube-label">Linx816</span>
+              </div>
+            </div>
+          </div>
+          <div class="iv-control-node is-queue" data-control-node="task-queue"><strong>Runtime Task Queue</strong><span>kernel_id / blockDim / stream</span></div>
+          <div class="iv-control-node is-workspace" data-control-node="workspace"><strong>Workspace / TilingData</strong><span>tilingKey, args, GM buffers</span></div>
+          <div class="iv-control-node is-scheduler" data-control-node="scheduler"><strong>AI Core Block Scheduler</strong><span>dispatch blocks to AIC / AIV</span></div>
+        `;
+        root.appendChild(plane);
+      }
+
+      function edge(root, el, side = 'right', bias = 0.5) {
+        const rootRect = root.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
+        const clampedBias = Math.max(0, Math.min(1, Number.isFinite(bias) ? bias : 0.5));
+        const xAtBias = rect.left + rect.width * clampedBias;
+        const yAtBias = rect.top + rect.height * clampedBias;
+        const x = side === 'left' ? rect.left : side === 'right' ? rect.right : xAtBias;
+        const y = side === 'top' ? rect.top : side === 'bottom' ? rect.bottom : yAtBias;
+        return { x: x - rootRect.left, y: y - rootRect.top };
+      }
+
+      function drawPath(root, route) {
+        const fromEl = root.querySelector(route.from);
+        const toEl = root.querySelector(route.to);
+        if (!fromEl || !toEl) return '';
+        const from = edge(root, fromEl, route.fromSide || 'right', route.fromBias);
+        const to = edge(root, toEl, route.toSide || 'left', route.toBias);
+        const midX = Number.isFinite(route.midX) ? route.midX : from.x + (to.x - from.x) / 2;
+        const midY = Number.isFinite(route.midY) ? route.midY : from.y + (to.y - from.y) / 2;
+        let points;
+        if (route.style === 'direct') {
+          if (Math.abs(from.y - to.y) < 1) {
+            points = [from, to];
+          } else {
+            points = [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+          }
+        } else if (route.style === 'elbow-v') {
+          points = [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
+        } else if (route.style === 'elbow-h') {
+          points = [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+        } else if (route.verticalFirst) {
+          points = [from, { x: from.x, y: to.y }, to];
+        } else {
+          points = [from, { x: midX, y: from.y }, { x: midX, y: to.y }, to];
+        }
+        const d = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+        const label = route.label
+          ? `<text class="iv-route-label" x="${(from.x + to.x) / 2}" y="${Math.min(from.y, to.y) - 8}">${escapeHtml(route.label)}</text>`
+          : '';
+        const marker = route.arrow === false ? '' : ' marker-end="url(#iv-control-arrow)"';
+        return `<path data-control-route="${route.id}" class="${route.className}" d="${d}"${marker}></path>${label}`;
+      }
+
+      function renderControlOverlay() {
+        const root = qs('#archHost .pto-mem950');
+        if (!root) return;
+        root.querySelector('.iv-control-overlay')?.remove();
+        const rect = root.getBoundingClientRect();
+        const routes = [
+          { id: 'host-aicpu', className: 'iv-route-control', style: 'direct', from: '[data-control-node="host"]', to: '[data-control-node="aicpu"]', toBias: 0.5 },
+          { id: 'aicpu-queue', className: 'iv-route-control', style: 'direct', from: '[data-control-node="aicpu"]', to: '[data-control-node="task-queue"]', fromBias: 0.5 },
+          { id: 'aicpu-workspace', className: 'iv-route-sync', style: 'elbow-h', from: '[data-control-node="aicpu"]', to: '[data-control-node="workspace"]', fromBias: 0.72, toBias: 0.5, midX: 576 },
+          { id: 'queue-scheduler', className: 'iv-route-compute', style: 'direct', from: '[data-control-node="task-queue"]', to: '[data-control-node="scheduler"]' },
+          { id: 'workspace-gm', className: 'iv-route-sync', style: 'elbow-v', from: '[data-control-node="workspace"]', fromSide: 'bottom', fromBias: 0.72, to: '[data-mem950-node="rail:GM"]', toSide: 'top', toBias: 0.5, arrow: false },
+          { id: 'scheduler-aiv', className: 'iv-route-compute', style: 'elbow-v', from: '[data-control-node="scheduler"]', fromSide: 'bottom', fromBias: 0.5, to: '#mem950-aiv1', toSide: 'top', toBias: 0.5 },
+          { id: 'scheduler-aic', className: 'iv-route-compute', style: 'elbow-v', from: '[data-control-node="scheduler"]', fromSide: 'bottom', fromBias: 0.58, to: '#mem950-aic', toSide: 'top', toBias: 0.5 },
+        ];
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'iv-control-overlay');
+        svg.setAttribute('viewBox', `0 0 ${Math.max(1, rect.width)} ${Math.max(1, rect.height)}`);
+        svg.innerHTML = `
+          <defs>
+            <marker id="iv-control-arrow" markerWidth="4.5" markerHeight="4.5" refX="4" refY="2.25" orient="auto" markerUnits="strokeWidth">
+              <path d="M0.8,0.7 L4,2.25 L0.8,3.8" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"></path>
+            </marker>
+          </defs>
+          ${routes.map((route) => drawPath(root, route)).join('')}
+        `;
+        root.appendChild(svg);
+      }
+
+      function applyArchitectureFocus() {
+        const archStage = qs('#archStage');
+        const line = enhancedLine(selectedAnnotation()) || {};
+        const step = activeStep();
+        const selectors = [...(line.selectors || []), ...(step.selectors || [])];
+        const routeIds = [...(line.routes || []), ...(step.routes || [])];
+        const controlRouteIds = [...(line.controlRoutes || []), ...(step.controlRoutes || [])];
+        const hasFocus = selectors.length || routeIds.length || controlRouteIds.length;
+        archStage.classList.toggle('is-focused', Boolean(hasFocus));
+        qsa('.is-focus-node', archStage).forEach((node) => node.classList.remove('is-focus-node'));
+        qsa('.is-active-route', archStage).forEach((node) => node.classList.remove('is-active-route'));
+        selectors.forEach((selector) => {
+          qsa(selector, archStage).forEach((node) => node.classList.add('is-focus-node'));
+        });
+        routeIds.forEach((id) => {
+          qsa(`[data-route-id="${CSS.escape(id)}"]`, archStage).forEach((route) => route.classList.add('is-active-route'));
+        });
+        controlRouteIds.forEach((id) => {
+          qsa(`[data-control-route="${CSS.escape(id)}"]`, archStage).forEach((route) => route.classList.add('is-active-route'));
+        });
+        const chips = qs('#pathChips');
+        chips.innerHTML = [
+          ...(line.controlRoutes?.length ? ['AICPU control arrow'] : []),
+          ...(line.routes || []),
+          ...(line.path ? [line.path] : []),
+        ].slice(0, 5).map((text) => `<span class="iv-chip">${escapeHtml(text)}</span>`).join('');
+        qs('#selectedPathChip').textContent = line.path ? line.path.split('→').slice(0, 3).join('→') : '等待选择源码行';
+      }
+
+      function laneFill(step, lane) {
+        if (step.bufferMode === 'empty') return 0;
+        if (step.bufferMode === 'resident') return lane.key === 'tmp' ? 58 : 72;
+        if (step.bufferMode === 'copyin') return ['x0', 'x1'].includes(lane.key) ? 92 : 38;
+        if (step.bufferMode === 'compute') return ['y', 'tmp'].includes(lane.key) ? 88 : 66;
+        if (step.bufferMode === 'copyout') return lane.key === 'y' ? 100 : 44;
+        return 0;
+      }
+
+      function renderTileGrid() {
+        const step = activeStep();
+        const grid = qs('#tileGrid');
+        const CORE_COUNT = 4;
+        const TILES_PER_CORE = 5;
+        grid.innerHTML = '';
+        for (let core = 0; core < CORE_COUNT; core += 1) {
+          const label = document.createElement('div');
+          label.className = 'tile-core-label';
+          label.textContent = `core${core}`;
+          grid.appendChild(label);
+
+          const row = document.createElement('div');
+          row.className = 'tile-core-row';
+          for (let tile = 0; tile < TILES_PER_CORE; tile += 1) {
+            const cell = document.createElement('div');
+            const isActive = step.tileMode === 'active' && core === step.cursor.core && tile === step.cursor.tile;
+            const isOwned = ['owned', 'active', 'planned'].includes(step.tileMode);
+            const isTail = tile === TILES_PER_CORE - 1;
+            cell.className = [
+              'tile-cell',
+              isOwned ? 'is-owned' : '',
+              isActive ? 'is-active' : '',
+              isTail && isOwned ? 'is-tail' : '',
+            ].filter(Boolean).join(' ');
+            cell.textContent = step.tileMode === 'planned' ? `plan${tile}` : step.tileMode === 'dim' ? '-' : `t${tile}`;
+            row.appendChild(cell);
+          }
+          grid.appendChild(row);
+        }
+      }
+
+      function renderBuffers() {
+        const step = activeStep();
+        const root = qs('#bufferLanes');
+        root.innerHTML = '';
+        lanes.forEach((lane) => {
+          const item = document.createElement('div');
+          item.className = 'buffer-lane';
+          const fill = laneFill(step, lane);
+          const hot = (step.bufferMode === 'compute' && ['y', 'tmp'].includes(lane.key)) ||
+            (step.bufferMode === 'copyout' && lane.key === 'y');
+          item.innerHTML = `
+            <span class="buffer-name">${escapeHtml(lane.name)}</span>
+            <span class="buffer-bar ${lane.double ? 'is-double' : ''} ${hot ? 'is-hot' : ''}" style="--fill:${fill}%"></span>
+            <span class="buffer-size">${escapeHtml(lane.size)}</span>
+          `;
+          root.appendChild(item);
+        });
+        const caption = document.createElement('div');
+        caption.className = 'buffer-caption';
+        caption.textContent = step.bufferMode === 'empty'
+          ? '此时只是控制面订单或逻辑计划，UB 还没有真实驻留当前 tile。'
+          : '这些 lane 是当前 tile 的输入、输出和临时区；下一轮 tile 会复用同一批 UB queue。';
+        root.appendChild(caption);
+      }
+
+      function renderStepTabs() {
+        const tabs = qs('#stepTabs');
+        tabs.innerHTML = steps.map((step, index) => `
+          <button class="step-tab ${index === state.activeStep ? 'is-active' : ''}" type="button" data-step="${index}">
+            <strong>${String(index + 1).padStart(2, '0')}</strong>
+            <span>${escapeHtml(step.short)}</span>
+          </button>
+        `).join('');
+        qsa('.step-tab', tabs).forEach((button) => {
+          button.addEventListener('click', () => {
+            stopPlayback();
+            setStep(Number(button.dataset.step), { selectSource: true });
+          });
+        });
+      }
+
+      function renderStep() {
+        const step = activeStep();
+        qs('#stepMeta').textContent = `Step ${state.activeStep + 1} / ${steps.length}`;
+        qs('#stepPhase').textContent = step.phase;
+        qs('#stepKicker').textContent = step.kicker;
+        qs('#stepTitle').textContent = step.title;
+        qs('#stepSummary').textContent = step.summary;
+        qs('#cursorMeta').textContent = `core${step.cursor.core} / tile${step.cursor.tile}`;
+        renderStepTabs();
+        syncPlaybackUi();
+      }
+
+      function renderQueue() {
+        const step = activeStep();
+        const activeIds = new Set(step.queueIds || []);
+        const root = qs('#queueLanes');
+        root.innerHTML = queueLanes.map((lane) => `
+          <div class="queue-lane">
+            <div class="queue-unit">${escapeHtml(lane.unit)}</div>
+            <div class="queue-track">
+              ${lane.events.map((event) => `
+                <button class="queue-segment is-${escapeHtml(event.kind)} ${activeIds.has(event.id) ? 'is-active' : ''}"
+                  type="button"
+                  data-queue-id="${escapeHtml(event.id)}"
+                  data-line-id="${escapeHtml(event.line)}"
+                  style="--seg-left:${event.left}%;--seg-width:${event.width}%"
+                  title="${escapeHtml(event.label)}">${escapeHtml(event.short || event.label)}</button>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+        qsa('.queue-segment', root).forEach((button) => {
+          button.addEventListener('click', () => selectLine(button.dataset.lineId, { syncStep: true }));
+        });
+        qs('#queueNote').textContent = step.summary;
+      }
+
+      function syncPlaybackUi() {
+        const control = state.playbackControl;
+        if (!control?.elements) return;
+        const { play, scrubberLabel, scrubberOpname, scrubber } = control.elements;
+        const step = activeStep();
+        if (play) play.innerHTML = state.playbackTimer ? '&#10074;&#10074; Pause' : '&#9654; Play';
+        if (scrubber) {
+          scrubber.max = String(steps.length - 1);
+          scrubber.value = String(state.activeStep);
+        }
+        if (scrubberLabel) scrubberLabel.textContent = `${state.activeStep + 1} / ${steps.length}`;
+        if (scrubberOpname) scrubberOpname.textContent = `${step.phase} · ${step.short}`;
+        control.sync?.({ playing: Boolean(state.playbackTimer) });
+      }
+
+      function mountFloatingPlayback() {
+        const helper = window.PtoFloatingPlaybackControl;
+        const mount = qs('#floatingPlaybackMount');
+        if (!helper || !mount) return;
+        mount.innerHTML = '';
+        const control = helper.createControl({
+          id: 'instructionFloatingPlayback',
+          ids: {
+            shell: 'instruction-floating-shell',
+            toggle: 'instruction-floating-toggle',
+            collapsedButton: 'instruction-floating-collapsed-btn',
+            collapsedIcon: 'instruction-floating-collapsed-icon',
+            controls: 'instruction-controls-row',
+            stepBack: 'instruction-step-back-btn',
+            play: 'instruction-play-btn',
+            stepForward: 'instruction-step-fwd-btn',
+            replay: 'instruction-replay-btn',
+            scrubber: 'instruction-scrubber',
+            scrubberLabel: 'instruction-scrubber-label',
+            scrubberOpname: 'instruction-scrubber-opname',
+            scrubberHover: 'instruction-scrubber-hover',
+          },
+        });
+        mount.appendChild(control);
+        state.playbackControl = helper.init({
+          root: control,
+          isPlaying: () => Boolean(state.playbackTimer),
+        });
+        state.playbackControl.elements = {
+          ...state.playbackControl.elements,
+          stepBack: control.querySelector('#instruction-step-back-btn'),
+          play: control.querySelector('#instruction-play-btn'),
+          stepForward: control.querySelector('#instruction-step-fwd-btn'),
+          replay: control.querySelector('#instruction-replay-btn'),
+          scrubber: control.querySelector('#instruction-scrubber'),
+          scrubberLabel: control.querySelector('#instruction-scrubber-label'),
+          scrubberOpname: control.querySelector('#instruction-scrubber-opname'),
+        };
+        state.scrubberHover = helper.initScrubberHover({
+          root: control,
+          getTotalSteps: () => steps.length,
+          getLabelForStep: (index) => {
+            const step = steps[Math.max(0, Math.min(steps.length - 1, index))];
+            return `${String(index + 1).padStart(2, '0')} ${step.short}`;
+          },
+        });
+        const elements = state.playbackControl.elements;
+        elements.stepBack?.addEventListener('click', () => {
+          stopPlayback();
+          setStep(state.activeStep - 1, { selectSource: true });
+        });
+        elements.stepForward?.addEventListener('click', () => {
+          stopPlayback();
+          setStep(state.activeStep + 1, { selectSource: true });
+        });
+        elements.play?.addEventListener('click', togglePlayback);
+        elements.replay?.addEventListener('click', () => {
+          stopPlayback();
+          setStep(0, { selectSource: true });
+        });
+        elements.scrubber?.addEventListener('input', () => {
+          stopPlayback();
+          setStep(Number(elements.scrubber.value), { selectSource: true });
+        });
+        syncPlaybackUi();
+      }
+
+      function renderInspector() {
+        const line = enhancedLine(selectedAnnotation());
+        const drawer = qs('#inspectorDrawer');
+        drawer.classList.toggle('is-open', state.inspectorOpen);
+        drawer.setAttribute('aria-hidden', state.inspectorOpen ? 'false' : 'true');
+        qs('#inspectorTitle').textContent = line ? `${line.tag} · L${line.line}` : '等待选择';
+        if (!line) {
+          qs('#inspectorBody').innerHTML = '';
+          return;
+        }
+        const orderFacts = [
+          ['kernel_id', currentKernel().label],
+          ['blockDim', line.id === 'add-l79' ? 'numBlocks = 8' : 'from tiling/order'],
+          ['tilingKey', line.kind === 'control' ? 'branch selector' : 'consumed by kernel'],
+          ['stream', line.id === 'add-l79' ? 'aclrtStream' : 'already enqueued'],
+        ];
+        qs('#inspectorBody').innerHTML = `
+          <section class="inspector-section">
+            <div class="inspector-section-head">
+              <span class="inspector-section-title">当前对象</span>
+              <span class="mode-tag ${tagClass(line.kind)}">${escapeHtml(line.kind)}</span>
+            </div>
+            <div class="inspector-soft-card">${escapeHtml(line.code || line.short || '')}</div>
+          </section>
+          <section class="inspector-section">
+            <div class="inspector-section-head"><span class="inspector-section-title">一句话解释</span></div>
+            <div class="inspector-soft-card">${escapeHtml(line.explanation || line.short || '')}</div>
+          </section>
+          <section class="inspector-section">
+            <div class="inspector-section-head"><span class="inspector-section-title">AICPU / AI Core 边界</span></div>
+            <div class="inspector-soft-card">${line.kind === 'control'
+              ? '这行属于控制面：准备任务订单、stream、tiling 或同步依赖；AI Core 之后按已编译 kernel 执行。'
+              : '这行属于 AI Core 数据面：进入 MTE、Vector、Cube 或 Barrier 队列，不是 AICPU 逐条发指令。'}</div>
+          </section>
+          <section class="inspector-section">
+            <div class="inspector-section-head"><span class="inspector-section-title">任务订单</span></div>
+            <div class="fact-grid">
+              ${orderFacts.map(([key, value]) => `<div class="fact"><span>${escapeHtml(key)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}
+            </div>
+          </section>
+          <section class="inspector-section">
+            <div class="inspector-section-head"><span class="inspector-section-title">路径与证据</span></div>
+            <div class="inspector-soft-card">${escapeHtml(line.path || 'source-inferred')}</div>
+            <div class="reason-list">${(line.reasons || []).map((reason) => `<span class="reason-pill">${escapeHtml(reason)}</span>`).join('')}</div>
+          </section>
+        `;
+      }
+
+      function renderAll() {
+        renderSource();
+        renderStep();
+        renderTileGrid();
+        renderBuffers();
+        renderQueue();
+        applyArchitectureFocus();
+        renderInspector();
+      }
+
+      function selectLine(id, options = {}) {
+        const found = lineById(id);
+        if (found.kernel?.id && found.kernel.id !== state.selectedKernelId) {
+          state.selectedKernelId = found.kernel.id;
+          qs('#kernelSelect').value = found.kernel.id;
+        }
+        state.selectedLineId = found.line?.id || state.selectedLineId;
+        if (options.syncStep) {
+          const index = steps.findIndex((step) => step.sourceId === id || (step.queueIds || []).some((queueId) => (
+            queueLanes.some((lane) => lane.events.some((event) => event.id === queueId && event.line === id))
+          )));
+          if (index >= 0) state.activeStep = index;
+        }
+        renderAll();
+      }
+
+      function setStep(index, options = {}) {
+        state.activeStep = (index + steps.length) % steps.length;
+        if (options.selectSource && activeStep().sourceId) {
+          const found = lineById(activeStep().sourceId);
+          state.selectedKernelId = found.kernel.id;
+          state.selectedLineId = found.line.id;
+          qs('#kernelSelect').value = found.kernel.id;
+        }
+        renderAll();
+      }
+
+      function stopPlayback() {
+        if (!state.playbackTimer) return;
+        window.clearInterval(state.playbackTimer);
+        state.playbackTimer = 0;
+        syncPlaybackUi();
+      }
+
+      function togglePlayback() {
+        if (state.playbackTimer) {
+          stopPlayback();
+          return;
+        }
+        state.playbackTimer = window.setInterval(() => {
+          const next = state.activeStep + 1;
+          if (next >= steps.length) {
+            setStep(0, { selectSource: true });
+            stopPlayback();
+            return;
+          }
+          setStep(next, { selectSource: true });
+        }, 2200);
+        syncPlaybackUi();
+      }
+
+      function initEvents() {
+        qs('#sourceMarkToggle').addEventListener('click', () => {
+          state.annotationsVisible = !state.annotationsVisible;
+          renderSource();
+        });
+        qs('#openInspectorBtn').addEventListener('click', () => {
+          state.inspectorOpen = true;
+          renderInspector();
+        });
+        qs('#closeInspectorBtn').addEventListener('click', () => {
+          state.inspectorOpen = false;
+          renderInspector();
+        });
+        qs('#archZoomOutBtn').addEventListener('click', () => {
+          state.archScaleIndex = Math.max(0, state.archScaleIndex - 1);
+          renderArchitecture();
+        });
+        qs('#archZoomInBtn').addEventListener('click', () => {
+          state.archScaleIndex = Math.min(archZoomLevels.length - 1, state.archScaleIndex + 1);
+          renderArchitecture();
+        });
+        qs('#archFitBtn').addEventListener('click', () => {
+          state.archScaleIndex = 1;
+          renderArchitecture();
+        });
+        qs('#archActualBtn').addEventListener('click', () => {
+          state.archScaleIndex = archZoomLevels.length - 1;
+          renderArchitecture();
+        });
+        qs('#archSelect').addEventListener('change', () => {
+          qs('#selectedPathChip').textContent = qs('#archSelect').value === 'ascend910b'
+            ? '910B 抽象：AICPU + AIV path'
+            : '950B 内置：AIC/AIV + CV path';
+        });
+        window.addEventListener('resize', () => {
+          state.archOverlay?.render?.();
+          renderControlOverlay();
+          applyArchitectureFocus();
+        });
+      }
+
+      function initSplits() {
+        const shell = window.PtoWorkbenchShell;
+        if (!shell) return;
+        shell.initResizablePanes({
+          root: '#mainSplit',
+          panes: [qs('#sourcePane'), qs('#rightPane')],
+          direction: 'horizontal',
+          sizes: [34, 66],
+          minSize: [380, 720],
+          gutterSize: 8,
+          storageKey: 'instruction_visualizer_prd_demo_main_v3',
+          onResize: () => {
+            state.archOverlay?.render?.();
+            renderControlOverlay();
+            applyArchitectureFocus();
+          },
+        });
+        shell.initResizablePanes({
+          root: '#rightSplit',
+          panes: [qs('#archPane'), qs('#execPane')],
+          direction: 'vertical',
+          sizes: [58, 42],
+          minSize: [300, 260],
+          gutterSize: 8,
+          storageKey: 'instruction_visualizer_prd_demo_right_v3',
+          onResize: () => {
+            state.archOverlay?.render?.();
+            renderControlOverlay();
+            applyArchitectureFocus();
+          },
+        });
+      }
+
+      function init() {
+        if (!kernels.length) return;
+        renderKernelSelector();
+        initEvents();
+        initSplits();
+        mountFloatingPlayback();
+        renderArchitecture();
+        renderAll();
+        setStep(0, { selectSource: true });
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
