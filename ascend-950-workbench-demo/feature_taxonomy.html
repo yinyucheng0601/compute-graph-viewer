@@ -680,7 +680,7 @@ aside.right-pane {
       </svg>
     </a>
     <span>910B → 950 算子迁移特征分类</span>
-    <span class="title-sub">9 类本质差异 × 硬件架构联动</span>
+    <span class="title-sub">10 类本质差异 × 硬件架构联动</span>
   </div>
   <div class="header-right">
     <div class="seg" id="arch-seg" role="tablist" aria-label="架构切换">
@@ -701,7 +701,7 @@ aside.right-pane {
       </div>
     </div>
     <div class="nav-divider"></div>
-    <h2>9 类本质差异</h2>
+    <h2>10 类本质差异</h2>
     <div id="nav-list"></div>
   </nav>
 
@@ -738,7 +738,7 @@ aside.right-pane {
 <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js"></script>
 <script>
 /* ====================================================================
-   CATEGORY DATA — 9 essential differences + reverse map
+   CATEGORY DATA — 10 essential differences + reverse map
    ==================================================================== */
 const CATEGORIES = [
   {
@@ -785,12 +785,13 @@ const CATEGORIES = [
         [c('RegTensor'),     '<strong>矢量寄存器张量</strong> —— 寄存器堆里一段固定长度的向量', '无', '计算的第一类对象', pill('B')],
         [c('MaskReg'),       '<strong>谓词寄存器</strong> —— 一组 bit，控制矢量指令对哪些 lane 生效', '无（用 selector 间接做）', '显式独立寄存器，可单独算/搬', pill('B')],
         [c('AddrReg'),       '<strong>地址寄存器</strong> —— 存指针/偏移，给寄存器搬运指令用', '无（地址藏在 LocalTensor 里）', '显式对象', pill('B')],
+        [c('GM -> UB -> Reg'), '<strong>显式寄存器路径</strong>：GM 仍需先入 UB，再 Load/Store 到 RegTensor', '隐式 UB 对象为主', '显式 Load/Store 是 RegBase 入口', pill('B')],
         [c('LoadAlign') + ' / ' + c('StoreAlign'), 'UB ↔ RegTensor <strong>对齐搬运指令</strong>', '无', '寄存器编程的入/出口', pill('B')],
         [c('LocalMemBar'),   '<strong>本地内存屏障</strong> —— 寄存器与 UB 间的内存可见性同步', '用 set_flag/wait_flag 等旧原语', '与寄存器编程配套的新屏障', pill('B')],
         [c('asc_add') + '（寄存器级）', '<strong>寄存器算子</strong>', '无（Add 作用在 LocalTensor 上）', '作用在 RegTensor 上', pill('B')],
       ],
     },
-    note: '一句话：看到 <code>RegXxx / LoadAlign / LocalMemBar</code>，就知道这是"裸寄存器"风格 → 它本身就是 950 原生写法。',
+    note: '文档校验：RegBase 不是绕开 UB 直读 GM，而是把 <code>GM -> UB -> Reg</code> 这条链路显式化；因此 Tiling、UB 布局和寄存器压力要一起看。',
     hl: {
       '910b': { selectors: ['[data-aiv-node="vector:Vector"]', '[data-aiv-node="buffer:UB"]'], routes: [] },
       '950b': { selectors: ['[data-aiv-node="vector:Vector"]', '[data-aiv-node="buffer:UB"]'], routes: [] },
@@ -829,9 +830,9 @@ const CATEGORIES = [
     lead: {
       actor: '<strong>芯片设计</strong>（die 上的物理总线）',
       goal: '简化 Cube 数据流、减少绕路',
-      effect: '<strong>删</strong> GM → L0A/L0B 直通、L1 → GM 回写；<strong>加</strong> UB → L1、L0C → UB、ND-DMA、MicroScaling 通路',
+      effect: '<strong>删</strong> GM → L0A/L0B 直通、L1 → GM 回写；<strong>加</strong> UB → L1、L0C → UB、NDDMA、MicroScaling、SSBuf 通路',
     },
-    essence: 'Cube 周围那些 buffer (GM / L1 / L0A / L0B / L0C / UB / Fixpipe) 之间的<strong>物理连线</strong>重接了。这是 die 上的硬件电路变化，不是 API 变。一些旧通路<strong>没有了</strong>，一些新通路<strong>多了</strong>。',
+    essence: 'Cube 周围那些 buffer (GM / L1 / L0A / L0B / L0C / UB / Fixpipe) 之间的<strong>物理连线</strong>重接了。这是 die 上的硬件电路变化，不是 API 变。一些旧通路<strong>没有了</strong>，一些新通路<strong>多了</strong>；文档还把 UB2L1、L0C2UB、L12UB、DualDest、SSBuf 作为融合算子的重要信号。',
     table: {
       head: ['关键词 / 通路', '它是什么', '2201', '3510', '提示'],
       rows: [
@@ -842,7 +843,8 @@ const CATEGORIES = [
         [pill('new','新增') + ' UB → L1',     '减少 UB→GM→L1 的绕路', '无', '有', pill('opp','优化机会')],
         [pill('new','新增') + ' L0C → UB',    '矩阵后处理少一次绕路', '无', '有', pill('opp','优化机会')],
         [c('LoadData') + ' + MicroScaling',   'LoadData 的新参数路径，配合 MX 格式', '不支持', '新增', pill('B')],
-        ['ND-DMA / loop mode / DN 分型',      '<strong>高维 DMA 指令</strong>，搬多维 tensor 更灵活', '受限', '新增', pill('opp','优化机会')],
+        ['NDDMA / loop mode / DN 分型',       '<strong>高维 DMA 指令</strong>，支持多维非连续访存、自动补 PAD 等场景', '受限', '新增', pill('opp','优化机会')],
+        ['SSBuf / DualDest / L12UB',          '<strong>C-V 同步与共享通路</strong>，减少跨核中间结果落 GM', '无或弱', '融合算子重点路径', pill('opp','优化机会')],
       ],
     },
     hl: {
@@ -917,21 +919,24 @@ const CATEGORIES = [
   {
     id: 7,
     badge: '低比特',
-    title: 'MX 系列新增',
-    sub: 'MicroScaling 格式',
+    title: 'HiF8 / FP8 / MX 系列新增',
+    sub: '低比特格式成为核心路径',
     lead: {
       actor: '<strong>Cube / Matmul 硬件 + ISA</strong>',
-      goal: '支持 LLM 低比特推理（4/8 比特浮点）',
-      effect: '新增 MXFP4 / MXFP8 原生电路，<code>LoadData</code> 配套 MicroScaling 扩展，DeepSeek-V4 走 Hybrid FP8-MXFP4',
+      goal: '支持 LLM 低比特训练、推理和量化融合',
+      effect: '新增 HiF8、FP8、MXFP4 / MXFP8 等低比特路径，<code>LoadData</code> 配套 MicroScaling 扩展，scale 张量和量化阶段进入 Tiling 主路径',
     },
-    essence: 'MX = MicroScaling，一组带共享 scale 的低比特格式（FP4/FP8）。Cube/Matmul 高阶 API 新增了原生支持，配套 <code>LoadData</code> 有 MicroScaling 扩展。',
+    essence: '文档把低比特放在 Matmul、训练、推理和量化算子一起讲：HiF8 / FP8 / MXFP8 / MXFP4 不是简单 dtype 变小，而会改变 scale 布局、cast/round/saturate、矩阵搬运、量化/反量化融合和端到端精度验证。',
     table: {
       head: ['关键词', '它是什么', '2201', '3510', '提示'],
       rows: [
+        [c('hifloat8_t / HiF8'),              '8 比特浮点，文档强调动态范围、锥形精度、训练/推理 scaling', '无', '低比特一等格式', pill('B')],
+        [c('fp8_e5m2_t / fp8_e4m3fn_t'),      'FP8 内置数据类型，需关注 Cast、舍入、饱和和产品支持', '无或弱', '新增/增强', pill('B')],
         [c('MXFP4'),                          '4 比特浮点 + 共享 scale', '无', '原生 Cube 路径', pill('B')],
         [c('MXFP8'),                          '8 比特浮点 + 共享 scale', '无', '原生', pill('B')],
         [c('FP8-MXFP4') + ' / ' + c('MXFP8-MXFP4') + ' Hybrid', '混合精度 Matmul', '无', 'DeepSeek-V4 路径', pill('B')],
         [c('MicroScaling') + ' (在 LoadData 上)', '搬数据时附带 scale 处理', '无', '新增', pill('B')],
+        ['scale cache / n-buffer / AntiQuant', '低比特 Matmul 和量化 kernel 的配套缓存、伪量化和反量化路径', '无', '性能关键点', pill('opp','优化机会')],
         [c('Histograms') + ' 指令',           '用于 LightningIndexer Top-k 等', '无', '950 专用', pill('B')],
       ],
     },
@@ -989,6 +994,41 @@ const CATEGORIES = [
       '910b': { selectors: ['[data-aiv-node="vector:Vector"]'], routes: [] },
       '950b': { selectors: ['[data-aiv-node="vector:Vector"]'], routes: [] },
     },
+    note: '文档校验：Profiling 也从模型/算子级扩展到 Pipe 流水图、PC Sampling、SIMT 寄存器分析、片上带宽和 CCU profiling；这里的数值/同步变化要通过工具链闭环确认。',
+  },
+  {
+    id: 10,
+    badge: '通信',
+    title: 'HCCL 软件通信 → CCU 硬化通信',
+    sub: '集合通信专用引擎',
+    preferredArch: '950b',
+    lead: {
+      actor: '<strong>CCU 通信引擎</strong>（950 新增硬化资源）',
+      goal: '降低通信对内存带宽和 AI Core 的占用，把集合通信节点同步、地址交换、搬运和规约下沉到专用引擎',
+      effect: 'HCCL 仍提供通信语义和通信域管理；950 上需要同时理解 CCU 专用引擎、资源限制、片上数据路径和 profiling',
+    },
+    essence: '文档明确把通信从“调用 HCCL API 的软件层问题”推进到“CCU 专用引擎如何和 AI Core、片上内存协同”的硬件路径问题。ReduceScatter、AllGatherMatMul、Dispatch / Combine 等场景不能只看通信总耗时，要看 CCU 内部打点、片上内存压力和通算重叠。',
+    table: {
+      head: ['关键词', '它是什么', '2201 / 910B', '3510 / 950', '提示'],
+      rows: [
+        [c('HCCL'), '<strong>集合通信库</strong>，提供 AllReduce、AllGather、ReduceScatter、Broadcast、P2P 和通信域管理', '软件库语义为主', '仍是上层接口入口', pill('A','接口语义')],
+        [c('CCU'), '<strong>Collective Communication Unit</strong>，950 集合通信专用引擎', '无专用硬化引擎', '新增', pill('B')],
+        ['CCU 专用引擎', '集合通信硬化执行路径，重点落在 L2/片上互联协同、资源约束和 profiling 证据', '由软件/通用资源组织', '硬件通信节点', pill('B')],
+        ['LoopEngine / Loop Group / Memory Slice / channel', '通信实例、循环、片上切片和通道资源约束', '不是主要迁移检查项', '决定并发通信和通信域规模', pill('opp','优化机会')],
+        [c('ReduceScatter'), '典型集合通信，文档用它解释 CCU 编程模型和硬化规约', 'HCCL 软件调度视角', 'CCU 示例重点', pill('B')],
+        [c('AllGatherMatMul'), '通信与本地 Matmul 重排/重叠的通算融合场景', '通信常被当成 kernel 后黑盒', '通信与计算需要协同排布', pill('opp','优化机会')],
+        ['Dispatch / Combine', 'MOE 通信场景，可结合 layout、双 buffer、单边写降低同步开销', '软件编排为主', 'CCU + 片上内存协同', pill('opp','优化机会')],
+        ['CCU profiling', '通信引擎内部打点、片上内存压力、AI Core/CCU 协同诊断', '看 HCCL 总耗时为主', '必须纳入 950 调优闭环', pill('B')],
+      ],
+    },
+    note: '迁移判断：代码只调用 HCCL API 不等于已经用好 950 通信能力；出现 CCU、ReduceScatter 示例、AllGatherMatMul、Dispatch/Combine、CCU profiling 时，应按 950 原生通信路径分析。',
+    hl: {
+      '910b': { selectors: ['[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'], routes: [] },
+      '950b': {
+        selectors: ['[data-mem950-node="rail:L2"]'],
+        routes: [],
+      },
+    },
   },
 ];
 
@@ -1033,13 +1073,15 @@ const ABC_DETAIL = {
       'README 只写支持 Ascend 950PR/950DT',
       '代码出现 <code>RegBase</code>、<code>RegTensor</code>、<code>MaskReg</code>、<code>AddrReg</code>',
       '算子注册里有 <code>AddConfig("ascend950", regbaseCfg)</code>',
-      '文档提到 Histograms、MXFP8、MXFP4、FP8-MXFP4',
+      '文档提到 Histograms、HiF8、FP8、MXFP8、MXFP4、FP8-MXFP4',
+      '通信链路出现 CCU、ReduceScatter、AllGatherMatMul、Dispatch/Combine 或 CCU profiling',
     ],
     actions: [
       '默认按 3510/950 专用实现看待',
       '如果要兼容 2201，需要<strong>另写 2201 分支</strong>，而不是简单改编译参数',
       'Host 侧算子注册要同时声明不同 SoC 的实现，例如 <code>ascend910b</code> 和 <code>ascend950</code> 分别配置',
       'Tiling、workspace、scale 布局和量化格式要<strong>按代际拆开</strong>',
+      '通信路径要把 HCCL 语义、CCU 硬化资源和 AI Core 计算重叠一起验证',
     ],
   },
   C: {
@@ -1064,6 +1106,16 @@ const ABC_DETAIL = {
   },
 };
 
+const DOCUMENT_VALIDATION = {
+  head: ['文档核对点', '页面补充后的落点'],
+  rows: [
+    ['AI Core 子系统升级：低比特、C-V 通路、Vector、SIMD/SIMT、RegBase、NDDMA、Sector Cache', '类别 2 / 3 / 4 / 7 覆盖；类别 4 补入 NDDMA、SSBuf、DualDest、L12UB'],
+    ['低比特格式不是简单 dtype 替换，影响 scale、搬运、量化、训练/推理精度', '类别 7 从 MX-only 扩展为 HiF8 / FP8 / MX 全路径'],
+    ['通信不再只是 HCCL API；950 引入 CCU，目标是低带宽占用、低时延、零拷贝和确定性计算', '新增类别 10；右侧架构图不再新增 CCU 节点，仅保留 AI Core / L2 硬件路径'],
+    ['Profiling 扩展到 Pipe、PC Sampling、SIMT 寄存器、片上带宽和 CCU profiling', '类别 9 与类别 10 的 note 中加入工具链闭环要求'],
+  ],
+};
+
 const REVERSE_MAP = {
   reverse: {
     head: ['算子里只命中…', '多半属于', '因为'],
@@ -1071,7 +1123,8 @@ const REVERSE_MAP = {
       ['仅类别 1 的 <code>dav-2201, dav-3510</code> 双声明', pill('A','A'), '主观就奔着跨架构去'],
       ['类别 2（RegBase 全家）+ 类别 1 的 <code>dav-3510</code>', pill('B','B'), '950 原生编程对象'],
       ['类别 3（SIMT）', pill('B','B'), '950 原生执行模型'],
-      ['类别 7（MX / Histograms）', pill('B','B'), '950 原生 ISA'],
+      ['类别 7（HiF8 / FP8 / MX / Histograms）', pill('B','B'), '950 原生低比特路径'],
+      ['类别 10（CCU / 通算融合通信 / CCU profiling）', pill('B','B'), '950 原生通信硬化路径'],
       ['类别 4 / 5 / 6 任一', pill('C','C'), '触到了 Cube 硬件假设'],
       ['类别 8（UB bank 写死）', pill('C','C'), 'SRAM 微架构假设'],
       ['类别 9 的 Subnormal / IA 检查', pill('C','C') + ' <span class="muted">(兼 A 精度风险)</span>', '数值 / 调试假设'],
@@ -1232,7 +1285,7 @@ function renderDetailMap() {
       <span class="detail-badge">A / B / C</span>
     </div>
     <h1 class="detail-title">三类迁移场景</h1>
-    <div class="detail-subtitle">先建立 A/B/C 心智模型；再去看左侧 9 类本质差异，"提示"列就懂了</div>
+    <div class="detail-subtitle">先建立 A/B/C 心智模型；再去看左侧 10 类本质差异，"提示"列就懂了</div>
 
     <div class="section-h">三类速查（识别特征 + 处理方式）</div>
     <div class="abc-grid">
@@ -1241,7 +1294,10 @@ function renderDetailMap() {
       ${renderAbcCard(ABC_DETAIL.C)}
     </div>
 
-    <div class="section-h">反向映射：9 类信号 → A / B / C</div>
+    <div class="section-h">文档校验补充</div>
+    ${renderTable(DOCUMENT_VALIDATION)}
+
+    <div class="section-h">反向映射：10 类信号 → A / B / C</div>
     ${renderTable(REVERSE_MAP.reverse)}
 
     <div class="note">
@@ -1397,9 +1453,17 @@ document.getElementById('left-nav').addEventListener('click', (e) => {
   if (!item) return;
   const cat = item.dataset.cat;
   state.selectedId = cat === 'map' ? 'map' : Number(cat);
+  const selectedCat = cat === 'map' ? null : CATEGORIES.find(c => c.id === state.selectedId);
+  const preferredArch = selectedCat?.preferredArch;
+  const archChanged = Boolean(preferredArch && state.arch !== preferredArch);
+  if (archChanged) state.arch = preferredArch;
   renderNav();
   renderDetail();
-  applyHighlight();
+  if (archChanged) {
+    applyArch();
+  } else {
+    applyHighlight();
+  }
 });
 
 document.getElementById('arch-seg').addEventListener('click', (e) => {

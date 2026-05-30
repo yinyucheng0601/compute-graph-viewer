@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ascend 950 算子开发者学习指南</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/floating-playback-control/pattern.css">
+  <style>
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+      overflow: hidden;
+    }
+
+    body {
+      --guide-pane-radius: var(--radius-lg);
+    }
+
+    .guide-shell {
+      height: 100vh;
+      padding: var(--space-3);
+      gap: 0;
+      background: var(--background);
+    }
+
+    .guide-pane {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--guide-pane-radius);
+      background: var(--surface-2);
+      overflow: hidden;
+    }
+
+    .guide-nav {
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .guide-nav__head {
+      padding: var(--space-4) var(--space-4) var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .guide-kicker {
+      margin: 0 0 var(--space-2);
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .guide-title {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+    }
+
+    .guide-subtitle {
+      margin: var(--space-2) 0 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .guide-nav__body {
+      overflow: auto;
+      padding: var(--space-3);
+    }
+
+    .guide-nav-group + .guide-nav-group {
+      margin-top: var(--space-4);
+    }
+
+    .guide-nav-group__label {
+      padding: 0 var(--space-2) var(--space-2);
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .guide-nav-item {
+      width: 100%;
+      min-height: 38px;
+      padding: var(--space-2);
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      text-align: left;
+      display: grid;
+      gap: 2px;
+      cursor: pointer;
+    }
+
+    .guide-nav-item:hover,
+    .guide-nav-item.is-active {
+      background: var(--state-hover);
+      border-color: var(--border-subtle);
+      color: var(--foreground);
+    }
+
+    .guide-nav-item.is-active {
+      background: var(--state-selected);
+      border-color: color-mix(in srgb, var(--primary) 44%, transparent);
+    }
+
+    .guide-nav-item span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .guide-doc {
+      overflow: auto;
+      scroll-behavior: smooth;
+      background: var(--surface-2);
+    }
+
+    .guide-doc__inner {
+      width: min(880px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 34px 0 120px;
+    }
+
+    .doc-hero {
+      padding-bottom: var(--space-6);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .doc-hero h1 {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-display);
+      letter-spacing: 0;
+    }
+
+    .doc-hero p {
+      margin: var(--space-3) 0 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body);
+    }
+
+    .doc-section {
+      padding: 30px 0 0;
+      scroll-margin-top: 18px;
+    }
+
+    .doc-section h2 {
+      margin: 0 0 var(--space-3);
+      color: var(--foreground);
+      font: var(--text-title-1);
+      letter-spacing: 0;
+    }
+
+    .doc-section h3 {
+      margin: var(--space-5) 0 var(--space-2);
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+    }
+
+    .doc-section p,
+    .doc-section li {
+      color: var(--foreground-secondary);
+      font: var(--text-body);
+    }
+
+    .doc-section p {
+      margin: 0 0 var(--space-3);
+    }
+
+    .doc-section ul,
+    .doc-section ol {
+      margin: 0 0 var(--space-4);
+      padding-left: 22px;
+    }
+
+    .doc-section li + li {
+      margin-top: var(--space-2);
+    }
+
+    .doc-section strong {
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-3);
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+
+    .guide-table {
+      width: 100%;
+      margin: var(--space-3) 0 var(--space-5);
+      border-collapse: collapse;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      font: var(--text-body-sm);
+    }
+
+    .guide-table th,
+    .guide-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .guide-table th {
+      color: var(--foreground);
+      background: var(--surface-1);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .guide-table td {
+      color: var(--foreground-secondary);
+    }
+
+    .guide-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .doc-note {
+      margin: var(--space-4) 0;
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .arch-pane {
+      display: grid;
+      grid-template-rows: auto minmax(300px, 1fr) minmax(210px, 34%);
+      background: var(--surface-2);
+    }
+
+    .arch-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+      min-width: 0;
+    }
+
+    .arch-toolbar__title {
+      min-width: 0;
+    }
+
+    .arch-toolbar__title strong {
+      display: block;
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+    }
+
+    .arch-toolbar__title span {
+      display: block;
+      margin-top: 2px;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .arch-toolbar__actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex: 0 0 auto;
+    }
+
+    .arch-frame {
+      position: relative;
+      min-height: 0;
+      background: var(--background);
+      overflow: hidden;
+    }
+
+    .arch-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    .annotation-rail {
+      min-height: 0;
+      border-top: 1px solid var(--border-subtle);
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .annotation-rail__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .annotation-rail__head strong {
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+    }
+
+    .annotation-select-all {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      white-space: nowrap;
+    }
+
+    .annotation-list {
+      overflow: auto;
+      padding: var(--space-3);
+      display: grid;
+      gap: var(--space-2);
+      align-content: start;
+    }
+
+    .annotation-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--surface-1);
+      padding: var(--space-3);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-2);
+      cursor: pointer;
+    }
+
+    .annotation-card:hover,
+    .annotation-card.is-active {
+      border-color: var(--border-default);
+      background: color-mix(in srgb, var(--surface-1) 78%, var(--state-hover));
+    }
+
+    .annotation-card.is-active {
+      box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+
+    .annotation-card input {
+      margin-top: 2px;
+    }
+
+    .annotation-card__body {
+      min-width: 0;
+      display: grid;
+      gap: 5px;
+    }
+
+    .annotation-card__head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+
+    .annotation-card__title {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .annotation-card__tag {
+      min-height: var(--tag-height);
+      padding: 0 var(--space-2);
+      border-radius: var(--tag-radius);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .annotation-card__summary {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      margin: 0;
+    }
+
+    .annotation-card__targets {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0;
+    }
+
+    .empty-state {
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+      padding: var(--space-3);
+    }
+
+    .pto-floating-playback--guide {
+      --floating-playback-expanded-width: 960px;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .guide-shell {
+        height: auto;
+        min-height: 100vh;
+        flex-direction: column;
+      }
+
+      .guide-pane {
+        min-height: 320px;
+      }
+
+      .guide-doc__inner {
+        width: min(100% - 28px, 880px);
+      }
+
+      .arch-pane {
+        grid-template-rows: auto 420px 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="workbench-frame-split guide-shell" id="guideShell">
+    <nav class="workbench-pane guide-pane guide-nav" id="guideNavPane" aria-label="文档章节导航">
+      <div class="guide-nav__head">
+        <p class="guide-kicker">Operator Guide</p>
+        <h1 class="guide-title">Ascend 950 算子开发者学习指南</h1>
+        <p class="guide-subtitle">左侧按文档结构导航；右侧通过注释卡和播放条驱动架构联动。</p>
+      </div>
+      <div class="guide-nav__body" id="guideNav"></div>
+    </nav>
+
+    <section class="workbench-pane guide-pane guide-doc" id="docPane" aria-label="文档正文">
+      <article class="guide-doc__inner" id="docContent"></article>
+    </section>
+
+    <aside class="workbench-pane guide-pane arch-pane" id="archPane" aria-label="架构可视化与联动注释">
+      <div class="arch-toolbar">
+        <div class="arch-toolbar__title">
+          <strong>950 架构可视化</strong>
+          <span id="activeAnnotationTitle">选择注释卡，或使用底部播放条逐条查看</span>
+        </div>
+        <div class="arch-toolbar__actions">
+          <button class="btn btn-ghost btn-sm" type="button" id="clearFocusBtn">清除</button>
+          <button class="btn btn-sm" type="button" id="showAllBtn">全部选中</button>
+        </div>
+      </div>
+      <div class="arch-frame">
+        <iframe id="hardwareFrame" src="hardware-frame.html?preset=ascend950b" title="Ascend 950 hardware architecture"></iframe>
+      </div>
+      <section class="annotation-rail" aria-label="联动注释">
+        <div class="annotation-rail__head">
+          <strong>联动注释</strong>
+          <label class="annotation-select-all">
+            <input id="selectAllAnnotations" type="checkbox" checked>
+            <span id="selectedCount">0 / 0</span>
+          </label>
+        </div>
+        <div class="annotation-list" id="annotationList"></div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="playbackMount"></div>
+
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/floating-playback-control/pattern.js"></script>
+  <script>
+    const DOC_SECTIONS = [
+      {
+        group: '总览',
+        id: 'overview',
+        eyebrow: 'P0',
+        title: '一句话结论',
+        nav: '一句话结论',
+        html: `
+          <p>如果你已经熟悉 A3/910B 上的 Ascend C 算子开发，学习 950 时不要只看“算力提升”。更重要的是 950 把算子性能瓶颈从单纯的核内计算，进一步推向数据通路、片上内存、低比特格式、SIMD/SIMT 混合、通算融合和集合通信硬化资源的协同使用。</p>
+          <ul>
+            <li><strong>AI Core 子系统升级</strong>：低比特数据格式、Cube-Vector 融合通路、Vector 算力提升、SIMD/SIMT 同构、RegBase、NDDMA、128B Sector Cache。</li>
+            <li><strong>数据通路升级</strong>：950 相比 910B/910C 的关键变化包括 <code>L0C -> UBuffer</code>、<code>UBuffer -> L1</code>、SSBuf 消息通路，以及 UB2L1/L0C2UB 等 C-V 直连能力。</li>
+            <li><strong>低比特格式成为一等公民</strong>：FP8、MXFP8、MXFP4、HiF8 会影响 Matmul、量化、FIA、scale 设计和数据搬运。</li>
+            <li><strong>通信不再只是 HCCL API 调用层问题</strong>：950 引入 CCU，目标是降低内存带宽占用、降低通信时延、天然零拷贝和确定性计算。</li>
+            <li><strong>调优工具链更细</strong>：Profiling 扩展到 Pipe 流水图、PC Sampling、SIMT 寄存器分析、CCU profiling 和片上内存带宽分析。</li>
+          </ul>
+          <div class="doc-note">源材料目录：<code>/Users/yin/CANNvisual/950 ppt/导出md/</code>。950/A5 结论来自课件重组；术语解释用 CANN 公开文档补充，实际开发仍以安装的 CANN Toolkit、SoC 版本和 API 头文件为准。</div>
+        `,
+      },
+      {
+        group: '总览',
+        id: 'read-first',
+        eyebrow: 'P0 / P1',
+        title: '建议先读哪些课件',
+        nav: '建议先读课件',
+        html: `
+          <table class="guide-table">
+            <thead><tr><th>优先级</th><th>课件与页码</th><th>适合谁</th><th>阅读目的</th></tr></thead>
+            <tbody>
+              <tr><td>P0</td><td>面向新一代硬件，CANN技术架构的变与不变 Page 2-5、8-11</td><td>所有人</td><td>建立 950 架构、微架构、SIMT/SIMD、RegBase、CCU 的总图。</td></tr>
+              <tr><td>P0</td><td>场景驱动下的算子编程语言选型 Page 3-6、51-52</td><td>所有人</td><td>决定用 Ascend C、PyAsc/PyPTO、Triton-Ascend、TileLang 还是模板库。</td></tr>
+              <tr><td>P0</td><td>CANN 算子开发全链路体验升级 Page 3-13、19-25</td><td>Ascend C 开发者、调优者</td><td>理解 NDDMA、CV 直连、兼容迁移、Profiling 新能力。</td></tr>
+              <tr><td>P1</td><td>探索 Ascend 950 的性能天花板 Page 4-8、10-15、17-28、30-32</td><td>性能优化者</td><td>学习 Matmul、RmsNormQuant、FIA、通信融合优化。</td></tr>
+              <tr><td>P1</td><td>HiFloat8 数据格式及其训推应用 Page 3-15、17-31</td><td>低比特/量化开发者</td><td>理解 HiF8 编码、scaling、量化算子、训练/推理实践。</td></tr>
+              <tr><td>P1</td><td>HCCL 集合通信专用引擎 CCU 技术介绍 Page 2-16</td><td>分布式/通信开发者</td><td>理解 CCU 设计初衷、编程模型、ReduceScatter 示例和硬化资源。</td></tr>
+            </tbody>
+          </table>
+        `,
+      },
+      {
+        group: '重点差异',
+        id: 'diff-storage',
+        eyebrow: 'Architecture',
+        title: '架构形态与存储子系统',
+        nav: '存储子系统',
+        html: `
+          <p>课件把 950 分为 PR 与 DT 两类：<code>Ascend 950PR</code> 面向 LLM-Prefill、推荐、多模态等中等算力/带宽、低成本场景；<code>Ascend 950DT</code> 面向 LLM-Decode、训练等高算力/带宽场景。</p>
+          <p>存储子系统升级为高容量低成本 HiBL 1.0 与高访存带宽 HiZQ 2.0。算子开发时，Tiling 不能只围绕 UB/L1 容量做，需要把 L2 命中、Sector Cache、小包/非对齐访问、跨 Die/IO 数据流也纳入思考。</p>
+          <ul>
+            <li>Decode、Prefill、训练、推荐、多模态的瓶颈不同，不能照搬同一个 Matmul/Fusion 策略。</li>
+            <li>访问局部性更重要；对应到 Ascend C 就是减少 GM 往返、提高片上数据复用。</li>
+          </ul>
+        `,
+      },
+      {
+        group: '重点差异',
+        id: 'diff-cv',
+        eyebrow: 'Data Path',
+        title: 'Cube 与 Vector 协同',
+        nav: 'Cube/Vector 协同',
+        html: `
+          <p>950 新增或增强 C-V 通路：<code>UB2L1</code>、<code>L0C2UB</code>、<code>L12UB</code>、DualDest、SSBuf。以前很多融合算子需要经 GM 或 workspace 过渡，950 的直连通路让 Matmul 后处理、FIA、Matmul+Add、量化、Layout 转换有机会减少中间拷贝。</p>
+          <ul>
+            <li>Cube 开发者不能只关注 MMAD 主循环，还要关心 L0C 输出到 UB 后 Vector epilogue 如何接。</li>
+            <li>Vector 开发者不能只看独立 AIV 算子，要理解 Cube 结果何时、以什么布局进入 UB。</li>
+            <li>融合算子要围绕“数据从哪里来、停留在哪一级 Buffer、下一步给谁用”设计。</li>
+          </ul>
+        `,
+      },
+      {
+        group: '重点差异',
+        id: 'diff-regbase',
+        eyebrow: 'Vector',
+        title: 'Vector 从 Memory-based 走向 RegBase + SIMT/SIMD',
+        nav: 'RegBase / SIMT',
+        html: `
+          <p>950 Vector 单元支持 SIMT/SIMD，RegBase 架构带来显式寄存器读写。RegBase API 直接操作 Vector 计算寄存器，输入输出是 Reg 矢量计算寄存器，不再只能基于 LocalTensor；GM 数据仍需要先进入 UB，再显式 Load/Store 到寄存器。</p>
+          <ul>
+            <li>熟悉 910B Memory-based Vector 的开发者，需要补上 RegTensor、MaskReg、AddrReg、Load/Store、VF 函数。</li>
+            <li>分支复杂、离散访问、Gather/Scatter、Hash/Atomic 类算子更适合关注 SIMT。</li>
+            <li>规整向量计算、表达式融合更适合关注 SIMD/VF。</li>
+          </ul>
+        `,
+      },
+      {
+        group: '重点差异',
+        id: 'diff-lowbit',
+        eyebrow: 'Low Bit',
+        title: '低比特格式进入核心路径',
+        nav: '低比特格式',
+        html: `
+          <p>HiF8、FP8、MXFP8、MXFP4 不只是存储格式问题，而会影响 Matmul、训练、推理和量化算子组织。低比特不是简单把 dtype 改小，要配套 scale 张量、cast/round/saturate、矩阵搬运接口、误差评估和端到端精度验证。</p>
+          <ul>
+            <li>重点看 HiF8 的动态范围、锥形精度、训练 Delayed Scaling、推理直转与 W/A 量化组合。</li>
+            <li>Matmul/GMM/qbmm/MOE/FIA 要关注 scale cache、n-buffer、layout、AntiQuant/Quant 阶段融合。</li>
+          </ul>
+        `,
+      },
+      {
+        group: '重点差异',
+        id: 'diff-ccu',
+        eyebrow: 'Communication',
+        title: '通信从软件调度转向硬化执行',
+        nav: 'CCU 通信硬化',
+        html: `
+          <p>HCCL 提供通信算子接口与通信域管理接口，支持集合通信和点对点通信。950 进一步引入 CCU：<code>Collective Communication Unit</code> 是集合通信专用引擎，目标是完成通信节点间同步、地址交换、数据传输和规约计算，从而降低内存带宽占用、降低通信时延、释放 AI Core 资源。</p>
+          <ul>
+            <li>通信开发者要同时理解 HCCL API 语义和 CCU 硬件执行模型。</li>
+            <li>AllGatherMatMul、ReduceScatter、Dispatch/Combine 的性能来自通信与本地计算的重排和重叠。</li>
+            <li>950 通信 Profiling 不只看端到端耗时，还要看 CCU 内部性能打点、片上内存压力和 AI Core/CCU 协同。</li>
+          </ul>
+        `,
+      },
+      {
+        group: '角色路径',
+        id: 'roles',
+        eyebrow: 'Persona',
+        title: '面向不同开发者角色的阅读路径',
+        nav: '角色阅读路径',
+        html: `
+          <h3>角色 A：刚进入昇腾算子开发的新手</h3>
+          <p>先知道 CANN、Ascend C、算子工程、Tiling、CopyIn/Compute/CopyOut 是什么，避免一上来陷入 PTO、CCU、SIMT 细节。</p>
+          <h3>角色 B：已有 910B 经验的 Ascend C 算子开发者</h3>
+          <p>把 910B 心智迁移到 950，重点检查 ISASI 接口、Tiling 假设、GM 中间结果往返、NDDMA、RegBase/VF 和 Profiling 指标。</p>
+          <h3>角色 C：Cube / Matmul / GEMM 高性能开发者</h3>
+          <p>围绕矩阵乘、GEMM 后处理、低比特矩阵计算、L2 命中和多核负载均衡读课件。重点看 CATLASS、SWAT、StreamK、MX scale 缓存。</p>
+          <h3>角色 D：Vector / SIMT / RegBase 开发者</h3>
+          <p>从 910B 的 Memory-based Vector 迁移到 950 的 SIMD/SIMT 和 RegBase，判断哪些算子适合线程式表达，哪些适合 VF 融合。</p>
+          <h3>角色 E：融合算子开发者</h3>
+          <p>把 Cube、Vector、DataCopy、Layout、低比特和同步看成一个整体，而不是多个算子串联。先画数据流，再画计算流，最后画同步流。</p>
+          <h3>角色 F：通信与分布式算子开发者</h3>
+          <p>从 HCCL 集合通信语义深入到 950 CCU 硬化执行、通算融合、ReduceScatter/AllGatherMatMul/Dispatch/Combine。</p>
+          <h3>角色 G：低比特、量化与训推精度开发者</h3>
+          <p>理解 HiF8、FP8、MXFP8/MXFP4 的编码、scaling、算子支持和端到端精度风险。</p>
+          <h3>角色 H：工具链、调试与性能分析工程师</h3>
+          <p>建立 Profiling 分层诊断方法，把“慢”定位到模型调度、Tiling、Pipe、PC Stall、寄存器、片上带宽或 CCU。</p>
+          <h3>角色 I：PTO/ISA/编译器/极致性能开发者</h3>
+          <p>用虚拟指令集视角理解 Tile、Buffer、调度和硬件抽象，但不要把 PTO 当作所有开发者的第一入口。</p>
+        `,
+      },
+      {
+        group: '术语与路线',
+        id: 'terms',
+        eyebrow: 'Glossary',
+        title: '核心术语速查',
+        nav: '核心术语',
+        html: `
+          <table class="guide-table">
+            <thead><tr><th>术语</th><th>解释</th><th>建议阅读</th></tr></thead>
+            <tbody>
+              <tr><td>CANN</td><td>昇腾面向 AI 场景的异构计算架构，连接上层框架与下层处理器、编程、运行时、算子库、通信库。</td><td>官方《CANN 是什么》</td></tr>
+              <tr><td>Ascend C</td><td>CANN 针对算子开发推出的 C/C++ 编程语言和 API 体系。</td><td>官方《什么是 Ascend C》</td></tr>
+              <tr><td>Tiling</td><td>Host 侧根据 shape、硬件资源、数据类型等生成切分参数；950 上要重新审视 L2、C-V 通路、低比特 scale、CCU。</td><td>工程化算子开发</td></tr>
+              <tr><td>TPipe / TQue</td><td>TPipe 管理 Device 端内存和事件；TQue 用于流水任务间通信和同步。</td><td>TPipe/TQue 编程</td></tr>
+              <tr><td>GM / UB / L1 / L0</td><td>常见内存层级。950 学习重点是减少 GM 往返、理解 UB2L1/L0C2UB。</td><td>课件 + Ascend C</td></tr>
+              <tr><td>SIMD / SIMT</td><td>SIMD 面向规整向量；SIMT 面向线程式 lane、分支和离散访存。</td><td>Reg 矢量计算 / SIMT API</td></tr>
+              <tr><td>RegBase / RegTensor</td><td>显式操作 Vector 计算寄存器，减少 UB 中间结果往返。</td><td>官方 Reg 矢量计算</td></tr>
+              <tr><td>NDDMA</td><td>多层循环搬运能力，支持多维非连续访存、自动补 PAD 等。</td><td>多维 DataCopy</td></tr>
+              <tr><td>HiF8 / MXFP8 / MXFP4</td><td>低比特格式和带 scale 的矩阵计算格式，影响 scale 布局、搬运、缓存和矩阵接口。</td><td>HiF8 课件 + Load2DMX</td></tr>
+              <tr><td>HCCL / CCU</td><td>HCCL 是集合通信库；CCU 是 950 集合通信专用引擎。</td><td>HCCL/CCU 课件</td></tr>
+            </tbody>
+          </table>
+        `,
+      },
+      {
+        group: '术语与路线',
+        id: 'learning-route',
+        eyebrow: 'Route',
+        title: '分层学习路线',
+        nav: '分层学习路线',
+        html: `
+          <ol>
+            <li><strong>建立架构地图</strong>：知道 PR/DT、存储子系统、AI Core、SIMT/SIMD、RegBase、CCU 分别解决什么问题。</li>
+            <li><strong>确定语言与抽象层</strong>：算法验证可用 PyPTO/Triton-Ascend/TileLang；性能优先看 Ascend C、基础 API、PTO/Expert 模式。</li>
+            <li><strong>掌握 Ascend C 核内流水</strong>：把 <code>CopyIn -> Compute -> CopyOut</code>、Double Buffer、Tiling、NDDMA、CV 直连和同步机制串起来。</li>
+            <li><strong>按角色深入</strong>：Cube/GEMM、Vector、融合、通信、量化各自走对应课件。</li>
+            <li><strong>用 Profiling 关闭循环</strong>：Roofline、Pipe 流水图、PC Sampling、Reg 分析、片上带宽、CCU profiling。</li>
+          </ol>
+        `,
+      },
+      {
+        group: '实战',
+        id: 'practice',
+        eyebrow: 'Practice',
+        title: '面向实战的练习',
+        nav: '实战练习',
+        html: `
+          <h3>练习 1：把 Add/Abs 类 Vector 算子跑通</h3>
+          <p>使用工程化算子或 ASC 直调方式完成编译运行，标注 <code>CopyIn -> Compute -> CopyOut</code>，开启 Double Buffer 前后对比 Pipe 图。</p>
+          <h3>练习 2：做一个 Matmul 基线与两轮优化</h3>
+          <p>用 CATLASS 或 Ascend C Matmul 写 baseline，加入 Double Buffer 或 Swizzle，观察 L2 命中、带宽供应、尾块拖尾。</p>
+          <h3>练习 3：分析 RmsNormQuant 的融合边界</h3>
+          <p>分解 RMS、归一化、量化、搬入/搬出，判断 VF 融合、小包/非对齐、尾块和寄存器压力。</p>
+          <h3>练习 4：为一个 Attention/FIA 画数据流</h3>
+          <p>标注 Q/K/V、Softmax、Cast、Transdata、Matmul 的数据位置，并判断 CV 共享通道、VF 融合和数据常驻收益。</p>
+          <h3>练习 5：拆解一个 ReduceScatter 或 AllGatherMatMul</h3>
+          <p>从 HCCL 语义写出输入输出和通信域，从 CCU 课件角度标出 Endpoint、Loop、Memory Slice、channel，并用 Profiling 区分 AI Core 与 CCU/片上带宽瓶颈。</p>
+        `,
+      },
+      {
+        group: '实战',
+        id: 'pitfalls',
+        eyebrow: 'Review',
+        title: '常见误区与推荐顺序',
+        nav: '误区与顺序',
+        html: `
+          <ul>
+            <li><strong>把 950 当成 910B 的算力增强版</strong>：950 的关键变化在数据通路、低比特、RegBase、CCU 和工具链。</li>
+            <li><strong>过早进入 PTO</strong>：多数业务算子应先掌握工程化 Ascend C、模板库和 Profiling。</li>
+            <li><strong>只优化 Compute，不优化 Copy</strong>：950 课件反复强调搬运、Layout、Buffer、L2、NDDMA、CV 直连。</li>
+            <li><strong>把低比特当 dtype 替换</strong>：HiF8/MXFP8/MXFP4 需要 scale、cast、校准、端到端精度和性能联动验证。</li>
+            <li><strong>用总耗时判断一切</strong>：需要看 Pipe、PC、寄存器、片上带宽、CCU profiling。</li>
+          </ul>
+          <div class="doc-note">如果只有半天：先读硬件架构与语言选型，再选自己的角色路径。如果要实际迁移 910B 算子到 950：先做 910B Profiling 基线，标注硬件假设，再在 950 上逐步启用 NDDMA、CV 直连、RegBase、低比特或 CCU。</div>
+        `,
+      },
+    ];
+
+    const LINKED_ANNOTATIONS = [
+      {
+        id: 'ai-core-map',
+        sectionId: 'overview',
+        tag: '总图',
+        title: 'AI Core 子系统升级总图',
+        shortTitle: 'AI Core 总图',
+        summary: '把 L2、AIC、AIV、Cube、Vector 放到同一张心智图上，先看数据停留在哪一级。',
+        targets: 'L2 / AIC / AIV / Cube / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+            '[data-mem950-node="core:AIV1"]',
+            '[data-mem950-node="core:AIC"]',
+            '[data-mem950-node="core:AIV2"]',
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+            '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['l2-to-aic', 'l2-to-aiv1', 'l2-to-aiv2'],
+        },
+      },
+      {
+        id: 'tiling-locality',
+        sectionId: 'diff-storage',
+        tag: 'Tiling',
+        title: 'Tiling 从 UB/L1 扩展到 L2/局部性',
+        shortTitle: 'Tiling 局部性',
+        summary: '950 的 Tiling 要同时看 GM 往返、L2 命中、L1/UB 常驻与小包路径。',
+        targets: 'GM / L2 / L1 / UB',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:GM"]',
+            '[data-mem950-node="rail:L2"]',
+            '#mem950-aic [data-aic-node="buffer:L1"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv2 [data-aiv-node="buffer:UB"]',
+          ],
+          routes: ['l2-to-aic', 'l2-to-aiv1', 'l2-to-aiv2', 'aiv1-to-l2', 'aiv2-to-l2'],
+        },
+      },
+      {
+        id: 'cv-direct',
+        sectionId: 'diff-cv',
+        tag: 'CV',
+        title: 'C-V 直连：L0C→UB 与 UB→L1',
+        shortTitle: 'CV 直连',
+        summary: 'Matmul 后处理、FIA、量化和 Layout 转换可以少走 GM/workspace 中间态。',
+        targets: 'L0C→UB / UB→L1',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aic [data-aic-node="buffer:L0C"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv2 [data-aiv-node="buffer:UB"]',
+            '#mem950-aic [data-aic-node="buffer:L1"]',
+          ],
+          routes: ['aic-to-aiv1', 'aiv2-to-aic'],
+        },
+      },
+      {
+        id: 'matmul-epilogue',
+        sectionId: 'diff-cv',
+        tag: 'Fusion',
+        title: 'Matmul + Epilogue 的数据接续',
+        shortTitle: 'Matmul Epilogue',
+        summary: 'Cube 输出停在 L0C 后，优先考虑是否能直接接 Vector epilogue，而不是写回 GM。',
+        targets: 'Cube / L0C / UB / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+            '#mem950-aic [data-aic-node="buffer:L0C"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['aic-to-aiv1'],
+        },
+      },
+      {
+        id: 'regbase-flow',
+        sectionId: 'diff-regbase',
+        tag: 'RegBase',
+        title: 'RegBase：GM→UB→Reg→Vector',
+        shortTitle: 'RegBase',
+        summary: 'RegBase 不是绕过 UB；它把 UB 中的数据显式 Load 到寄存器，再做 VF/RegTensor 计算。',
+        targets: 'UB / SIMD / SIMT / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMD"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMT"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['l2-to-aiv1', 'aiv1-to-l2'],
+        },
+      },
+      {
+        id: 'simt-use-case',
+        sectionId: 'diff-regbase',
+        tag: 'SIMT',
+        title: 'SIMT：离散访存与复杂分支',
+        shortTitle: 'SIMT',
+        summary: 'Gather/Scatter、Hash/Atomic、直方图等线程式场景优先关注 SIMT 子系统。',
+        targets: 'DCache / SIMT / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aiv1 [data-aiv-node="cache:DCache"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMT"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['l2-to-aiv1-dcache'],
+        },
+      },
+      {
+        id: 'lowbit-matmul',
+        sectionId: 'diff-lowbit',
+        tag: 'LowBit',
+        title: '低比特矩阵路径与 scale',
+        shortTitle: '低比特',
+        summary: 'MXFP8/MXFP4/HiF8 会影响 LoadData、Cube、FixPipe、scale 缓存和量化/反量化阶段。',
+        targets: 'L0A / L0B / Cube / FP',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aic [data-aic-node="buffer:L0A"]',
+            '#mem950-aic [data-aic-node="buffer:L0B"]',
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+            '#mem950-aic [data-aic-node="buffer:FP"]',
+          ],
+          routes: ['l2-to-aic'],
+        },
+      },
+      {
+        id: 'nddma-copy',
+        sectionId: 'learning-route',
+        tag: 'Copy',
+        title: 'NDDMA 与多维非连续搬运',
+        shortTitle: 'NDDMA',
+        summary: '多维、非连续、带 padding、as-strided、transpose、broadcast 场景要先看搬运路径。',
+        targets: 'L2 / UB / L1',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aic [data-aic-node="buffer:L1"]',
+          ],
+          routes: ['l2-to-aiv1', 'l2-to-aic'],
+        },
+      },
+      {
+        id: 'ccu-overview',
+        sectionId: 'diff-ccu',
+        tag: 'CCU',
+        title: 'CCU：集合通信专用引擎',
+        shortTitle: 'CCU 总览',
+        summary: 'CCU 将集合通信从纯软件调度推进到靠近 L2/片上互联的硬化执行路径。',
+        targets: 'L2 / 片上互联',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+          ],
+          routes: [],
+        },
+      },
+      {
+        id: 'ccu-reduce',
+        sectionId: 'practice',
+        tag: 'Collective',
+        title: 'ReduceScatter / AllReduce 的规约阶段',
+        shortTitle: 'CCU Collective',
+        summary: '拆通信算子时，把 Endpoint、Loop、Memory Slice、channel 与规约计算分开看。',
+        targets: 'L2 / 片上互联',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+          ],
+          routes: [],
+        },
+      },
+      {
+        id: 'profiling-loop',
+        sectionId: 'learning-route',
+        tag: 'Profile',
+        title: 'Profiling 关闭优化循环',
+        shortTitle: 'Profiling',
+        summary: 'Pipe、PC Sampling、Reg、片上带宽、CCU profiling 要对应到具体数据路径和硬件对象。',
+        targets: 'L2 / UB / Cube',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+          ],
+          routes: ['l2-to-aiv1', 'l2-to-aic'],
+        },
+      },
+      {
+        id: 'role-c-matmul',
+        sectionId: 'roles',
+        tag: 'Role C',
+        title: 'Cube/GEMM 开发者：先看主循环和 L2',
+        shortTitle: 'Role C',
+        summary: 'Matmul baseline、Double Buffer、Swizzle、SWAT/StreamK 都要落到 L2→L1→L0→Cube 的路径上验证。',
+        targets: 'L2 / L1 / L0 / Cube',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+            '#mem950-aic [data-aic-node="buffer:L1"]',
+            '#mem950-aic [data-aic-node="buffer:L0A"]',
+            '#mem950-aic [data-aic-node="buffer:L0B"]',
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+          ],
+          routes: ['l2-to-aic'],
+        },
+      },
+      {
+        id: 'role-d-vector',
+        sectionId: 'roles',
+        tag: 'Role D',
+        title: 'Vector 开发者：SIMD/SIMT 与 UB/Reg',
+        shortTitle: 'Role D',
+        summary: '规整表达式看 SIMD/VF，离散访存和分支看 SIMT；都要理解 UB 到寄存器的边界。',
+        targets: 'UB / SIMD / SIMT / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aiv2 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv2 [data-aiv-node="exec:SIMD"]',
+            '#mem950-aiv2 [data-aiv-node="exec:SIMT"]',
+            '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['l2-to-aiv2', 'aiv2-to-l2'],
+        },
+      },
+      {
+        id: 'role-e-fusion',
+        sectionId: 'roles',
+        tag: 'Role E',
+        title: '融合算子：数据流、计算流、同步流',
+        shortTitle: 'Role E',
+        summary: 'FIA、RmsNormQuant、Matmul+Epilogue 要同时看 Cube、Vector、DataCopy、Layout、低比特和同步。',
+        targets: 'Cube / L0C / UB / Vector',
+        selected: true,
+        focus: {
+          selectors: [
+            '#mem950-aic [data-aic-node="cube:CUBE"]',
+            '#mem950-aic [data-aic-node="buffer:L0C"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['l2-to-aic', 'aic-to-aiv1'],
+        },
+      },
+      {
+        id: 'role-f-comm',
+        sectionId: 'roles',
+        tag: 'Role F',
+        title: '通信开发者：HCCL 语义落到 CCU 资源',
+        shortTitle: 'Role F',
+        summary: 'AllGather、ReduceScatter、Dispatch/Combine 要看 CCU 与本地计算的重排和重叠。',
+        targets: 'L2 / 片上互联',
+        selected: true,
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:L2"]',
+          ],
+          routes: [],
+        },
+      },
+    ];
+
+    const state = {
+      activeSectionId: DOC_SECTIONS[0].id,
+      activeAnnotationId: LINKED_ANNOTATIONS[0].id,
+      selectedIds: new Set(LINKED_ANNOTATIONS.filter((item) => item.selected).map((item) => item.id)),
+      iframeReady: false,
+      playing: false,
+      timer: null,
+      currentIndex: 0,
+    };
+
+    const hardwareFrame = document.getElementById('hardwareFrame');
+    const guideNav = document.getElementById('guideNav');
+    const docContent = document.getElementById('docContent');
+    const docPane = document.getElementById('docPane');
+    const annotationList = document.getElementById('annotationList');
+    const activeAnnotationTitle = document.getElementById('activeAnnotationTitle');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectAllAnnotations = document.getElementById('selectAllAnnotations');
+
+    function groupedSections() {
+      return DOC_SECTIONS.reduce((groups, section) => {
+        if (!groups.has(section.group)) groups.set(section.group, []);
+        groups.get(section.group).push(section);
+        return groups;
+      }, new Map());
+    }
+
+    function renderDoc() {
+      docContent.innerHTML = `
+        <header class="doc-hero">
+          <p class="guide-kicker">Ascend 950</p>
+          <h1>算子开发者学习指南</h1>
+          <p>基于 8 套 950 课件抽取结果重组，目标是给不同类型、不同水平的算子开发者一条可执行的阅读路径，并把可以落到硬件图上的知识点做成联动注释。</p>
+        </header>
+        ${DOC_SECTIONS.map((section) => `
+          <section class="doc-section" id="${section.id}" data-section-id="${section.id}">
+            <p class="guide-kicker">${section.eyebrow}</p>
+            <h2>${section.title}</h2>
+            ${section.html}
+          </section>
+        `).join('')}
+      `;
+    }
+
+    function renderNav() {
+      const groups = groupedSections();
+      guideNav.innerHTML = Array.from(groups.entries()).map(([label, sections]) => `
+        <div class="guide-nav-group">
+          <div class="guide-nav-group__label">${label}</div>
+          ${sections.map((section) => `
+            <button class="guide-nav-item ${state.activeSectionId === section.id ? 'is-active' : ''}" type="button" data-section-id="${section.id}">
+              <strong>${section.nav}</strong>
+              <span>${section.eyebrow}</span>
+            </button>
+          `).join('')}
+        </div>
+      `).join('');
+    }
+
+    function selectedAnnotations() {
+      return LINKED_ANNOTATIONS.filter((item) => state.selectedIds.has(item.id));
+    }
+
+    function annotationIndexById(id) {
+      const list = selectedAnnotations();
+      return Math.max(0, list.findIndex((item) => item.id === id));
+    }
+
+    function renderAnnotations() {
+      annotationList.innerHTML = LINKED_ANNOTATIONS.map((item) => {
+        const checked = state.selectedIds.has(item.id);
+        const active = state.activeAnnotationId === item.id;
+        return `
+          <label class="annotation-card ${active ? 'is-active' : ''}" data-annotation-id="${item.id}">
+            <input type="checkbox" ${checked ? 'checked' : ''} data-annotation-check="${item.id}" aria-label="选择 ${item.title}">
+            <span class="annotation-card__body">
+              <span class="annotation-card__head">
+                <span class="annotation-card__tag">${item.tag}</span>
+                <span class="annotation-card__title">${item.title}</span>
+              </span>
+              <span class="annotation-card__summary">${item.summary}</span>
+              <span class="annotation-card__targets">${item.targets}</span>
+            </span>
+          </label>
+        `;
+      }).join('');
+      const total = LINKED_ANNOTATIONS.length;
+      const selected = state.selectedIds.size;
+      selectedCount.textContent = `${selected} / ${total}`;
+      selectAllAnnotations.checked = selected === total;
+      selectAllAnnotations.indeterminate = selected > 0 && selected < total;
+      syncPlaybackUi();
+    }
+
+    function sendHardwareMessage(payload) {
+      if (!state.iframeReady || !hardwareFrame.contentWindow) return;
+      hardwareFrame.contentWindow.postMessage(payload, '*');
+    }
+
+    function applyAnnotation(annotation, options = {}) {
+      if (!annotation) return;
+      state.activeAnnotationId = annotation.id;
+      state.activeSectionId = annotation.sectionId;
+      state.currentIndex = annotationIndexById(annotation.id);
+      activeAnnotationTitle.textContent = annotation.title;
+      sendHardwareMessage({
+        type: 'hardware-focus',
+        selectors: annotation.focus.selectors || [],
+        routes: annotation.focus.routes || [],
+      });
+      if (options.scrollDoc !== false) {
+        document.getElementById(annotation.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      renderNav();
+      renderAnnotations();
+    }
+
+    function clearFocus() {
+      state.activeAnnotationId = '';
+      activeAnnotationTitle.textContent = '选择注释卡，或使用底部播放条逐条查看';
+      sendHardwareMessage({ type: 'hardware-focus', selectors: [], routes: [] });
+      renderAnnotations();
+    }
+
+    function jumpToSection(sectionId) {
+      state.activeSectionId = sectionId;
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const annotation = LINKED_ANNOTATIONS.find((item) => item.sectionId === sectionId && state.selectedIds.has(item.id));
+      if (annotation) applyAnnotation(annotation, { scrollDoc: false });
+      renderNav();
+    }
+
+    function playableAnnotations() {
+      const list = selectedAnnotations();
+      if (list.length > 0) return list;
+      return [];
+    }
+
+    function step(delta) {
+      const list = playableAnnotations();
+      if (list.length === 0) {
+        clearFocus();
+        return;
+      }
+      state.currentIndex = (state.currentIndex + delta + list.length) % list.length;
+      applyAnnotation(list[state.currentIndex]);
+    }
+
+    function stopPlayback() {
+      state.playing = false;
+      if (state.timer) window.clearInterval(state.timer);
+      state.timer = null;
+      syncPlaybackUi();
+    }
+
+    function startPlayback() {
+      const list = playableAnnotations();
+      if (list.length === 0) return;
+      state.playing = true;
+      applyAnnotation(list[state.currentIndex] || list[0]);
+      state.timer = window.setInterval(() => step(1), 2200);
+      syncPlaybackUi();
+    }
+
+    let floatingControl = null;
+    let scrubberHover = null;
+
+    function setupFloatingPlayback() {
+      const helper = window.PtoFloatingPlaybackControl;
+      if (!helper?.createControl) return;
+      const ids = {
+        shell: 'guide-floating-shell',
+        toggle: 'guide-floating-toggle',
+        collapsedButton: 'guide-floating-collapsed-btn',
+        collapsedIcon: 'guide-floating-collapsed-icon',
+        controls: 'guide-controls-row',
+        stepBack: 'guide-step-back-btn',
+        play: 'guide-play-btn',
+        stepForward: 'guide-step-fwd-btn',
+        replay: 'guide-replay-btn',
+        scrubber: 'guide-scrubber',
+        scrubberLabel: 'guide-scrubber-label',
+        scrubberOpname: 'guide-scrubber-opname',
+        scrubberHover: 'guide-scrubber-hover',
+      };
+      const control = helper.createControl({ ids, className: 'pto-floating-playback--guide' });
+      document.getElementById('playbackMount').appendChild(control);
+      floatingControl = helper.init({ root: control, isPlaying: () => state.playing });
+      const playBtn = document.getElementById(ids.play);
+      const stepBackBtn = document.getElementById(ids.stepBack);
+      const stepForwardBtn = document.getElementById(ids.stepForward);
+      const replayBtn = document.getElementById(ids.replay);
+      const scrubber = document.getElementById(ids.scrubber);
+      const label = document.getElementById(ids.scrubberLabel);
+      const opname = document.getElementById(ids.scrubberOpname);
+      const timelineLabel = control.querySelector('.pto-floating-playback__label');
+      if (timelineLabel) timelineLabel.textContent = 'Annotations';
+
+      playBtn.addEventListener('click', () => {
+        if (state.playing) stopPlayback();
+        else startPlayback();
+      });
+      stepBackBtn.addEventListener('click', () => {
+        stopPlayback();
+        step(-1);
+      });
+      stepForwardBtn.addEventListener('click', () => {
+        stopPlayback();
+        step(1);
+      });
+      replayBtn.addEventListener('click', () => {
+        stopPlayback();
+        state.currentIndex = 0;
+        const first = playableAnnotations()[0];
+        if (first) applyAnnotation(first);
+      });
+      scrubber.addEventListener('input', () => {
+        stopPlayback();
+        const list = playableAnnotations();
+        state.currentIndex = Number(scrubber.value) || 0;
+        if (list[state.currentIndex]) applyAnnotation(list[state.currentIndex]);
+      });
+
+      scrubberHover = helper.initScrubberHover({
+        root: control,
+        getTotalSteps: () => Math.max(1, playableAnnotations().length),
+        getLabelForStep: (stepIndex) => playableAnnotations()[stepIndex]?.shortTitle || 'No annotation',
+      });
+
+      window.guidePlaybackElements = { ids, playBtn, scrubber, label, opname };
+      syncPlaybackUi();
+    }
+
+    function syncPlaybackUi() {
+      const helper = window.PtoFloatingPlaybackControl;
+      const elements = window.guidePlaybackElements;
+      if (!elements) return;
+      const list = playableAnnotations();
+      const max = Math.max(0, list.length - 1);
+      elements.scrubber.max = String(max);
+      elements.scrubber.value = String(Math.min(state.currentIndex, max));
+      elements.label.textContent = list.length > 0 ? `${Math.min(state.currentIndex + 1, list.length)} / ${list.length}` : '0 / 0';
+      elements.opname.textContent = list[state.currentIndex]?.shortTitle || 'No selected annotation';
+      elements.playBtn.innerHTML = state.playing
+        ? `${helper.icons.pause}<span>Pause</span>`
+        : `${helper.icons.play}<span>Play</span>`;
+      floatingControl?.sync({ playing: state.playing });
+    }
+
+    function initSplit() {
+      window.PtoWorkbenchShell?.initResizablePanes?.({
+        panes: ['#guideNavPane', '#docPane', '#archPane'],
+        direction: 'horizontal',
+        sizes: [19, 43, 38],
+        minSize: [220, 420, 420],
+        gutterSize: 10,
+        storageKey: 'ascend950-operator-guide-split-v1',
+        gutterLabel: '调整相邻栏宽度',
+      });
+    }
+
+    function initObservers() {
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        state.activeSectionId = visible.target.dataset.sectionId;
+        renderNav();
+      }, {
+        root: docPane,
+        threshold: [0.28, 0.55],
+      });
+      document.querySelectorAll('.doc-section').forEach((section) => observer.observe(section));
+    }
+
+    guideNav.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-section-id]');
+      if (!button) return;
+      jumpToSection(button.dataset.sectionId);
+    });
+
+    annotationList.addEventListener('click', (event) => {
+      const checkbox = event.target.closest('[data-annotation-check]');
+      if (checkbox) {
+        const id = checkbox.dataset.annotationCheck;
+        if (checkbox.checked) state.selectedIds.add(id);
+        else state.selectedIds.delete(id);
+        if (!state.selectedIds.has(state.activeAnnotationId)) {
+          const next = playableAnnotations()[0];
+          if (next) applyAnnotation(next, { scrollDoc: false });
+          else clearFocus();
+        }
+        renderAnnotations();
+        return;
+      }
+      const card = event.target.closest('[data-annotation-id]');
+      if (!card) return;
+      const annotation = LINKED_ANNOTATIONS.find((item) => item.id === card.dataset.annotationId);
+      stopPlayback();
+      applyAnnotation(annotation);
+    });
+
+    selectAllAnnotations.addEventListener('change', () => {
+      if (selectAllAnnotations.checked) {
+        LINKED_ANNOTATIONS.forEach((item) => state.selectedIds.add(item.id));
+      } else {
+        state.selectedIds.clear();
+      }
+      const next = playableAnnotations()[0];
+      if (next) applyAnnotation(next, { scrollDoc: false });
+      else clearFocus();
+      renderAnnotations();
+    });
+
+    document.getElementById('showAllBtn').addEventListener('click', () => {
+      LINKED_ANNOTATIONS.forEach((item) => state.selectedIds.add(item.id));
+      const next = playableAnnotations()[0];
+      if (next) applyAnnotation(next, { scrollDoc: false });
+      renderAnnotations();
+    });
+
+    document.getElementById('clearFocusBtn').addEventListener('click', () => {
+      stopPlayback();
+      clearFocus();
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'hardware-ready') {
+        state.iframeReady = true;
+        sendHardwareMessage({ type: 'hardware-arch-change', preset: 'ascend950b' });
+        sendHardwareMessage({ type: 'hardware-details', visible: true });
+        const first = LINKED_ANNOTATIONS.find((item) => item.id === state.activeAnnotationId);
+        if (first) applyAnnotation(first, { scrollDoc: false });
+      }
+    });
+
+    hardwareFrame.addEventListener('load', () => {
+      window.setTimeout(() => {
+        if (!state.iframeReady) {
+          state.iframeReady = true;
+          sendHardwareMessage({ type: 'hardware-arch-change', preset: 'ascend950b' });
+          sendHardwareMessage({ type: 'hardware-details', visible: true });
+          applyAnnotation(LINKED_ANNOTATIONS[0], { scrollDoc: false });
+        }
+      }, 180);
+    });
+
+    renderDoc();
+    renderNav();
+    renderAnnotations();
+    initSplit();
+    setupFloatingPlayback();
+    initObservers();
+  </script>
+</body>
+</html>
