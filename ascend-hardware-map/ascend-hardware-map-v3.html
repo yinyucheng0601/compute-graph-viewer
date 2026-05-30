@@ -261,6 +261,7 @@
       justify-content: space-between;
       gap: var(--space-3);
       border-bottom: 1px solid var(--panel-shell-border);
+      background: transparent;
     }
 
     .stage-title {
@@ -958,18 +959,18 @@
       </div>
     </aside>
 
-    <main class="main-stage">
-      <div class="stage-head">
+    <main class="main-stage pto-hw-viewport">
+      <div class="stage-head pto-hw-viewport__toolbar">
         <div class="stage-title">
           <strong>Ascend 950B Memory Architecture Pattern</strong>
           <span>1 AIC + 2 AIV；GM/L2 在 AI Core 外；L0C→UB 和 UB→L1 作为 950 直接 CV lanes。</span>
         </div>
         <div class="stage-meta pto-hw-viewport__controls">
-          <span class="stat-chip">pattern: memory-architecture-layout</span>
-          <span class="stat-chip">preset: ascend950b</span>
-          <span class="stat-chip">source: md + ascend-950-hardware-v1.html</span>
           <div class="pto-hw-viewport__tools" aria-label="架构图显示控制">
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureDetailToggle" aria-pressed="true">细节开</button>
+            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureZoomOut" aria-label="缩小架构图">−</button>
+            <span class="pto-hw-viewport__readout" id="architectureZoomReadout">75%</span>
+            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureZoomIn" aria-label="放大架构图">+</button>
           </div>
         </div>
       </div>
@@ -1303,8 +1304,10 @@
       playTimer: null,
       iframeReady: false,
       detailsVisible: true,
+      zoomIndex: 3,
       viewMode: 'architecture',
     };
+    const ARCH_ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.75, 0.85, 1];
 
     function getFlow() {
       return FLOWS.find((flow) => flow.id === state.flowId) || FLOWS[0];
@@ -1354,9 +1357,34 @@
       const button = document.getElementById('architectureDetailToggle');
       if (!button) return;
       button.textContent = state.detailsVisible ? '细节开' : '细节关';
-      button.title = state.detailsVisible ? '隐藏 bank 数据' : '显示 bank 数据';
+      button.title = state.detailsVisible ? '隐藏细节数据' : '显示细节数据';
       button.setAttribute('aria-label', button.title);
       button.setAttribute('aria-pressed', state.detailsVisible ? 'true' : 'false');
+    }
+
+    function syncArchitectureZoom() {
+      const scale = ARCH_ZOOM_LEVELS[state.zoomIndex] || 0.75;
+      const frame = document.getElementById('architectureFrameEl');
+      const readout = document.getElementById('architectureZoomReadout');
+      const zoomOut = document.getElementById('architectureZoomOut');
+      const zoomIn = document.getElementById('architectureZoomIn');
+      if (frame) {
+        const inverse = 100 / scale;
+        frame.style.width = `${inverse}%`;
+        frame.style.minWidth = `${inverse}%`;
+        frame.style.height = `${inverse}%`;
+        frame.style.minHeight = `${inverse}%`;
+        frame.style.transform = `scale(${scale})`;
+      }
+      if (readout) readout.textContent = `${Math.round(scale * 100)}%`;
+      if (zoomOut) zoomOut.disabled = state.zoomIndex <= 0;
+      if (zoomIn) zoomIn.disabled = state.zoomIndex >= ARCH_ZOOM_LEVELS.length - 1;
+    }
+
+    function stepArchitectureZoom(direction) {
+      state.zoomIndex = Math.max(0, Math.min(ARCH_ZOOM_LEVELS.length - 1, state.zoomIndex + direction));
+      syncArchitectureZoom();
+      applyHighlights();
     }
 
     function postArchitectureDetails() {
@@ -1618,6 +1646,7 @@
       renderDetail();
       setViewMode(state.viewMode);
       syncArchitectureDetailToggle();
+      syncArchitectureZoom();
       window.setTimeout(applyHighlights, 80);
       window.setTimeout(applyHighlights, 260);
 
@@ -1652,7 +1681,10 @@
         syncArchitectureDetailToggle();
         postArchitectureDetails();
       });
+      document.getElementById('architectureZoomOut')?.addEventListener('click', () => stepArchitectureZoom(-1));
+      document.getElementById('architectureZoomIn')?.addEventListener('click', () => stepArchitectureZoom(1));
       window.addEventListener('resize', () => {
+        syncArchitectureZoom();
         applyHighlights();
       });
     }

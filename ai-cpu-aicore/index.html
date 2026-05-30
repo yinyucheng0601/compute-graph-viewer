@@ -242,12 +242,6 @@
       font-weight: var(--font-weight-semibold);
     }
 
-    #selectedPathChip {
-      max-width: 340px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     .panel-shell-meta .toolbar-control {
       flex: 0 0 auto;
     }
@@ -1418,16 +1412,12 @@
                 </div>
               </div>
               <div class="panel-shell-meta pto-hw-viewport__controls">
-                <span class="iv-chip">无 iframe</span>
                 <div class="toolbar-control pto-hw-viewport__tools" aria-label="架构图缩放控制">
                   <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archDetailToggle" aria-pressed="true">细节开</button>
-                  <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomOutBtn" aria-label="缩小架构图">-</button>
-                  <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archFitBtn">适配</button>
-                  <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archActualBtn">1:1</button>
+                  <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomOutBtn" aria-label="缩小架构图">−</button>
                   <span class="toolbar-readout pto-hw-viewport__readout" id="archZoomReadout">76%</span>
                   <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomInBtn" aria-label="放大架构图">+</button>
                 </div>
-                <span class="iv-chip" id="selectedPathChip">等待选择源码行</span>
               </div>
             </header>
             <div class="panel-shell-body arch-body">
@@ -1795,7 +1785,7 @@
         if (line.id === 'add-l79') {
           next.selectors = ['[data-control-node="host"]', '[data-control-node="aicpu"]', '[data-control-node="task-queue"]', '[data-control-node="scheduler"]', '#mem950-aiv1', '#mem950-aic'];
           next.controlRoutes = ['host-aicpu', 'aicpu-queue', 'queue-scheduler', 'scheduler-aiv', 'scheduler-aic'];
-          next.path = 'Host Runtime → AICPU / Device CPU → Stream Task Queue → AI Core Block Scheduler';
+          next.path = 'Host launch → AI Core Block Scheduler';
           next.short = 'Host launch 形成任务订单；AICPU/Runtime 准备控制面参数，AI Core 接收任务后执行 kernel。';
         }
         if (line.id === 'add-l32') {
@@ -2084,7 +2074,7 @@
         const button = qs('#archDetailToggle');
         if (!button) return;
         button.textContent = state.archDetailsVisible ? '细节开' : '细节关';
-        button.title = state.archDetailsVisible ? '隐藏 bank 数据' : '显示 bank 数据';
+        button.title = state.archDetailsVisible ? '隐藏细节数据' : '显示细节数据';
         button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-pressed', state.archDetailsVisible ? 'true' : 'false');
       }
@@ -2124,7 +2114,6 @@
           ...(line.routes || []),
           ...(line.path ? [line.path] : []),
         ].slice(0, 5).map((text) => `<span class="iv-chip">${escapeHtml(text)}</span>`).join('');
-        qs('#selectedPathChip').textContent = line.path ? line.path.split('→').slice(0, 3).join('→') : '等待选择源码行';
       }
 
       function laneFill(step, lane) {
@@ -2458,20 +2447,7 @@
           state.archScaleIndex = Math.min(archZoomLevels.length - 1, state.archScaleIndex + 1);
           renderArchitecture();
         });
-        qs('#archFitBtn').addEventListener('click', () => {
-          state.archScaleIndex = 1;
-          renderArchitecture();
-        });
-        qs('#archActualBtn').addEventListener('click', () => {
-          state.archScaleIndex = archZoomLevels.length - 1;
-          renderArchitecture();
-        });
         qs('#archDetailToggle')?.addEventListener('click', toggleArchDetails);
-        qs('#archSelect').addEventListener('change', () => {
-          qs('#selectedPathChip').textContent = qs('#archSelect').value === 'ascend910b'
-            ? '910B 抽象：AICPU + AIV path'
-            : '950B 内置：AIC/AIV + CV path';
-        });
         window.addEventListener('resize', () => {
           state.archOverlay?.render?.();
           renderControlOverlay();

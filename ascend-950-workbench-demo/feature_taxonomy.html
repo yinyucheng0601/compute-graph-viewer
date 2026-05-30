@@ -713,7 +713,7 @@ aside.right-pane {
       <div class="hw-controls pto-hw-viewport__controls pto-hw-viewport__tools" aria-label="画布设置">
         <button type="button" class="hw-control pto-hw-viewport__tool" id="hw-detail-toggle" aria-pressed="true">细节开</button>
         <button type="button" class="hw-control pto-hw-viewport__tool" id="hw-zoom-out" aria-label="缩小">−</button>
-        <button type="button" class="hw-control hw-zoom-readout pto-hw-viewport__tool pto-hw-viewport__readout" id="hw-zoom-reset" aria-label="重置缩放">60%</button>
+        <span class="hw-control hw-zoom-readout pto-hw-viewport__readout" id="hw-zoom-readout">60%</span>
         <button type="button" class="hw-control pto-hw-viewport__tool" id="hw-zoom-in" aria-label="放大">+</button>
       </div>
     </div>
@@ -1272,15 +1272,15 @@ function syncHardwareControls() {
   const detailBtn = document.getElementById('hw-detail-toggle');
   const zoomOut = document.getElementById('hw-zoom-out');
   const zoomIn = document.getElementById('hw-zoom-in');
-  const zoomReset = document.getElementById('hw-zoom-reset');
+  const zoomReadout = document.getElementById('hw-zoom-readout');
   wrap?.style.setProperty('--hw-scale', String(scale));
   if (detailBtn) {
     detailBtn.textContent = state.hwDetailsVisible ? '细节开' : '细节关';
-    detailBtn.title = state.hwDetailsVisible ? '隐藏 bank 数据' : '显示 bank 数据';
+    detailBtn.title = state.hwDetailsVisible ? '隐藏细节数据' : '显示细节数据';
     detailBtn.setAttribute('aria-label', detailBtn.title);
     detailBtn.setAttribute('aria-pressed', state.hwDetailsVisible ? 'true' : 'false');
   }
-  if (zoomReset) zoomReset.textContent = `${Math.round(scale * 100)}%`;
+  if (zoomReadout) zoomReadout.textContent = `${Math.round(scale * 100)}%`;
   if (zoomOut) zoomOut.disabled = state.hwZoomIndex <= 0;
   if (zoomIn) zoomIn.disabled = state.hwZoomIndex >= HW_ZOOM_LEVELS.length - 1;
 }
@@ -1429,11 +1429,6 @@ document.getElementById('hw-zoom-out').addEventListener('click', () => {
 
 document.getElementById('hw-zoom-in').addEventListener('click', () => {
   state.hwZoomIndex = Math.min(HW_ZOOM_LEVELS.length - 1, state.hwZoomIndex + 1);
-  syncHardwareControls();
-});
-
-document.getElementById('hw-zoom-reset').addEventListener('click', () => {
-  state.hwZoomIndex = HW_ZOOM_LEVELS.indexOf(0.6);
   syncHardwareControls();
 });
 
