@@ -1177,12 +1177,14 @@
       grid-template-columns: 84px minmax(0, 1fr);
       gap: var(--space-2);
       align-items: center;
+      transition: opacity 160ms ease;
     }
 
     .queue-unit {
       color: var(--foreground-secondary);
       font: var(--text-label);
       white-space: nowrap;
+      transition: color 160ms ease, opacity 160ms ease;
     }
 
     .queue-track {
@@ -1214,6 +1216,7 @@
       align-items: center;
       justify-content: center;
       text-align: center;
+      transition: filter 160ms ease, opacity 160ms ease, outline-color 160ms ease, transform 160ms ease;
     }
 
     .queue-segment.is-control { --seg-color: var(--warning); }
@@ -1233,6 +1236,58 @@
       outline: 2px solid color-mix(in srgb, var(--foreground) 48%, transparent);
       outline-offset: -2px;
       transform: translateY(-1px);
+      z-index: 2;
+    }
+
+    .queue-segment.is-linked {
+      color: var(--background);
+      outline: 2px solid color-mix(in srgb, var(--foreground) 78%, transparent);
+      outline-offset: -2px;
+      filter: none;
+      opacity: 1;
+      transform: translateY(-2px) scaleY(1.08);
+      z-index: 4;
+    }
+
+    .queue-segment.is-linked::after {
+      content: "";
+      position: absolute;
+      inset: 3px auto 3px 5px;
+      width: 3px;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--background) 78%, transparent);
+    }
+
+    .queue-segment.is-bubble.is-linked {
+      color: var(--foreground);
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--warning) 88%, var(--surface-1)), color-mix(in srgb, var(--warning) 54%, transparent)),
+        repeating-linear-gradient(135deg, color-mix(in srgb, var(--warning) 62%, transparent) 0 3px, transparent 3px 6px);
+    }
+
+    .queue-lanes.is-playing .queue-lane:not(.is-active-lane) .queue-unit {
+      opacity: 0.42;
+      color: var(--foreground-muted);
+    }
+
+    .queue-lanes.is-playing .queue-segment:not(.is-active) {
+      filter: grayscale(1) saturate(0.08) brightness(0.74);
+      opacity: 0.34;
+    }
+
+    .queue-lanes.is-playing .queue-segment.is-active:not(.is-linked) {
+      filter: grayscale(0.45) saturate(0.48) brightness(0.92);
+      opacity: 0.68;
+    }
+
+    .queue-lanes.is-playing .queue-segment.is-linked {
+      filter: none;
+      opacity: 1;
+    }
+
+    .queue-lane.is-linked-lane .queue-unit {
+      color: var(--foreground);
+      opacity: 1;
     }
 
     .queue-note {
@@ -1473,7 +1528,7 @@
                 <section class="viz-card queue-panel">
                   <div class="viz-card-head">
                     <div class="viz-card-title">Instruction Queue</div>
-                    <div class="viz-card-meta">tile 级排队 / overlap / bubble</div>
+                    <div class="viz-card-meta" id="queueActiveTask">tile 级排队 / overlap / bubble</div>
                   </div>
                   <div class="queue-axis">
                     <span>cycle</span>
@@ -2213,30 +2268,55 @@
       function renderQueue() {
         const step = activeStep();
         const activeIds = new Set(step.queueIds || []);
+        const allEvents = queueLanes.flatMap((lane) => lane.events.map((event) => ({ ...event, unit: lane.unit })));
+        const activeEvents = allEvents.filter((event) => activeIds.has(event.id));
+        const linkedEvents = activeEvents.filter((event) => event.line === state.selectedLineId);
+        const linkedIds = new Set((linkedEvents.length ? linkedEvents : activeEvents).map((event) => event.id));
+        const isPlaying = Boolean(state.playbackTimer);
         const root = qs('#queueLanes');
+        root.classList.toggle('is-playing', isPlaying);
+        root.setAttribute('data-playback-state', isPlaying ? 'playing' : 'idle');
         root.innerHTML = queueLanes.map((lane) => `
-          <div class="queue-lane">
+          <div class="queue-lane ${lane.events.some((event) => activeIds.has(event.id)) ? 'is-active-lane' : ''} ${lane.events.some((event) => linkedIds.has(event.id)) ? 'is-linked-lane' : ''}">
             <div class="queue-unit">${escapeHtml(lane.unit)}</div>
             <div class="queue-track">
-              ${lane.events.map((event) => `
-                <button class="queue-segment is-${escapeHtml(event.kind)} ${activeIds.has(event.id) ? 'is-active' : ''}"
+              ${lane.events.map((event) => {
+                const isActive = activeIds.has(event.id);
+                const isLinked = linkedIds.has(event.id);
+                return `
+                <button class="queue-segment is-${escapeHtml(event.kind)} ${isActive ? 'is-active' : ''} ${isLinked ? 'is-linked' : ''}"
                   type="button"
                   data-queue-id="${escapeHtml(event.id)}"
                   data-line-id="${escapeHtml(event.line)}"
+                  ${isLinked ? 'aria-current="step"' : ''}
                   style="--seg-left:${event.left}%;--seg-width:${event.width}%"
                   title="${escapeHtml(event.label)}">${escapeHtml(event.short || event.label)}</button>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
           </div>
         `).join('');
         qsa('.queue-segment', root).forEach((button) => {
           button.addEventListener('click', () => selectLine(button.dataset.lineId, { syncStep: true }));
         });
+        const taskLabel = (linkedEvents.length ? linkedEvents : activeEvents)
+          .map((event) => `${event.unit} · ${event.label}`)
+          .join(' / ');
+        qs('#queueActiveTask').textContent = taskLabel || 'tile 级排队 / overlap / bubble';
         qs('#queueNote').textContent = step.summary;
+      }
+
+      function syncQueuePlaybackState() {
+        const root = qs('#queueLanes');
+        if (!root) return;
+        const isPlaying = Boolean(state.playbackTimer);
+        root.classList.toggle('is-playing', isPlaying);
+        root.setAttribute('data-playback-state', isPlaying ? 'playing' : 'idle');
       }
 
       function syncPlaybackUi() {
         const control = state.playbackControl;
+        syncQueuePlaybackState();
         if (!control?.elements) return;
         const { play, scrubberLabel, scrubberOpname, scrubber } = control.elements;
         const step = activeStep();
