@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>昇腾 950 算子开发者报告</title>
-  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css?v=20260601-950-report-v4">
-  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css?v=20260601-950-report-v4">
-  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.css?v=20260601-950-report-v4">
-  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/floating-playback-control/pattern.css?v=20260601-950-report-v4">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css?v=20260602-950-report-v5">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css?v=20260602-950-report-v5">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.css?v=20260602-950-report-v5">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/floating-playback-control/pattern.css?v=20260602-950-report-v5">
   <style>
     * { box-sizing: border-box; }
 
@@ -16,24 +16,25 @@
       width: 100%;
       height: 100%;
       margin: 0;
+      overflow: hidden;
       background: var(--background);
       color: var(--foreground);
       font-family: var(--font-sans);
-      overflow: hidden;
     }
 
     body {
       --report-pane-radius: 16px;
-      --report-page-max: 980px;
+      --report-page-max: 1040px;
       display: grid;
       grid-template-rows: 56px 1fr;
     }
 
     .topbar {
+      min-width: 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      min-width: 0;
+      gap: var(--space-3);
       padding: 0 20px;
       border-bottom: 0;
       background: transparent;
@@ -51,7 +52,7 @@
       letter-spacing: 0;
     }
 
-    .brand .home-btn {
+    .home-btn {
       width: 30px;
       height: 30px;
       display: grid;
@@ -64,7 +65,7 @@
       text-decoration: none;
     }
 
-    .brand .home-btn:hover {
+    .home-btn:hover {
       border-color: var(--border-default);
       background: var(--state-hover);
       color: var(--foreground);
@@ -83,13 +84,15 @@
       white-space: nowrap;
     }
 
-    .header-right {
+    .header-actions {
       display: flex;
       align-items: center;
       gap: var(--space-2);
     }
 
     .report-shell {
+      min-width: 0;
+      min-height: 0;
       height: 100%;
       padding: 0 var(--space-3) var(--space-3);
       gap: 0;
@@ -106,13 +109,13 @@
     }
 
     .report-nav {
-      flex: 0 0 280px !important;
       width: 280px;
       min-width: 280px;
       max-width: 280px;
+      flex: 0 0 280px !important;
+      padding: 16px 12px;
       overflow-y: auto;
       background: var(--surface-1);
-      padding: 16px 12px;
     }
 
     .report-nav h2 {
@@ -128,15 +131,9 @@
       gap: 2px;
     }
 
-    .report-nav-divider {
-      height: 1px;
-      margin: 12px 8px;
-      background: var(--border-subtle);
-    }
-
     .report-nav-item {
       width: 100%;
-      min-height: 54px;
+      min-height: 60px;
       display: flex;
       align-items: flex-start;
       gap: 10px;
@@ -162,11 +159,11 @@
     }
 
     .report-nav-num {
-      width: 22px;
-      height: 22px;
+      width: 24px;
+      height: 24px;
       display: grid;
       place-items: center;
-      flex: 0 0 22px;
+      flex: 0 0 24px;
       border-radius: var(--radius-sm);
       background: var(--surface-3);
       color: var(--foreground-secondary);
@@ -176,7 +173,7 @@
 
     .report-nav-item.is-active .report-nav-num {
       background: var(--primary);
-      color: #fff;
+      color: var(--primary-foreground);
     }
 
     .report-nav-meta {
@@ -197,11 +194,10 @@
       font: var(--text-label);
       letter-spacing: 0;
       line-height: 1.3;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .report-doc {
+      flex: 1 1 auto;
       overflow: auto;
       scroll-behavior: smooth;
       background: var(--surface-1);
@@ -210,75 +206,127 @@
     .report-doc-inner {
       width: min(var(--report-page-max), calc(100% - 56px));
       margin: 0 auto;
-      padding: 34px 0 96px;
+      padding: 28px 0 104px;
     }
 
-    .doc-hero {
-      padding: 26px 0 28px;
-      border-bottom: 1px solid var(--border-subtle);
+    .hero {
+      margin-bottom: var(--space-5);
+      padding: 0;
+      background: transparent;
     }
 
-    .doc-kicker {
-      margin: 0 0 var(--space-2);
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--tag-height);
+      margin-bottom: var(--space-3);
+      padding: 0 var(--space-2);
+      border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border-subtle));
+      border-radius: var(--tag-radius);
+      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
       color: var(--primary);
       font: var(--text-label);
-      letter-spacing: var(--letter-spacing-label);
-      text-transform: uppercase;
+      letter-spacing: 0;
     }
 
-    .doc-hero h1 {
+    .hero h1 {
       margin: 0;
       color: var(--foreground);
       font: var(--text-display);
       letter-spacing: 0;
     }
 
-    .doc-hero p {
+    .hero h1 span {
+      color: var(--primary);
+    }
+
+    .hero p {
+      max-width: 860px;
       margin: var(--space-3) 0 0;
       color: var(--foreground-secondary);
       font: var(--text-body);
+      line-height: 1.7;
     }
 
-    .report-section {
-      padding: 34px 0 0;
-      scroll-margin-top: 18px;
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-top: var(--space-4);
     }
 
-    .report-section h2 {
-      margin: 0 0 var(--space-3);
-      color: var(--foreground);
-      font: var(--text-title-1);
+    .hero-meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--foreground-muted);
+      font: var(--text-label);
       letter-spacing: 0;
     }
 
-    .report-section h3 {
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--primary);
+    }
+
+    .section {
+      margin-bottom: 48px;
+      scroll-margin-top: 18px;
+    }
+
+    .section-title {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 var(--space-4);
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+      color: var(--foreground);
+      font: var(--text-title-2);
+      letter-spacing: 0;
+      backdrop-filter: blur(10px);
+    }
+
+    .section-num {
+      width: 28px;
+      height: 28px;
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border-subtle));
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
+      color: var(--primary);
+      font: var(--text-mono);
+      font-weight: 700;
+    }
+
+    h3 {
       margin: var(--space-5) 0 var(--space-2);
       color: var(--foreground);
       font: var(--text-title-2);
       letter-spacing: 0;
     }
 
-    .report-section p,
-    .report-section li {
+    p,
+    li,
+    td {
       color: var(--foreground-secondary);
       font: var(--text-body);
+      line-height: 1.65;
     }
 
-    .report-section p {
+    p {
       margin: 0 0 var(--space-3);
     }
 
-    .report-section ul,
-    .report-section ol {
-      margin: 0 0 var(--space-4);
-      padding-left: 22px;
-    }
-
-    .report-section li + li {
-      margin-top: var(--space-2);
-    }
-
-    .report-section strong {
+    strong {
       color: var(--foreground);
       font-weight: var(--font-weight-semibold);
     }
@@ -291,60 +339,79 @@
       font: var(--text-mono);
     }
 
-    .note {
-      margin: var(--space-4) 0;
-      padding: var(--space-3);
+    .card,
+    .callout,
+    .pain-hook,
+    .src-ref,
+    .step-card,
+    .code-case {
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      background: var(--surface-2);
-      color: var(--foreground-secondary);
-      font: var(--text-body-sm);
-    }
-
-    .callout {
-      margin: var(--space-4) 0;
-      padding: var(--space-4);
-      border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border-subtle));
-      border-left: 3px solid var(--primary);
-      border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--primary) 7%, var(--surface-1));
-    }
-
-    .callout p:last-child {
-      margin-bottom: 0;
-    }
-
-    .grid-2,
-    .grid-3,
-    .grid-4 {
-      display: grid;
-      gap: var(--space-3);
-      margin: var(--space-4) 0;
-    }
-
-    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-    .card {
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
       background: var(--surface-1);
+    }
+
+    .card,
+    .callout,
+    .pain-hook,
+    .step-card,
+    .code-case {
       padding: var(--space-4);
     }
 
-    .card-title {
+    .card-title,
+    .step-title,
+    .code-case-title {
       margin: 0 0 var(--space-2);
       color: var(--foreground);
       font: var(--text-title-2);
       letter-spacing: 0;
     }
 
-    .card p {
-      font: var(--text-body-sm);
+    .card p:last-child,
+    .callout p:last-child,
+    .pain-hook p:last-child,
+    .step-card p:last-child,
+    .code-case p:last-child {
+      margin-bottom: 0;
     }
 
-    .chip-row {
+    .callout {
+      margin: var(--space-4) 0;
+      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
+      border-color: transparent;
+    }
+
+    .pain-hook {
+      margin-bottom: var(--space-4);
+      background: color-mix(in srgb, var(--warning) 10%, var(--surface-1));
+      border-color: transparent;
+    }
+
+    .pain-hook-q {
+      margin-bottom: 4px;
+      color: var(--warning);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .pain-hook-sub {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.7;
+    }
+
+    .cards {
+      display: grid;
+      gap: var(--space-3);
+      margin: var(--space-4) 0;
+    }
+
+    .cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cards-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .chip-row,
+    .path-links {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2);
@@ -352,13 +419,14 @@
     }
 
     .chip,
-    .annotation-link {
+    .annotation-link,
+    .tag {
       display: inline-flex;
       align-items: center;
       min-height: var(--tag-height);
       padding: 0 var(--space-2);
-      border-radius: var(--tag-radius);
       border: 1px solid var(--comp-tag-border);
+      border-radius: var(--tag-radius);
       background: var(--comp-tag-bg);
       color: var(--foreground-secondary);
       font: var(--text-label);
@@ -376,6 +444,24 @@
       background: color-mix(in srgb, var(--primary) 13%, var(--surface-1));
     }
 
+    .tag-green {
+      border-color: color-mix(in srgb, var(--success) 26%, var(--border-subtle));
+      background: color-mix(in srgb, var(--success) 8%, var(--surface-1));
+      color: var(--success);
+    }
+
+    .tag-orange {
+      border-color: color-mix(in srgb, var(--warning) 28%, var(--border-subtle));
+      background: color-mix(in srgb, var(--warning) 10%, var(--surface-1));
+      color: var(--warning);
+    }
+
+    .tag-red {
+      border-color: color-mix(in srgb, var(--danger) 26%, var(--border-subtle));
+      background: color-mix(in srgb, var(--danger) 8%, var(--surface-1));
+      color: var(--danger);
+    }
+
     .report-table {
       width: 100%;
       margin: var(--space-4) 0 var(--space-5);
@@ -383,6 +469,7 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       overflow: hidden;
+      background: var(--surface-1);
       font: var(--text-body-sm);
     }
 
@@ -390,8 +477,8 @@
     .report-table td {
       padding: 10px 12px;
       border-bottom: 1px solid var(--border-subtle);
-      vertical-align: top;
       text-align: left;
+      vertical-align: top;
     }
 
     .report-table th {
@@ -400,306 +487,39 @@
       font-weight: var(--font-weight-semibold);
     }
 
-    .report-table td {
-      color: var(--foreground-secondary);
-    }
-
     .report-table tr:last-child td {
       border-bottom: 0;
     }
 
-    .report-source {
-      --src-card: var(--surface-1);
-      --src-card-2: var(--surface-2);
-      --src-card-3: var(--surface-3);
-      --src-border: var(--border-subtle);
-      --src-border-strong: var(--border-default);
-      --src-text: var(--foreground);
-      --src-muted: var(--foreground-secondary);
-      --src-faint: var(--foreground-muted);
-      --accent: var(--primary);
-      --accent2: #2563eb;
-      --accent3: #059669;
-      --accent4: var(--warning);
-      --danger: #dc2626;
-      --warn: var(--warning);
-      --success: #059669;
-      width: min(1100px, calc(100% - 48px));
-      color: var(--src-text);
-      font: var(--text-body);
-      line-height: 1.58;
-    }
-
-    .report-source .hero {
-      margin-bottom: 24px;
-      padding: 30px 34px;
-      border: 0;
-      border-radius: var(--radius-lg);
-      background: transparent;
-      box-shadow: none;
-    }
-
-    .report-source .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--tag-height);
-      margin-bottom: 14px;
-      padding: 0 var(--space-2);
-      border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border-subtle));
-      border-radius: var(--tag-radius);
-      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
-      color: var(--primary);
-      font: var(--text-label);
-      letter-spacing: 0;
-    }
-
-    .report-source .hero h1 {
-      margin: 0;
-      color: var(--foreground);
-      font: var(--text-display);
-      letter-spacing: 0;
-    }
-
-    .report-source .hero h1 span {
-      color: var(--primary);
-    }
-
-    .report-source .hero p {
-      max-width: 760px;
-      margin: var(--space-3) 0 0;
-      color: var(--foreground-secondary);
-      font: var(--text-body);
-    }
-
-    .report-source .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 18px;
-      margin-top: var(--space-4);
-    }
-
-    .report-source .hero-meta-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--foreground-muted);
-      font: var(--text-label);
-      letter-spacing: 0;
-    }
-
-    .report-source .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--success);
-    }
-
-    .report-source .section {
-      margin-bottom: 44px;
-      scroll-margin-top: 18px;
-    }
-
-    .report-source .section-title {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin: 0 0 20px;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border-subtle);
-      background: color-mix(in srgb, var(--surface-1) 92%, transparent);
-      color: var(--foreground);
-      font: var(--text-title-2);
-      letter-spacing: 0;
-      backdrop-filter: blur(10px);
-    }
-
-    .report-source .section-num {
-      width: 24px;
-      height: 24px;
-      display: inline-grid;
-      place-items: center;
-      flex: 0 0 auto;
-      border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border-subtle));
-      border-radius: var(--radius-sm);
-      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
-      color: var(--primary);
-      font: var(--text-mono);
-      font-weight: 700;
-    }
-
-    .report-source p {
-      margin: 0 0 var(--space-3);
-      color: var(--foreground-secondary);
-      font: var(--text-body);
-    }
-
-    .report-source .card,
-    .report-source .dtree,
-    .report-source .iceberg,
-    .report-source .workflow,
-    .report-source .src-ref {
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: var(--surface-1);
-    }
-
-    .report-source .card {
-      padding: var(--space-4);
-    }
-
-    .report-source .card-title {
-      margin: 0 0 var(--space-2);
-      color: var(--foreground);
-      font: var(--text-title-2);
-      letter-spacing: 0;
-      text-transform: none;
-    }
-
-    .report-source .cards {
-      display: grid;
-      gap: var(--space-3);
-      margin: var(--space-4) 0;
-    }
-
-    .report-source .cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .report-source .cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .report-source .cards-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-
-    .report-source table {
-      width: 100%;
-      margin: var(--space-3) 0 var(--space-5);
-      border-collapse: collapse;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: var(--surface-1);
-      overflow: hidden;
-      font: var(--text-body-sm);
-    }
-
-    .report-source th,
-    .report-source td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-subtle);
-      color: var(--foreground-secondary);
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .report-source th {
-      background: var(--surface-2);
-      color: var(--foreground);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .report-source tr:last-child td {
-      border-bottom: 0;
-    }
-
-    .report-source tr:hover td {
+    .report-table tr:hover td {
       background: var(--state-hover);
     }
 
-    .report-source .tag,
-    .report-source .chip,
-    .report-source .perf-badge,
-    .report-source .dtree-label,
-    .report-source .workflow-tool {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--tag-height);
-      margin: 1px;
-      padding: 0 var(--space-2);
-      border: 1px solid var(--comp-tag-border);
-      border-radius: var(--tag-radius);
-      background: var(--comp-tag-bg);
-      color: var(--foreground-secondary);
-      font: var(--text-label);
-      letter-spacing: 0;
-    }
-
-    .report-source .tag-blue,
-    .report-source .dtree-q,
-    .report-source .workflow-tool {
-      border-color: color-mix(in srgb, var(--primary) 24%, var(--border-subtle));
-      background: color-mix(in srgb, var(--primary) 8%, var(--surface-1));
-      color: var(--primary);
-    }
-
-    .report-source .tag-green,
-    .report-source .perf-badge,
-    .report-source .dtree-action {
-      border-color: color-mix(in srgb, var(--success) 26%, var(--border-subtle));
-      background: color-mix(in srgb, var(--success) 8%, var(--surface-1));
-      color: var(--success);
-    }
-
-    .report-source .tag-orange {
-      border-color: color-mix(in srgb, var(--warning) 28%, var(--border-subtle));
-      background: color-mix(in srgb, var(--warning) 10%, var(--surface-1));
-      color: var(--warning);
-    }
-
-    .report-source .tag-red {
-      border-color: color-mix(in srgb, var(--danger) 26%, var(--border-subtle));
-      background: color-mix(in srgb, var(--danger) 8%, var(--surface-1));
-      color: var(--danger);
-    }
-
-    .report-source .tag-purple {
-      border-color: color-mix(in srgb, #7c8db8 28%, var(--border-subtle));
-      background: color-mix(in srgb, #7c8db8 12%, var(--surface-1));
-      color: #64748b;
-    }
-
-    .report-source .pain-hook {
-      margin-bottom: var(--space-4);
-      padding: var(--space-3) var(--space-4);
-      border: 1px solid color-mix(in srgb, var(--warning) 24%, var(--border-subtle));
-      border-left: 3px solid var(--warning);
-      border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--warning) 7%, var(--surface-1));
-    }
-
-    .report-source .pain-hook-q {
-      margin-bottom: 4px;
-      color: var(--warning);
-      font: var(--text-body-sm);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .report-source .pain-hook-sub {
-      color: var(--foreground-secondary);
-      font: var(--text-body-sm);
-    }
-
-    .report-source .before-after {
+    .before-after {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr);
       align-items: stretch;
       margin: var(--space-4) 0;
     }
 
-    .report-source .ba-old,
-    .report-source .ba-new {
+    .ba-old,
+    .ba-new {
       padding: var(--space-4);
       border: 1px solid var(--border-subtle);
       background: var(--surface-1);
     }
 
-    .report-source .ba-old {
+    .ba-old {
       border-right: 0;
       border-radius: var(--radius-md) 0 0 var(--radius-md);
     }
 
-    .report-source .ba-new {
+    .ba-new {
       border-left: 0;
       border-radius: 0 var(--radius-md) var(--radius-md) 0;
     }
 
-    .report-source .ba-mid {
+    .ba-mid {
       display: grid;
       place-items: center;
       border-top: 1px solid var(--border-subtle);
@@ -708,7 +528,7 @@
       color: var(--foreground-muted);
     }
 
-    .report-source .ba-header {
+    .ba-header {
       margin-bottom: var(--space-3);
       padding-bottom: var(--space-2);
       border-bottom: 1px solid var(--border-subtle);
@@ -717,162 +537,54 @@
       letter-spacing: 0;
     }
 
-    .report-source .ba-point {
+    .ba-point {
       display: flex;
       gap: 8px;
       margin-bottom: var(--space-2);
       color: var(--foreground-secondary);
       font: var(--text-body-sm);
+      line-height: 1.6;
     }
 
-    .report-source .ba-point:last-child {
+    .ba-point:last-child {
       margin-bottom: 0;
     }
 
-    .report-source .ba-dot {
+    .ba-dot {
       flex: 0 0 auto;
       color: var(--primary);
     }
 
-    .report-source .ba-point-text {
-      color: var(--foreground-secondary);
-    }
-
-    .report-source .ba-point-muted {
-      display: block;
-      margin-top: 2px;
-      color: var(--foreground-muted);
-      font: var(--text-label);
-      letter-spacing: 0;
-    }
-
-    .report-source .workflow {
+    .workflow {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      overflow: hidden;
-      margin: var(--space-4) 0;
-    }
-
-    .report-source .workflow-step {
-      padding: var(--space-4);
-      border-right: 1px solid var(--border-subtle);
-    }
-
-    .report-source .workflow-step:last-child {
-      border-right: 0;
-    }
-
-    .report-source .workflow-num {
-      margin-bottom: var(--space-2);
-      color: color-mix(in srgb, var(--primary) 22%, var(--surface-1));
-      font-size: 34px;
-      font-weight: 800;
-      line-height: 1;
-    }
-
-    .report-source .workflow-title,
-    .report-source .iceberg-title,
-    .report-source .opt-step-name,
-    .report-source .pitfall-title,
-    .report-source .metric-value,
-    .report-source .vs-text {
-      color: var(--foreground);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .report-source .workflow-desc,
-    .report-source .iceberg-detail,
-    .report-source .iceberg-effort,
-    .report-source .opt-step-detail,
-    .report-source .metric-label,
-    .report-source .metric-sub,
-    .report-source .pitfall-desc,
-    .report-source .src-ref-note,
-    .report-source .src-ref-pages {
-      color: var(--foreground-secondary);
-      font: var(--text-body-sm);
-    }
-
-    .report-source .iceberg {
-      overflow: hidden;
-      margin: var(--space-4) 0;
-    }
-
-    .report-source .iceberg-layer {
-      display: flex;
-      align-items: center;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
-      border-bottom: 1px solid var(--border-subtle);
+      margin: var(--space-4) 0;
     }
 
-    .report-source .iceberg-layer:last-child {
-      border-bottom: 0;
+    .step-card {
+      background: var(--surface-2);
     }
 
-    .report-source .iceberg-num {
+    .step-num {
       width: 28px;
       height: 28px;
       display: grid;
       place-items: center;
-      flex: 0 0 auto;
-      border-radius: 999px;
-      background: var(--surface-2);
-      color: var(--primary);
-      font-weight: 700;
-    }
-
-    .report-source .iceberg-content {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-
-    .report-source .iceberg-effort {
-      flex: 0 0 auto;
-      text-align: right;
-    }
-
-    .report-source .opt-steps,
-    .report-source .pitfall-list {
-      display: grid;
-      gap: var(--space-2);
-    }
-
-    .report-source .opt-step,
-    .report-source .pitfall-item {
-      padding: var(--space-3);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: var(--surface-2);
-    }
-
-    .report-source .opt-step-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-3);
       margin-bottom: var(--space-2);
-    }
-
-    .report-source .opt-step-perf {
-      color: var(--success);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--primary) 10%, var(--surface-1));
+      color: var(--primary);
+      font: var(--text-mono);
       font-weight: 700;
     }
 
-    .report-source .progress-bar {
-      height: 5px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: var(--surface-3);
+    .code-case {
+      margin: var(--space-4) 0;
+      background: var(--surface-1);
     }
 
-    .report-source .progress-fill {
-      height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--success), var(--primary));
-    }
-
-    .report-source pre {
+    pre {
       margin: var(--space-3) 0;
       padding: var(--space-3);
       overflow-x: auto;
@@ -884,120 +596,17 @@
       line-height: 1.7;
     }
 
-    .report-source pre .kw { color: var(--primary); }
-    .report-source pre .str,
-    .report-source pre .out { color: var(--success); }
-    .report-source pre .num,
-    .report-source pre .flag { color: var(--warning); }
-    .report-source pre .cm { color: var(--foreground-muted); }
+    pre .kw { color: var(--primary); }
+    pre .cm { color: var(--foreground-muted); }
+    pre .fn { color: var(--success); }
+    pre .warn { color: var(--warning); }
 
-    .report-source .dtree {
-      padding: var(--space-4);
-      margin: var(--space-4) 0;
-    }
-
-    .report-source .dtree-node {
-      display: grid;
-      gap: var(--space-2);
-    }
-
-    .report-source .dtree-q,
-    .report-source .dtree-action {
-      width: fit-content;
-      padding: 6px 10px;
-    }
-
-    .report-source .dtree-children {
-      display: grid;
-      gap: var(--space-2);
-      margin-left: 12px;
-      padding-left: var(--space-4);
-      border-left: 1px solid var(--border-subtle);
-    }
-
-    .report-source .dtree-branch {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-2);
-    }
-
-    .report-source .vs-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr);
-      gap: var(--space-3);
-      align-items: stretch;
-      margin: var(--space-3) 0;
-    }
-
-    .report-source .vs-old,
-    .report-source .vs-new {
-      padding: var(--space-3);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: var(--surface-2);
-    }
-
-    .report-source .vs-mid {
-      display: grid;
-      place-items: center;
-      color: var(--foreground-muted);
-    }
-
-    .report-source .vs-label {
-      margin-bottom: 4px;
-      color: var(--foreground-muted);
-      font: var(--text-label);
-      letter-spacing: 0;
-    }
-
-    .report-source .metrics {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: var(--space-3);
-      margin: var(--space-4) 0;
-    }
-
-    .report-source .metric-card {
-      padding: var(--space-3);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: var(--surface-1);
-    }
-
-    .report-source .metric-value {
-      color: var(--success);
-      font-size: 24px;
-      line-height: 1;
-    }
-
-    .report-source .pitfall-item {
-      display: flex;
-      gap: var(--space-3);
-      border-left: 3px solid var(--danger);
-    }
-
-    .report-source .pitfall-icon {
-      flex: 0 0 auto;
-      color: var(--danger);
-    }
-
-    .report-source .pitfall-fix {
-      display: inline-flex;
-      margin-top: var(--space-2);
-      padding: 4px 8px;
-      border: 1px solid color-mix(in srgb, var(--success) 26%, var(--border-subtle));
-      border-radius: var(--radius-sm);
-      background: color-mix(in srgb, var(--success) 8%, var(--surface-1));
-      color: var(--success);
-      font: var(--text-body-sm);
-    }
-
-    .report-source .src-ref {
+    .src-ref {
       overflow: hidden;
       margin-top: var(--space-4);
     }
 
-    .report-source .src-ref summary {
+    .src-ref summary {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1010,22 +619,22 @@
       list-style: none;
     }
 
-    .report-source .src-ref summary::-webkit-details-marker {
+    .src-ref summary::-webkit-details-marker {
       display: none;
     }
 
-    .report-source .src-ref summary::before {
-      content: '▶';
-      font-size: 9px;
+    .src-ref summary::before {
+      content: '>';
+      font-size: 10px;
       opacity: 0.65;
       transition: transform 120ms ease;
     }
 
-    .report-source .src-ref[open] summary::before {
+    .src-ref[open] summary::before {
       transform: rotate(90deg);
     }
 
-    .report-source .src-ref-body {
+    .src-ref-body {
       display: grid;
       gap: 6px;
       padding: var(--space-3);
@@ -1033,7 +642,7 @@
       background: var(--surface-1);
     }
 
-    .report-source .src-ref-row {
+    .src-ref-row {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -1041,93 +650,20 @@
       font: var(--text-body-sm);
     }
 
-    .report-source .src-ref-pdf {
+    .src-ref-pdf {
       color: var(--foreground);
       font-weight: var(--font-weight-semibold);
     }
 
-    .report-source .hardware-path-links {
-      border: 0;
-      background: color-mix(in srgb, var(--primary) 10%, var(--surface-1));
-    }
-
-    .report-source .pain-hook {
-      border: 0;
-      background: color-mix(in srgb, var(--warning) 10%, var(--surface-1));
-    }
-
-    .report-source .pitfall-item {
-      border: 0;
-      background: color-mix(in srgb, var(--danger) 10%, var(--surface-1));
-    }
-
-    .report-source [style*="border-top:3px solid var(--accent3)"],
-    .report-source [style*="border-left:3px solid var(--accent3)"],
-    .report-source [style*="border:1px solid rgba(4,215,147"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--accent3) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-top:3px solid var(--accent4)"],
-    .report-source [style*="border-left:3px solid var(--accent4)"],
-    .report-source [style*="border:1px solid var(--accent4)"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--accent4) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-top:3px solid var(--accent)"],
-    .report-source [style*="border-left:3px solid var(--accent)"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-top:3px solid var(--accent2)"],
-    .report-source [style*="border-left:3px solid var(--accent2)"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--accent2) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-left:3px solid var(--danger)"],
-    .report-source [style*="border:1px solid rgba(255,75,123"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--danger) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-left:3px solid var(--warn)"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--warn) 10%, var(--surface-1)) !important;
-    }
-
-    .report-source [style*="border-top:3px solid var(--muted)"] {
-      border: 0 !important;
-      background: color-mix(in srgb, var(--foreground-muted) 10%, var(--surface-1)) !important;
-    }
-
-    .ba {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr);
-      gap: var(--space-3);
-      align-items: stretch;
-      margin: var(--space-4) 0;
-    }
-
-    .ba-box {
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: var(--space-4);
-      background: var(--surface-1);
-    }
-
-    .ba-box h3 {
-      margin-top: 0;
-      font: var(--text-title-2);
-    }
-
-    .ba-mid {
-      display: grid;
-      place-items: center;
+    .footer-note {
+      margin-top: var(--space-6);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--border-subtle);
       color: var(--foreground-muted);
-      font: var(--text-title-2);
+      font: var(--text-label);
+      letter-spacing: 0;
+      text-align: center;
+      line-height: 1.8;
     }
 
     .arch-pane {
@@ -1135,6 +671,10 @@
       --pto-hw-viewport-top-glow: transparent;
       display: flex;
       flex-direction: column;
+    }
+
+    .arch-pane[hidden] {
+      display: none !important;
     }
 
     .arch-toolbar {
@@ -1195,6 +735,10 @@
       display: block;
     }
 
+    .pto-hw-viewport--interactive-frame .pto-hw-viewport__frame {
+      pointer-events: auto;
+    }
+
     .pto-floating-playback--report {
       --floating-playback-expanded-width: 980px;
       z-index: var(--z-overlay);
@@ -1246,36 +790,38 @@
     }
 
     @media (max-width: 1100px) {
-      body { overflow: auto; }
+      body {
+        overflow: auto;
+      }
+
       .report-shell {
         height: auto;
         min-height: 100vh;
         flex-direction: column;
       }
+
       .report-nav {
         width: 100%;
         max-width: none;
         flex-basis: auto !important;
       }
-      .grid-2,
-      .grid-3,
-      .grid-4,
-      .ba,
-      .report-source .cards-2,
-      .report-source .cards-3,
-      .report-source .cards-4,
-      .report-source .workflow,
-      .report-source .metrics,
-      .report-source .before-after,
-      .report-source .vs-row {
-        grid-template-columns: 1fr;
-      }
-      .ba-mid,
-      .report-source .ba-mid,
-      .report-source .vs-mid { display: none; }
-      .report-source {
+
+      .report-doc-inner {
         width: min(100%, calc(100% - 28px));
       }
+
+      .cards-2,
+      .cards-3,
+      .cards-4,
+      .workflow,
+      .before-after {
+        grid-template-columns: 1fr;
+      }
+
+      .ba-mid {
+        display: none;
+      }
+
       .arch-pane {
         min-height: 760px;
       }
@@ -1291,7 +837,10 @@
         </svg>
       </a>
       <span class="brand-title">昇腾 950 算子开发者报告</span>
-      <span class="title-sub">三类算子场景 × 芯片架构图</span>
+      <span class="title-sub">1347 章节重组版</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-sm btn-ghost" type="button" id="archPaneToggle" aria-expanded="false" aria-controls="archPane">展开架构图</button>
     </div>
   </header>
 
@@ -1299,1925 +848,424 @@
     <nav class="workbench-pane report-pane report-nav left-nav" id="reportNavPane" aria-label="报告目录">
       <h2>报告目录</h2>
       <div class="report-nav-list" id="reportNav">
-        <button class="report-nav-item is-active" type="button" data-section-id="s1">
+        <button class="report-nav-item is-active" type="button" data-section-id="part1">
           <span class="report-nav-num">1</span>
-          <span class="report-nav-meta"><span class="report-nav-label">硬件认知升级</span><span class="report-nav-sub">950 新架构与调优心智</span></span>
+          <span class="report-nav-meta"><span class="report-nav-label">Part 1 架构认知</span><span class="report-nav-sub">950 架构有什么更新</span></span>
         </button>
-        <button class="report-nav-item" type="button" data-section-id="s2">
-          <span class="report-nav-num">2</span>
-          <span class="report-nav-meta"><span class="report-nav-label">性能调优工作流</span><span class="report-nav-sub">Profile → Pipe → 指令</span></span>
+        <button class="report-nav-item" type="button" data-section-id="part21">
+          <span class="report-nav-num">2.1</span>
+          <span class="report-nav-meta"><span class="report-nav-label">从 0-1 开发算子</span><span class="report-nav-sub">Vector / Cube / 融合</span></span>
         </button>
-        <button class="report-nav-item" type="button" data-section-id="s3">
+        <button class="report-nav-item" type="button" data-section-id="part22">
+          <span class="report-nav-num">2.2</span>
+          <span class="report-nav-meta"><span class="report-nav-label">910 迁移到 950</span><span class="report-nav-sub">旧路径改为新通路</span></span>
+        </button>
+        <button class="report-nav-item" type="button" data-section-id="part3">
           <span class="report-nav-num">3</span>
-          <span class="report-nav-meta"><span class="report-nav-label">算子优化方法论</span><span class="report-nav-sub">访存、指令与寄存器</span></span>
-        </button>
-        <button class="report-nav-item" type="button" data-section-id="s4">
-          <span class="report-nav-num">4</span>
-          <span class="report-nav-meta"><span class="report-nav-label">三类算子场景</span><span class="report-nav-sub">Vector / Cube / 融合</span></span>
-        </button>
-        <button class="report-nav-item" type="button" data-section-id="s5">
-          <span class="report-nav-num">5</span>
-          <span class="report-nav-meta"><span class="report-nav-label">编程框架选型</span><span class="report-nav-sub">抽象层次与性能上限</span></span>
-        </button>
-        <div class="report-nav-divider" aria-hidden="true"></div>
-        <button class="report-nav-item" type="button" data-section-id="s6">
-          <span class="report-nav-num">★</span>
-          <span class="report-nav-meta"><span class="report-nav-label">Ascend C 工具链</span><span class="report-nav-sub">编码、编译、调试、调优</span></span>
-        </button>
-        <button class="report-nav-item" type="button" data-section-id="s7">
-          <span class="report-nav-num">6</span>
-          <span class="report-nav-meta"><span class="report-nav-label">大模型实践</span><span class="report-nav-sub">低比特、通信与 MoE</span></span>
-        </button>
-        <button class="report-nav-item" type="button" data-section-id="s8">
-          <span class="report-nav-num">7</span>
-          <span class="report-nav-meta"><span class="report-nav-label">迁移注意事项</span><span class="report-nav-sub">旧路径与 950 新能力</span></span>
+          <span class="report-nav-meta"><span class="report-nav-label">代码化注意事项</span><span class="report-nav-sub">第 7 章实例化</span></span>
         </button>
       </div>
     </nav>
 
     <section class="workbench-pane report-pane report-doc" id="docPane" aria-label="报告正文">
       <article class="report-doc-inner report-source">
-<!-- Hero -->
-<div class="hero">
-  <div class="hero-badge">Operator Developer Guide</div>
-  <h1>昇腾 <span>950</span> 算子开发者速成指南</h1>
-  <p>面向算子开发者与训练 / 推理性能调优工程师，从 910B/910C/A3 迁移至 950 架构所需掌握的硬件认知、工具链变化、调优方法论与常见坑；本页已按《Ascend 950 算子开发者学习指南》校准，超出该指南的案例数值和命令开关需回到对应 CANN 版本、SoC 与原始课件确认。</p>
-  <div class="hero-meta">
-    <div class="hero-meta-item"><span class="dot"></span>硬件架构变化</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--accent)"></span>Profiling 工作流</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--accent4)"></span>算子优化方法论</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--accent2)"></span>三类算子场景</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--accent2)"></span>框架选型</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--warn)"></span>大模型实践</div>
-    <div class="hero-meta-item"><span class="dot" style="background:var(--danger)"></span>迁移注意事项</div>
-  </div>
-</div>
+        <div class="hero">
+          <div class="hero-badge">Operator Developer Guide</div>
+          <h1>昇腾 <span>950</span> 算子开发者速成指南</h1>
+          <p>评审后，本页只保留原报告中更贴近新手开发者目标的 1 / 3 / 4 / 7 章，并重组为“先理解 950 架构变化，再从 0-1 写算子，再迁移 910 算子，最后用代码块固化避坑点”的学习路径。右侧芯片架构图默认收起，只有用户主动展开时才展示。</p>
+          <div class="hero-meta">
+            <div class="hero-meta-item"><span class="dot"></span>Part 1 架构更新</div>
+            <div class="hero-meta-item"><span class="dot"></span>Part 2.1 0-1 开发</div>
+            <div class="hero-meta-item"><span class="dot"></span>Part 2.2 910 迁移</div>
+            <div class="hero-meta-item"><span class="dot"></span>Part 3 代码避坑</div>
+          </div>
+        </div>
 
-<div class="card" style="margin-bottom:20px;border-left:3px solid var(--accent4);">
-  <div class="card-title">校对口径</div>
-  <p style="font-size:12px;color:var(--muted);line-height:1.7;">
-    本次校对基准为 <code>950-operator-developer-guide.md</code>：它明确支持 PR/DT 场景划分、低比特数据格式、C-V 直连、RegBase、SIMT/SIMD、CCU、NDDMA 与 Profiling 分层诊断。页面中涉及 DeepSeek/TorchTitan、精确收益百分比、具体 msprof 参数、PHS 评分和外部 issue 统计的内容不属于该指南的直接结论，均应视为样例或外部案例。
-  </p>
-</div>
+        <div class="callout">
+          <p><strong>校对口径：</strong>本页以 <code>950-operator-developer-guide.md</code> 为准。直接保留 PR/DT 场景划分、低比特、C-V 直连、RegBase、SIMT/SIMD、NDDMA、CCU 与迁移检查清单；外部案例、精确收益百分比和具体 msprof 参数不作为本页主线。</p>
+        </div>
 
-<!-- Section 1: 硬件认知升级 -->
-<div class="section" id="s1" data-section-id="s1">
-  <div class="section-title"><div class="section-num">1</div>硬件认知升级：950 新在哪里</div>
+        <div class="section" id="part1" data-section-id="part1">
+          <div class="section-title"><div class="section-num">1</div>Part 1：认知层面，950 架构有什么更新</div>
 
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：A3/910B 上调过的算子移到 950 后，单看 Cube 利用率或 Vector 饱和度仍然解释不了瓶颈？</div>
-    <div class="pain-hook-sub">按官方指南口径，950 调优需要把数据通路、低比特 scale、RegBase、SIMT/SIMD、片上带宽和 CCU 协同一起纳入分析。</div>
-  </div>
+          <div class="pain-hook">
+            <div class="pain-hook-q">新手最容易犯的错：把 950 当成 910B 的算力增强版。</div>
+            <div class="pain-hook-sub">950 的关键变化在数据通路、低比特、RegBase、SIMT/SIMD、C-V 直连和通信硬化资源。写算子前，要先知道数据到底停在哪一层、被哪类执行单元消费。</div>
+          </div>
 
-  <!-- Before/After: Core 结构 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ A2 / A3 旧认知</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">调优关注点多集中在 Cube / Memory-based Vector / DMA 流水<span class="ba-point-muted">对寄存器级中间结果、SIMT 分支和 CCU 内部打点关注较少</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">低比特通常不是端到端主路径，scale 搬运、量化误差和 MatMul 接口需要单独建模</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">集合通信经过软件 CCL Buffer，AllReduce 有额外拷贝开销</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Tiling 往往隐含旧代核数、L0/L1/UB 容量和 L2 命中假设</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 新架构</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">低比特、Cube-Vector 融合通路、Vector 算力、SIMT/SIMD 和 RegBase 一起进入优化路径<span class="ba-point-muted">离散访存、复杂分支和表达式融合需要按范式分别分析</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">FP8 / MXFP8 / MXFP4 / HiF8 影响 MatMul、量化、scale 设计、搬运和端到端精度</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">CCU 用于硬化集合通信流程，目标是降低带宽占用、通信时延并释放 AI Core 资源</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">PR / DT 面向不同瓶颈：Prefill、Decode、训练、推荐、多模态不能套同一套 Fusion 策略</span></div>
-    </div>
-  </div>
+          <div class="before-after">
+            <div class="ba-old">
+              <div class="ba-header">910 / A3 常见心智</div>
+              <div class="ba-point"><span class="ba-dot">-</span><span>Vector 多按 Memory-based 路径理解，核心是 GM、UB、LocalTensor 和流水隐藏。</span></div>
+              <div class="ba-point"><span class="ba-dot">-</span><span>Cube 主循环和 Vector 后处理容易拆成多个算子，中间结果经 GM 或 workspace 过渡。</span></div>
+              <div class="ba-point"><span class="ba-dot">-</span><span>低比特通常被看成 dtype 替换，scale、layout、搬运接口容易后置考虑。</span></div>
+              <div class="ba-point"><span class="ba-dot">-</span><span>离散访存、分支和线程模型不是大多数 Ascend C 新手的第一关注点。</span></div>
+            </div>
+            <div class="ba-mid">-&gt;</div>
+            <div class="ba-new">
+              <div class="ba-header">950 必须补上的心智</div>
+              <div class="ba-point"><span class="ba-dot">+</span><span>Vector 从 Memory-based 延展到 RegBase + SIMD/SIMT：连续规则数据看 SIMD Reg，离散索引数据看 SIMT Reg File。</span></div>
+              <div class="ba-point"><span class="ba-dot">+</span><span>Cube 与 Vector 可以通过 L0C2UB、UB2L1、DualDest、SSBuf 减少 GM 往返。</span></div>
+              <div class="ba-point"><span class="ba-dot">+</span><span>HiF8、FP8、MXFP8、MXFP4 会影响 MatMul、量化、scale 缓存、搬运和端到端精度。</span></div>
+              <div class="ba-point"><span class="ba-dot">+</span><span>PR / DT 面向不同场景，Prefill、Decode、训练、推荐、多模态不能套同一套 Tiling 和 Fusion 策略。</span></div>
+            </div>
+          </div>
 
-  <!-- Product variants -->
-  <div class="cards cards-2" style="margin-bottom:20px;">
-    <div class="card">
-      <div class="card-title" style="color:#8BA4F8;">950PR — Prefill / 推荐 / 多模态</div>
-      <table style="border:none;background:transparent;">
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;width:110px;">定位</td><td style="border:none;padding:4px 0;font-size:13px;">LLM Prefill、推荐、视觉多模态</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">官方口径</td><td style="border:none;padding:4px 0;font-size:13px;">中等算力 / 带宽、低成本取向</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">典型瓶颈</td><td style="border:none;padding:4px 0;font-size:13px;">长序列、数据复用、低比特搬运</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">典型场景</td><td style="border:none;padding:4px 0;"><span class="tag tag-blue">Prefill</span><span class="tag tag-blue">推荐</span><span class="tag tag-blue">多模态</span></td></tr>
-      </table>
-    </div>
-    <div class="card">
-      <div class="card-title" style="color:#04D793;">950DT — Decode / 训练</div>
-      <table style="border:none;background:transparent;">
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;width:110px;">定位</td><td style="border:none;padding:4px 0;font-size:13px;">LLM Decode、大模型训练</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">官方口径</td><td style="border:none;padding:4px 0;font-size:13px;">高算力 / 高带宽取向</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">典型瓶颈</td><td style="border:none;padding:4px 0;font-size:13px;">Decode、训练、通信与片上带宽协同</td></tr>
-        <tr><td style="border:none;padding:4px 0;color:var(--muted);font-size:12px;">典型场景</td><td style="border:none;padding:4px 0;"><span class="tag tag-green">训练</span><span class="tag tag-green">Decode</span><span class="tag tag-green">MoE</span></td></tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- Architecture highlights -->
-  <div class="cards cards-3" style="margin-bottom:20px;">
-    <div class="card">
-      <div class="card-title">PR / DT 场景划分</div>
-      <p style="font-size:13px;margin-bottom:8px;">指南强调 950 有 PR / DT 两类形态，Prefill、Decode、训练、推荐和多模态瓶颈不同。</p>
-      <p style="font-size:12px;color:var(--muted);">AI Core 子系统重点是低比特格式、Cube-Vector 融合通路、Vector 算力提升、SIMT/SIMD、RegBase、NDDMA 和 128B Sector Cache。</p>
-    </div>
-    <div class="card">
-      <div class="card-title">CCU — 集合通信单元</div>
-      <p style="font-size:13px;margin-bottom:8px;">集合通信专用引擎，用于通信节点间同步、地址交换、数据传输和规约计算。</p>
-      <p style="font-size:12px;color:var(--muted);">目标是降低内存带宽占用、降低通信时延并释放 AI Core；AllGatherMatMul、ReduceScatter、Dispatch/Combine 需要用 HCCL/CCU profiling 验证。</p>
-    </div>
-    <div class="card">
-      <div class="card-title">Regbase 架构</div>
-      <p style="font-size:13px;margin-bottom:8px;">RegBase 允许直接操作 Vector 计算寄存器，GM 数据仍需先进入 UB，再显式 Load/Store 到寄存器。</p>
-      <p style="font-size:12px;color:var(--muted);">NDDMA 支持多维非连续访存、自动补 PAD；128B Sector Cache 用于改善小包 / 非对齐访问。</p>
-    </div>
-  </div>
-
-  <!-- New data types -->
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-title">新数据类型速览</div>
-    <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px;">指南确认 HiF8、FP8、MXFP8、MXFP4 是 950 学习重点；具体编码范围、溢出、饱和和产品支持边界需按当前 CANN API 文档与头文件确认。</p>
-    <table>
-      <thead>
-        <tr>
-          <th>类型</th>
-          <th>格式</th>
-          <th>最大值</th>
-          <th>主要用途</th>
-          <th>注意事项</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><span class="tag tag-blue">MXFP4</span></td>
-          <td>4-bit，有共享缩放因子</td>
-          <td>—</td>
-          <td>MatMul 权重量化，最激进压缩</td>
-          <td>需要 Scale 预存入 UB，否则成为瓶颈</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-blue">MXFP8</span></td>
-          <td>8-bit，有共享缩放因子</td>
-          <td>~57344</td>
-          <td>MoE Activation 量化（A5 量化方案）</td>
-          <td>动态范围远大于标准 FP8-E4M3（max 448）</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-purple">HiF8</span></td>
-          <td>8-bit 特殊格式</td>
-          <td>~32768</td>
-          <td>训练激活值，高动态范围</td>
-          <td>非标准 FP8，转换时需特殊处理</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-green">FP8-E4M3</span></td>
-          <td>1+4+3</td>
-          <td>448</td>
-          <td>推理权重，兼容 GPU</td>
-          <td>动态范围较小，LLM 激活值易溢出</td>
-        </tr>
-        <tr>
-          <td><span class="tag tag-green">FP8-E5M2</span></td>
-          <td>1+5+2</td>
-          <td>57344</td>
-          <td>训练梯度</td>
-          <td>精度低于 E4M3，适合梯度存储</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Memory hierarchy -->
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-title">存储层次（从外到内）</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;">
-      <span class="tag tag-red" style="font-size:13px;padding:6px 12px;">GM (HBM)</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-orange" style="font-size:13px;padding:6px 12px;">L3</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-orange" style="font-size:13px;padding:6px 12px;">L2</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-blue" style="font-size:13px;padding:6px 12px;">L1</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-blue" style="font-size:13px;padding:6px 12px;">L0A/B</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-green" style="font-size:13px;padding:6px 12px;">L0C</span>
-      <span style="color:var(--muted);">→</span>
-      <span class="tag tag-green" style="font-size:13px;padding:6px 12px;">UB / Reg</span>
-    </div>
-    <p style="font-size:12px;color:var(--muted);margin-top:10px;">关键新路径按指南表述为 UB2L1、L0C2UB、L12UB、DualDest、SSBuf 等 C-V 直连能力，用于减少 GM / workspace 中间往返；具体容量与可用接口以实际 SoC 和 CANN 版本为准。</p>
-  </div>
-
-  <!-- A2/A3 vs 950 comparison -->
-  <div class="card">
-    <div class="card-title">与 A2/A3 关键差异对比</div>
-    <table>
-      <thead>
-        <tr><th>维度</th><th>A2 / A3</th><th>950</th><th>影响</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>AI Core 结构</td>
-          <td>Cube + Vector 分离</td>
-          <td>低比特 + C-V 通路 + SIMT/SIMD + RegBase</td>
-          <td>调优需同时看数据通路、寄存器、片上带宽和范式选择</td>
-        </tr>
-        <tr>
-          <td>集合通信</td>
-          <td>软件 CCL，有拷贝开销</td>
-          <td>CCU 硬化集合通信流程</td>
-          <td>通信需看 HCCL 语义、CCU 打点和 AI Core 协同</td>
-        </tr>
-        <tr>
-          <td>数据类型</td>
-          <td>FP16/BF16/INT8</td>
-          <td>新增 MXFP4/MXFP8/HiF8</td>
-          <td>量化精度 / 算力更灵活</td>
-        </tr>
-        <tr>
-          <td>Profiling 层级</td>
-          <td>以 Timeline / 算子耗时为主</td>
-          <td>扩展到 Pipe、PC Sampling、SIMT 寄存器、CCU、片上带宽</td>
-          <td>能从模型级下钻到 pipe / 指令级</td>
-        </tr>
-        <tr>
-          <td>片上带宽采集</td>
-          <td>不支持</td>
-          <td>片上内存带宽分析（开关按版本确认）</td>
-          <td>可辅助定位小包、非对齐、L2 miss、GM 往返</td>
-        </tr>
-        <tr>
-          <td>调试视图</td>
-          <td>Timeline + 算子耗时</td>
-          <td>新增 Pipe 流水图、PC Sampling、SIMT GPR</td>
-          <td>可定位 bubble / stall / 寄存器溢出</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">昇腾950特性全景剖析.pdf</span>
-        <span class="src-ref-pages">p2–15</span>
-        <span class="src-ref-note">950 PR/DT 两形态、Chiplet 架构、AI Core 三类单元（AIC/AIV/SIU）、CCU 设计、POD/Server 拓扑</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">PTO ISA 教你如何快速上手昇腾950.pdf</span>
-        <span class="src-ref-pages">p10–16</span>
-        <span class="src-ref-note">冯诺依曼类比讲解内存层次 / Roofline 天花板分析、AIC 与 AIV 存储对比</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 2: 性能调优工作流 -->
-<div class="section" id="s2" data-section-id="s2">
-  <div class="section-title"><div class="section-num">2</div>性能调优工作流：三步法 + 950 新特性</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：有了整网 Timeline 仍然只能知道“慢”，却很难判断是 Tiling、Pipe、PC Stall、寄存器、片上带宽还是通信协同问题？</div>
-    <div class="pain-hook-sub">官方指南建议按模型级、算子级、Pipe 级、指令级、片上带宽和通信级逐层闭环，而不是只看端到端耗时。</div>
-  </div>
-
-  <!-- Before/After: Profiling 能力 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ A2 / A3 Profiling 能力</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">只看整网耗时和 Timeline，很容易把 Tiling、Pipe、访存、通信问题混在一起</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">片上带宽、PC Stall、寄存器压力如果没有采集，瓶颈只能靠经验猜测</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">通信只看端到端 HCCL 耗时，无法解释 CCU / 片上资源竞争</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">总耗时改善无法说明是哪一级优化生效</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 Profiling 新能力</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">模型级：先判断调度、shape、Tiling 和融合决策是否异常</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">算子 / Pipe 级：看 block 均衡、CopyIn / Compute / CopyOut bubble 和 Double Buffer 效果</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">指令级：PC Sampling 看 Stall，Reg 分析看寄存器压力</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">通信级：HCCL/CCU 时延、片上资源和 AI Core/CCU 竞争一起看</span></div>
-    </div>
-  </div>
-
-  <!-- 3-step workflow -->
-  <div class="workflow" style="margin-bottom:20px;">
-    <div class="workflow-step">
-      <div class="workflow-num">01</div>
-      <div class="workflow-title">采集整网 Profile</div>
-      <span class="workflow-tool">msprof</span>
-      <div class="workflow-desc">采集全网络算子耗时、通信、内存，得到宏观瓶颈概览；具体采集并发和参数以当前 CANN 版本为准。</div>
-    </div>
-    <div class="workflow-step">
-      <div class="workflow-num">02</div>
-      <div class="workflow-title">解析整网 Profile</div>
-      <span class="workflow-tool">msprof + MindStudio Insight</span>
-      <div class="workflow-desc">定位慢算子、找通信 / 计算重叠问题；看 Timeline、算子摘要、核间负载均衡、Roofline。</div>
-    </div>
-    <div class="workflow-step">
-      <div class="workflow-num">03</div>
-      <div class="workflow-title">单算子精细分析</div>
-      <span class="workflow-tool">msprof op + MindStudio Insight</span>
-      <div class="workflow-desc">对单个慢算子采集 Pipe 流水图 / PC Sampling / SIMT GPR 分析，找 bubble 和 stall。</div>
-    </div>
-  </div>
-
-  <!-- msprof commands -->
-  <div class="cards cards-2" style="margin-bottom:20px;">
-    <div class="card">
-      <div class="card-title">整网采集命令</div>
-      <pre><span class="cm"># 基础整网采集；具体开关请以 msprof --help 和 CANN 文档为准</span>
-msprof \
-  --output=./prof_output \
-  --application="python train.py" \
-  <span class="flag">--task-block=on</span>       <span class="cm"># 950新增：AICore首尾block</span>
-  <span class="flag">--sys-hardware-mem=on</span> <span class="cm"># 如当前版本支持，用于片上带宽采集</span>
-  --process-num=&lt;N&gt;     <span class="cm"># 按实际进程数配置</span>
-
-<span class="cm"># CCU 通信 profiling</span>
-msprof \
-  --ccu-profiling=on \  <span class="cm"># 如当前版本支持，用于 CCU 相关采集</span>
-  --output=./ccu_prof \
-  --application="python train.py"</pre>
-    </div>
-    <div class="card">
-      <div class="card-title">单算子采集命令</div>
-      <pre><span class="cm"># 单算子精细采集；参数名按当前 CANN 版本确认</span>
-msprof op \
-  --op-name=MatMul \
-  --pipe-view=on \      <span class="cm"># Pipe流水图 (ID14/ID15)</span>
-  --pc-sampling=on \    <span class="cm"># 9种stall状态采样</span>
-  --simt-gpr=on \       <span class="cm"># SIMT寄存器分析</span>
-  --simt-ipc=on \       <span class="cm"># Core Occupancy+IPC</span>
-  --output=./op_prof
-
-<span class="cm"># 解析</span>
-msprof parse --input=./op_prof</pre>
-    </div>
-  </div>
-
-  <!-- Decision tree -->
-  <div class="dtree" style="margin-bottom:20px;">
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">性能分析决策树</p>
-    <div class="dtree-node">
-      <div class="dtree-q">📊 采集整网基线</div>
-      <div class="dtree-children">
-        <div class="dtree-branch">
-          <div class="dtree-label">AICore 饱和?</div>
-          <div class="dtree-node">
-            <div class="dtree-q">📈 AICore 饱和度分析</div>
-            <div class="dtree-children">
-              <div class="dtree-branch">
-                <div class="dtree-label">单算子慢?</div>
-                <div class="dtree-action">🔬 msprof op → Pipe 流水图</div>
+          <div class="cards cards-3">
+            <div class="card" id="part1-subsystem">
+              <div class="card-title">AI Core 子系统升级</div>
+              <p>学习 950 时先把 AIC、AIV、SIU 分开：AIC 负责 Cube 主计算，AIV 负责 Vector/SIMD/SIMT，SIU 和片上互联影响多单元协同。调优时不要只问“哪个核忙”，要问“数据从哪里来、到哪里去”。</p>
+              <div class="chip-row">
+                <span class="chip">AIC</span>
+                <span class="chip">AIV</span>
+                <span class="chip">SIU</span>
+                <span class="chip">CCU</span>
               </div>
-              <div class="dtree-branch">
-                <div class="dtree-label">Block 均时 vs 饱和度</div>
-                <div class="dtree-action">📉 tbmiss 采集 → 片上带宽分析</div>
+            </div>
+            <div class="card" id="part1-paths">
+              <div class="card-title">数据通路升级</div>
+              <p>950 学习重点是减少 GM 往返，提高片上复用。最需要记住的路径是 GM、L2、L1、L0A/B/C、UB、Vector Reg File、SIMT Reg File 之间的关系。</p>
+              <div class="path-links">
+                <button class="annotation-link" type="button" data-annotation-jump="hardware-overview">查看总图</button>
+                <button class="annotation-link" type="button" data-annotation-jump="scene-fusion">查看 C-V 直连</button>
+              </div>
+            </div>
+            <div class="card" id="part1-lowbit">
+              <div class="card-title">低比特成为主路径</div>
+              <p>低比特不是把 dtype 改小。MXFP8/MXFP4 需要关心 scale 张量、scale 缓存、layout、LoadData 类接口、量化/反量化融合和精度验证。</p>
+              <div class="chip-row">
+                <span class="chip">HiF8</span>
+                <span class="chip">FP8</span>
+                <span class="chip">MXFP8</span>
+                <span class="chip">MXFP4</span>
+              </div>
+            </div>
+          </div>
+
+          <table class="report-table">
+            <thead>
+              <tr><th>能力</th><th>开发者要建立的判断</th><th>优先联动的硬件对象</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>RegBase / SIMD</td><td>连续规则表达式、规整向量融合，优先减少 UB 中间结果反复读写。</td><td>GM - UB - Vector Reg File</td></tr>
+              <tr><td>SIMT</td><td>离散索引、Gather/Scatter、Hash/Atomic、复杂分支，优先按 Thread Block / Warp / Lane 建模。</td><td>GM - UB - SIMT Reg File；GM - SIMT Reg File</td></tr>
+              <tr><td>Cube 低比特</td><td>MatMul、GEMM、qbmm、MoE 主计算要同时设计 scale、layout 和 L0A/B 组织。</td><td>GM - L0A/B - Cube - L0C</td></tr>
+              <tr><td>C-V 融合</td><td>MatMul 后处理、FIA、MatMul+Add、RmsNormQuant 等场景优先检查是否能少走 GM。</td><td>L0C - UB；UB - L1；SSBuf</td></tr>
+            </tbody>
+          </table>
+
+          <details class="src-ref">
+            <summary>信息来源</summary>
+            <div class="src-ref-body">
+              <div class="src-ref-row"><span class="src-ref-pdf">950-operator-developer-guide.md</span><span>原第 1 章：硬件认知升级；原第 3 / 4 章：优化方法与算子场景。</span></div>
+              <div class="src-ref-row"><span class="src-ref-pdf">本地校对重点</span><span>PR/DT、低比特、C-V 直连、RegBase、SIMT/SIMD、NDDMA、CCU。</span></div>
+            </div>
+          </details>
+        </div>
+
+        <div class="section" id="part21" data-section-id="part21">
+          <div class="section-title"><div class="section-num">2.1</div>Part 2.1：如何基于 950 芯片从 0-1 开发算子</div>
+
+          <div class="pain-hook">
+            <div class="pain-hook-q">从 0-1 不是先选语法，而是先选算子场景。</div>
+            <div class="pain-hook-sub">新手可以按三类编程场景启动：Vector 算子、Cube 算子、融合算子。每类先画数据流，再写 Tiling，再写 Copy / Compute / Store，最后用 profiling 验证。</div>
+          </div>
+
+          <div class="workflow">
+            <div class="step-card">
+              <div class="step-num">01</div>
+              <div class="step-title">画数据流</div>
+              <p>标出 GM、L2、L1、L0A/B/C、UB、Reg。先判断是否存在 GM 中间往返。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-num">02</div>
+              <div class="step-title">定范式</div>
+              <p>连续规则数据优先 SIMD/RegBase；离散索引数据优先 SIMT；矩阵主计算优先 Cube。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-num">03</div>
+              <div class="step-title">定片上复用</div>
+              <p>决定 UB、L1、L0 和 Reg 的生命周期，低比特场景同步决定 scale 何时加载。</p>
+            </div>
+            <div class="step-card">
+              <div class="step-num">04</div>
+              <div class="step-title">验证瓶颈</div>
+              <p>看 pipe bubble、片上带宽、PC stall、寄存器压力和尾块负载，而不是只看总耗时。</p>
+            </div>
+          </div>
+
+          <h3 id="part21-vector">Vector 算子：连续规则数据走 SIMD Reg</h3>
+          <div class="cards cards-2">
+            <div class="card">
+              <div class="card-title">适合场景</div>
+              <p>Add、RMSNorm、Quant、激活函数、规则表达式融合。950 上的收益来自 RegBase / VF 融合减少 UB 中间结果往返，但寄存器变量过多会引发 spill。</p>
+              <div class="chip-row">
+                <span class="chip">RegTensor</span>
+                <span class="chip">MaskReg</span>
+                <span class="chip">AddrReg</span>
+                <span class="chip">SIMD VF</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">硬件路径</div>
+              <p>主路径是 <strong>GM - UB - Vector Reg File</strong>，结果再从 Reg 写回 UB / GM。若数据离散，优先不要硬套 SIMD。</p>
+              <div class="path-links">
+                <button class="annotation-link" type="button" data-annotation-jump="scene-vector">联动 Vector 路径</button>
+                <button class="annotation-link" type="button" data-annotation-jump="scene-simt">对比 SIMT 路径</button>
+              </div>
+            </div>
+          </div>
+
+          <pre><span class="cm">// 伪代码骨架：规则向量表达式，先 GM-&gt;UB，再 UB-&gt;Vector Reg File</span>
+<span class="kw">__global__</span> <span class="kw">__aicore__</span> <span class="kw">void</span> <span class="fn">VectorAdd950</span>(GM_ADDR x, GM_ADDR y, GM_ADDR out) {
+  <span class="cm">// 1. Tiling 决定每个 block 的 GM offset 和 UB tile 大小</span>
+  CopyIn(x, y);                  <span class="cm">// GM -&gt; UB</span>
+  LoadToVectorReg();             <span class="cm">// UB -&gt; Vector Reg File</span>
+  SimdVfAddOrFuse();             <span class="cm">// SIMD VF / RegBase 计算</span>
+  StoreFromVectorReg();          <span class="cm">// Vector Reg File -&gt; UB</span>
+  CopyOut(out);                  <span class="cm">// UB -&gt; GM</span>
+}</pre>
+
+          <h3 id="part21-cube">Cube 算子：低比特进入主计算路径</h3>
+          <div class="cards cards-2">
+            <div class="card">
+              <div class="card-title">适合场景</div>
+              <p>MatMul、GEMM、GMM、qbmm、MoE。950 不只看 Cube busy，还要把低比特 scale、layout、伪量化、尾块和 L2/L1 复用一起纳入 Tiling。</p>
+              <div class="chip-row">
+                <span class="chip">L0A</span>
+                <span class="chip">L0B</span>
+                <span class="chip">L0C</span>
+                <span class="chip">Scale Cache</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">硬件路径</div>
+              <p>主路径看 <strong>GM - L0A/B</strong> 到 Cube 主计算，结果进入 L0C；如果后面接 Vector epilogue，要继续检查 L0C 到 UB 的直连。</p>
+              <div class="path-links">
+                <button class="annotation-link" type="button" data-annotation-jump="scene-cube">联动 Cube 路径</button>
+                <button class="annotation-link" type="button" data-annotation-jump="lowbit-scale">联动低比特 scale</button>
+              </div>
+            </div>
+          </div>
+
+          <pre><span class="cm">// 伪代码骨架：低比特 MatMul 先把数据与 scale 的生命周期一起设计</span>
+<span class="kw">__global__</span> <span class="kw">__aicore__</span> <span class="kw">void</span> <span class="fn">LowBitMatmul950</span>(GM_ADDR a, GM_ADDR b, GM_ADDR scale, GM_ADDR c) {
+  LoadScaleToUB(scale);          <span class="cm">// scale 不要每个 inner loop 反复从 GM 取</span>
+  LoadAtoL0A(a);                 <span class="cm">// GM -&gt; L0A</span>
+  LoadBtoL0B(b);                 <span class="cm">// GM -&gt; L0B</span>
+  MmadLowBit();                  <span class="cm">// Cube 计算，结果在 L0C</span>
+  FixPipeOrEpilogue(c);          <span class="cm">// 视场景写 GM 或接 C-V 直连</span>
+}</pre>
+
+          <h3 id="part21-fusion">融合算子：Cube 结果尽量少走 GM</h3>
+          <div class="cards cards-2">
+            <div class="card">
+              <div class="card-title">适合场景</div>
+              <p>MatMul+Add、MatMul+Activation、RmsNormQuant、FIA、Attention 后处理。先判断 Cube 结果能否通过 L0C2UB、DualDest 或 UB2L1 给 Vector 侧使用。</p>
+              <div class="chip-row">
+                <span class="chip">__mix__(aic_aiv)</span>
+                <span class="chip">L0C2UB</span>
+                <span class="chip">UB2L1</span>
+                <span class="chip">DualDest</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">硬件路径</div>
+              <p>关注 <strong>L0C - UB</strong> 和 <strong>UB - L1</strong> 的双向复用，以及 SSBuf / 指令序列如何让 AIC 与 AIV 协作。</p>
+              <div class="path-links">
+                <button class="annotation-link" type="button" data-annotation-jump="scene-fusion">联动融合路径</button>
+                <button class="annotation-link" type="button" data-annotation-jump="instruction-flow">联动指令序列</button>
+              </div>
+            </div>
+          </div>
+
+          <h3 id="part21-simt">SIMT 场景：离散数据走线程式表达</h3>
+          <div class="cards cards-2">
+            <div class="card">
+              <div class="card-title">适合场景</div>
+              <p>索引、分支、Gather/Scatter、Hash/Atomic、稀疏或不规则访存。SIMT 是单指令多线程模型，Warp 内有 Lane，调试时要额外关注同步、越界和 GPR 压力。</p>
+              <div class="chip-row">
+                <span class="chip">Thread Block</span>
+                <span class="chip">Warp</span>
+                <span class="chip">Lane</span>
+                <span class="chip">SIMT VF</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">硬件路径</div>
+              <p>对离散数据，要表达 <strong>GM - UB - SIMT Reg File</strong> 与 <strong>GM - SIMT Reg File</strong> 两类路径，避免把 SIMT 密集算子误写成纯 SIMD。</p>
+              <div class="path-links">
+                <button class="annotation-link" type="button" data-annotation-jump="scene-simt">联动 SIMT 路径</button>
               </div>
             </div>
           </div>
         </div>
-        <div class="dtree-branch">
-          <div class="dtree-label">通信瓶颈?</div>
-          <div class="dtree-action">📡 CCU Profiling → Timeline + Channel BW</div>
-        </div>
-        <div class="dtree-branch">
-          <div class="dtree-label">访存瓶颈?</div>
-          <div class="dtree-action">💾 片上带宽采集 → PMU / 吞吐指标</div>
-        </div>
-        <div class="dtree-branch">
-          <div class="dtree-label">指令级 stall?</div>
-          <div class="dtree-action">🔍 PC Sampling (9种stall状态) → SIMT GPR 分析</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- MindStudio Insight views -->
-  <div class="card">
-    <div class="card-title">MindStudio Insight 关键视图</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">⏱</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">Timeline</div>
-        <div style="font-size:11px;color:var(--muted);">整网时序、Kernel 启动、通信重叠</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">⚖</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">核间负载图</div>
-        <div style="font-size:11px;color:var(--muted);">多核 Block 负载均衡分析</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">📐</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">Roofline</div>
-        <div style="font-size:11px;color:var(--muted);">算子算力/带宽利用率双限制</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">🔥</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">Cache 热力图</div>
-        <div style="font-size:11px;color:var(--muted);">L1/L2 Cache hit rate 可视化</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">🔁</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">Pipe 流水图 ★新</div>
-        <div style="font-size:11px;color:var(--muted);">ID14/ID15 MarkStamp，bubble 可视化</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">🎯</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">PC Sampling ★新</div>
-        <div style="font-size:11px;color:var(--muted);">9种 stall 状态热点定位</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">📊</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">SIMT GPR ★新</div>
-        <div style="font-size:11px;color:var(--muted);">GPR Count + Status，寄存器溢出诊断</div>
-      </div>
-      <div style="text-align:center;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:22px;margin-bottom:6px;">📈</div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;">SIMT IPC ★新</div>
-        <div style="font-size:11px;color:var(--muted);">Core Occupancy + IPC 利用率</div>
-      </div>
-    </div>
-  </div>
+        <div class="section" id="part22" data-section-id="part22">
+          <div class="section-title"><div class="section-num">2.2</div>Part 2.2：如何把 910 算子迁移到 950</div>
 
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">950-operator-developer-guide.md</span>
-        <span class="src-ref-pages">角色 H / 第五层</span>
-        <span class="src-ref-note">模型级、算子级、Pipe 级、指令级、片上带宽、通信级的 Profiling 诊断顺序</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">探索Ascend 950的性能天花板.pdf</span>
-        <span class="src-ref-pages">p2–37</span>
-        <span class="src-ref-note">Matmul、RmsNormQuant、FIA、通信融合等优化方向；具体收益数字需回到原始课件或实测验证</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 3: 算子优化方法论 -->
-<div class="section" id="s3" data-section-id="s3">
-  <div class="section-title"><div class="section-num">3</div>算子优化方法论：冰山模型 + 实测数据</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：做完 Double Buffer 和 Tiling 之后，算子性能就"到顶"了——但 Roofline 图显示利用率只有 40%，明显还有余量，却不知道下一步该动哪里？</div>
-    <div class="pain-hook-sub">性能优化是有层次的。到了瓶颈往往是因为只用了第1~2层工具，第3~5层才是真正的增量空间。</div>
-  </div>
-
-  <!-- Before/After: 优化能见度 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ 旧式优化思路（经验驱动）</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">优化路径：Tiling → Double Buffer → 调参 → 经验猜测<span class="ba-point-muted">没有系统方法，到了瓶颈就停止</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Roofline 上不到上限 → 说明有问题，但不知道是访存/指令/系统哪层</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Scalar 慢 → 只能反复加 printf 打日志，猜哪条指令在 stall</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">实测优化收益：单凭经验平均 ≤1.5× 改善</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 冰山模型（工具驱动）</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">5层冰山：功能基线 → 资源利用 → 访存优化 → 指令调优 → 系统优化<span class="ba-point-muted">每层有明确工具和指标，不再靠猜</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">Roofline 定位瓶颈区域 → PC Sampling 定位 stall 类型 → Pipe 图定位 bubble 位置</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">从宏观到指令级：整网→单算子→Pipe 流水→代码热点，层层下探</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">案例数字只能说明可优化方向，最终收益必须用本机 msProf / simulator 数据闭环验证</span></div>
-    </div>
-  </div>
-
-  <!-- Iceberg model -->
-  <div class="iceberg" style="margin-bottom:24px;">
-    <div class="iceberg-layer" style="background:rgba(67,105,239,0.07);">
-      <div class="iceberg-num" style="background:rgba(67,105,239,0.16);color:#8BA4F8;">5</div>
-      <div class="iceberg-content">
-        <div class="iceberg-title">系统优化 — Kernel 启动开销</div>
-        <div class="iceberg-detail">减少 Kernel Launch 次数；算子融合减少跨 Kernel 数据搬运；Stream 并发提升硬件利用率</div>
-      </div>
-      <div class="iceberg-effort" style="color:#8BA4F8;">~5%</div>
-    </div>
-    <div class="iceberg-layer" style="background:rgba(124,141,184,0.07);">
-      <div class="iceberg-num" style="background:rgba(124,141,184,0.16);color:#7C8DB8;">4</div>
-      <div class="iceberg-content">
-        <div class="iceberg-title">指令调优 — 寄存器 / 指令精简 / VF 融合</div>
-        <div class="iceberg-detail">减少 GPR 占用防溢出；指令精简去冗余；循环展开提高指令密度；Vector-Fusion 合并多个向量操作</div>
-      </div>
-      <div class="iceberg-effort" style="color:#7C8DB8;">~10%</div>
-    </div>
-    <div class="iceberg-layer" style="background:rgba(255,170,59,0.07);">
-      <div class="iceberg-num" style="background:rgba(255,170,59,0.16);color:#FFAA3B;">3</div>
-      <div class="iceberg-content">
-        <div class="iceberg-title">访存优化 — 合并访存 / UB 缓存 / Sector Cache / NDDMA</div>
-        <div class="iceberg-detail">合并小粒度访存；UB 缓存复用数据；关注 128B Sector Cache 对小粒度/非对齐访问的影响；NDDMA 支持多维非连续和 PAD 搬运</div>
-      </div>
-      <div class="iceberg-effort" style="color:#FFAA3B;">~30%</div>
-    </div>
-    <div class="iceberg-layer" style="background:rgba(4,215,147,0.07);">
-      <div class="iceberg-num" style="background:rgba(4,215,147,0.18);color:#04D793;">2</div>
-      <div class="iceberg-content">
-        <div class="iceberg-title">资源利用 — 多核并行 / Tiling / 负载均衡 / 流水并行</div>
-        <div class="iceberg-detail">跨核并行分配 Block；合理 Tiling 充分利用 L0/UB；首尾 Block 均衡（tbmiss 分析）；Double Buffer 流水隐藏搬运延迟</div>
-      </div>
-      <div class="iceberg-effort" style="color:#04D793;">~40%</div>
-    </div>
-    <div class="iceberg-layer" style="background:rgba(255,75,123,0.07);">
-      <div class="iceberg-num" style="background:rgba(255,75,123,0.18);color:#FF4B7B;">1</div>
-      <div class="iceberg-content">
-        <div class="iceberg-title">功能跑通（基线）</div>
-        <div class="iceberg-detail">算法正确性验证，对齐 Golden 输出。这是一切优化的起点，不做性能假设。</div>
-      </div>
-      <div class="iceberg-effort" style="color:#FF4B7B;">基线</div>
-    </div>
-  </div>
-
-  <!-- 3 real-world optimization cases -->
-  <div class="cards cards-3">
-    <!-- MXFP4 Matmul -->
-    <div class="card">
-      <div class="card-title" style="color:#8BA4F8;">外部案例：MXFP4 Quant MatMul — 7步优化</div>
-      <div style="margin-bottom:12px;">
-        <span class="perf-badge">408μs → 175μs</span>
-        <span style="font-size:12px;color:var(--muted);margin-left:8px;">2.33×</span>
-      </div>
-      <div class="opt-steps">
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">① Double Buffer</span>
-            <span class="opt-step-perf">408→205μs 1.99×</span>
+          <div class="pain-hook">
+            <div class="pain-hook-q">迁移不是改 CMake 版本号后重编译。</div>
+            <div class="pain-hook-sub">先扫描旧算子里的硬件假设：数据是否绕 GM、中间结果是否用 workspace、Vector 是否反复读写 UB、是否把低比特当普通 dtype、是否存在跨代不兼容 API。</div>
           </div>
-          <div class="opt-step-detail">搬运与计算流水并行，隐藏 DMA 延迟</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">② SWAT 优化</span>
-            <span class="opt-step-perf">205→197μs 2.07×</span>
-          </div>
-          <div class="opt-step-detail">Shape-aware Tiling，适配硬件矩阵单元</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:38%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">③ 尾粒均衡</span>
-            <span class="opt-step-perf">197→193μs 2.11×</span>
-          </div>
-          <div class="opt-step-detail">末尾不足一个 Tile 的 Block 负载均衡</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:44%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">④ UnitFlag</span>
-            <span class="opt-step-perf">193→182μs 2.24×</span>
-          </div>
-          <div class="opt-step-detail">减少同步等待，细化流水控制粒度</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:58%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">⑤ L1 Bank Conflict 消除</span>
-            <span class="opt-step-perf">182→181μs 2.25×</span>
-          </div>
-          <div class="opt-step-detail">调整访问步长避免 Bank 冲突</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:61%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">⑥⑦ Scale 预存 UB</span>
-            <span class="opt-step-perf">181→175μs 2.33×</span>
-          </div>
-          <div class="opt-step-detail">将 MX Scale 因子预加载进 UB 避免重复搬运</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
-        </div>
-      </div>
-    </div>
 
-    <!-- RmsNorm -->
-    <div class="card">
-      <div class="card-title" style="color:#04D793;">外部案例：RmsNorm — 6步优化</div>
-      <div style="margin-bottom:12px;">
-        <span class="perf-badge">7693μs → 49μs</span>
-        <span style="font-size:12px;color:var(--muted);margin-left:8px;">157×</span>
-      </div>
-      <div class="opt-steps">
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">① Gamma 预加载</span>
-            <span class="opt-step-perf">7693→6790μs 1.13×</span>
-          </div>
-          <div class="opt-step-detail">Gamma 参数提前加载进 UB，避免每次从 GM 读取</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:5%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">② 多核并行</span>
-            <span class="opt-step-perf">6790→113.6μs 67.7×</span>
-          </div>
-          <div class="opt-step-detail">按 batch 维度切分，充分利用所有 AI Core</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:35%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">③ RegBase 重构</span>
-            <span class="opt-step-perf">113.6→84.1μs 91.5×</span>
-          </div>
-          <div class="opt-step-detail">重构计算逻辑充分利用 Regbase OOO 双发射</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:50%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">④ Double Buffer</span>
-            <span class="opt-step-perf">84.1→54.3μs 141.7×</span>
-          </div>
-          <div class="opt-step-detail">搬运与计算完全重叠，隐藏访存延迟</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:68%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">⑤⑥ UB 多行批处理</span>
-            <span class="opt-step-perf">54.3→49.0μs 157×</span>
-          </div>
-          <div class="opt-step-detail">单次 UB 处理多行数据，提升 Vector 指令利用率</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Flash Attention Scalar -->
-    <div class="card">
-      <div class="card-title" style="color:#FFAA3B;">外部案例：FA Scalar — 4步优化</div>
-      <div style="margin-bottom:12px;">
-        <span class="perf-badge">10.6μs → 5.9μs</span>
-        <span style="font-size:12px;color:var(--muted);margin-left:8px;">1.79×</span>
-      </div>
-      <div class="opt-steps">
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">① ICache 优化</span>
-            <span class="opt-step-perf">10.6→10.3μs 1.03×</span>
-          </div>
-          <div class="opt-step-detail">指令排列优化，提升 ICache 命中率减少取指 stall</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:15%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">② 常量传播</span>
-            <span class="opt-step-perf">10.3μs 1.03×</span>
-          </div>
-          <div class="opt-step-detail">编译期将循环不变量提取为常量，减少运行时计算</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:20%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">③ 数据局部性</span>
-            <span class="opt-step-perf">10.3→8.7μs 1.22×</span>
-          </div>
-          <div class="opt-step-detail">重排计算顺序提升 UB 数据复用，减少 GM 访问</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:45%"></div></div>
-        </div>
-        <div class="opt-step">
-          <div class="opt-step-header">
-            <span class="opt-step-name">④ 综合调优</span>
-            <span class="opt-step-perf">8.7→5.9μs 1.79×</span>
-          </div>
-          <div class="opt-step-detail">循环展开 + 寄存器复用 + Scalar 指令精简融合</div>
-          <div class="progress-bar"><div class="progress-fill" style="width:75%"></div></div>
-        </div>
-      </div>
-      <div style="margin-top:16px;padding:12px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;">TileLang FA 渐进优化参考</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <span style="font-size:12px;color:var(--muted);">Ascend C 基线 100%</span>
-          <span style="font-size:11px;color:var(--border);">→</span>
-          <span class="chip">Cube L0 DB 47%</span>
-          <span class="chip">Vector DB+Prefetch 55%</span>
-          <span class="chip">axpy+Scalar 63%</span>
-          <span class="chip" style="background:rgba(4,215,147,0.10);border-color:rgba(4,215,147,0.25);color:#04D793;">Pipeline 80%</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">昇腾950利用率提升的奥秘.pdf</span>
-        <span class="src-ref-pages">p2–20</span>
-        <span class="src-ref-note">MXFP4 Matmul 7 步优化（408→175 μs，2.33×）、RmsNorm 6 步（7693→49 μs，157×）、FA Scalar 4 步（10.6→5.9 μs，1.79×）</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">探索Ascend 950的性能天花板.pdf</span>
-        <span class="src-ref-pages">p2–37</span>
-        <span class="src-ref-note">冰山模型 5 层定义与逐层突破框架</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">CANNBot进阶开发：Vector算子之排序性能优化.pdf</span>
-        <span class="src-ref-pages">p3, 5, 8, 12, 16</span>
-        <span class="src-ref-note">Vector 算子端到端优化实战：Tiling 策略、Double Buffer、多核并行加速</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 4: 三类算子编程场景 -->
-<div class="section" id="s4" data-section-id="s4">
-  <div class="section-title"><div class="section-num">4</div>三类算子编程场景：Vector / Cube / 融合算子差异</div>
-  <div class="card hardware-path-links" style="margin-bottom:20px;">
-    <div class="card-title">三类算子场景 × 芯片架构路径</div>
-    <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:10px;">Vector、Cube、融合算子的差异需要落到硬件路径上看：连续规则数据看 UB 与 Vector Reg File，离散数据看 SIMT Register File，Cube 低比特主路径看 GM 到 L0A/L0B，融合场景看 AIC 与 AIV 的 C-V 直连。</p>
-    <div class="chip-row">
-      <button class="annotation-link" type="button" data-annotation-jump="scene-vector">Vector：GM↔UB↔Vector RF</button>
-      <button class="annotation-link" type="button" data-annotation-jump="scene-cube">Cube：GM→L0A/B</button>
-      <button class="annotation-link" type="button" data-annotation-jump="scene-fusion">融合：L0C→UB / UB→L1</button>
-      <button class="annotation-link" type="button" data-annotation-jump="scene-simt">SIMT：GM→UB/SIMT RF</button>
-    </div>
-  </div>
-
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：910 上的 Vector/Cube 经验搬到 950 后，代码能跑但性能路径完全变了——到底该按哪种算子范式重写？</div>
-    <div class="pain-hook-sub">950 的关键变化不是单点算力增强，而是把算子编程拆成三类场景：连续规则数据走 SIMD Reg，离散索引数据走 SIMT 多线程，Cube 主计算和 Vector 后处理走 MIX / C-V 直连融合。</div>
-  </div>
-
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ 910 / A3 典型心智</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Vector 多围绕 UB / LocalTensor 做 Memory-based 流水<span class="ba-point-muted">中间结果经常在 UB 中反复读写</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Cube 优化重点集中在 MMAD 主循环、L0/L1/UB Tiling 和 Double Buffer</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">融合算子常以两个 kernel 串联或 workspace 中转实现<span class="ba-point-muted">Cube 写 GM，Vector 再从 GM 读回</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">复杂分支、离散索引、多线程任务容易退化成 scalar/访存瓶颈</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 场景化编程心智</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>Vector 算子</strong>：连续、规则、表达式型数据优先走 SIMD Reg / VF 融合<span class="ba-point-muted">减少 UB 往返，但要控制寄存器压力</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>Cube 算子</strong>：低比特数据类型进入主路径<span class="ba-point-muted">HiF8 / FP8 / MXFP8 / MXFP4、scale 缓存和低比特 layout 需要进 Tiling 设计</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>融合算子</strong>：MIX 编程模式让 AIC + AIV 协同执行<span class="ba-point-muted">这里的 MIX 是混合执行/编程模式，不是数据类型</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>SIMT 多线程</strong>：离散访问、索引、分支、Gather/Scatter 类数据用 thread block / warp 表达</span></div>
-    </div>
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>算子场景</th>
-        <th>数据形态</th>
-        <th>910 典型实现</th>
-        <th>950 关键变化</th>
-        <th>编程判断</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>Vector 算子</strong></td>
-        <td>连续、规则、表达式型数据</td>
-        <td>Memory-based Vector；UB / LocalTensor 读写；CopyIn / Compute / CopyOut 流水</td>
-        <td>SIMD Reg / RegBase、VF 融合、显式 Load/Store 到寄存器；SIMD 与 SIMT 可混合</td>
-        <td>优先把中间结果留在 Reg，少走 UB；重点看 GPR 占用、spill、VF 融合收益</td>
-      </tr>
-      <tr>
-        <td><strong>Cube 算子</strong></td>
-        <td>矩阵乘、GEMM、低比特矩阵计算</td>
-        <td>L0A/L0B/L0C + L1/UB/GM 搬运；MMAD 主循环；Double Buffer</td>
-        <td>HiF8 / FP8 / MXFP8 / MXFP4 等低比特路径；scale cache、伪量化 n-buffer、低比特 layout 进入主路径</td>
-        <td>不要只调 MMAD；同时检查 scale 搬运、尾块、L2/L1 命中、低比特转换和 Cube 输出布局</td>
-      </tr>
-      <tr>
-        <td><strong>融合算子</strong></td>
-        <td>Cube 主计算 + Vector 前后处理；Matmul+Epilogue、RmsNormQuant、FIA</td>
-        <td>常见 Cube 写 GM / workspace，Vector 再读 GM；多个 kernel 串联</td>
-        <td>MIX 编程模式、AIC+AIV 协同、L0C→UB / UB2L1、DualDest、C-V 直连</td>
-        <td>先画数据流，再定 kernel 边界；目标是让 Cube 结果尽量直接进入 Vector 后处理，减少 GM 往返</td>
-      </tr>
-      <tr>
-        <td><strong>SIMT 离散数据</strong></td>
-        <td>索引、分支、离散访存、多线程任务</td>
-        <td>容易落到 scalar 控制、非连续搬运或低效 Vector 表达</td>
-        <td>thread block / warp / shared memory 风格的 SIMT 编程模型；适合 Gather/Scatter、Hash/Atomic、复杂分支</td>
-        <td>数据不是连续向量表达式时，不要硬套 SIMD Reg；优先检查 SIMT thread block 切分与访存合并</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="cards cards-3" style="margin-top:16px;margin-bottom:16px;">
-    <div class="card" style="border-top:3px solid var(--accent3);">
-      <div class="card-title" style="color:var(--accent3);">Vector：SIMD Reg 处理连续规则数据</div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;">适合 Add、RMSNorm、Quant、激活函数、规整表达式融合等场景。950 上的收益来自 RegBase / VF 融合减少 UB 中间结果往返，但寄存器变量过多会造成 spill。</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        <span class="chip">RegTensor</span>
-        <span class="chip">MaskReg</span>
-        <span class="chip">AddrReg</span>
-        <span class="chip">VF 融合</span>
-        <span class="chip">GPR 分析</span>
-      </div>
-    </div>
-    <div class="card" style="border-top:3px solid var(--accent4);">
-      <div class="card-title" style="color:var(--accent4);">Cube：低比特进入主计算路径</div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;">适合 Matmul、GEMM、GMM、qbmm、MOE 等场景。950 不只看 Cube busy，还要把低比特 scale、layout、伪量化、尾块和 L2/L1 复用一起纳入 Tiling。</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        <span class="chip">HiF8</span>
-        <span class="chip">FP8</span>
-        <span class="chip">MXFP8</span>
-        <span class="chip">MXFP4</span>
-        <span class="chip">Scale Cache</span>
-      </div>
-    </div>
-    <div class="card" style="border-top:3px solid var(--accent);">
-      <div class="card-title" style="color:var(--accent);">融合：MIX / C-V 直连消除 GM 往返</div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px;">适合 Matmul+Add、Matmul+Activation、RmsNormQuant、FIA、Attention 后处理等场景。先判断 Cube 结果能否通过 L0C→UB、DualDest 或 UB2L1 直接给 Vector 侧使用。</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        <span class="chip">__mix__(aic_aiv)</span>
-        <span class="chip">L0C→UB</span>
-        <span class="chip">DualDest</span>
-        <span class="chip">AIC+AIV</span>
-        <span class="chip">Thread Block</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">快速判断：先看数据形态，再选编程范式</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:4px;">连续规则</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.6;">优先 SIMD Reg / VF 融合；用 RegTensor 承接中间结果，减少 UB 读写。</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:4px;">矩阵低比特</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.6;">优先 Cube / 模板库路径；把 scale、layout、尾块和 Cube 输出位置纳入设计。</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">Cube + Vector</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.6;">优先 MIX / C-V 直连；目标是减少 workspace 和 GM 中转。</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:4px;">离散多线程</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.6;">优先 SIMT thread block；重点看 warp divergence、访存合并和 shared memory/UB 使用。</div>
-      </div>
-    </div>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">950-operator-developer-guide.md</span>
-        <span class="src-ref-pages">重点差异 / 角色 C-D-E / 分层学习路线</span>
-        <span class="src-ref-note">Cube-Vector 融合通路、RegBase、SIMT/SIMD、低比特格式、融合算子和不同角色阅读路径</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">场景驱动下的算子编程语言选型.pdf</span>
-        <span class="src-ref-pages">p10–14, p19–31, p45–52</span>
-        <span class="src-ref-note">SIMT 线程架构、Reg 矢量编程、SIMD/SIMT/MIX 编程模型、语言和场景选型</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">CANN 算子开发全链路体验升级.pdf</span>
-        <span class="src-ref-pages">p3–13</span>
-        <span class="src-ref-note">NDDMA、CV 直连、代际兼容处理、950 数据通路变化</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">探索Ascend 950的性能天花板.pdf</span>
-        <span class="src-ref-pages">p4–21</span>
-        <span class="src-ref-note">Matmul、RmsNormQuant、FIA、低比特 scale、CV 共享通道和 VF 融合优化方向</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 5: 编程框架选型 -->
-<div class="section" id="s5" data-section-id="s5">
-  <div class="section-title"><div class="section-num">5</div>编程框架选型矩阵</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：想写一个新算子，不知道该选 Ascend C、Triton 还是 TileLang——只能用最熟悉的，但用了之后发现性能达不到预期，或者开发周期远超预期？</div>
-    <div class="pain-hook-sub">950 引入了多个新框架（PyAsc、TileLang 950 专属路径），不同场景有明确的最优解，靠经验猜会系统性踩坑。</div>
-  </div>
-
-  <!-- Before/After: 框架选型方式 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ 旧式框架选择（经验驱动）</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">熟悉哪个就用哪个：CUDA 背景 → Triton，华为背景 → Ascend C<span class="ba-point-muted">没有场景→框架的系统映射</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Triton 写了但性能只有 Ascend C 的 60%，不知道是框架问题还是写法问题</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">TileLang 在 910/A3 上的写法搬到 950 性能没提升（旧路径：L0C→GM→UB）</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">新框架 PyAsc 缺少选择依据，不知道什么时候值得用</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 三层需求漏斗</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>易用性优先</strong>：PyPTO / Triton / TileLang → 快速原型，7天内出性能<span class="ba-point-muted">适合新算法探索、非关键路径</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>兼顾易用与性能</strong>：高阶 API + 算子模板库（CATLASS/ATVOSS）→ 2~4周<span class="ba-point-muted">适合有性能要求但不想手写汇编级代码</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>性能优先</strong>：Ascend C 语言扩展层 + BiSheng 直接优化 → 逼近硬件上限<span class="ba-point-muted">950 专属：L0C→UB 直通（省去 GM 中转），SIMT 独立调度</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">TileLang 在 950 上启用 DualDest 模式：L0C 直接分发到 2 个 AIV UB，无 GM 中转</span></div>
-    </div>
-  </div>
-
-
-  <table>
-    <thead>
-      <tr>
-        <th>框架</th>
-        <th>抽象层次</th>
-        <th>易用性</th>
-        <th>性能上限</th>
-        <th>主要特点</th>
-        <th>典型场景</th>
-        <th>适合人群</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>AsNumpy</strong></td>
-        <td>Tensor 级</td>
-        <td><span class="tag tag-green">极高</span></td>
-        <td><span class="tag tag-red">低</span></td>
-        <td>NumPy 风格 API，几乎零门槛</td>
-        <td>算法验证、原型开发</td>
-        <td>算法研究员、快速验证</td>
-      </tr>
-      <tr>
-        <td><strong>PyPTO</strong></td>
-        <td>Tensor/Tile 级</td>
-        <td><span class="tag tag-blue">高</span></td>
-        <td><span class="tag tag-orange">中高</span></td>
-        <td>Python 接口，支持 Tile 级操作</td>
-        <td>自定义算子开发</td>
-        <td>ML 工程师</td>
-      </tr>
-      <tr>
-        <td><strong>TileLang</strong></td>
-        <td>Tile 级</td>
-        <td><span class="tag tag-orange">中</span></td>
-        <td><span class="tag tag-green">高</span></td>
-        <td>TVM-based；AIC+AIV 协作；Fixed Core 模式；Inter/Intra-core Pipeline；cross_interval 流水控制</td>
-        <td>FA、Matmul 等计算密集算子</td>
-        <td>高性能算子开发者</td>
-      </tr>
-      <tr>
-        <td><strong>Triton-Ascend</strong></td>
-        <td>Tile 级</td>
-        <td><span class="tag tag-orange">中</span></td>
-        <td><span class="tag tag-orange">中高</span></td>
-        <td>GPU 编程风格迁移，降低 GPU 团队迁移成本</td>
-        <td>GPU 算子快速移植</td>
-        <td>有 GPU Triton 经验工程师</td>
-      </tr>
-      <tr>
-        <td><strong>Ascend C</strong></td>
-        <td>Kernel C++</td>
-        <td><span class="tag tag-red">低</span></td>
-        <td><span class="tag tag-green">极高</span></td>
-        <td>直接控制 Cube/Vector/DMA；完整流水控制；双缓冲精细编排</td>
-        <td>生产级算子、库算子开发</td>
-        <td>硬件系统工程师</td>
-      </tr>
-      <tr>
-        <td><strong>PTO ISA</strong></td>
-        <td>指令级</td>
-        <td><span class="tag tag-red">极低</span></td>
-        <td><span class="tag tag-green">极致</span></td>
-        <td>直接操作 ISA 指令，完全手工调度</td>
-        <td>极致性能优化、库底层</td>
-        <td>芯片 / 编译器专家</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- 3-tier demand model -->
-  <div class="cards cards-3" style="margin-top:16px;margin-bottom:16px;">
-    <div class="card" style="border-top:3px solid var(--muted);">
-      <div class="card-title" style="color:var(--muted);">易用性优先</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">快速验证算法思路，原型迭代为主</p>
-      <div><span class="chip">AsNumpy</span><span class="chip">PyPTO</span><span class="chip">Triton-Ascend</span><span class="chip">TileLang</span></div>
-    </div>
-    <div class="card" style="border-top:3px solid var(--accent);">
-      <div class="card-title" style="color:var(--accent);">兼顾易用性与性能</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">自定义算子，需要调参但不想写底层</p>
-      <div><span class="chip">Ascend C（高阶API）</span><span class="chip">PyPTO</span><span class="chip">TileLang</span></div>
-    </div>
-    <div class="card" style="border-top:3px solid var(--accent3);">
-      <div class="card-title" style="color:var(--accent3);">性能优先</div>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">生产算子、库算子，榨取极致算力</p>
-      <div><span class="chip">Ascend C (C/C++)</span><span class="chip">PTO ISA</span></div>
-    </div>
-  </div>
-
-  <!-- SIMT thread model (950 new) -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">950 新增 SIMT 线程模型（业界通用架构）</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
-      <div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">950 AIV 新增 SIMT 矢量计算单元，支持与 GPU 一致的三级线程+内存模型，有 GPU 背景的工程师可快速上手。</p>
-        <table style="font-size:12px;">
-          <thead><tr><th>概念</th><th>说明</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Thread Block</strong></td><td>最多 2048 个线程；与 SIMT VF 一一对应</td></tr>
-            <tr><td><strong>Warp</strong></td><td>最小调度单位；每个 AIV 有若干 Warp Scheduler</td></tr>
-            <tr><td><strong>Register File</strong></td><td>每个 Thread Block SIMT Reg File 总大小 128K</td></tr>
-            <tr><td><strong>Shared Memory</strong></td><td>对应 UB（Unified Buffer）</td></tr>
-            <tr><td><strong>Global Memory</strong></td><td>对应 GM（HBM）</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">线程数 / Block 规格</p>
-        <table style="font-size:12px;">
-          <thead><tr><th>线程个数/Block</th><th>Warp 数</th></tr></thead>
-          <tbody>
-            <tr><td>2048</td><td>64</td></tr>
-            <tr><td>1024</td><td>32</td></tr>
-            <tr><td>512</td><td>16</td></tr>
-          </tbody>
-        </table>
-        <div style="margin-top:12px;padding:10px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent2);">
-          <div style="font-size:11px;color:var(--muted);">SIMT VF 函数需加 <code>__simt_vf__</code> 修饰；SIMD 与 SIMT 可混合在同一 Kernel，Ascend C 通过 <code>__mix__(aic_aiv)</code> 关键字标识。</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TileLang 950-specific: L0C→UB direct path -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">950 C-V 直连：L0C → UB 通路</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
-      <div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">官方指南确认 950 新增 L0C→UB 直连能力，可减少 C/V 核间一次 GM 中间拷贝；具体到 TileLang/Ascend C 的接口、后端支持和约束需按当前工具链确认。</p>
-        <div class="vs-row" style="margin-bottom:0;">
-          <div class="vs-old">
-            <div class="vs-label">910/A3 系列</div>
-            <div style="font-size:11px;color:var(--muted);">T.copy(c_sh, ws) // AIC: L0C → <strong style="color:var(--danger);">GM</strong><br>T.copy(ws, x_sh) // AIV: <strong style="color:var(--danger);">GM</strong> → UB</div>
-          </div>
-          <div class="vs-mid">→</div>
-          <div class="vs-new">
-            <div class="vs-label">950</div>
-            <div style="font-size:11px;color:var(--muted);">T.copy(c_sh, ws) // AIC: L0C → <strong style="color:var(--success);">UB</strong><br><span style="opacity:0.4;">(GM中转消除)</span></div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">收益</p>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;border-left:3px solid var(--accent3);">减少 C/V 核间一次 GM 中间搬运</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;border-left:3px solid var(--accent3);">减少 workspace 内存占用</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;border-left:3px solid var(--accent3);">融合算子复杂度显著降低</div>
-        </div>
-        <div style="margin-top:10px;padding:8px 12px;background:rgba(255,75,123,0.07);border-radius:6px;border:1px solid rgba(255,75,123,0.18);font-size:11px;color:var(--muted);">
-          ⚠ DualDest 模式：L0C 矩阵同时写入两个 AIV 核的 UB，按 M 维度拆分时 M 必须为 2 的倍数；按 N 维度拆分时 N 必须为 32 的倍数。
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Triton-Ascend auto-opt -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">Triton-Ascend 编译器自动优化能力</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">逻辑层</div>
-        <div style="font-size:11px;color:var(--muted);">UB Tiling 自动求解<br>Load/Store layout 推导优化<br>高阶邻近自动化<br>类型自动转化/形状广播</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:4px;">向量层</div>
-        <div style="font-size:11px;color:var(--muted);">Buffer 自动申请和重用<br>自动向量量化<br>VF 融合（cost model 决策）<br>SIMT/SIMD 自动选择</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:4px;">硬件层</div>
-        <div style="font-size:11px;color:var(--muted);">计算单元和数据搬运单元流水排布<br>Cube/Vector 单元流水排布<br>硬件循环优化<br>最佳硬件指令选择</div>
-      </div>
-    </div>
-    <p style="font-size:11px;color:var(--muted);margin-top:10px;">Triton DSL → Analyze and outline → Simt scope + Simd scope → Simt pipeline + Simd pipeline → Kernel.o；编译器自动完成 SIMT/SIMD 分区和 VF 融合决策，开发者只需描述算法逻辑。</p>
-  </div>
-
-  <div class="cards cards-2" style="margin-top:0px;">
-    <div class="card">
-      <div class="card-title">TileLang 关键编程模式</div>
-      <pre><span class="cm"># Fixed Core 模式 — 绑定核数</span>
-<span class="kw">with</span> T.Kernel(
-    <span class="num">128</span>,  <span class="cm"># 固定使用128个AICore</span>
-    threads=<span class="num">4</span>
-) <span class="kw">as</span> (bx, tx):
-    ...
-
-<span class="cm"># Inter-core Pipeline — 核间流水</span>
-<span class="kw">with</span> T.Pipeline(
-    num_stages=<span class="num">8</span>,
-    cross_interval=<span class="num">2</span>  <span class="cm"># 核间交错间隔</span>
-):
-    ...
-
-<span class="cm"># AIC + AIV 协同</span>
-T.launch_aic(matmul_kernel)  <span class="cm"># Cube</span>
-T.launch_aiv(epilogue)       <span class="cm"># Vector</span></pre>
-    </div>
-    <div class="card">
-      <div class="card-title">选型建议决策</div>
-      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent3);">
-          <strong>快速验证想法</strong> → <span class="chip">AsNumpy</span> 或 <span class="chip">PyPTO</span>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent);">
-          <strong>有 GPU 背景，快速移植</strong> → <span class="chip">Triton-Ascend</span>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent4);">
-          <strong>需要高性能自定义算子</strong> → <span class="chip">TileLang</span> 或 <span class="chip">Ascend C</span>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent2);">
-          <strong>库级别极致性能</strong> → <span class="chip">Ascend C</span> + <span class="chip">PTO ISA</span>（部分 hot path）
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- PyPTO 融合算子开发 3 步流程 -->
-  <div class="card" style="margin-top:16px;margin-bottom:16px;">
-    <div class="card-title">PyPTO 融合算子开发工作流（3 步）</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
-      <div style="padding:12px;background:var(--card2);border-radius:8px;border-top:3px solid var(--accent);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">① 分析计算流</div>
-        <div style="font-size:11px;color:var(--muted);">阅读模型脚本，梳理计算流<br>绘制计算流程图<br>明确算子原型（输入/属性/输出）<br>识别 Cube（linear）与 Vec（RoPE/norm）模块边界</div>
-      </div>
-      <div style="padding:12px;background:var(--card2);border-radius:8px;border-top:3px solid var(--accent3);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:6px;">② 按模块开发与组装</div>
-        <div style="font-size:11px;color:var(--muted);">逐模块实现（LayerNorm / RoPE / Quant）<br>用 PyTorch golden 对比精度<br>将模块组装为完整融合算子<br>精度调试：<code>@pypto.jit(compile_debug_mode=1)</code></div>
-      </div>
-      <div style="padding:12px;background:var(--card2);border-radius:8px;border-top:3px solid var(--accent4);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:6px;">③ 性能调优</div>
-        <div style="font-size:11px;color:var(--muted);">先做动静分析与 Stitch 图合并<br>再逐模块 Tile Shape 调整<br>用 PyPTO Toolkit 泳道图定位瓶颈<br>L1Reuse / CubeNBuffer 进阶优化</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">Cube Tile Shape 规则</div>
-        <table style="font-size:11px;">
-          <thead><tr><th>场景</th><th>推荐 TileShape</th><th>说明</th></tr></thead>
-          <tbody>
-            <tr><td>Q-linear (Prefill)</td><td>[512,128], [128,128]</td><td>显著提升利用率</td></tr>
-            <tr><td>K-linear (Prefill)</td><td>[128,128]</td><td>与 Q 不同，需分别调</td></tr>
-            <tr><td>Decode 场景</td><td>通常带宽 bound</td><td>用 loop_unroll 展开</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">Vector Tile Shape 规则</div>
-        <table style="font-size:11px;">
-          <thead><tr><th>算子</th><th>推荐设置</th><th>避免</th></tr></thead>
-          <tbody>
-            <tr><td>LayerNorm / Quant</td><td>连续操作相同 TileShape</td><td>不同 Shape 阻碍图合并</td></tr>
-            <tr><td>RoPE (FP32)</td><td>64KB</td><td>96KB 会 OOM spill</td></tr>
-            <tr><td>Hadamard Transform</td><td>固定 [128,128]</td><td>过大触发重复搬运</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- PyPTO Toolkit 4 大功能 -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">PyPTO Toolkit（VSCode 插件）— 4 大核心特性</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">① 控制流可视化</div>
-        <div style="font-size:11px;color:var(--muted);">逻辑映射验证算法意图<br>代码↔算法一致性校验<br>控制流图结构 / 节点搜索</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent3);margin-bottom:4px;">② 计算图可视化</div>
-        <div style="font-size:11px;color:var(--muted);">全景解析计算逻辑<br>Tensor/Operation 层次<br>Pass 前后 IR diff</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--accent4);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent4);margin-bottom:4px;">③ 泳道图可视化</div>
-        <div style="font-size:11px;color:var(--muted);">微观时序 / 性能瓶颈<br>节点时间间隔测量<br>时间观测线 / 搜索定位</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent2);margin-bottom:4px;">④ 三栏联动</div>
-        <div style="font-size:11px;color:var(--muted);">代码-计算图-泳道图联动<br>一站式闭环调优<br>点击泳道节点跳转代码行</div>
-      </div>
-    </div>
-    <div style="margin-top:10px;padding:8px 12px;background:var(--card2);border-radius:6px;font-size:11px;color:var(--muted);">
-      安装：VSCode 扩展市场搜索 "PyPTO Toolkit" → 一键安装；数据准备：Python/C++ 代码文件 + 运行时生成 JSON + 打开项目目录
-    </div>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">场景驱动下的算子编程语言选型.pdf</span>
-        <span class="src-ref-pages">p3–10, 12, 14, 16, 18, 22, 26, 30, 34, 36, 38</span>
-        <span class="src-ref-note">AscendC / TileLang / PyPTO 选型矩阵、SIMT vs SIMD 适用场景对比、各框架实测性能数据</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">TileLang典型算子性能优化.pdf</span>
-        <span class="src-ref-pages">p3, 4, 5, 8, 10, 14, 18, 22, 25, 28</span>
-        <span class="src-ref-note">TileLang FlashAttention / Matmul 优化示例、Pipeline num_stages 配置、FA 63%→80% 关键调优步骤</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">TorchTitan-NPU.pdf</span>
-        <span class="src-ref-pages">p3, 5, 8, 12, 18</span>
-        <span class="src-ref-note">TorchTitan NPU 适配框架概览、分布式训练与 DFX 配置</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">PyPTO 模型融合算子实操.pdf</span>
-        <span class="src-ref-pages">p1–27（全读）</span>
-        <span class="src-ref-note">IndexerProlog 融合算子开发 3 步流程、Cube/Vector Tile Shape 调优规则、AI Agent 路线图</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">PyPTO IDE调优工具实操.pdf</span>
-        <span class="src-ref-pages">p1–21（全读）</span>
-        <span class="src-ref-note">PyPTO Toolkit 4 大核心特性：控制流/计算图/泳道图可视化 + 三栏联动</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section NEW: Ascend C 算子工具链 -->
-<div class="section" id="s6" data-section-id="s6">
-  <div class="section-title"><div class="section-num" style="background:var(--accent3);">★</div>Ascend C 算子开发工具链详解</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：算子出了 Bug，只能靠 printf 打日志；遇到 Race Condition 或内存越界，根本无从下手——调试一个看似简单的问题要花几天？</div>
-    <div class="pain-hook-sub">950 的 Ascend C 工具链已经达到 GPU 生态的调试成熟度：4 步独立工具，覆盖编码→编译→调试→调优全链路。</div>
-  </div>
-
-  <!-- Before/After: 调试能力 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ 旧式调试（黑盒）</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">唯一手段：printf 打日志 + 手动比对 Golden 输出<span class="ba-point-muted">日志量大时根本看不出规律</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">内存越界：运行出错但不知道哪行代码写越界了</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">Race Condition / 未初始化读：结果偶发性错误，复现概率低</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">性能分析：只有宏观耗时，不知道哪条指令在 stall</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 全链路工具</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>msSanitizer 4种模式</strong>自动检测：内存越界 / RAW 冒险 / 未初始化读 / 同步缺失<span class="ba-point-muted">编译加 <code style="font-size:10px;">--sanitizer -g</code> 即可，问题精确到行</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>msDebug</strong>：断点 + 单步 + 内存/寄存器查看 + 孪生调试（仿真 vs 真板对比）</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text"><strong>msProf op</strong>：6种可视化（核间负载/热力图/Roofline/Pipe流水/PC Sampling/代码热点）</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">CoreDump 分析：<code style="font-size:10px;">msdebug --core xxx.core fatbin</code>，硬件异常事后可分析</span></div>
-    </div>
-  </div>
-
-  <!-- 4-stage pipeline -->
-  <div class="workflow" style="margin-bottom:20px;">
-    <div class="workflow-step">
-      <div class="workflow-num">编</div>
-      <div class="workflow-title">算子编码</div>
-      <span class="workflow-tool">VS Code Plugin</span>
-      <div class="workflow-desc">BiSheng 编译器 + VS Code OP DevTools 插件；支持 SIMD / SIMT / SIMT VF 混合范式；CMake 或命令行两种编译方式。</div>
-    </div>
-    <div class="workflow-step">
-      <div class="workflow-num">译</div>
-      <div class="workflow-title">算子编译</div>
-      <span class="workflow-tool">bisheng / CMake</span>
-      <div class="workflow-desc">异构编译：源码 → BiSheng → host/device compiler → linker → 可执行文件（binary.so/.a）。</div>
-    </div>
-    <div class="workflow-step">
-      <div class="workflow-num">调</div>
-      <div class="workflow-title">算子调试</div>
-      <span class="workflow-tool">msDebug + msSanitizer</span>
-      <div class="workflow-desc">在板交互调试（断点/单步/内存显示）；msSanitizer 4种异常检测；CoreDump 解析回溯代码调用栈。</div>
-    </div>
-    <div class="workflow-step">
-      <div class="workflow-num">优</div>
-      <div class="workflow-title">算子调优</div>
-      <span class="workflow-tool">msProf + MindStudio Insight</span>
-      <div class="workflow-desc">7类性能指标数据；6种可视化视图（Pipe流水图/PcSampling/Roofline/核间负载/热力图/代码热点）。</div>
-    </div>
-  </div>
-
-  <div class="cards cards-2" style="margin-bottom:20px;">
-    <!-- Compile commands -->
-    <div class="card">
-      <div class="card-title">编译命令速查</div>
-      <pre><span class="cm"># 命令行编译（调试模式）</span>
-bisheng main.asc \
-  --npu-arch=<span class="str">dav-3510</span> \
-  -o main \
-  -g                    <span class="cm"># 保留调试符号</span>
-
-<span class="cm"># 带 sanitizer 编译</span>
-bisheng demo.asc \
-  --npu-arch=<span class="str">dav-3510</span> \
-  -o demo \
-  --sanitizer -g
-
-<span class="cm"># CMake 方式</span>
-target_compile_options(main PRIVATE
-  -\$&lt;COMPILE_LANGUAGE:ASC&gt;:--npu-arch=dav-3510&gt;
-)
-<span class="cm"># mkdir build; cd build; cmake ..; make</span></pre>
-    </div>
-
-    <!-- Debug interfaces table -->
-    <div class="card">
-      <div class="card-title">调试接口汇总</div>
-      <table>
-        <thead><tr><th>用途</th><th>接口</th><th>适用范式</th></tr></thead>
-        <tbody>
-          <tr><td>字符串打印</td><td><code>printf</code></td><td><span class="tag tag-blue">SIMD</span><span class="tag tag-green">SIMT</span></td></tr>
-          <tr><td>断言</td><td><code>assert</code></td><td><span class="tag tag-blue">SIMD</span><span class="tag tag-green">SIMT</span></td></tr>
-          <tr><td>Dump GM内存</td><td><code>asc_dump_gm</code></td><td><span class="tag tag-blue">SIMD</span></td></tr>
-          <tr><td>Dump UB内存</td><td><code>asc_dump_ubuf</code></td><td><span class="tag tag-blue">SIMD</span></td></tr>
-          <tr><td>Dump L0内存</td><td><code>asc_dump_cbuf</code></td><td><span class="tag tag-blue">SIMD</span></td></tr>
-          <tr><td>Dump 寄存器</td><td><code>asc_dump_reg</code></td><td><span class="tag tag-blue">SIMD</span></td></tr>
-          <tr><td>Dump Tensor</td><td><code>AscendC::DumpTensor</code></td><td><span class="tag tag-blue">SIMD</span><span class="tag tag-green">SIMT</span></td></tr>
-          <tr><td>时间戳</td><td><code>asc_time_stamp</code></td><td><span class="tag tag-blue">SIMD</span><span class="tag tag-green">SIMT</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="cards cards-2" style="margin-bottom:20px;">
-    <!-- msSanitizer -->
-    <div class="card">
-      <div class="card-title" style="color:#FF4B7B;">msSanitizer — 4种异常检测模式</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--danger);">
-          <div style="font-size:12px;font-weight:700;color:#FF4B7B;margin-bottom:3px;">内存检测 (memcheck)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">检测 GM 内存越界读写，精确定位异常代码行</div>
-          <code style="font-size:11px;color:#7ec98a;">mssanitizer --tool=memcheck /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--warn);">
-          <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:3px;">竞争检测 (tracecheck)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">检测 Potential RAW hazard，UB 竞争访问问题</div>
-          <code style="font-size:11px;color:#7ec98a;">mssanitizer --tool=tracecheck /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent4);">
-          <div style="font-size:12px;font-weight:700;color:var(--accent4);margin-bottom:3px;">未初始化检测 (initcheck)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">识别未初始化内存读 256 大小问题</div>
-          <code style="font-size:11px;color:#7ec98a;">mssanitizer --tool=initcheck /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border-left:3px solid var(--accent2);">
-          <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:3px;">同步检测 (synccheck)</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">检测 set_flag 指令缺失引发的同步异常</div>
-          <code style="font-size:11px;color:#7ec98a;">mssanitizer --tool=synccheck /demo</code>
-        </div>
-      </div>
-    </div>
-
-    <!-- msProf visualization modes -->
-    <div class="card">
-      <div class="card-title" style="color:#8BA4F8;">msProf — 6种可视化采集命令</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">核间负载图</span>
-            <span class="tag tag-blue" style="font-size:10px;">Occupancy</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op --aic-metrics=Occupancy.Default /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">计算内存热力图</span>
-            <span class="tag tag-orange" style="font-size:10px;">Memory</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op --aic-metrics=Memory.Default /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">Roofline 性能分析</span>
-            <span class="tag tag-green" style="font-size:10px;">Roofline</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op --aic-metrics=Roofline.Default /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">Pipe 流水图 ★</span>
-            <span class="tag tag-purple" style="font-size:10px;">Timeline</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op --aic-metrics=Timeline /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">SIMT VF Stall 分析 ★</span>
-            <span class="tag tag-red" style="font-size:10px;">PcSampling</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op --aic-metrics=PcSampling /demo</code>
-        </div>
-        <div style="padding:10px 14px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">代码热点度量</span>
-            <span class="tag tag-blue" style="font-size:10px;">Source</span>
-          </div>
-          <code style="font-size:11px;color:var(--muted);">msprof op simulator --aic-Source.Default /demo</code>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- msProf output files -->
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-title">msProf 输出文件索引（OPPROF_{timestamp}/）</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">OpBaseInfo.csv</div>
-        <div style="font-size:11px;color:var(--muted);">算子名/block数量/运行频率/block耗时</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">ArithmeticUtilization.csv</div>
-        <div style="font-size:11px;color:var(--muted);">Cube/Vector 计算单元有效时间占比</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">L2Cache.csv</div>
-        <div style="font-size:11px;color:var(--muted);">L2 Cache 命中率</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">MemoryL0.csv</div>
-        <div style="font-size:11px;color:var(--muted);">L0A/L0B/L0C 通道带宽数据</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">MemoryUB.csv</div>
-        <div style="font-size:11px;color:var(--muted);">UB 详细带宽数据</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">MemoryUtilization.csv</div>
-        <div style="font-size:11px;color:var(--muted);">内存/存储带宽利用率</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">PipeUtilization.csv</div>
-        <div style="font-size:11px;color:var(--muted);">各计算流水线发射队列利用率</div>
-      </div>
-      <div style="padding:10px;background:var(--card2);border-radius:8px;border:1px solid var(--border);">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">ResourceConflictRatio.csv</div>
-        <div style="font-size:11px;color:var(--muted);">资源冲突比，定位 Bank Conflict</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- msDebug -->
-  <div class="card">
-    <div class="card-title" style="color:#04D793;">msDebug — 在板调试使用方法</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-      <div>
-        <pre><span class="cm"># 编译（需 -g 保留调试信息）</span>
-bisheng main.asc \
-  --npu-arch=<span class="str">dav-3510</span> -o main -g
-
-<span class="cm"># 启动调试器</span>
-msdebug /main
-
-<span class="cm"># CoreDump 分析（算子崩溃后）</span>
-msdebug \
-  --core extra-info/data-dump/0/add.core \
-  add.fatbin</pre>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">msDebug 能力</p>
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> 断点与单步执行控制</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> 存储器内容实时显示</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> 寄存器值查看</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> 流程图可视化追踪</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> 孪生调试（仿真 + 真实上板对比）</div>
-          <div style="padding:8px 12px;background:var(--card2);border-radius:6px;font-size:12px;"><span style="color:var(--accent3);">●</span> CoreDump 文件回溯异常代码调用栈</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SIMT 5大优化技巧 -->
-  <div class="card" style="margin-top:16px;margin-bottom:16px;">
-    <div class="card-title">950 SIMT 编程 — 5 大优化技巧</div>
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <div style="display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px;background:var(--card2);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);text-align:center;">①</div>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">合理切分线程数（512~1024 最佳）</div>
-          <div style="font-size:11px;color:var(--muted);">线程数不超 2048，优先用 b32 类型（b64 占两个寄存器，消耗翻倍）。切分过少浪费并行度；切分过多超出寄存器限制触发 spill。</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px;background:var(--card2);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);text-align:center;">②</div>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">访存合并（Coalesced Memory Access）</div>
-          <div style="font-size:11px;color:var(--muted);">同一 Warp 内所有线程的 GM 访问请求落在同一 Sector 时可合并为单次内存请求，带宽利用率最高。最差情况：每个线程访不同 Sector，n 线程 = n 次独立请求。</div>
-          <div style="font-family:monospace;font-size:11px;color:var(--accent3);margin-top:4px;">推荐：output[threadIdx.x] = input[threadIdx.x]  // 连续访问，同 Sector</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px;background:var(--card2);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);text-align:center;">③</div>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">避免 Warp Divergence（分支在 Warp 间，不在 Warp 内）</div>
-          <div style="font-size:11px;color:var(--muted);">SIMT 硬件为每个 Warp 分配单个 PC，Warp 内分支跳转导致两路串行执行。<br>
-            <span style="color:var(--danger);">✗ 错：if (threadIdx.x % 2 == 0)</span>（Warp 内分支，半 Warp 空转）<br>
-            <span style="color:var(--success);">✓ 对：int warp_id = threadIdx.x/32; if (warp_id % 2 == 0)</span>（整 Warp 分支）
-          </div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px;background:var(--card2);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);text-align:center;">④</div>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">代码优化：合并独立操作利于编译器并发</div>
-          <div style="font-size:11px;color:var(--muted);">将独立的 Load/Compute/Store 重排分组：先批量 LOAD，再批量 PROCESS，再批量 STORE。编译器更容易检测到无数据依赖并发指令。</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;padding:10px;background:var(--card2);border-radius:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);text-align:center;">⑤</div>
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">#pragma unroll 与参数量控制</div>
-          <div style="font-size:11px;color:var(--muted);"><code>#pragma unroll</code>：提示编译器展开循环（减少分支 + 提高指令并行）；但会增加代码体积和寄存器消耗，权衡使用。<br>SIMT 入参最大 <strong>28×32 Bit</strong>；超过时用预留空间中转，但延迟增大。建议将 tiling 参数结构体搬入 UB 展开。</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Reg矢量编程模型 -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="card-title">950 SIMD Reg 矢量编程模型（Regbase 新架构）</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
-      <div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">950 AIV 引入 Regbase 架构：向开发者开放 SIMD Reg 寄存器，数据流从 GM↔UB（旧）升级为 GM↔UB↔Reg，减少 UB 访存带宽、支持 OOO 双发射。</p>
-        <div style="background:var(--card2);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--accent3);line-height:1.8;">
-          GM <span style="color:var(--muted);">←→</span> UB <span style="color:var(--muted);">←→</span> Reg (VL=256B)<br>
-          <span style="color:var(--muted);">↑每个VF独立计算单元</span><br><br>
-          <span style="color:var(--muted);">// 标准数据流（5步）</span><br>
-          GM <span style="color:var(--success);">→</span> UB（DataCopy in Kernel）<br>
-          UB <span style="color:var(--success);">→</span> Reg（asc_load in VF）<br>
-          Reg <span style="color:var(--success);">→</span> compute（ALU）<br>
-          Reg <span style="color:var(--success);">→</span> UB（asc_store in VF）<br>
-          UB <span style="color:var(--success);">→</span> GM（DataCopy in Kernel）
-        </div>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">关键编程规则</p>
-        <table style="font-size:11px;">
-          <thead><tr><th>规则</th><th>说明</th></tr></thead>
-          <tbody>
-            <tr><td><code>__simd_vf__</code></td><td>VF 函数标识，必须用 <code>asc_vf_call&lt;&gt;</code> 调用</td></tr>
-            <tr><td><code>__simd_callee__</code></td><td>只能在 VF 内调用；标量部分在 AuxScalar 执行</td></tr>
-            <tr><td><code>vector_float</code></td><td>C API 向量类型，VL=256B（64 个 float）</td></tr>
-            <tr><td><code>RegTensor&lt;T&gt;</code></td><td>C++ 模板，定义 SIMD Reg 寄存器</td></tr>
-            <tr><td>Reg 计算</td><td>只能在 SIMD VF 内执行，不能在主 Kernel 中直接用</td></tr>
-          </tbody>
-        </table>
-        <div style="margin-top:10px;padding:8px 12px;background:rgba(255,75,123,0.07);border-radius:6px;border:1px solid rgba(255,75,123,0.18);font-size:11px;color:var(--muted);">
-          ⚠ 为保持对当代（A2/A3）算子兼容，下一代同时保留 Membase 矢量计算接口。Reg 与 Membase 均可使用，但 Reg 性能更优（减少 UB 带宽压力，支持 OOO 双发射）。
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">Ascend C算子编译与调试调优能力概述.pdf</span>
-        <span class="src-ref-pages">p2–27（全读）</span>
-        <span class="src-ref-note">4 步开发流程、BiSheng 编译命令（-g / --sanitizer）、调试接口 8 类、msSanitizer 4 模式、msDebug 断点 + CoreDump、msProf 7 类指标 + 6 种可视化命令</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">基于下一代Ascend平台的SIMT编程介绍.pdf</span>
-        <span class="src-ref-pages">p1–29（全读）</span>
-        <span class="src-ref-note">SIMT 5 大优化技巧（切分/访存合并/避免 divergence/代码优化/pragma unroll）、Warp Shuffle/Vote/Reduce API、gather 算子示例</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">基于下一代硬件的Ascend C Reg矢量编程.pdf</span>
-        <span class="src-ref-pages">p1–11（架构+编程模型+API 概述）</span>
-        <span class="src-ref-note">Regbase 硬件架构、VF 函数调用规则、GM↔UB↔Reg 数据流 5 步、C++ RegTensor 与 C API vector_float</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">基于下一代Ascend平台的Ascend C算子编程概述.pdf</span>
-        <span class="src-ref-pages">p1–43（全读）</span>
-        <span class="src-ref-note">SIMT/SIMD/混合三大编程模型、UB 内存分配规则（DataCache≥32K）、A2/A3→950 迁移 95% 兼容 + 5 大不兼容项</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 6: 大模型实践 -->
-<div class="section" id="s7" data-section-id="s7">
-  <div class="section-title"><div class="section-num">6</div>大模型训练 / 推理实践</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否发现：大模型训练时通信开销占比居高不下，AllReduce / AllGather 是主要瓶颈——但通信是框架调的，代码层面完全不知道怎么优化？</div>
-    <div class="pain-hook-sub">950 官方指南要求把 CCU / HCCL、通信与本地计算重排和 Profiling 诊断一起看；DeepSeek-V4 等案例只能作为外部工程参考，具体收益需要复测。</div>
-  </div>
-
-  <!-- Before/After: 大模型通信优化 -->
-  <div class="before-after">
-    <div class="ba-old">
-      <div class="ba-header">▼ A2 / A3 大模型通信现状</div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">AllReduce / AllGather = 独立软件 CCL 调用，通信与计算<strong>严格串行</strong></span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">数据经过 CCL Buffer 拷贝，每次通信有额外内存搬运开销</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">MoE Dispatch + Combine：多次独立 Kernel，无法合并执行</span></div>
-      <div class="ba-point"><span class="ba-dot">✕</span><span class="ba-point-text">通信占比 30%+ 时，扩展到更多卡效率递减</span></div>
-    </div>
-    <div class="ba-mid">→</div>
-    <div class="ba-new">
-      <div class="ba-header">▲ 950 CCU 通信融合</div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">AllGather + MatMul 可作为通信与计算融合方向分析<span class="ba-point-muted">是否零拷贝、隐藏比例和收益需按 HCCL/CANN 版本与算子实现验证</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">确定性计算保证 Reduce 结果精度一致，无需数值调试</span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">外部案例中的 MoE Dispatch/Combine 融合收益需按模型、并行策略和 CANN 版本复测<span class="ba-point-muted">指南只要求关注通信与本地计算的重排和重叠</span></span></div>
-      <div class="ba-point"><span class="ba-dot">✓</span><span class="ba-point-text">自动融合案例可作为工程方向参考，不属于本指南的通用收益保证</span></div>
-    </div>
-  </div>
-
-
-  <!-- DeepSeek V4 -->
-  <div class="card" style="margin-bottom:20px;">
-    <div class="card-title">外部案例：DeepSeek V4 950 集群优化实践</div>
-    <div class="metrics">
-      <div class="metric-card">
-        <div class="metric-value">1.6TB</div>
-        <div class="metric-label">模型参数量</div>
-        <div class="metric-sub">Dense equiv.</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">1M</div>
-        <div class="metric-label">上下文长度</div>
-        <div class="metric-sub">超长序列</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">1536卡</div>
-        <div class="metric-label">集群规模</div>
-        <div class="metric-sub">950 NPU</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">4122</div>
-        <div class="metric-label">tokens/p/s</div>
-        <div class="metric-sub">推理吞吐</div>
-      </div>
-    </div>
-
-    <div class="cards cards-2">
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">模型架构创新</p>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div style="padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:8px;">
-            <div style="font-size:12px;font-weight:700;color:#8BA4F8;margin-bottom:4px;">Hybrid Attention</div>
-            <div style="font-size:12px;color:var(--muted);">Win(128)+CSA(4×KV压缩)+HCA(128×KV压缩) 混合注意力，极致压缩 KV Cache</div>
-          </div>
-          <div style="padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:8px;">
-            <div style="font-size:12px;font-weight:700;color:#04D793;margin-bottom:4px;">MoE 3-hash Routing</div>
-            <div style="font-size:12px;color:var(--muted);">384 专家，TopK6，3-hash 路由；亲和分析优化专家分布，减少跨节点通信</div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">并行 + 量化策略</p>
-        <table style="border:none;background:transparent;">
-          <tr>
-            <td style="border:none;padding:5px 0;font-size:12px;color:var(--muted);width:100px;">Prefill</td>
-            <td style="border:none;padding:5px 0;font-size:12px;">CP + EP (zig-zag 序列并行 + 专家并行)</td>
-          </tr>
-          <tr>
-            <td style="border:none;padding:5px 0;font-size:12px;color:var(--muted);">Decode</td>
-            <td style="border:none;padding:5px 0;font-size:12px;">DP + EP (数据并行 + 专家并行)</td>
-          </tr>
-          <tr>
-            <td style="border:none;padding:5px 0;font-size:12px;color:var(--muted);">A3 量化</td>
-            <td style="border:none;padding:5px 0;font-size:12px;"><span class="chip">A8W8+Indexer C8</span></td>
-          </tr>
-          <tr>
-            <td style="border:none;padding:5px 0;font-size:12px;color:var(--muted);">A5 量化</td>
-            <td style="border:none;padding:5px 0;font-size:12px;"><span class="chip">FP8 MoE</span><span class="chip">MXFP4 Linear</span><span class="chip">MXFP8 A8W8</span></td>
-          </tr>
-        </table>
-      </div>
-    </div>
-
-    <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;padding:12px 16px;background:rgba(4,215,147,0.07);border:1px solid rgba(4,215,147,0.18);border-radius:8px;">
-        <div style="font-size:12px;font-weight:700;color:var(--success);margin-bottom:4px;">CCU AllGather + MatMul 融合</div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);">外部案例指标：通信开销 -70%</div>
-      </div>
-      <div style="flex:1;min-width:200px;padding:12px 16px;background:rgba(4,215,147,0.07);border:1px solid rgba(4,215,147,0.18);border-radius:8px;">
-        <div style="font-size:12px;font-weight:700;color:var(--success);margin-bottom:4px;">MoE Dispatch & Combine 融合</div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);">外部案例指标：吞吐 +20%</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TorchTitan NPU -->
-  <div class="card">
-    <div class="card-title">外部案例：TorchTitan-NPU AutoFuse 自动融合</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-      <div>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">torch.compile + Inductor FX → AutoFuse → Ascend C Kernel 自动生成，无需手写融合算子。</p>
-        <div class="vs-row">
-          <div class="vs-old">
-            <div class="vs-label">原始</div>
-            <div class="vs-text">Top-K: <strong>229μs</strong></div>
-          </div>
-          <div class="vs-mid">→</div>
-          <div class="vs-new">
-            <div class="vs-label">融合后</div>
-            <div class="vs-text">Top-K: <strong>152μs</strong> <span class="perf-badge" style="font-size:10px;">1.5×</span></div>
-          </div>
-        </div>
-        <div class="vs-row">
-          <div class="vs-old">
-            <div class="vs-label">原始</div>
-            <div class="vs-text">RoPE: <strong>126μs</strong></div>
-          </div>
-          <div class="vs-mid">→</div>
-          <div class="vs-new">
-            <div class="vs-label">融合后</div>
-            <div class="vs-text">RoPE: <strong>15μs</strong> <span class="perf-badge" style="font-size:10px;">8.4×</span></div>
-          </div>
-        </div>
-      </div>
-      <div>
-        <p style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">端到端收益</p>
-        <div style="padding:20px;background:var(--card2);border-radius:10px;border:1px solid var(--border);text-align:center;">
-          <div style="font-size:36px;font-weight:700;color:var(--accent3);line-height:1;font-family:'JetBrains Mono',monospace;">+38.5%</div>
-          <div style="font-size:14px;color:var(--muted);margin-top:8px;">e2e 训练吞吐提升</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px;">通过 AutoFuse 自动融合</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">DeepSeek-V4的950集群优化实践.pdf</span>
-        <span class="src-ref-pages">p2–14</span>
-        <span class="src-ref-note">模型演进图、Hybrid Attention（Win+CSA+HCA）、MoE 3-hash 384 专家、亲和分析、Prefill CP+EP / Decode DP+EP 并行策略、A3/A5 量化策略对比</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">TorchTitan-NPU.pdf</span>
-        <span class="src-ref-pages">p3, 5, 8, 12, 18</span>
-        <span class="src-ref-note">TorchTitan NPU 大模型训练流水线适配、DFX 调试接口</span>
-      </div>
-    </div>
-  </details>
-</div>
-
-<!-- Section 7: 迁移注意事项 -->
-<div class="section" id="s8" data-section-id="s8">
-  <div class="section-title"><div class="section-num">7</div>迁移注意事项 — 常见坑</div>
-
-  <!-- Pain hook -->
-  <div class="pain-hook">
-    <div class="pain-hook-q">你是否把 A3 上测过的代码直接搬到 950，CI 全绿、功能正确，但性能只有预期的 30%~50%，而且 profiling 数据完全看不懂？</div>
-    <div class="pain-hook-sub">以下是从外部性能优化案例中总结的高频踩坑点，每个都需要回到当前 CANN Toolkit、SoC 版本和 profiling 数据验证。</div>
-  </div>
-
-
-  <div class="pitfall-list">
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">Profiling 参数随 CANN 版本变化</div>
-        <div class="pitfall-desc">官方指南只确认 950 的 Profiling 会扩展到 Pipe、PC Sampling、SIMT 寄存器、CCU 和片上带宽等层级；具体采集参数、并发能力和文件格式必须按当前 CANN 版本确认。</div>
-        <div class="pitfall-fix">✓ 迁移时检查所有 msprof 调用，不把旧脚本参数默认带到新环境</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">MXFP4 Scale 因子不预存导致瓶颈</div>
-        <div class="pitfall-desc">MXFP4 每组数据有共享缩放因子 Scale，若在计算时每次从 GM 读取 Scale，访存成本抵消量化收益。实测从 181μs 优化到 175μs（最后一步）正是源于此。</div>
-        <div class="pitfall-fix">✓ 在算子 prologue 阶段将 Scale 预加载至 UB，整个计算期间复用</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">L1 Bank Conflict（访问步长问题）</div>
-        <div class="pitfall-desc">L1 存储有 Bank 结构，若矩阵访问步长恰好是 Bank 数倍数，会导致所有访问打到同一 Bank，吞吐下降数倍。Ascend C 程序员从 GPU 迁移后特别容易忽略。</div>
-        <div class="pitfall-fix">✓ Tiling 时将矩阵行宽 pad 到非 Bank 数倍数（如 +1 列），或使用 Swizzle 访问模式</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">Regbase 编程范式转变</div>
-        <div class="pitfall-desc">950 Regbase 架构下，操作数直接来自寄存器而非 Local Buffer，Large Regbase 操作减少 UB 带宽压力。但 GPR 数量有限，使用过多 Regbase 变量会导致 spill，反而引发性能下降（SIMT GPR 分析可诊断）。</div>
-        <div class="pitfall-fix">✓ 用 SIMT GPR 视图监控 GPR Count，超过阈值时重构减少临时变量</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">CCU 路径需确认对齐与版本约束</div>
-        <div class="pitfall-desc">官方指南确认 CCU、128B Sector Cache 和访存优化方向，但本地指南未给出统一的 CCU 零拷贝地址对齐规则；是否 fallback、如何分配对齐内存需要按当前 CANN/HCCL 文档和算子实现确认。</div>
-        <div class="pitfall-fix">✓ 以当前工具链文档、Profiling 采集结果和算子代码为准，避免把外部案例约束当作通用规则</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">片上带宽非 profiling 不可见</div>
-        <div class="pitfall-desc">950 调优需要额外关注片上访存瓶颈、小包、非对齐、L2 miss 和 GM 往返；是否需要显式采集开关取决于 CANN 版本。</div>
-        <div class="pitfall-fix">✓ 将片上带宽 / PMU 指标纳入团队 profiling baseline，具体参数按版本固化</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">HiF8 / MXFP8 与 FP8-E4M3 混淆</div>
-        <div class="pitfall-desc">950 引入多种 8-bit 格式。HiF8 最大值 ~32768、MXFP8 最大值 ~57344，而标准 FP8-E4M3 最大值仅 448。混用或错误转换会导致激活值溢出截断，引发精度问题但不报错。</div>
-        <div class="pitfall-fix">✓ 量化代码中明确标注数据类型枚举，不要用 "FP8" 泛指；添加范围校验断言</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">TileLang cross_interval 参数调错</div>
-        <div class="pitfall-desc">TileLang Pipeline 的 cross_interval 控制核间流水交错间隔，设为 0 退化为无流水；设过大则流水 stage 数不足，实测 FA 优化从 63% → 80% 的关键就是找对 num_stages=8, cross_interval=2 组合。</div>
-        <div class="pitfall-fix">✓ 使用 Pipe 流水图验证 bubble 是否消除，不要凭感觉设置 cross_interval</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">尾 Block 负载不均衡（tbmiss 问题）</div>
-        <div class="pitfall-desc">当矩阵尺寸不能被 Block 大小整除时，最后一个 Block（尾 Block）工作量偏少，所有核中只有该核没有做完，其他核等待，导致整体效率下降。</div>
-        <div class="pitfall-fix">✓ 用核间负载图 + tbmiss 采集分析；对尾粒进行合并或 padding 均衡处理</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">TileLang/Ascend C 未利用 950 L0C→UB 直通路径</div>
-        <div class="pitfall-desc">910/A3 代码中 AIC 输出数据经 L0C→GM，AIV 再从 GM→UB 读取（两次 GM 搬运）。950 新增 L0C→UB 直通通路，若不修改代码仍走旧路径，融合算子性能潜力白白损失，且多消耗 workspace 内存。</div>
-        <div class="pitfall-fix">✓ 将 T.copy(c_sh, ws) 从 L0C→GM 改为 L0C→UB；注意 DualDest 的 M/N 对齐要求（M 为 2 倍数/N 为 32 倍数）</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">SIMT 编程调试时忘用 msSanitizer</div>
-        <div class="pitfall-desc">SIMT 范式引入 Warp/Thread Block 后，内存越界、未初始化访问、set_flag 缺失引发的竞争等问题比 SIMD 更难凭 printf 定位。msSanitizer 提供 4 种精确检测模式，但需在编译时加 <code>--sanitizer -g</code> 才能生效，遗漏这两个参数则工具完全不工作。</div>
-        <div class="pitfall-fix">✓ 将 msSanitizer 编译选项加入 Debug 构建 preset；先跑 memcheck + synccheck 再跑 tracecheck</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">A2/A3→950：5 大 Ascend C API 不兼容项（约 5% 代码需改动）</div>
-        <div class="pitfall-desc">95% API 改 CMake 版本号重编译即可；但以下 5 类接口在 950 上已变更，直接搬代码会编译失败或行为错误：
-          <table style="margin-top:8px;font-size:11px;">
-            <thead><tr><th>类别</th><th>变化</th><th>影响接口</th><th>迁移方案</th></tr></thead>
+          <table class="report-table">
+            <thead>
+              <tr><th>旧写法 / 旧假设</th><th>950 迁移检查</th><th>建议动作</th></tr>
+            </thead>
             <tbody>
-              <tr><td>数据通路</td><td>删除 L1Buffer→GM 路径</td><td>DataCopy / DumpTensor</td><td>Cube only: 用 MIX 通过 Vector 搬运；Mix: 走 L1→UB→GM</td></tr>
-              <tr><td>数据通路</td><td>删除 GM→L0A/L0B 直接路径</td><td>InitConstValue / LoadData</td><td>先 LoadData 到 L1，再 Pipeline 到 L0</td></tr>
-              <tr><td>数据类型</td><td>Cube 不支持 int4b_t</td><td>LoadData / Mmad</td><td>改用 int8_t + 手动转换：Cast(int8)→Mmad</td></tr>
-              <tr><td>L0A 形状</td><td>ZZ格式→ZN格式</td><td>LoadDataWithTranspose / Mmad</td><td>切分数量 ×2 个 L0A Buffer，Stride 不变</td></tr>
-              <tr><td>Cube only</td><td>不支持单独 MMAD</td><td>matmul_mx 等</td><td>改为 MIX Core 类型执行</td></tr>
+              <tr><td>L0C 结果先写 GM，AIV 再从 GM 读</td><td>是否属于 MatMul 后处理、FIA、RmsNormQuant 等融合场景</td><td>优先评估 L0C2UB、DualDest、UB2L1，减少 workspace</td></tr>
+              <tr><td>Vector 中间结果全部在 UB / LocalTensor 之间流转</td><td>是否是规则表达式或可融合的连续向量计算</td><td>评估 RegBase / SIMD VF，减少 UB 往返</td></tr>
+              <tr><td>离散索引逻辑写成 SIMD 循环</td><td>是否存在 Gather/Scatter、Hash/Atomic、分支发散</td><td>评估 SIMT，按 Thread Block / Warp 建模</td></tr>
+              <tr><td>低比特只替换 dtype</td><td>scale 是否从 GM 反复读取，layout 是否适配 MatMul</td><td>把 scale 缓存、cast、round、saturate 和精度校验纳入设计</td></tr>
+              <tr><td>旧 Tiling 隐含 910 容量与核数</td><td>L1 / L0 / UB / Reg / L2 命中假设是否仍成立</td><td>重新做 Tiling baseline，再逐步启用 950 新通路</td></tr>
             </tbody>
           </table>
+
+          <div class="cards cards-3">
+            <div class="card" id="part22-l0c-ub">
+              <div class="card-title">迁移重点 1：旧 GM 中转</div>
+              <p>看到 <code>L0C -&gt; GM -&gt; UB</code>，先不要急着照搬。950 的学习目标是判断能否让 Cube 结果更近地交给 Vector 侧。</p>
+              <button class="annotation-link" type="button" data-annotation-jump="migration-l0c-ub">联动旧路径替换</button>
+            </div>
+            <div class="card" id="part22-regbase">
+              <div class="card-title">迁移重点 2：Vector RegBase</div>
+              <p>Memory-based Vector 迁移时，先找表达式融合和临时变量；再判断哪些中间结果值得进 Vector Reg File。</p>
+              <button class="annotation-link" type="button" data-annotation-jump="migration-regbase">联动 RegBase</button>
+            </div>
+            <div class="card" id="part22-lowbit">
+              <div class="card-title">迁移重点 3：低比特 scale</div>
+              <p>MXFP8/MXFP4 的 scale 生命周期要和主计算一起设计；否则低比特节省的带宽会被 scale 搬运吃掉。</p>
+              <button class="annotation-link" type="button" data-annotation-jump="lowbit-scale">联动 scale 缓存</button>
+            </div>
+          </div>
+
+          <pre><span class="cm">// 迁移检查顺序：先标硬件假设，再改路径</span>
+scan_910_kernel() {
+  find_data_path("L0C -&gt; GM -&gt; UB");
+  find_memory_based_vector_temporaries();
+  find_lowbit_without_scale_cache();
+  find_isasi_or_generation_sensitive_api();
+}
+
+migrate_to_950() {
+  enable_l0c_to_ub_when_fusion_is_valid();
+  move_regular_vector_expr_to_regbase_when_profitable();
+  use_simt_for_irregular_access_when_supported();
+  rebuild_tiling_for_950_memory_and_block_shape();
+}</pre>
         </div>
-        <div class="pitfall-fix">✓ 迁移前先扫描代码中的 L1Buffer DataCopy、int4b_t 类型、cube_only 模式，逐一替换</div>
-      </div>
-    </div>
-    <div class="pitfall-item">
-      <div class="pitfall-icon">⚠</div>
-      <div class="pitfall-content">
-        <div class="pitfall-title">Ascend C SIMD/SIMT 范式选错导致性能下降</div>
-        <div class="pitfall-desc">950 AIV 支持 SIMD 和 SIMT 两种范式，两者共享 UB 但 Register File 组织完全不同。SIMT 的 Reg File 是 per-warp 的 128K 总量；SIMD 的 Reg 是 Regbase 风格。若把 SIMT 密集的算子写成 SIMD，会导致 warp 空转；反之 SIMD 优势（Regbase OOO 双发射）也无法发挥。</div>
-        <div class="pitfall-fix">✓ 访存密集/gather-scatter 型算子用 SIMT；矩阵规则计算用 SIMD；混合场景用 <code>__mix__(aic_aiv)</code> + SIMT VF + SIMD VF 融合</div>
-      </div>
-    </div>
-  </div>
 
-  <details class="src-ref">
-    <summary>信息来源</summary>
-    <div class="src-ref-body">
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">TileLang典型算子性能优化.pdf</span>
-        <span class="src-ref-pages">p3, 4, 5, 8, 10, 14, 18, 22, 25, 28</span>
-        <span class="src-ref-note">cross_interval / num_stages 配置错误导致无流水、FA 63%→80% 调参过程</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">面向下一代硬件的性能调优.pdf</span>
-        <span class="src-ref-pages">p2–22</span>
-        <span class="src-ref-note">尾 Block tbmiss 问题与核间负载均衡分析、片上带宽采集思路；具体参数按 CANN 版本确认</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">Ascend C算子编译与调试调优能力概述.pdf</span>
-        <span class="src-ref-pages">p2–27</span>
-        <span class="src-ref-note">msSanitizer 必须加 --sanitizer -g 才能生效；SIMT 调试坑点</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">场景驱动下的算子编程语言选型.pdf</span>
-        <span class="src-ref-pages">p3–10, 12, 14, 16, 18, 22, 26, 30, 34, 36, 38</span>
-        <span class="src-ref-note">SIMD/SIMT 范式选错后果与判断标准、各场景性能数据</span>
-      </div>
-      <div class="src-ref-row">
-        <span class="src-ref-pdf">昇腾950特性全景剖析.pdf</span>
-        <span class="src-ref-pages">p2–15</span>
-        <span class="src-ref-note">L0C→UB 直通路径（DualDest）原理、M/N 对齐要求</span>
-      </div>
-    </div>
-  </details>
-</div>
+        <div class="section" id="part3" data-section-id="part3">
+          <div class="section-title"><div class="section-num">3</div>Part 3：迁移注意事项，用代码块实例化</div>
 
-<!-- Footer -->
-<div style="text-align:center;padding:32px 0;color:var(--fg-muted);font-size:12px;border-top:1px solid var(--border-subtle);margin-top:16px;">
-  校对基准：/Users/yin/CANNvisual/950 ppt/导出md/950-operator-developer-guide.md<br>
-  直接支持：PR/DT 场景、C-V 直连、低比特、RegBase、SIMT/SIMD、CCU、NDDMA、Profiling 分层诊断。<br>
-  外部案例：DeepSeek/TorchTitan、具体收益百分比、具体 msprof 开关与工具安装细节需回到原始课件、CANN Toolkit、SoC 版本和 API 头文件确认。
-</div>
+          <div class="pain-hook">
+            <div class="pain-hook-q">第 7 章不再只列坑点，而是改成可复制的检查模板。</div>
+            <div class="pain-hook-sub">下面代码块是迁移示意和 review checklist，不直接替代具体 CANN API 调用。真实接口名、参数、产品支持边界以安装的 CANN Toolkit、SoC 和头文件为准。</div>
+          </div>
+
+          <div class="code-case" id="part3-l0c-ub">
+            <div class="code-case-title">案例 1：把 L0C -&gt; GM -&gt; UB 改成 L0C -&gt; UB</div>
+            <p>适用 MatMul 后处理、RmsNormQuant、FIA 等融合场景。核心检查是：Cube 输出布局是否能被 AIV 侧消费，DualDest 的 M/N 对齐约束是否满足。</p>
+            <pre><span class="cm">// 910 / A3 常见路径：中间结果绕 GM 或 workspace</span>
+AIC: Mmad(a_l0a, b_l0b, c_l0c);
+AIC: Copy(c_l0c, workspace_gm);      <span class="cm">// L0C -&gt; GM</span>
+AIV: Copy(workspace_gm, x_ub);       <span class="cm">// GM -&gt; UB</span>
+AIV: VectorEpilogue(x_ub, out_gm);
+
+<span class="cm">// 950 迁移方向：优先评估 C-V 直连</span>
+AIC: Mmad(a_l0a, b_l0b, c_l0c);
+AIC: CopyL0CToUB(c_l0c, x_ub);       <span class="cm">// L0C -&gt; UB，或使用 DualDest</span>
+AIV: VectorEpilogue(x_ub, out_gm);   <span class="cm">// UB -&gt; Vector Reg / GM</span></pre>
+            <button class="annotation-link" type="button" data-annotation-jump="code-l0c-ub">联动 L0C2UB</button>
+          </div>
+
+          <div class="code-case" id="part3-scale">
+            <div class="code-case-title">案例 2：MXFP4 / MXFP8 scale 先进入 UB 再复用</div>
+            <p>低比特场景不要只看矩阵数据本身。scale 如果每个 inner loop 都从 GM 读取，会把量化收益抵消掉。</p>
+            <pre><span class="cm">// 风险写法：scale 随每个 tile 重复从 GM 读取</span>
+for (tile in k_tiles) {
+  LoadA(tile);
+  LoadB(tile);
+  LoadScaleFromGM(tile);             <span class="warn">// 容易成为额外 GM 搬运瓶颈</span>
+  MmadLowBitWithScale();
+}
+
+<span class="cm">// 950 迁移方向：按 tile group 预加载并复用 scale</span>
+PreloadScaleToUB(scale_gm, scale_ub);
+for (tile in k_tiles) {
+  LoadA(tile);
+  LoadB(tile);
+  UseScaleFromUB(scale_ub);
+  MmadLowBitWithScale();
+}</pre>
+            <button class="annotation-link" type="button" data-annotation-jump="code-scale">联动 scale 缓存</button>
+          </div>
+
+          <div class="code-case" id="part3-simt-simd">
+            <div class="code-case-title">案例 3：先判断 SIMD 还是 SIMT，不要混用心智</div>
+            <p>规则表达式走 SIMD Reg；离散访存、复杂分支、Gather/Scatter 类场景优先看 SIMT。两者共享 UB，但 Register File 组织和调试方式不同。</p>
+            <pre><span class="cm">// 规则连续数据：SIMD / RegBase</span>
+if (access_pattern == contiguous &amp;&amp; expression_is_regular) {
+  CopyGMToUB();
+  LoadUBToVectorReg();
+  RunSimdVf();
+  StoreVectorRegToUB();
+}
+
+<span class="cm">// 离散索引数据：SIMT</span>
+if (access_pattern == gather_scatter || has_branch_divergence) {
+  MapThreadBlockAndWarp();
+  LoadOrAccessSimtRegFile();
+  RunSimtVf();
+  CheckSyncAndBounds();
+}</pre>
+            <button class="annotation-link" type="button" data-annotation-jump="code-simt-simd">联动 SIMD/SIMT</button>
+          </div>
+
+          <div class="code-case" id="part3-api-scan">
+            <div class="code-case-title">案例 4：迁移前扫描跨代敏感点</div>
+            <p>旧代码里凡是绑定具体硬件路径、低比特类型、L0/L1 格式和 Cube-only 模式的地方，都要纳入 migration review。</p>
+            <pre><span class="cm"># 示例：先找高风险关键字，再逐项查当前 CANN 文档和头文件</span>
+rg "L1Buffer|L0A|L0B|L0C|int4b_t|cube_only|LoadData|DataCopy|DumpTensor" ./operator_src
+rg "GM.*UB|workspace|LocalTensor|RegTensor|MaskReg|AddrReg" ./operator_src
+rg "MXFP|HiF8|FP8|scale|AntiQuant|Quant" ./operator_src</pre>
+          </div>
+
+          <div class="code-case" id="part3-sanitizer">
+            <div class="code-case-title">案例 5：SIMT 调试必须把 sanitizer 放进 Debug preset</div>
+            <p>SIMT 范式更容易出现越界、未初始化访问、同步遗漏。编译时要保留调试信息，并按当前工具链启用 sanitizer 能力。</p>
+            <pre><span class="cm"># 具体参数以当前 CANN 版本为准；这里表达的是检查项</span>
+ascendc_compile \
+  --npu-arch=dav-3510 \
+  --sanitizer \
+  -g \
+  -o simt_kernel.o
+
+<span class="cm"># 迁移验收：先功能，再内存，再同步，再性能</span>
+run_memcheck();
+run_synccheck();
+run_tracecheck();
+profile_pipe_and_gpr();</pre>
+          </div>
+
+          <details class="src-ref">
+            <summary>信息来源</summary>
+            <div class="src-ref-body">
+              <div class="src-ref-row"><span class="src-ref-pdf">950-operator-developer-guide.md</span><span>原第 7 章：迁移注意事项；原第 4 章：三类算子场景。</span></div>
+              <div class="src-ref-row"><span class="src-ref-pdf">边界说明</span><span>代码块为迁移示意和 review 模板，实际 API 名称与支持列表需回到 CANN Toolkit、SoC 与头文件确认。</span></div>
+            </div>
+          </details>
+        </div>
+
+        <div class="footer-note">
+          校对基准：/Users/yin/CANNvisual/950 ppt/导出md/950-operator-developer-guide.md<br>
+          保留章节：原 1 / 3 / 4 / 7；移除主线：Profiling 工作流、框架选型、工具链、大模型案例。
+        </div>
       </article>
     </section>
 
-    <aside class="workbench-pane report-pane arch-pane pto-hw-viewport" id="archPane" aria-label="架构可视化">
+    <aside class="workbench-pane report-pane arch-pane pto-hw-viewport pto-hw-viewport--interactive-frame" id="archPane" aria-label="架构可视化" hidden>
       <div class="arch-toolbar pto-hw-viewport__toolbar">
         <div class="arch-toolbar__title pto-hw-viewport__title">
           <strong>芯片架构图</strong>
@@ -3231,16 +1279,17 @@ msdebug \
             </div>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archDetailToggle" aria-pressed="true" title="隐藏细节数据">细节开</button>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archFoldAivToggle" aria-pressed="true" title="折叠为 AIC / AIV×2">AIV展开</button>
-            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomOut" aria-label="缩小">−</button>
+            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomOut" aria-label="缩小">-</button>
             <span class="pto-hw-viewport__readout" id="archZoomReadout">100%</span>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archZoomIn" aria-label="放大">+</button>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="clearFocusBtn">清除</button>
+            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="archCloseBtn">收起</button>
           </div>
         </div>
       </div>
       <div class="arch-frame pto-hw-viewport__stage" id="hardwareViewport">
         <div class="pto-hw-viewport__scale" id="hardwareScale">
-          <iframe class="pto-hw-viewport__frame" id="hardwareFrame" src="hardware-frame.html?preset=ascend950b&theme=light&v=20260601-950-report-v4" title="Ascend 950 hardware architecture"></iframe>
+          <iframe class="pto-hw-viewport__frame" id="hardwareFrame" src="about:blank" data-frame-src="hardware-frame.html?preset=ascend950b&theme=light&v=20260602-950-report-v5" title="Ascend 950 hardware architecture"></iframe>
         </div>
       </div>
     </aside>
@@ -3248,18 +1297,21 @@ msdebug \
 
   <div id="annotationPlayerMount"></div>
 
-  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js?v=20260601-950-report-v4"></script>
-  <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js?v=20260601-950-report-v4"></script>
-  <script src="../vendor/pto-design-system/patterns/floating-playback-control/pattern.js?v=20260601-950-report-v4"></script>
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js?v=20260602-950-report-v5"></script>
+  <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js?v=20260602-950-report-v5"></script>
+  <script src="../vendor/pto-design-system/patterns/floating-playback-control/pattern.js?v=20260602-950-report-v5"></script>
   <script>
+    const ASSET_VERSION = '20260602-950-report-v5';
+
     const ANNOTATIONS = [
       {
         id: 'hardware-overview',
-        sectionId: 's1',
+        sectionId: 'part1',
+        anchorId: 'part1',
         tag: '总图',
         title: 'AI Core 子系统升级总图',
-        summary: '把 GM、AIC、左右 AIV、Cube、SIMT/SIMD 和 Vector Reg File 放到同一张心智图上。',
-        targets: 'GM / AIC / AIV / Cube / SIMT / Vector RF',
+        summary: '先把 GM、L2、AIC、AIV、Cube、SIMD/SIMT 和寄存器文件放到同一张图里。',
+        targets: 'GM / L2 / AIC / AIV / Cube / SIMD / SIMT',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
@@ -3267,66 +1319,41 @@ msdebug \
             '[data-mem950-node="core:AIC"]',
             '[data-mem950-node="core:AIV1"]',
             '[data-mem950-node="core:AIV2"]',
-            '#mem950-aic [data-aic-node="buffer:L0A"]',
-            '#mem950-aic [data-aic-node="buffer:L0B"]',
             '#mem950-aic [data-aic-node="cube:CUBE"]',
-            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
-            '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMD"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMT"]',
           ],
-          routes: [
-            'gm-to-aiv1-ub',
-            'aiv1-ub-to-gm',
-            'gm-to-aiv2-ub',
-            'aiv2-ub-to-gm',
-            'gm-to-aic-l0a',
-            'gm-to-aic-l0b',
-          ],
+          routes: ['gm-to-aic-l0a', 'gm-to-aic-l0b', 'gm-to-aiv1-ub', 'gm-to-aiv2-ub'],
         },
       },
       {
-        id: 'workflow-profile',
-        sectionId: 's2',
-        tag: 'Profile',
-        title: 'Profiling 分层诊断路径',
-        summary: '整网、单算子、Pipe、PC、GPR、CCU 都要回到硬件路径验证。',
-        targets: 'GM / UB / L0A/B / Cube',
+        id: 'lowbit-scale',
+        sectionId: 'part1',
+        anchorId: 'part1-lowbit',
+        tag: '低比特',
+        title: '低比特：scale 和矩阵搬运一起设计',
+        summary: 'MXFP8 / MXFP4 不只是 dtype，scale 缓存和 layout 会影响 Cube 主路径。',
+        targets: 'GM / L0A / L0B / Cube / UB',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
-            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
-            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
             '#mem950-aic [data-aic-node="buffer:L0A"]',
             '#mem950-aic [data-aic-node="buffer:L0B"]',
             '#mem950-aic [data-aic-node="cube:CUBE"]',
-          ],
-          routes: ['gm-to-aiv1-ub', 'aiv1-ub-to-gm', 'gm-to-aic-l0a', 'gm-to-aic-l0b'],
-        },
-      },
-      {
-        id: 'opt-memory',
-        sectionId: 's3',
-        tag: 'Iceberg',
-        title: '访存与指令层优化',
-        summary: 'Roofline 之后要看 UB/L1/L2、PC stall 和寄存器压力。',
-        targets: 'GM / UB / Vector RF / L0A-B',
-        focus: {
-          selectors: [
-            '[data-mem950-node="rail:GM"]',
             '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
-            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
-            '#mem950-aic [data-aic-node="buffer:L0A"]',
-            '#mem950-aic [data-aic-node="buffer:L0B"]',
           ],
-          routes: ['gm-to-aiv1-ub', 'aiv1-ub-to-gm', 'gm-to-aic-l0a', 'gm-to-aic-l0b'],
+          routes: ['gm-to-aic-l0a', 'gm-to-aic-l0b', 'gm-to-aiv1-ub'],
+          instructionTags: ['Cube', 'MTE1', 'MTE2'],
         },
       },
       {
         id: 'scene-vector',
-        sectionId: 's4',
+        sectionId: 'part21',
+        anchorId: 'part21-vector',
         tag: 'Vector',
-        title: 'Vector：GM↔UB↔Vector Reg File',
-        summary: '连续表达式优先看 GM 与 UB 双向搬运，以及 UB 与 Vector Reg File 的双向交换。',
-        targets: 'GM / UB / SIMD RF / Vector RF',
+        title: 'Vector：GM - UB - Vector Reg File',
+        summary: '连续规则表达式用 SIMD Reg / VF 融合减少 UB 中间结果往返。',
+        targets: 'GM / UB / SIMD / Vector Reg File',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
@@ -3338,51 +1365,57 @@ msdebug \
             '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
           ],
           routes: ['gm-to-aiv1-ub', 'aiv1-ub-to-gm', 'gm-to-aiv2-ub', 'aiv2-ub-to-gm'],
+          instructionTags: ['MTE2', 'MTE3', 'SIMD VF'],
         },
       },
       {
         id: 'scene-cube',
-        sectionId: 's4',
+        sectionId: 'part21',
+        anchorId: 'part21-cube',
         tag: 'Cube',
-        title: 'Cube：GM→L0A/B 低比特矩阵路径',
-        summary: 'HiF8 / FP8 / MXFP8 / MXFP4 会影响 GM 到 L0A/B、Cube、FixPipe 和 scale 缓存。',
-        targets: 'L0A / L0B / Cube / FP',
+        title: 'Cube：GM - L0A/B 低比特主计算路径',
+        summary: '矩阵算子先看 GM 到 L0A/B、Cube 和 L0C，再决定 epilogue 是否接 AIV。',
+        targets: 'GM / L0A / L0B / Cube / L0C',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
             '#mem950-aic [data-aic-node="buffer:L0A"]',
             '#mem950-aic [data-aic-node="buffer:L0B"]',
             '#mem950-aic [data-aic-node="cube:CUBE"]',
-            '#mem950-aic [data-aic-node="buffer:FP"]',
+            '#mem950-aic [data-aic-node="buffer:L0C"]',
           ],
           routes: ['gm-to-aic-l0a', 'gm-to-aic-l0b'],
+          instructionTags: ['Cube', 'FixPipe', 'MTE1', 'MTE2'],
         },
       },
       {
         id: 'scene-fusion',
-        sectionId: 's4',
-        tag: 'Fusion',
-        title: '融合：MIX / C-V 直连',
-        summary: 'Cube 结果从 L0C 直接接 AIV UB，减少 GM / workspace 往返。',
-        targets: 'Cube / L0C / UB / Vector',
+        sectionId: 'part21',
+        anchorId: 'part21-fusion',
+        tag: '融合',
+        title: '融合：L0C - UB / UB - L1',
+        summary: 'Cube 结果尽量不绕 GM，优先判断 L0C2UB、DualDest、UB2L1 是否可用。',
+        targets: 'L0C / UB / L1 / SSBuf',
         focus: {
           selectors: [
-            '#mem950-aic [data-aic-node="cube:CUBE"]',
             '#mem950-aic [data-aic-node="buffer:L0C"]',
             '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
             '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
             '#mem950-aiv2 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv2 [data-aiv-node="vector:Vector"]',
           ],
           routes: ['aic-to-aiv1', 'aiv2-to-aic'],
+          instructionTags: ['Cube', 'FixPipe', 'MTE2', 'MTE3', 'SIMD VF'],
         },
       },
       {
         id: 'scene-simt',
-        sectionId: 's4',
+        sectionId: 'part21',
+        anchorId: 'part21-simt',
         tag: 'SIMT',
-        title: 'SIMT：GM→UB→SIMT RF / GM→SIMT RF',
-        summary: '索引、分支、Gather/Scatter、Hash/Atomic 类数据优先看 GM 到 SIMT Reg File 的直接路径和经 UB 的路径。',
-        targets: 'GM / UB / SIMT RF',
+        title: 'SIMT：GM - UB - SIMT Reg File / GM - SIMT Reg File',
+        summary: '离散索引、分支、Gather/Scatter、Hash/Atomic 优先用线程式心智建模。',
+        targets: 'GM / UB / SIMT Register File',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
@@ -3392,99 +1425,141 @@ msdebug \
             '#mem950-aiv2 [data-aiv-node="exec:SIMT"]',
           ],
           routes: ['gm-to-aiv1-ub', 'gm-to-aiv1-simt', 'gm-to-aiv2-ub', 'gm-to-aiv2-simt'],
+          instructionTags: ['MTE2', 'MTE3', 'SIMT VF'],
         },
       },
       {
-        id: 'framework-choice',
-        sectionId: 's5',
-        tag: 'Framework',
-        title: '框架选型落到硬件控制粒度',
-        summary: '越追求性能，越需要直接控制 Cube / Vector / DMA / 同步。',
-        targets: 'AIC / AIV / GM',
+        id: 'instruction-flow',
+        sectionId: 'part21',
+        anchorId: 'part21-fusion',
+        tag: '指令',
+        title: 'AIC / AIV 指令序列协同',
+        summary: 'AIC 侧看 Cube、FixPipe、MTE1、MTE2；AIV 侧看 MTE2、MTE3、SIMD VF、SIMT VF。',
+        targets: 'Scalar / SSBuf / 指令序列',
         focus: {
           selectors: [
-            '[data-mem950-node="rail:GM"]',
-            '[data-mem950-node="core:AIC"]',
-            '[data-mem950-node="core:AIV1"]',
+            '#mem950-aic [data-aic-node="scalar:Scalar"]',
+            '#mem950-aiv1 [data-aiv-node="scalar:AuxScalar"]',
+            '#mem950-aiv2 [data-aiv-node="scalar:AuxScalar"]',
           ],
-          routes: ['gm-to-aic-l0a', 'gm-to-aiv1-ub'],
+          routes: ['aic-aiv2-ssbuffer'],
+          instructionTags: ['Cube', 'FixPipe', 'MTE1', 'MTE2', 'MTE3', 'SIMD VF', 'SIMT VF'],
         },
       },
       {
-        id: 'toolchain-debug',
-        sectionId: 's6',
-        tag: 'Tool',
-        title: 'Ascend C 工具链定位对象',
-        summary: 'Pipe、PC Sampling、SIMT GPR、msSanitizer 都要对应到具体硬件对象。',
-        targets: 'GM / UB / SIMD RF / SIMT RF / Cube',
-        focus: {
-          selectors: [
-            '[data-mem950-node="rail:GM"]',
-            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
-            '#mem950-aiv1 [data-aiv-node="exec:SIMD"]',
-            '#mem950-aiv1 [data-aiv-node="exec:SIMT"]',
-            '#mem950-aic [data-aic-node="cube:CUBE"]',
-            '#mem950-aic [data-aic-node="buffer:L0A"]',
-          ],
-          routes: ['gm-to-aiv1-ub', 'gm-to-aiv1-simt', 'gm-to-aic-l0a'],
-        },
-      },
-      {
-        id: 'llm-ccu',
-        sectionId: 's7',
-        tag: 'CCU',
-        title: '大模型通信与 CCU',
-        summary: 'AllGatherMatMul、ReduceScatter、Dispatch/Combine 需要看 L2/片上互联与 AI Core 协同。',
-        targets: 'L2 / 片上互联',
-        focus: {
-          selectors: ['[data-mem950-node="rail:L2"]'],
-          routes: [],
-        },
-      },
-      {
-        id: 'migration-risk',
-        sectionId: 's8',
-        tag: 'Risk',
-        title: '迁移风险：旧路径没有用上 950 能力',
-        summary: '重点检查 L0C→UB、RegBase、SIMT 和低比特 scale 是否仍按旧代路径运行。',
-        targets: 'L0C / GM / UB / SIMD RF / SIMT RF',
+        id: 'migration-l0c-ub',
+        sectionId: 'part22',
+        anchorId: 'part22-l0c-ub',
+        tag: '迁移',
+        title: '迁移：旧 GM 中转改为 C-V 直连',
+        summary: '910 旧路径 L0C - GM - UB 要优先检查是否能换成 L0C - UB。',
+        targets: 'L0C / GM / UB',
         focus: {
           selectors: [
             '[data-mem950-node="rail:GM"]',
             '#mem950-aic [data-aic-node="buffer:L0C"]',
             '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+          ],
+          routes: ['aic-to-aiv1', 'gm-to-aiv1-ub'],
+          instructionTags: ['FixPipe', 'MTE2', 'MTE3'],
+        },
+      },
+      {
+        id: 'migration-regbase',
+        sectionId: 'part22',
+        anchorId: 'part22-regbase',
+        tag: '迁移',
+        title: '迁移：Memory-based Vector 到 RegBase',
+        summary: '规则表达式先评估 Vector Reg File 中间结果复用，再检查寄存器压力。',
+        targets: 'UB / SIMD / Vector Reg File',
+        focus: {
+          selectors: [
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aiv1 [data-aiv-node="exec:SIMD"]',
+            '#mem950-aiv1 [data-aiv-node="vector:Vector"]',
+          ],
+          routes: ['gm-to-aiv1-ub', 'aiv1-ub-to-gm'],
+          instructionTags: ['SIMD VF'],
+        },
+      },
+      {
+        id: 'code-l0c-ub',
+        sectionId: 'part3',
+        anchorId: 'part3-l0c-ub',
+        tag: '代码',
+        title: '代码案例：L0C - UB',
+        summary: '用伪代码对比旧 GM 中转和 950 C-V 直连写法。',
+        targets: 'L0C / UB',
+        focus: {
+          selectors: [
+            '#mem950-aic [data-aic-node="buffer:L0C"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+          ],
+          routes: ['aic-to-aiv1'],
+          instructionTags: ['FixPipe', 'MTE3'],
+        },
+      },
+      {
+        id: 'code-scale',
+        sectionId: 'part3',
+        anchorId: 'part3-scale',
+        tag: '代码',
+        title: '代码案例：scale 预加载到 UB',
+        summary: '低比特 scale 不要在 inner loop 里反复从 GM 读取。',
+        targets: 'GM / UB / L0A / L0B',
+        focus: {
+          selectors: [
+            '[data-mem950-node="rail:GM"]',
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
+            '#mem950-aic [data-aic-node="buffer:L0A"]',
+            '#mem950-aic [data-aic-node="buffer:L0B"]',
+          ],
+          routes: ['gm-to-aiv1-ub', 'gm-to-aic-l0a', 'gm-to-aic-l0b'],
+          instructionTags: ['MTE1', 'MTE2'],
+        },
+      },
+      {
+        id: 'code-simt-simd',
+        sectionId: 'part3',
+        anchorId: 'part3-simt-simd',
+        tag: '代码',
+        title: '代码案例：SIMD / SIMT 范式选择',
+        summary: '连续规则表达式走 SIMD Reg，离散索引和分支走 SIMT Reg File。',
+        targets: 'SIMD / SIMT / UB',
+        focus: {
+          selectors: [
+            '#mem950-aiv1 [data-aiv-node="buffer:UB"]',
             '#mem950-aiv1 [data-aiv-node="exec:SIMD"]',
             '#mem950-aiv1 [data-aiv-node="exec:SIMT"]',
           ],
-          routes: ['aic-to-aiv1', 'gm-to-aiv1-ub', 'gm-to-aiv1-simt'],
+          routes: ['gm-to-aiv1-ub', 'gm-to-aiv1-simt'],
+          instructionTags: ['SIMD VF', 'SIMT VF'],
         },
       },
     ];
 
     const SECTION_DEFAULT = {
-      s1: 'hardware-overview',
-      s2: 'workflow-profile',
-      s3: 'opt-memory',
-      s4: 'scene-fusion',
-      s5: 'framework-choice',
-      s6: 'toolchain-debug',
-      s7: 'llm-ccu',
-      s8: 'migration-risk',
+      part1: 'hardware-overview',
+      part21: 'scene-vector',
+      part22: 'migration-l0c-ub',
+      part3: 'code-l0c-ub',
     };
 
-    const ASSET_VERSION = '20260601-950-report-v4';
-
     const state = {
-      activeSectionId: 's1',
+      activeSectionId: 'part1',
       activeAnnotationId: 'hardware-overview',
       archPreset: 'ascend950b',
+      archOpen: false,
       iframeReady: false,
       playing: false,
       playbackIndex: 0,
       aivFolded: false,
     };
 
+    const reportShell = document.getElementById('reportShell');
     const archPane = document.getElementById('archPane');
+    const archPaneToggle = document.getElementById('archPaneToggle');
+    const archCloseBtn = document.getElementById('archCloseBtn');
     const hardwareFrame = document.getElementById('hardwareFrame');
     const reportNav = document.getElementById('reportNav');
     const docPane = document.getElementById('docPane');
@@ -3492,8 +1567,9 @@ msdebug \
     const archFoldAivToggle = document.getElementById('archFoldAivToggle');
     const archPresetButtons = Array.from(document.querySelectorAll('[data-arch-preset]'));
     const activeAnnotationTitle = document.getElementById('activeAnnotationTitle');
-    const reportSections = Array.from(document.querySelectorAll('.report-section, .report-source .section[data-section-id]'));
+    const reportSections = Array.from(document.querySelectorAll('.report-source [data-section-id]'));
     let hardwareViewportController = null;
+    let splitController = null;
     let pendingNavSync = 0;
     let floatingControl = null;
     let playbackElements = null;
@@ -3528,7 +1604,7 @@ msdebug \
 
       playbackElements.label.textContent = `${visibleIndex} / ${list.length}`;
       playbackElements.opname.textContent = current?.title || '未选择联动步骤';
-      playbackElements.summary.textContent = current?.summary || '点击播放后逐步联动架构图中的硬件路径。';
+      playbackElements.summary.textContent = current?.summary || '点击播放后逐步联动正文与硬件路径。';
       playbackElements.targets.textContent = current?.targets ? `硬件路径：${current.targets}` : '硬件路径：-';
       playbackElements.playBtn.innerHTML = state.playing
         ? `${helper.icons.pause}<span>暂停</span>`
@@ -3606,9 +1682,18 @@ msdebug \
       syncPlaybackUi();
     }
 
+    function scrollDocTo(targetId) {
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const paneRect = docPane.getBoundingClientRect();
+      const top = targetRect.top - paneRect.top + docPane.scrollTop - 12;
+      docPane.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+
     function applyPlaybackStep() {
       const annotation = currentPlaybackAnnotation();
-      if (annotation) applyAnnotation(annotation, { scroll: false });
+      if (annotation) applyAnnotation(annotation, { scrollContent: true });
     }
 
     function stepPlayback(delta) {
@@ -3654,16 +1739,83 @@ msdebug \
     }
 
     function sendHardwareMessage(payload) {
+      if (!state.archOpen) return;
       if (hardwareViewportController?.postToFrame?.(payload)) return;
       if (!state.iframeReady || !hardwareFrame.contentWindow) return;
       hardwareFrame.contentWindow.postMessage(payload, '*');
     }
 
+    function currentFrameSrc() {
+      return `hardware-frame.html?preset=${state.archPreset}&theme=light&v=${ASSET_VERSION}`;
+    }
+
     function syncHardwareFramePreset() {
-      const nextSrc = `hardware-frame.html?preset=${state.archPreset}&theme=light&v=${ASSET_VERSION}`;
+      const nextSrc = currentFrameSrc();
       if (hardwareFrame.getAttribute('src') === nextSrc) return;
       state.iframeReady = false;
       hardwareFrame.setAttribute('src', nextSrc);
+    }
+
+    function ensureHardwareMounted() {
+      syncHardwareFramePreset();
+      if (hardwareViewportController) {
+        hardwareViewportController.fit?.();
+        return;
+      }
+      hardwareViewportController = window.PtoHardwareArchitectureViewport?.mount?.('#archPane', {
+        viewport: '#hardwareViewport',
+        scaleEl: '#hardwareScale',
+        frame: '#hardwareFrame',
+        detailToggle: '#archDetailToggle',
+        zoomOut: '#archZoomOut',
+        zoomIn: '#archZoomIn',
+        readout: '#archZoomReadout',
+        detailsVisible: true,
+        scale: 0.6,
+        zoomLevels: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2],
+        fitOnMount: true,
+        frameSize: { width: 1200, height: 820 },
+        fitPaddingX: 28,
+        fitPaddingY: 44,
+        onReady: markHardwareReady,
+      });
+    }
+
+    function openArchPane() {
+      if (state.archOpen) return;
+      state.archOpen = true;
+      archPane.hidden = false;
+      reportShell.classList.add('has-arch');
+      archPaneToggle.textContent = '收起架构图';
+      archPaneToggle.setAttribute('aria-expanded', 'true');
+      ensureHardwareMounted();
+      if (!splitController && window.PtoWorkbenchShell?.initResizablePanes) {
+        splitController = window.PtoWorkbenchShell.initResizablePanes({
+          panes: ['#docPane', '#archPane'],
+          direction: 'horizontal',
+          sizes: [58, 42],
+          minSize: [520, 400],
+          gutterSize: 10,
+          storageKey: 'ascend950-operator-report-split-v1',
+          gutterLabel: '调整相邻栏宽度',
+        });
+      }
+      window.setTimeout(() => {
+        hardwareViewportController?.fit?.();
+        const annotation = ANNOTATIONS.find((item) => item.id === state.activeAnnotationId) || ANNOTATIONS[0];
+        applyAnnotation(annotation, { scrollContent: false });
+      }, 120);
+    }
+
+    function closeArchPane() {
+      if (!state.archOpen) return;
+      state.archOpen = false;
+      splitController?.destroy?.();
+      splitController = null;
+      archPane.hidden = true;
+      reportShell.classList.remove('has-arch');
+      archPaneToggle.textContent = '展开架构图';
+      archPaneToggle.setAttribute('aria-expanded', 'false');
     }
 
     function applyAnnotation(annotation, options = {}) {
@@ -3672,15 +1824,16 @@ msdebug \
       state.activeSectionId = annotation.sectionId;
       const nextIndex = annotationIndexById(annotation.id);
       if (nextIndex >= 0) state.playbackIndex = nextIndex;
-      activeAnnotationTitle.textContent = annotation.title;
+      if (activeAnnotationTitle) activeAnnotationTitle.textContent = annotation.title;
       sendHardwareMessage({
         type: 'hardware-focus',
         selectors: annotation.focus.selectors || [],
         routes: annotation.focus.routes || [],
+        instructionTags: annotation.focus.instructionTags || [],
         foldAiv: annotation.foldAiv ?? state.aivFolded,
       });
-      if (options.scroll !== false) {
-        document.getElementById(annotation.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (options.scrollContent) {
+        scrollDocTo(annotation.anchorId || annotation.sectionId);
       }
       renderNav();
       syncPlaybackUi();
@@ -3689,16 +1842,16 @@ msdebug \
     function jumpToSection(sectionId) {
       state.activeSectionId = sectionId;
       renderNav();
-      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollDocTo(sectionId);
       const annotation = ANNOTATIONS.find((item) => item.id === SECTION_DEFAULT[sectionId]);
-      if (annotation) applyAnnotation(annotation, { scroll: false });
+      if (annotation) applyAnnotation(annotation, { scrollContent: false });
     }
 
     function clearFocus() {
       stopPlayback();
       state.activeAnnotationId = '';
-      activeAnnotationTitle.textContent = '使用底部播放器逐步查看硬件路径';
-      sendHardwareMessage({ type: 'hardware-focus', selectors: [], routes: [], foldAiv: state.aivFolded });
+      if (activeAnnotationTitle) activeAnnotationTitle.textContent = '使用底部播放器逐步查看硬件路径';
+      sendHardwareMessage({ type: 'hardware-focus', selectors: [], routes: [], instructionTags: [], foldAiv: state.aivFolded });
       syncPlaybackUi();
     }
 
@@ -3739,10 +1892,17 @@ msdebug \
       if (!button) return;
       stopPlayback();
       const annotation = ANNOTATIONS.find((item) => item.id === button.dataset.annotationJump);
-      applyAnnotation(annotation, { scroll: false });
+      applyAnnotation(annotation, { scrollContent: true });
     });
 
+    archPaneToggle.addEventListener('click', () => {
+      if (state.archOpen) closeArchPane();
+      else openArchPane();
+    });
+
+    archCloseBtn.addEventListener('click', closeArchPane);
     document.getElementById('clearFocusBtn').addEventListener('click', clearFocus);
+
     archPresetButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const nextPreset = button.dataset.archPreset;
@@ -3759,10 +1919,12 @@ msdebug \
           type: 'hardware-focus',
           selectors: annotation?.focus.selectors || [],
           routes: annotation?.focus.routes || [],
+          instructionTags: annotation?.focus.instructionTags || [],
           foldAiv: state.aivFolded,
         });
       });
     });
+
     archFoldAivToggle.addEventListener('click', () => {
       state.aivFolded = !state.aivFolded;
       renderAivFoldToggle();
@@ -3772,6 +1934,7 @@ msdebug \
         type: 'hardware-focus',
         selectors: annotation?.focus.selectors || [],
         routes: annotation?.focus.routes || [],
+        instructionTags: annotation?.focus.instructionTags || [],
         foldAiv: state.aivFolded,
       });
     });
@@ -3787,52 +1950,27 @@ msdebug \
       sendHardwareMessage({ type: 'hardware-arch-change', preset: state.archPreset });
       sendHardwareMessage({ type: 'hardware-details', visible: true });
       const annotation = ANNOTATIONS.find((item) => item.id === state.activeAnnotationId) || ANNOTATIONS[0];
-      applyAnnotation(annotation, { scroll: false });
+      applyAnnotation(annotation, { scrollContent: false });
     }
-
-    hardwareViewportController = window.PtoHardwareArchitectureViewport?.mount?.('#archPane', {
-      viewport: '#hardwareViewport',
-      scaleEl: '#hardwareScale',
-      frame: '#hardwareFrame',
-      detailToggle: '#archDetailToggle',
-      zoomOut: '#archZoomOut',
-      zoomIn: '#archZoomIn',
-      readout: '#archZoomReadout',
-      detailsVisible: true,
-      scale: 0.6,
-      zoomLevels: [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2],
-      fitOnMount: true,
-      frameSize: { width: 1200, height: 820 },
-      fitPaddingX: 28,
-      fitPaddingY: 44,
-      onReady: markHardwareReady,
-    });
 
     window.addEventListener('message', (event) => {
       if (event.data?.type === 'hardware-ready') markHardwareReady();
     });
 
     hardwareFrame.addEventListener('load', () => {
-      window.setTimeout(markHardwareReady, 180);
+      if (hardwareFrame.getAttribute('src') !== 'about:blank') {
+        window.setTimeout(markHardwareReady, 180);
+      }
     });
 
     window.addEventListener('beforeunload', stopPlayback);
-
-    window.PtoWorkbenchShell?.initResizablePanes?.({
-      panes: ['#docPane', '#archPane'],
-      direction: 'horizontal',
-      sizes: [58, 42],
-      minSize: [520, 400],
-      gutterSize: 10,
-      storageKey: 'ascend950-perf-report-split-v2',
-      gutterLabel: '调整相邻栏宽度',
-    });
 
     renderNav();
     setupAnnotationPlayer();
     renderAivFoldToggle();
     renderArchPresetButtons();
     initScrollSync();
+    syncPlaybackUi();
   </script>
 </body>
 </html>
