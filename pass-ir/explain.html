@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pass 解释</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121318'/%3E%3Ccircle cx='20' cy='32' r='8' fill='%234369ef'/%3E%3Cpath d='M30 24h14M30 32h14M30 40h10' stroke='%23fff' stroke-opacity='.86' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+<style>
+body.pass-explain-page {
+  letter-spacing: 0;
+}
+
+.pass-explain-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--toolbar-border);
+  color: var(--foreground);
+  font: var(--text-title-2);
+  white-space: nowrap;
+}
+
+.pass-explain-brand-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 56%, transparent);
+}
+
+.pass-explain-title {
+  max-width: min(34vw, 520px);
+}
+
+.pass-explain-toolbar-select {
+  width: min(38vw, 520px);
+  min-width: 240px;
+  height: var(--input-height-md);
+  border: 1px solid var(--input-border);
+  border-radius: var(--input-radius);
+  background: var(--input-bg);
+  color: var(--foreground);
+  font: var(--text-body-sm);
+  padding: 0 32px 0 10px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.pass-explain-pass-select {
+  width: min(22vw, 280px);
+  min-width: 180px;
+}
+
+.pass-explain-toolbar-select:disabled {
+  opacity: var(--button-disabled-opacity);
+}
+
+.pass-explain-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.pass-explain-select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--foreground-secondary);
+  border-bottom: 1.5px solid var(--foreground-secondary);
+  transform: translateY(-2px) rotate(45deg);
+  pointer-events: none;
+}
+
+.pass-explain-color-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pass-explain-color-menu {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  width: 188px;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pass-explain-color-menu[hidden] {
+  display: none;
+}
+
+.pass-explain-color-option {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.pass-explain-color-option.is-selected {
+  background: var(--state-selected);
+  color: var(--foreground);
+}
+
+.pass-explain-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 384px);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--canvas-bg);
+}
+
+.pass-explain-page.is-explain-panel-closed .pass-explain-main {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pass-explain-page.is-explain-panel-closed .pass-cause-panel {
+  display: none;
+}
+
+.pass-explain-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--background);
+}
+
+.pass-explain-canvas .viewport {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pass-explain-canvas .viewport.is-panning {
+  cursor: grabbing;
+}
+
+.pass-explain-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.pass-explain-empty[hidden] {
+  display: none;
+}
+
+.pass-explain-empty-card {
+  pointer-events: auto;
+  width: min(360px, calc(100vw - 48px));
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.pass-cause-ghost-tray {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 12;
+  max-width: min(420px, calc(100% - 32px));
+  padding: var(--space-3);
+  border: 1px solid var(--panel-shell-border);
+  border-radius: var(--panel-shell-radius);
+  background: var(--panel-shell-bg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.pass-cause-ghost-title {
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+}
+
+.pass-cause-ghost-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pass-explain-empty-title {
+  color: var(--foreground);
+  font: var(--text-title-1);
+}
+
+.pass-explain-empty-copy {
+  color: var(--foreground-secondary);
+  font: var(--text-body);
+}
+
+.pass-cause-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pass-cause-panel.is-collapsed .pass-cause-body {
+  display: none;
+}
+
+.pass-cause-header {
+  align-items: center;
+}
+
+.pass-cause-title-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pass-cause-eyebrow,
+.pass-cause-section-title {
+  color: var(--foreground-muted);
+  font: var(--text-label);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pass-cause-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pass-cause-body {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.pass-cause-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pass-cause-body::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-pill);
+}
+
+.pass-cause-empty,
+.pass-cause-loading,
+.pass-cause-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pass-cause-empty-title,
+.pass-cause-headline {
+  color: var(--foreground);
+  font: var(--text-title-1);
+}
+
+.pass-cause-empty-copy,
+.pass-cause-note {
+  color: var(--foreground-secondary);
+  font: var(--text-body);
+}
+
+.pass-cause-note.is-warning {
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.pass-cause-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pass-cause-stat {
+  gap: 6px;
+}
+
+.pass-cause-coverage {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pass-cause-stat strong {
+  color: var(--foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pass-cause-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pass-cause-step {
+  width: 100%;
+  min-height: 58px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  color: var(--foreground);
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pass-cause-step:hover {
+  background: var(--state-hover);
+  border-color: var(--card-hover-border);
+}
+
+.pass-cause-step.is-active {
+  background: var(--state-selected);
+  border-color: var(--primary);
+}
+
+.pass-cause-step-index {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--comp-tag-bg);
+  border: 1px solid var(--comp-tag-border);
+  color: var(--foreground-secondary);
+  font: var(--text-mono);
+}
+
+.pass-cause-step-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pass-cause-step-title {
+  color: var(--foreground);
+  font: var(--text-title-2);
+}
+
+.pass-cause-step-summary {
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.pass-cause-step-side {
+  align-self: start;
+  color: var(--foreground-muted);
+  font: var(--text-label);
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  min-width: 80px;
+  text-align: right;
+}
+
+.pass-cause-step-count {
+  max-width: 120px;
+  color: var(--foreground-secondary);
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.pass-cause-opcode-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pass-cause-evidence {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pass-cause-evidence-row,
+.pass-cause-source-related {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+}
+
+.pass-cause-evidence-row strong {
+  color: var(--foreground);
+  font: var(--text-mono);
+  text-align: right;
+}
+
+.pass-cause-source {
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-bg);
+  padding: var(--space-3);
+}
+
+.pass-cause-source summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--foreground);
+  font: var(--text-title-2);
+  cursor: pointer;
+}
+
+.pass-cause-source summary span + span {
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+}
+
+.pass-cause-source-path {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--foreground-secondary);
+  font: var(--text-mono);
+  overflow-wrap: anywhere;
+}
+
+.pass-cause-collapse-open,
+.pass-cause-panel.is-collapsed .pass-cause-collapse-closed {
+  display: inline;
+}
+
+.pass-cause-collapse-closed,
+.pass-cause-panel.is-collapsed .pass-cause-collapse-open {
+  display: none;
+}
+
+.pass-cause-playback {
+  position: fixed;
+  left: 24px;
+  right: 420px;
+  bottom: 24px;
+  z-index: var(--z-overlay);
+  min-height: var(--floating-playback-expanded-min-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--floating-playback-padding-y) var(--floating-playback-padding-x);
+  border: 1px solid var(--floating-playback-border);
+  border-radius: var(--floating-playback-radius);
+  background: var(--floating-playback-bg);
+  box-shadow: var(--floating-playback-inner-highlight), var(--floating-playback-shadow);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+.pass-explain-page.is-explain-panel-closed .pass-cause-playback {
+  right: 24px;
+}
+
+.pass-cause-playback.is-empty {
+  opacity: var(--button-disabled-opacity);
+}
+
+.pass-cause-playback-track {
+  flex: 1 1 auto;
+  min-width: 140px;
+}
+
+.pass-cause-playback-range {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.pass-cause-playback-meta {
+  flex: 0 1 360px;
+  min-width: 0;
+  color: var(--foreground-secondary);
+  font: var(--text-body-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-card.cause-node-highlight {
+  outline: 3px solid color-mix(in srgb, var(--primary) 82%, white 12%);
+  outline-offset: 4px;
+  opacity: 1 !important;
+  filter: none !important;
+  z-index: 60;
+}
+
+.node-card.cause-node-muted:not(.cause-node-highlight) {
+  opacity: 0.18;
+  filter: grayscale(1) saturate(0.08);
+}
+
+.node-card.cause-node-remove {
+  outline-color: color-mix(in srgb, var(--danger) 82%, white 10%);
+}
+
+.node-card.cause-node-add {
+  outline-color: color-mix(in srgb, var(--success) 78%, white 8%);
+}
+
+.node-card.cause-node-rewire {
+  outline-color: color-mix(in srgb, var(--warning) 82%, white 6%);
+}
+
+.cause-node-badge {
+  position: absolute;
+  right: 8px;
+  top: -10px;
+  z-index: 2;
+  height: var(--tag-height);
+  padding: 0 var(--tag-padding-x);
+  border-radius: var(--tag-radius);
+  border: 1px solid var(--comp-tag-border);
+  background: var(--surface-4);
+  color: var(--foreground);
+  font: var(--text-label);
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.edge.cause-edge-highlight {
+  stroke: var(--primary) !important;
+  stroke-width: 4px !important;
+  stroke-opacity: 1 !important;
+}
+
+.edge.cause-edge-removed {
+  stroke: var(--danger) !important;
+  stroke-dasharray: 7 5;
+}
+
+.edge.cause-edge-added {
+  stroke: var(--success) !important;
+}
+
+.edge.cause-edge-rewire {
+  stroke: var(--warning) !important;
+  stroke-dasharray: 3 4;
+}
+
+.node-card.cause-node-dim-unchanged:not(.cause-node-highlight) {
+  opacity: 0.38;
+  filter: grayscale(0.75) saturate(0.38);
+}
+
+.edge.cause-edge-dim-unchanged:not(.cause-edge-highlight) {
+  stroke-opacity: 0.10 !important;
+  filter: grayscale(1);
+}
+
+.node-card.cause-diff-emphasis {
+  opacity: 1;
+  filter: none;
+}
+
+.edge.cause-diff-emphasis {
+  stroke-opacity: 0.82 !important;
+  stroke-width: 2.4px !important;
+}
+
+@media (max-width: 980px) {
+  .pass-explain-main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(240px, 38vh);
+  }
+
+  .pass-cause-playback {
+    right: 24px;
+  }
+
+  .pass-explain-toolbar-select {
+    width: min(42vw, 360px);
+    min-width: 180px;
+  }
+
+  .pass-explain-pass-select {
+    width: min(30vw, 260px);
+    min-width: 150px;
+  }
+}
+
+@media (max-width: 720px) {
+  .pass-explain-title,
+  .graph-stats {
+    display: none;
+  }
+
+  .pass-explain-main {
+    padding: var(--space-2);
+  }
+
+  .pass-cause-playback {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    flex-wrap: wrap;
+  }
+}
+</style>
+</head>
+<body class="pass-ir-page pass-explain-page is-explain-panel-closed">
+<header class="toolbar">
+  <div class="toolbar-l">
+    <a class="home-link btn btn-ghost btn-icon" href="../launch.html" title="返回首页" aria-label="返回首页">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 0 1-.7.7H8.6V8.9a.6.6 0 0 0-.6-.6H6a.6.6 0 0 0-.6.6V12H2.7a.7.7 0 0 1-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <div class="pass-explain-brand"><span class="pass-explain-brand-mark"></span>Pass 解释</div>
+    <span class="graph-title pass-explain-title" id="currentPairLabel">未选择 Pass</span>
+    <span class="stat-chip" id="explainStatus">打开 Pass 文件夹开始</span>
+  </div>
+  <div class="toolbar-r">
+    <div class="pass-explain-select-wrap">
+      <select class="pass-explain-toolbar-select pass-explain-pass-select" id="passFilterSelect" disabled aria-label="Pass"></select>
+    </div>
+    <div class="pass-explain-select-wrap">
+      <select class="pass-explain-toolbar-select" id="pairSelect" disabled aria-label="Pass 配对"></select>
+    </div>
+    <span class="stat-chip pass-cause-coverage" id="pairCoverageLabel">未加载</span>
+    <div class="segmented-control segmented-control-muted" aria-label="Before After 视图">
+      <button class="btn btn-sm" id="showBeforeBtn" type="button">Before</button>
+      <button class="btn btn-sm is-selected" id="showAfterBtn" type="button">After</button>
+    </div>
+    <div class="pass-explain-color-wrap">
+      <button class="btn btn-ghost" id="colorModeBtn" type="button" aria-haspopup="true" aria-expanded="false" title="染色模式">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="4" cy="4" r="2" fill="currentColor" opacity=".72"/>
+          <circle cx="10" cy="4" r="2" fill="currentColor" opacity=".42"/>
+          <circle cx="4" cy="10" r="2" fill="currentColor" opacity=".42"/>
+          <circle cx="10" cy="10" r="2" fill="currentColor" opacity=".72"/>
+        </svg>
+        <span id="colorModeLabel">Semantic</span>
+      </button>
+      <div class="pass-explain-color-menu panel-shell" id="colorModeMenu" hidden>
+        <button class="btn btn-ghost btn-sm pass-explain-color-option is-selected" data-color-mode="semantic" type="button">Semantic</button>
+        <button class="btn btn-ghost btn-sm pass-explain-color-option" data-color-mode="latency" type="button">Latency</button>
+        <button class="btn btn-ghost btn-sm pass-explain-color-option" data-color-mode="subgraph" type="button">Subgraph</button>
+        <button class="btn btn-ghost btn-sm pass-explain-color-option" data-color-mode="none" type="button">None</button>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-icon" id="fitExplainBtn" type="button" title="适配视图" aria-label="适配视图">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M1 5V2h3M10 2h3v3M13 9v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button class="btn btn-solid" id="openPassFolderBtn" data-open-pass-folder type="button">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M1.5 4h4l1 1.5H12a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      </svg>
+      打开 Pass 文件夹
+    </button>
+    <input id="passFolderInput" type="file" webkitdirectory directory multiple accept=".json" hidden>
+  </div>
+</header>
+
+<main class="pass-explain-main">
+  <section class="pass-explain-canvas" aria-label="Pass 图">
+    <div class="viewport" id="explainViewport">
+      <div class="graph-root" id="explainGraphRoot">
+        <svg class="edges-svg" id="edgesSvg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow-default" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="var(--border-default)"/>
+            </marker>
+            <marker id="arrow-incast" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="var(--incast-accent)"/>
+            </marker>
+            <marker id="arrow-op" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="var(--op-accent)"/>
+            </marker>
+            <marker id="arrow-outcast" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="var(--outcast-accent)"/>
+            </marker>
+          </defs>
+        </svg>
+        <div class="nodes-layer" id="nodesLayer"></div>
+      </div>
+      <div class="pass-explain-empty" id="explainEmptyState">
+        <div class="pass-explain-empty-card panel-shell">
+          <div class="pass-explain-empty-title">尚未加载 Pass 文件夹</div>
+          <div class="pass-explain-empty-copy">加载后会自动选择第一个有结构变化的 Pass，并打开规则播放。</div>
+          <button class="btn btn-solid" data-open-pass-folder type="button">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1.5 4h4l1 1.5H12a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+            打开 Pass 文件夹
+          </button>
+        </div>
+      </div>
+      <div class="pass-cause-ghost-tray" id="passCauseGhostTray" hidden></div>
+    </div>
+  </section>
+
+  <aside class="pass-cause-panel panel-shell" id="passCausePanel"></aside>
+</main>
+
+<div class="pass-cause-playback" id="passCausePlayback"></div>
+
+<script>
+window.PTO_BASE_PREFIX = '../';
+window.PTO_ASSET_PREFIX = '../';
+</script>
+<script src="../js/colormap.js"></script>
+<script src="../js/parser.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/renderer.js"></script>
+<script src="../js/nav_index_builder.js"></script>
+<script src="../js/pass_cause_source_schema.js"></script>
+<script src="../js/pass_cause_semantic.js"></script>
+<script src="../js/pass_cause_dump_schema.js"></script>
+<script src="../js/pass_cause_pairs.js"></script>
+<script src="../js/pass_cause_diff.js"></script>
+<script src="../js/pass_cause_rules.js"></script>
+<script src="../js/pass_cause_explainer.js"></script>
+<script src="../js/pass_cause_playback.js"></script>
+<script src="../js/pass_cause_panel.js"></script>
+<script src="../js/pass_cause_standalone.js"></script>
+</body>
+</html>
