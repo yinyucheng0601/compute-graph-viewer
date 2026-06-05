@@ -219,7 +219,7 @@
     `;
   }
 
-  function renderResult(result) {
+  function renderResult(result, options = {}) {
     activeResult = result;
     ensureDom();
     const pair = result?.pair;
@@ -261,7 +261,64 @@
       </section>
       ${sourceHtml(steps)}
     `;
-    window.PtoPassCausePlayback?.setResult?.(result);
+    if (options.syncPlayback !== false) window.PtoPassCausePlayback?.setResult?.(result);
+  }
+
+  function timelineStepMatchesResult(step, result) {
+    const pair = result?.pair;
+    if (!step || !pair) return false;
+    return step.passIndex === pair.passIndex
+      && step.passName === pair.passName
+      && (!pair.pathId || !step.pathId || step.pathId === pair.pathId);
+  }
+
+  function renderTimelineFrame(detail) {
+    const step = detail?.timelineStep;
+    if (!step) return;
+    const result = detail?.result || activeResult;
+    if (timelineStepMatchesResult(step, result)) {
+      renderResult(result, { syncPlayback: false });
+      updateActiveStep(-1);
+      return;
+    }
+
+    activeRequest += 1;
+    ensureDom();
+    const passNo = step.passIndex != null ? `P${String(step.passIndex).padStart(2, '0')}` : 'Pass';
+    setTitle(`${passNo} ${step.passName || '当前帧'}`);
+    body.innerHTML = `
+      <section class="pass-cause-section pass-cause-summary">
+        <div class="pass-cause-section-title">当前播放帧</div>
+        <div class="pass-cause-headline">${escHtml(step.label || `${passNo} ${step.passName || ''}`)}</div>
+        <div class="pass-cause-stats">
+          ${step.pathId ? statChip('Path', step.pathId) : ''}
+          ${step.side ? statChip('Side', step.side === 'before' ? 'Before' : 'After') : ''}
+          ${detail?.timelineCount ? statChip('Frame', `${(detail.timelineIndex ?? 0) + 1}/${detail.timelineCount}`) : ''}
+        </div>
+        <div class="pass-cause-note">这一帧没有展开源码规则解释，只跟随 Pass 级播放显示当前计算图状态。</div>
+      </section>
+    `;
+    updateActiveStep(-1);
+  }
+
+  function renderSelectionFrame(selection, message) {
+    activeRequest += 1;
+    ensureDom();
+    const passNo = selection?.passIndex != null ? `P${String(selection.passIndex).padStart(2, '0')}` : 'Pass';
+    setTitle(`${passNo} ${selection?.passName || '当前帧'}`);
+    body.innerHTML = `
+      <section class="pass-cause-section pass-cause-summary">
+        <div class="pass-cause-section-title">当前选中帧</div>
+        <div class="pass-cause-headline">${escHtml(`${passNo} ${selection?.passName || ''}`)}</div>
+        <div class="pass-cause-stats">
+          ${selection?.pathId ? statChip('Path', selection.pathId) : ''}
+          ${selection?.side ? statChip('Side', selection.side === 'before' ? 'Before' : 'After') : ''}
+          ${selection?.snapshotKey ? statChip('Snapshot', selection.snapshotKey) : ''}
+        </div>
+        <div class="pass-cause-note">${escHtml(message || '这一帧没有展开源码规则解释，只显示当前计算图状态。')}</div>
+      </section>
+    `;
+    updateActiveStep(-1);
   }
 
   function copyText(value) {
@@ -313,6 +370,10 @@
       renderEmpty('打开包含 Before/After JSON 的 Pass 文件夹后，可以查看规则解释和逐步播放。单张图没有可配对的 Pass 上下文。');
       return;
     }
+    if (selection.hasExplain === false) {
+      renderSelectionFrame(selection, '这一帧没有展开源码规则解释，只显示当前计算图状态。');
+      return;
+    }
     const pair = window.PtoPassCausePairs.resolvePair({
       navIndex: selection.navIndex,
       passIndex: selection.passIndex,
@@ -321,11 +382,11 @@
       snapshotKey: selection.snapshotKey,
     });
     if (!pair) {
-      renderEmpty('当前选中的 snapshot 无法组成 Before/After 配对。');
+      renderSelectionFrame(selection, '当前选中的 snapshot 无法组成 Before/After 配对。');
       return;
     }
     if (pair.status !== 'ready') {
-      renderPairProblem(pair);
+      renderSelectionFrame(selection, `配对状态：${pair.status || 'missing'}。`);
       return;
     }
 
@@ -349,6 +410,10 @@
   });
 
   window.addEventListener(STEP_EVENT, event => {
+    if (event.detail?.mode === 'timeline') {
+      renderTimelineFrame(event.detail);
+      return;
+    }
     updateActiveStep(event.detail?.index ?? -1);
   });
 

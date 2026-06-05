@@ -47,44 +47,42 @@
       };
     }
 
-    const leaf = rest.match(/^TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)_LEAF_program_id_([A-Za-z0-9]+)_([A-Za-z0-9]+)$/);
-    if (leaf) {
+    const tensor = rest.match(/^TENSOR_(.+?)_Unroll\d+_PATH(\d+)(?:_hiddenfunc(\d+))?_(\d+)(?:_(ROOT)|_LEAF_program_id_([A-Za-z0-9]+)_([A-Za-z0-9]+))?$/);
+    if (tensor) {
+      const functionMagicName = tensor[3] != null ? `${tensor[1]} hiddenfunc${tensor[3]}` : tensor[1];
+      const pathId = `PATH${tensor[2]}_${tensor[4]}`;
+      if (tensor[6]) {
+        return {
+          side,
+          fileIndex,
+          identifier,
+          functionMagicName,
+          pathId,
+          targetKind: 'leaf',
+          snapshotKey: `LEAF_${tensor[6]}`,
+          leafProgramId: tensor[6],
+          leafHash: tensor[7],
+        };
+      }
+      if (tensor[5] === 'ROOT') {
+        return {
+          side,
+          fileIndex,
+          identifier,
+          functionMagicName,
+          pathId,
+          targetKind: 'root',
+          snapshotKey: 'ROOT',
+          leafProgramId: null,
+          leafHash: null,
+        };
+      }
       return {
         side,
         fileIndex,
         identifier,
-        functionMagicName: leaf[1],
-        pathId: `PATH${leaf[2]}_${leaf[3]}`,
-        targetKind: 'leaf',
-        snapshotKey: `LEAF_${leaf[4]}`,
-        leafProgramId: leaf[4],
-        leafHash: leaf[5],
-      };
-    }
-
-    const root = rest.match(/^TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)_ROOT$/);
-    if (root) {
-      return {
-        side,
-        fileIndex,
-        identifier,
-        functionMagicName: root[1],
-        pathId: `PATH${root[2]}_${root[3]}`,
-        targetKind: 'root',
-        snapshotKey: 'ROOT',
-        leafProgramId: null,
-        leafHash: null,
-      };
-    }
-
-    const main = rest.match(/^TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)$/);
-    if (main) {
-      return {
-        side,
-        fileIndex,
-        identifier,
-        functionMagicName: main[1],
-        pathId: `PATH${main[2]}_${main[3]}`,
+        functionMagicName,
+        pathId,
         targetKind: 'current',
         snapshotKey: 'main',
         leafProgramId: null,

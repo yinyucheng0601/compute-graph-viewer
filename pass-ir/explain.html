@@ -463,56 +463,107 @@ body.pass-explain-page {
   display: none;
 }
 
-.pass-cause-playback {
-  position: fixed;
-  left: 24px;
-  right: 420px;
-  bottom: 24px;
-  z-index: var(--z-overlay);
-  min-height: var(--floating-playback-expanded-min-height);
-  display: flex;
+.pass-explain-page .nav-bar {
+  top: calc(var(--toolbar-height) + var(--space-2));
+}
+
+.pass-explain-page .nav-left {
+  gap: var(--space-1);
+}
+
+.pass-playback-nav-controls,
+.pass-cause-playback-controls {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--floating-playback-padding-y) var(--floating-playback-padding-x);
-  border: 1px solid var(--floating-playback-border);
-  border-radius: var(--floating-playback-radius);
-  background: var(--floating-playback-bg);
-  box-shadow: var(--floating-playback-inner-highlight), var(--floating-playback-shadow);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  gap: 2px;
 }
 
-.pass-explain-page.is-explain-panel-closed .pass-cause-playback {
-  right: 24px;
+.pass-playback-nav-controls {
+  height: 100%;
+  padding-right: var(--space-1);
+  margin-right: 2px;
+  border-right: 1px solid var(--border-default);
 }
 
-.pass-cause-playback.is-empty {
+.pass-playback-nav-controls .pass-cause-playback-btn,
+.pass-playback-nav-controls .pass-cause-playback-main {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+}
+
+.pass-playback-nav-controls .pass-cause-playback-main:disabled,
+.pass-playback-nav-controls .pass-cause-playback-btn:disabled {
   opacity: var(--button-disabled-opacity);
 }
 
-.pass-cause-playback-track {
-  flex: 1 1 auto;
-  min-width: 140px;
+.pass-playback-nav-controls .pass-cause-playback-main [data-role="pause-icon"],
+.pass-playback-nav-controls .pass-cause-playback-main.is-playing [data-role="play-icon"] {
+  display: none;
 }
 
-.pass-cause-playback-range {
-  width: 100%;
-  accent-color: var(--primary);
+.pass-playback-nav-controls .pass-cause-playback-main.is-playing [data-role="pause-icon"] {
+  display: block;
 }
 
-.pass-cause-playback-meta {
-  flex: 0 1 360px;
-  min-width: 0;
-  color: var(--foreground-secondary);
-  font: var(--text-body-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.pass-explain-page .nav-pass-dot.no-explain {
+  opacity: 0.22;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.pass-explain-page .nav-pass-dot.no-explain:hover {
+  opacity: 0.68;
+}
+
+.pass-explain-page .nav-pass-dot.no-explain.active {
+  opacity: 0.62;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 0 5px color-mix(in srgb, var(--dot-color, #fff) 45%, transparent);
+}
+
+.pass-explain-page .nav-pass-dot.has-explain {
+  opacity: 1;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 0 9px var(--dot-color, #fff);
+}
+
+.pass-explain-page .nav-pass-dot.has-explain.active {
+  transform: scale(1.78);
+}
+
+.pass-magic-ghost-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 80;
+}
+
+.pass-magic-ghost-node {
+  position: absolute;
+  opacity: 0.92;
+  filter: saturate(0.82) brightness(0.92);
+  transform-origin: center;
+  transition:
+    opacity 820ms var(--easing-out),
+    transform 820ms var(--easing-out),
+    filter 820ms var(--easing-out);
+}
+
+.pass-magic-ghost-node.is-exiting {
+  opacity: 0;
+  filter: saturate(0.3) brightness(0.62);
+  transform: scale(0.965);
+}
+
+.node-card.pass-magic-move-node {
+  will-change: transform, opacity;
 }
 
 .node-card.cause-node-highlight {
-  outline: 3px solid color-mix(in srgb, var(--primary) 82%, white 12%);
-  outline-offset: 4px;
   opacity: 1 !important;
   filter: none !important;
   z-index: 60;
@@ -528,16 +579,12 @@ body.pass-explain-page {
   filter: grayscale(1) saturate(0.08);
 }
 
-.node-card.cause-node-remove {
-  outline-color: color-mix(in srgb, var(--danger) 82%, white 10%);
-}
-
 .node-card.cause-node-add {
-  outline-color: color-mix(in srgb, var(--success) 78%, white 8%);
+  animation: causeNodeFadeIn 760ms var(--easing-out) both;
 }
 
-.node-card.cause-node-rewire {
-  outline-color: color-mix(in srgb, var(--warning) 82%, white 6%);
+.node-card.cause-node-remove {
+  animation: causeNodeFadeOut 920ms var(--easing-default) both;
 }
 
 .cause-node-badge {
@@ -570,11 +617,16 @@ body.pass-explain-page {
 
 .edge.cause-edge-added {
   stroke: var(--success) !important;
+  animation: causeEdgeFadeIn 760ms var(--easing-out) both;
 }
 
 .edge.cause-edge-rewire {
   stroke: var(--warning) !important;
   stroke-dasharray: 3 4;
+}
+
+.edge.cause-edge-removed {
+  animation: causeEdgeFadeOut 920ms var(--easing-default) both;
 }
 
 .node-card.cause-node-dim-unchanged:not(.cause-node-highlight) {
@@ -613,14 +665,47 @@ body.pass-explain-page {
   filter: none;
 }
 
+@keyframes causeNodeFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes causeNodeFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  68% {
+    opacity: 0.22;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 0.82;
+    transform: scale(1);
+  }
+}
+
+@keyframes causeEdgeFadeIn {
+  from { stroke-opacity: 0; }
+  to { stroke-opacity: 1; }
+}
+
+@keyframes causeEdgeFadeOut {
+  0% { stroke-opacity: 1; }
+  68% { stroke-opacity: 0.14; }
+  100% { stroke-opacity: 0.72; }
+}
+
 @media (max-width: 980px) {
   .pass-explain-main {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) minmax(240px, 38vh);
-  }
-
-  .pass-cause-playback {
-    right: 24px;
   }
 
   .pass-explain-toolbar-select {
@@ -644,12 +729,6 @@ body.pass-explain-page {
     padding: var(--space-2);
   }
 
-  .pass-cause-playback {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    flex-wrap: wrap;
-  }
 }
 </style>
 </head>
@@ -661,9 +740,7 @@ body.pass-explain-page {
         <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 0 1-.7.7H8.6V8.9a.6.6 0 0 0-.6-.6H6a.6.6 0 0 0-.6.6V12H2.7a.7.7 0 0 1-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
       </svg>
     </a>
-    <div class="pass-explain-brand"><span class="pass-explain-brand-mark"></span>Pass 解释</div>
-    <span class="graph-title pass-explain-title" id="currentPairLabel">未选择 Pass</span>
-    <span class="stat-chip" id="explainStatus">打开 Pass 文件夹开始</span>
+    <div class="pass-explain-brand"><span class="pass-explain-brand-mark"></span>GLM-4.5 IFA Pass</div>
   </div>
   <div class="toolbar-r">
     <div class="pass-explain-select-wrap">
@@ -672,7 +749,6 @@ body.pass-explain-page {
     <div class="pass-explain-select-wrap">
       <select class="pass-explain-toolbar-select" id="pairSelect" disabled aria-label="Pass 配对"></select>
     </div>
-    <span class="stat-chip pass-cause-coverage" id="pairCoverageLabel">未加载</span>
     <div class="segmented-control segmented-control-muted" aria-label="Before After 视图">
       <button class="btn btn-sm" id="showBeforeBtn" type="button">Before</button>
       <button class="btn btn-sm is-selected" id="showAfterBtn" type="button">After</button>
@@ -694,6 +770,15 @@ body.pass-explain-page {
         <button class="btn btn-ghost btn-sm pass-explain-color-option" data-color-mode="none" type="button">None</button>
       </div>
     </div>
+    <button class="btn btn-ghost" id="groupViewBtn" type="button" disabled aria-pressed="false" title="当前图没有可聚合节点">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="1.5" y="2" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="8.5" y="2" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <rect x="5" y="8.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M5.5 4h3M7 6v2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+      <span>Group</span>
+    </button>
     <button class="btn btn-ghost btn-icon" id="fitExplainBtn" type="button" title="适配视图" aria-label="适配视图">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <path d="M1 5V2h3M10 2h3v3M13 9v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -708,6 +793,51 @@ body.pass-explain-page {
     <input id="passFolderInput" type="file" webkitdirectory directory multiple accept=".json" hidden>
   </div>
 </header>
+
+<div class="nav-bar hidden" id="navBar">
+  <div class="nav-shell">
+    <div class="nav-left">
+      <div class="pass-playback-nav-controls" id="passPlaybackNavControls" aria-label="Pass 播放控制"></div>
+      <div class="nav-pill-wrap" id="navPassWrap">
+        <button class="btn btn-compact nav-pill nav-pill-pass" id="navPassPill" type="button">
+          <span id="navPassLabel">loop</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-pill-menu" id="navPassMenu"></div>
+      </div>
+      <div class="nav-pill-wrap" id="navPathWrap">
+        <button class="btn btn-compact nav-pill nav-pill-path" id="navPathPill" type="button">
+          <span id="navPathLabel">unroll</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-pill-menu" id="navPathMenu"></div>
+      </div>
+      <div class="nav-pill-wrap" id="navSideWrap">
+        <button class="btn btn-compact nav-pill nav-pill-side" id="navSidePill" type="button">
+          <span id="navSideLabel">After</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-pill-menu" id="navSideMenu">
+          <div class="nav-pill-item active" data-value="after">After</div>
+          <div class="nav-pill-item" data-value="before">Before</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-timeline-wrap" id="navTimelineWrap">
+      <div class="nav-timeline" id="navTimeline"></div>
+    </div>
+    <div class="nav-right">
+      <span class="nav-source-tag" id="navSourceTag">output_glm4.5_attention</span>
+      <div class="nav-pill-wrap" id="navSnapWrap">
+        <button class="btn btn-compact nav-pill nav-pill-snap" id="navSnapPill" type="button">
+          <span id="navSnapLabel">main</span>
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 2.5l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-pill-menu" id="navSnapMenu"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <main class="pass-explain-main">
   <section class="pass-explain-canvas" aria-label="Pass 图">
@@ -733,8 +863,8 @@ body.pass-explain-page {
       </div>
       <div class="pass-explain-empty" id="explainEmptyState">
         <div class="pass-explain-empty-card panel-shell">
-          <div class="pass-explain-empty-title">尚未加载 Pass 文件夹</div>
-          <div class="pass-explain-empty-copy">加载后会自动选择第一个有结构变化的 Pass，并打开规则播放。</div>
+          <div class="pass-explain-empty-title">GLM-4.5 IFA focused pass</div>
+          <div class="pass-explain-empty-copy">默认只加载 TensorGraph 边界尾图到 TileGraph 起点的 MergeViewAssemble 对比。</div>
           <button class="btn btn-solid" data-open-pass-folder type="button">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M1.5 4h4l1 1.5H12a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
@@ -750,26 +880,174 @@ body.pass-explain-page {
   <aside class="pass-cause-panel panel-shell" id="passCausePanel"></aside>
 </main>
 
-<div class="pass-cause-playback" id="passCausePlayback"></div>
-
 <script>
 window.PTO_BASE_PREFIX = '../';
 window.PTO_ASSET_PREFIX = '../';
+window.PTO_PASS_IR_ENTRY = 'explain.html';
+window.PTO_DISABLE_NAV_AUTOLOAD = true;
 </script>
 <script src="../js/colormap.js"></script>
 <script src="../js/parser.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/renderer.js"></script>
-<script src="../js/nav_index_builder.js"></script>
+<script src="../js/nav_index_builder.js?v=glm45-ifa-20260605"></script>
+<script src="../js/nav.js?v=glm45-ifa-magic-20260605h"></script>
 <script src="../js/pass_cause_source_schema.js"></script>
 <script src="../js/pass_cause_semantic.js"></script>
-<script src="../js/pass_cause_dump_schema.js"></script>
+<script src="../js/pass_cause_dump_schema.js?v=glm45-ifa-20260605"></script>
 <script src="../js/pass_cause_pairs.js"></script>
 <script src="../js/pass_cause_diff.js"></script>
 <script src="../js/pass_cause_rules.js"></script>
 <script src="../js/pass_cause_explainer.js"></script>
-<script src="../js/pass_cause_playback.js"></script>
-<script src="../js/pass_cause_panel.js"></script>
-<script src="../js/pass_cause_standalone.js"></script>
+<script src="../js/pass_cause_playback.js?v=glm45-ifa-magic-20260605f"></script>
+<script src="../js/pass_cause_panel.js?v=glm45-ifa-magic-20260605g"></script>
+<script src="../js/pass_cause_standalone.js?v=glm45-ifa-magic-20260605f"></script>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  if (params.get('manual') === '1') return;
+  var FOCUSED_PASS_DIR = 'Pass_05_MergeViewAssemble';
+  var FOCUSED_PASS_NAME = 'MergeViewAssemble';
+  var FOCUSED_PASS_INDEX = 5;
+  var FOCUSED_PATH_ID = 'PATH3_56';
+
+  var sampleFiles = [
+    {
+      url: './samples/glm-ifa/Pass_05_MergeViewAssemble/Before_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_56.json',
+      relativePath: 'Pass_05_MergeViewAssemble/Before_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_hiddenfunc0_56.json',
+      ref: './samples/glm-ifa/Pass_05_MergeViewAssemble/Before_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_56.json'
+    },
+    {
+      url: './samples/glm-ifa/Pass_05_MergeViewAssemble/After_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_56.json',
+      relativePath: 'Pass_05_MergeViewAssemble/After_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_hiddenfunc0_56.json',
+      ref: './samples/glm-ifa/Pass_05_MergeViewAssemble/After_005_MergeViewAssemble_TENSOR_LOOP_s2_Unroll1_PATH3_56.json'
+    }
+  ];
+
+  function basename(path) {
+    return String(path || '').split('/').pop();
+  }
+
+  function fetchAsEntry(item) {
+    return fetch(item.url)
+      .then(function (response) {
+        if (!response.ok) throw new Error(item.url + ' ' + response.status);
+        return response.text();
+      })
+      .then(function (text) {
+        return {
+          relativePath: item.relativePath,
+          ref: item.ref,
+          file: new File([text], basename(item.relativePath), { type: 'application/json' })
+        };
+      });
+  }
+
+  function normalizeNavRef(ref) {
+    var value = String(ref || '');
+    if (!value || value.indexOf('local::') === 0) return ref;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.indexOf('/') === 0 || value.indexOf('./') === 0 || value.indexOf('../') === 0) {
+      return ref;
+    }
+    return '../' + value;
+  }
+
+  function findSnapshot(navIndex, passDir, pathId, side) {
+    var passIndex = -1;
+    var pass = (navIndex.passes || []).find(function (item, idx) {
+      if (item.dir === passDir) {
+        passIndex = idx;
+        return true;
+      }
+      return false;
+    });
+    if (!pass) return null;
+    var path = (pass.paths || []).find(function (item) { return item.path_id === pathId; }) || pass.paths[0];
+    if (!path) return null;
+    var snap = (path.snapshots || []).find(function (item) { return item.snap_type === 'main'; }) || path.snapshots[0];
+    if (!snap) return null;
+    var ref = side === 'before' ? snap.before : snap.after;
+    return {
+      fileRef: normalizeNavRef(ref || snap.after || snap.before),
+      navPassIndex: passIndex,
+      passIndex: pass.pass_index,
+      passName: pass.pass_name,
+      pathId: path.path_id
+    };
+  }
+
+  function buildBoundaryTimeline(navIndex) {
+    var p04After = findSnapshot(navIndex, 'Pass_04_ExpandFunction', FOCUSED_PATH_ID, 'after');
+    var p05After = findSnapshot(navIndex, FOCUSED_PASS_DIR, FOCUSED_PATH_ID, 'after');
+    var p06After = findSnapshot(navIndex, 'Pass_06_SplitReshape', FOCUSED_PATH_ID, 'after');
+    return [
+      p04After && Object.assign(p04After, {
+        label: 'P04 After · TensorGraph 结束态',
+        side: 'after'
+      }),
+      p05After && Object.assign(p05After, {
+        label: 'P05 After · MergeViewAssemble 后',
+        side: 'after'
+      }),
+      p06After && Object.assign(p06After, {
+        label: 'P06 After · SplitReshape 后',
+        side: 'after'
+      })
+    ].filter(Boolean);
+  }
+
+  function explainAvailability() {
+    return [{
+      dir: FOCUSED_PASS_DIR,
+      passIndex: FOCUSED_PASS_INDEX,
+      passName: FOCUSED_PASS_NAME,
+      pathId: FOCUSED_PATH_ID
+    }];
+  }
+
+  function fetchNavIndex() {
+    return fetch('../nav_index.json').then(function (response) {
+      if (!response.ok) throw new Error('nav_index.json ' + response.status);
+      return response.json();
+    }).catch(function () {
+      return fetch('./samples/glm-ifa/focused-nav-index.json').then(function (response) {
+        if (!response.ok) throw new Error('focused-nav-index.json ' + response.status);
+        return response.json();
+      });
+    });
+  }
+
+  function loadFocusedSample() {
+    if (!window.PtoPassIrState || typeof window.PtoPassIrState.loadEntries !== 'function') return;
+    Promise.all([
+      fetchNavIndex(),
+      Promise.all(sampleFiles.map(fetchAsEntry))
+    ])
+      .then(function (result) {
+        var fullNav = result[0];
+        var entries = result[1];
+        return window.PtoPassIrState.loadEntries(entries, 'output_glm4.5_attention · IFA tensor/tile boundary', {
+          navigatorIndex: fullNav,
+          navigatorSourceLabel: fullNav.base_path || 'output_glm4.5_attention',
+          explainAvailability: explainAvailability(),
+          preferredPathId: FOCUSED_PATH_ID,
+          initialPassDir: FOCUSED_PASS_DIR,
+          timeline: buildBoundaryTimeline(fullNav),
+          timelineTitle: 'Tensor -> Tile Magic Move',
+          timelineAnimateInitial: false
+        });
+      })
+      .catch(function (error) {
+        console.error('Failed to load GLM-4.5 IFA focused pass sample:', error);
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadFocusedSample, { once: true });
+  } else {
+    loadFocusedSample();
+  }
+})();
+</script>
 </body>
 </html>

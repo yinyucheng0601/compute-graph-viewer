@@ -40,8 +40,30 @@
     };
   }
 
+  function parseTensorSnapshot(base) {
+    const tensorM = String(base || '').match(
+      /^(Before|After)_(\d+)_(.+?)_TENSOR_(.+?)_Unroll\d+_PATH(\d+)(?:_hiddenfunc(\d+))?_(\d+)(?:_(ROOT)|_LEAF_program_id_([A-Za-z0-9]+)_([A-Za-z0-9]+))?$/
+    );
+    if (!tensorM) return null;
+
+    const hiddenFunc = tensorM[6] != null ? `hiddenfunc${tensorM[6]}` : '';
+    const snapType = tensorM[8] === 'ROOT' ? 'ROOT' : (tensorM[9] ? 'LEAF' : 'main');
+    const funcName = hiddenFunc ? `${tensorM[4]} ${hiddenFunc}` : tensorM[4];
+
+    return {
+      side: tensorM[1],
+      passIndex: parseInt(tensorM[2], 10),
+      passName: tensorM[3],
+      funcName,
+      pathId: `PATH${tensorM[5]}_${tensorM[7]}`,
+      snapType,
+      programId: tensorM[9] || null,
+    };
+  }
+
   // Parse filename patterns:
   // Before_000_RemoveRedundantReshape_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4.json
+  // Before_000_DynAttrToStatic_TENSOR_LOOP_s2_Unroll1_PATH3_hiddenfunc0_56.json
   // After_027_SubgraphToFunction_TENSOR_LOOP_RESHAPE_Unroll1_PATH0_4_ROOT.json
   // After_028_..._LEAF_program_id_01_XXXXXXXX.json
   // Before_000_LoopUnroll_PROGRAM_ENTRY.json
@@ -62,53 +84,8 @@
       };
     }
 
-    // LEAF
-    const leafM = base.match(
-      /^(Before|After)_(\d+)_(.+?)_TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)_LEAF_program_id_([A-Za-z0-9]+)_[A-Za-z0-9]+$/
-    );
-    if (leafM) {
-      return {
-        side: leafM[1],
-        passIndex: parseInt(leafM[2], 10),
-        passName: leafM[3],
-        funcName: leafM[4],
-        pathId: `PATH${leafM[5]}_${leafM[6]}`,
-        snapType: 'LEAF',
-        programId: leafM[7],
-      };
-    }
-
-    // ROOT
-    const rootM = base.match(
-      /^(Before|After)_(\d+)_(.+?)_TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)_ROOT$/
-    );
-    if (rootM) {
-      return {
-        side: rootM[1],
-        passIndex: parseInt(rootM[2], 10),
-        passName: rootM[3],
-        funcName: rootM[4],
-        pathId: `PATH${rootM[5]}_${rootM[6]}`,
-        snapType: 'ROOT',
-        programId: null,
-      };
-    }
-
-    // Main
-    const mainM = base.match(
-      /^(Before|After)_(\d+)_(.+?)_TENSOR_(.+?)_Unroll\d+_PATH(\d+)_(\d+)$/
-    );
-    if (mainM) {
-      return {
-        side: mainM[1],
-        passIndex: parseInt(mainM[2], 10),
-        passName: mainM[3],
-        funcName: mainM[4],
-        pathId: `PATH${mainM[5]}_${mainM[6]}`,
-        snapType: 'main',
-        programId: null,
-      };
-    }
+    const tensorSnapshot = parseTensorSnapshot(base);
+    if (tensorSnapshot) return tensorSnapshot;
 
     return null;
   }

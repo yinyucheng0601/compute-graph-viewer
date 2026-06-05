@@ -12,6 +12,15 @@
     return `${PTO_BASE_PREFIX}${path}`;
   }
 
+  function normalizeFileRef(ref) {
+    const value = String(ref || '');
+    if (!value || value.startsWith('local::')) return ref;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) {
+      return ref;
+    }
+    return ptoUrl(value);
+  }
+
   // ── DOM ──────────────────────────────────────────────────────────────────
   const navBar = document.getElementById('navBar');
   const navTimeline = document.getElementById('navTimeline');
@@ -250,6 +259,7 @@
   let activeIdx = null;      // index into navIndex.passes
   let activeSide = 'after';  // after|before
   let activeSnap = 'main';   // main|ROOT|LEAF_xx
+  let explainAvailability = null; // null outside explain-highlight mode; Set of "dir::path_id"
 
   // Static path mapping: loop+unroll → path_id
   const PATH_MAP = {
@@ -300,6 +310,7 @@
   }
 
   function derivePath() {
+    if (!usesMappedPathControls()) return activePath;
     if (activeLoop === 'RESHAPE') return PATH_MAP.RESHAPE;
     return PATH_MAP.MAIN[activeUnroll] || null;
   }
@@ -311,7 +322,76 @@
     return ids;
   }
 
+  function usesMappedPathControls() {
+    if (!navIndex?.passes?.length) return true;
+    const ids = allPathIds();
+    return ids.has(PATH_MAP.RESHAPE) || UNROLL_ORDER.some(u => ids.has(PATH_MAP.MAIN[u]));
+  }
+
+  function availabilityKey(pass, pathId) {
+    if (!pass || !pathId) return '';
+    return `${pass.dir || `Pass_${String(pass.pass_index).padStart(2, '0')}_${pass.pass_name}`}::${pathId}`;
+  }
+
+  function buildAvailabilitySet(list) {
+    if (!Array.isArray(list)) return null;
+    const set = new Set();
+    list.forEach(item => {
+      if (typeof item === 'string') {
+        set.add(item);
+        return;
+      }
+      if (!item || !item.pathId) return;
+      const dir = item.dir || (item.passName != null && item.passIndex != null
+        ? `Pass_${String(item.passIndex).padStart(2, '0')}_${item.passName}`
+        : null);
+      if (dir) set.add(`${dir}::${item.pathId}`);
+    });
+    return set;
+  }
+
+  function pathHasExplain(pass, pathId) {
+    if (!explainAvailability) return false;
+    return explainAvailability.has(availabilityKey(pass, pathId));
+  }
+
+  function passHasExplain(pass) {
+    if (!explainAvailability) return false;
+    return (pass?.paths || []).some(path => pathHasExplain(pass, path.path_id));
+  }
+
+  function preferredPathForPass(pass) {
+    if (!pass?.paths?.length) return null;
+    const preferred = navMeta.preferredPathId;
+    if (preferred && pass.paths.some(path => path.path_id === preferred)) return preferred;
+    if (activePath && pass.paths.some(path => path.path_id === activePath)) return activePath;
+    const explainedPath = explainAvailability
+      ? pass.paths.find(path => pathHasExplain(pass, path.path_id))
+      : null;
+    return (explainedPath || pass.paths[0])?.path_id || null;
+  }
+
+  function initialPassIndex() {
+    if (!navIndex?.passes?.length) return 0;
+    const dir = navMeta.initialPassDir;
+    if (dir) {
+      const idx = navIndex.passes.findIndex(pass => pass.dir === dir);
+      if (idx >= 0) return idx;
+    }
+    const passName = navMeta.initialPassName;
+    if (passName) {
+      const idx = navIndex.passes.findIndex(pass => pass.pass_name === passName);
+      if (idx >= 0) return idx;
+    }
+    if (explainAvailability) {
+      const idx = navIndex.passes.findIndex(pass => passHasExplain(pass));
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  }
+
   function availableLoops() {
+    if (!usesMappedPathControls()) return [];
     const ids = allPathIds();
     const loops = [];
     if (ids.has(PATH_MAP.RESHAPE)) loops.push('RESHAPE');
@@ -321,6 +401,7 @@
 
   // Which unroll factors are present in pass i
   function availableUnrolls(passIdx) {
+    if (!usesMappedPathControls()) return [];
     const paths = navIndex.passes[passIdx]?.paths || [];
     const pathIds = new Set(paths.map(p => p.path_id));
     return UNROLL_ORDER.filter(u => pathIds.has(PATH_MAP.MAIN[u]));
@@ -348,27 +429,42 @@
     if (!data || !Array.isArray(data.passes) || !data.passes.length) return;
     navIndex = data;
     navMeta = meta || {};
+    explainAvailability = buildAvailabilitySet(navMeta.explainAvailability);
     navBar.classList.remove('hidden');
     updateSourceTag();
 
     const loops = availableLoops();
     activeLoop = loops.includes('RESHAPE') ? 'RESHAPE' : (loops[0] || 'MAIN');
     activeUnroll = 32;
-    activePath = derivePath();
+    activePath = navMeta.preferredPathId || derivePath();
 
     createDotTooltip();
     buildTimeline();
     rebuildLoopMenu();
-    selectPass(0);
+    selectPass(initialPassIndex());
   }
 
   window.setNavIndex = setNavIndex;
+  window.navSetExplainAvailability = (list) => {
+    explainAvailability = buildAvailabilitySet(list);
+    if (navIndex) buildTimeline();
+  };
   window.navSelectPath = selectPath;
+  window.navSelectPassIndex = selectPass;
+  window.navSelectPass = (passQuery) => {
+    if (!navIndex?.passes?.length) return;
+    const target = navIndex.passes.findIndex(pass => (
+      pass.pass_index === passQuery || pass.pass_name === passQuery
+    ));
+    if (target >= 0) selectPass(target);
+  };
 
   // ── Initial load ─────────────────────────────────────────────────────────
   if (!PTO_DISABLE_NAV_AUTOLOAD) {
     fetch(ptoUrl('nav_index.json'))
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .catch(() => fetch(ptoUrl('pass-ir/samples/glm-ifa/focused-nav-index.json'))
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }))
       .then(data => setNavIndex(data, { sourceLabel: data.base_path }))
       .catch(() => { /* optional navigator; keep hidden without index */ });
   }
@@ -409,12 +505,18 @@
       const style = stageStyle(stage);
       const dot = document.createElement('button');
       dot.type = 'button';
-      dot.className = 'nav-pass-dot';
+      const explainClass = explainAvailability
+        ? (passHasExplain(pass) ? ' has-explain' : ' no-explain')
+        : '';
+      dot.className = `nav-pass-dot${explainClass}`;
       dot.dataset.i = String(i);
       dot.style.setProperty('--dot-color', style.color);
       dot.addEventListener('click', () => selectPass(i));
       dot.addEventListener('mouseenter', () => {
-        dotTooltip.textContent = `P${String(pass.pass_index).padStart(2, '0')} · ${pass.pass_name}`;
+        const explainText = explainAvailability
+          ? (passHasExplain(pass) ? ' · explain ready' : ' · graph only')
+          : '';
+        dotTooltip.textContent = `P${String(pass.pass_index).padStart(2, '0')} · ${pass.pass_name}${explainText}`;
         const r = dot.getBoundingClientRect();
         dotTooltip.style.left = (r.left + r.width / 2) + 'px';
         dotTooltip.style.top = r.top + 'px';
@@ -427,6 +529,11 @@
 
   // ── Menus ────────────────────────────────────────────────────────────────
   function rebuildLoopMenu() {
+    if (!usesMappedPathControls()) {
+      navPassWrap.hidden = true;
+      return;
+    }
+    navPassWrap.hidden = false;
     navPassMenu.innerHTML = '';
     const loops = availableLoops();
     loops.forEach(loop => {
@@ -443,6 +550,24 @@
   }
 
   function rebuildUnrollMenu() {
+    if (!usesMappedPathControls()) {
+      const pass = activeIdx !== null ? navIndex.passes[activeIdx] : null;
+      navPathWrap.hidden = !(pass?.paths?.length);
+      navPathMenu.innerHTML = '';
+      (pass?.paths || []).forEach(path => {
+        const item = document.createElement('div');
+        item.className = 'nav-pill-item' + (path.path_id === activePath ? ' active' : '');
+        item.textContent = path.path_id;
+        item.title = path.path_label || path.path_id;
+        item.addEventListener('click', () => {
+          navPathWrap.classList.remove('open');
+          selectPath(path.path_id);
+        });
+        navPathMenu.appendChild(item);
+      });
+      navPathLabel.textContent = activePath || 'path';
+      return;
+    }
     if (activeLoop === 'RESHAPE') {
       navPathWrap.hidden = true;
       return;
@@ -558,7 +683,15 @@
     loadCurrent();
   }
 
-  function selectPath(pathId) {
+  function selectPath(pathId, options = {}) {
+    if (!usesMappedPathControls()) {
+      activePath = pathId;
+      activeSnap = 'main';
+      rebuildUnrollMenu();
+      rebuildSnapMenu();
+      if (options.load !== false) loadCurrent();
+      return;
+    }
     const UNROLL_FROM_PATH = { PATH0_6:32, PATH0_8:16, PATH0_10:8, PATH0_12:4, PATH0_14:2, PATH0_16:1 };
     if (pathId === 'PATH0_4') {
       activeLoop = 'RESHAPE';
@@ -573,10 +706,10 @@
     rebuildLoopMenu();
     rebuildUnrollMenu();
     rebuildSnapMenu();
-    loadCurrent();
+    if (options.load !== false) loadCurrent();
   }
 
-  function selectPass(i) {
+  function selectPass(i, options = {}) {
     if (!navIndex?.passes?.[i]) return;
     activeIdx = i;
 
@@ -584,6 +717,10 @@
     const hasCurrentPath = pass.paths.some(p => p.path_id === activePath);
 
     if (!hasCurrentPath) {
+      if (!usesMappedPathControls()) {
+        activePath = preferredPathForPass(pass);
+        activeSnap = 'main';
+      } else {
       // Try to stay in current loop
       if (activeLoop === 'MAIN') {
         const unrolls = availableUnrolls(i);
@@ -607,6 +744,7 @@
         }
       }
       activeSnap = 'main';
+      }
     }
 
     navTimeline.querySelectorAll('.nav-pass-dot').forEach(dot => {
@@ -616,7 +754,7 @@
     rebuildLoopMenu();
     rebuildUnrollMenu();
     rebuildSnapMenu();
-    loadCurrent();
+    if (options.load !== false) loadCurrent();
     centerActiveDot();
   }
 
@@ -636,6 +774,26 @@
     return prefer || fallback || null;
   }
 
+  function selectionNavIndex(pass, path, snapshot) {
+    const normalizedSnapshot = snapshot
+      ? {
+          ...snapshot,
+          before: normalizeFileRef(snapshot.before),
+          after: normalizeFileRef(snapshot.after),
+        }
+      : null;
+    return {
+      ...navIndex,
+      passes: [{
+        ...pass,
+        paths: [{
+          ...path,
+          snapshots: normalizedSnapshot ? [normalizedSnapshot] : [],
+        }],
+      }],
+    };
+  }
+
   function loadCurrent() {
     if (activeIdx === null || !activePath) return;
     const pass = navIndex.passes[activeIdx];
@@ -650,8 +808,22 @@
       snap = path.snapshots.find(s => s.snap_type === activeSnap);
     }
 
-    const fileRef = resolveSnapshotFile(snap);
-    if (fileRef && window.loadFile) window.loadFile(fileRef);
+    const fileRef = normalizeFileRef(resolveSnapshotFile(snap));
+    const selection = {
+      navIndex: selectionNavIndex(pass, path, snap),
+      pass,
+      passIndex: pass.pass_index,
+      passName: pass.pass_name,
+      path,
+      pathId: path.path_id,
+      snapshot: snap,
+      snapshotKey: activeSnap,
+      side: activeSide,
+      fileRef,
+      hasExplain: pathHasExplain(pass, path.path_id),
+    };
+    window.dispatchEvent(new CustomEvent('pto-pass-ir:nav-selection', { detail: selection }));
+    if (fileRef && window.loadFile) window.loadFile(fileRef, selection);
   }
 
   // ── Dropdown toggles ─────────────────────────────────────────────────────
