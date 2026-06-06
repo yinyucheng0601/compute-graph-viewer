@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ascend C Tiling 真实算子开发流程白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">Ascend C Tiling · 真实算子开发流程</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#index">索引</a>
+      <a href="#runtime-tiling">运行时</a>
+      <a href="#shape-inference">Shape</a>
+      <a href="#dynamic-keys">Tiling Key</a>
+      <a href="#constraints">约束</a>
+      <a href="#cost-model">性能</a>
+      <a href="#chip-path">芯片差异</a>
+      <a href="#safe-default">默认策略</a>
+      <a href="#breakpoint-map">断点地图</a>
+      <a href="#product-position">工具定位</a>
+      <a href="#evidence">证据</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026 · Operator Tiling Workflow</div>
+    <h1>真实算子开发里，Tiling 是一条随 shape 变化的决策曲线</h1>
+    <p class="lead">这份白皮书把 <code>docs/ascend-tiling-真实算子开发流程的调研.md</code> 整理成产品化读法：开发者不是手填一组固定 tile 数字，而是在给定硬件和运行时 shape 下，写出能覆盖动态范围的 tiling 决策函数。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>2</strong><span>编译期保存硬件信息，运行期读取真实 shape 并现算 tiling</span></div>
+      <div class="card metric"><strong>7</strong><span>MoeGatingTopKHash 示例里按条件选择的 tiling key 数量</span></div>
+      <div class="card metric"><strong>16</strong><span>baseM / baseN 对齐的基本粒度，尾块和核利用率都绕不开它</span></div>
+      <div class="card metric"><strong>M</strong><span>推理场景里最会变的维度：batch × seq，也就是 token 数</span></div>
+    </div>
+    <div class="callout"><b>核心洞察：</b>真实开发的难点不是“把一个 tensor 切成几块”，而是“当 M 从 1 到最大请求范围不断变化时，哪些 tile 合法、哪些快、哪些阈值会突然换策略”。工具应该把这条曲线画出来。</div>
+  </section>
+
+  <section class="floor" id="index">
+    <div class="kicker">Index · 纵向阅读路线</div>
+    <h2>从“函数何时运行”读到“工具该补什么”</h2>
+    <p class="lead">这份调研笔记原本是 §13-§22 的连续推理。白皮书按真实开发者会遇到的问题重排：先确定输入和运行机制，再看硬件约束、性能启发式、芯片差异，最后落到产品机会。</p>
+    <div class="index-list">
+      <a class="card index-item" href="#runtime-tiling">
+        <span class="pill blue index-num">01</span>
+        <div><b>Tiling 函数在运行时现算</b><p>开发者交付的是一个读真实 shape 的函数，不是一组静态数字。</p><small>输出：TilingParse、TilingFunc、TilingData 的分工。</small></div>
+      </a>
+      <a class="card index-item" href="#shape-inference">
+        <span class="pill blue index-num">02</span>
+        <div><b>shape 是调用方喂进来的</b><p>LLM 推理里 K/N 多数来自 weight，真正大幅变化的是 M=batch×seq。</p><small>输出：prefill/decode 为什么让同一算子落入完全不同的 tiling 场景。</small></div>
+      </a>
+      <a class="card index-item" href="#dynamic-keys">
+        <span class="pill blue index-num">03</span>
+        <div><b>一个 binary 覆盖一片动态 shape</b><p>运行期用 tiling key 在多套 kernel 模板实例之间分流。</p><small>输出：动态 shape、key 条件、模板实例的关系。</small></div>
+      </a>
+      <a class="card index-item" href="#constraints">
+        <span class="pill blue index-num">04</span>
+        <div><b>硬件容量先决定“能不能切”</b><p>L0A/L0B/L0C/L1/UB 和 16 对齐构成合法性包络。</p><small>输出：为什么 L0C、double buffer、对齐会成为硬门槛。</small></div>
+      </a>
+      <a class="card index-item" href="#cost-model">
+        <span class="pill blue index-num">05</span>
+        <div><b>合法不等于快</b><p>源码有 cost model，但没有把 per-shape 性能反馈直接展示给开发者。</p><small>输出：工具可以补一张开发者看不见的曲线。</small></div>
+      </a>
+      <a class="card index-item" href="#chip-path">
+        <span class="pill blue index-num">06</span>
+        <div><b>910B 与 950 的结构性差异在融合路径</b><p>是否支持 L0C→UB 决定 fusion 是否需要 GM workspace。</p><small>输出：纯 matmul 与 fused matmul 的差异边界。</small></div>
+      </a>
+      <a class="card index-item" href="#breakpoint-map">
+        <span class="pill blue index-num">07</span>
+        <div><b>验证要找断点，不是手猜样例</b><p>M=1、对齐边缘、尾块、key 阈值、full-load 翻转都能解析定位。</p><small>输出：自动扫描 shape 范围的产品模型。</small></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="floor" id="runtime-tiling">
+    <div class="kicker">01 · Runtime Tiling</div>
+    <h2>Tiling 不是写死数字，而是运行时函数</h2>
+    <p class="lead">真实 CANN 算子里，tiling 函数签名通常是 <code>ge::graphStatus TilingFunc(gert::TilingContext* context)</code>。每次算子被调用，函数读取真实 shape、属性、dtype 和平台信息，然后写回 tiling data 与 tiling key。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>编译期：TilingParse</h3>
+        <p>保存与 shape 无关的硬件信息，例如核数、SoC 版本、UB/L1 大小。它给运行期决策提供环境边界。</p>
+        <div class="pill-row"><span class="pill blue">CompileInfo</span><span class="pill">SoC</span><span class="pill">buffer size</span></div>
+      </div>
+      <div class="card">
+        <h3>运行期：TilingFunc</h3>
+        <p>通过 <code>context</code> 读取当前输入 shape，再计算 block、tile、split、workspace、key 等具体值。</p>
+        <div class="pill-row"><span class="pill good">GetInputShape</span><span class="pill good">SetTilingKey</span></div>
+      </div>
+      <div class="card">
+        <h3>Kernel：模板实例</h3>
+        <p>tiling key 把动态 shape 映射到不同 kernel 模板实例。每个实例可能有不同 unroll、buffer 和分支策略。</p>
+        <div class="pill-row"><span class="pill warn">TILING_KEY_IS</span><span class="pill">OpTemplate</span></div>
+      </div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>两阶段 tiling 模型</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1060 390" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 940px">
+          <defs>
+            <marker id="arrow-runtime" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+            </marker>
+          </defs>
+          <rect x="40" y="58" width="260" height="210" rx="12" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="170" y="94" text-anchor="middle" font-size="20" font-weight="800" fill="#1d4ed8">Compile time</text>
+          <text x="170" y="132" text-anchor="middle" font-size="15" fill="#344054">TilingParse&lt;CompileInfo&gt;</text>
+          <text x="170" y="162" text-anchor="middle" font-size="14" fill="#64748b">核数 / SoC / UB / L1</text>
+          <text x="170" y="190" text-anchor="middle" font-size="14" fill="#64748b">不依赖真实输入 shape</text>
+          <rect x="82" y="218" width="176" height="34" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+          <text x="170" y="240" text-anchor="middle" font-size="13" font-weight="800" fill="#182033">CompileInfo</text>
+
+          <path d="M310 160 H410" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-runtime)"/>
+          <text x="360" y="143" text-anchor="middle" font-size="13" font-weight="800" fill="#2563eb">runtime call</text>
+
+          <rect x="426" y="38" width="300" height="250" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+          <text x="576" y="74" text-anchor="middle" font-size="20" font-weight="800" fill="#182033">TilingFunc(context)</text>
+          <rect x="466" y="104" width="220" height="34" rx="8" fill="#f8fafc" stroke="#dfe4ee"/>
+          <text x="576" y="126" text-anchor="middle" font-size="13" fill="#344054">GetInputShape / GetAttr / dtype</text>
+          <rect x="466" y="154" width="220" height="34" rx="8" fill="#fff7ed" stroke="#fed7aa"/>
+          <text x="576" y="176" text-anchor="middle" font-size="13" fill="#9a3412">算 block / tile / split / workspace</text>
+          <rect x="466" y="204" width="220" height="34" rx="8" fill="#ecfdf3" stroke="#bbf7d0"/>
+          <text x="576" y="226" text-anchor="middle" font-size="13" fill="#047857">SetTilingKey + SaveToBuffer</text>
+
+          <path d="M738 160 H838" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-runtime)"/>
+          <text x="788" y="143" text-anchor="middle" font-size="13" font-weight="800" fill="#2563eb">dispatch</text>
+
+          <rect x="854" y="58" width="168" height="210" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+          <text x="938" y="94" text-anchor="middle" font-size="20" font-weight="800" fill="#182033">Kernel</text>
+          <text x="938" y="132" text-anchor="middle" font-size="14" fill="#64748b">if TILING_KEY_IS(K)</text>
+          <text x="938" y="160" text-anchor="middle" font-size="14" fill="#64748b">选择模板实例</text>
+          <rect x="884" y="198" width="108" height="42" rx="8" fill="#ffffff" stroke="#d9e1ec"/>
+          <text x="938" y="224" text-anchor="middle" font-size="13" font-weight="800" fill="#182033">OpTemplate</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">这张图强调分工：硬件边界在编译期缓存，shape 决策在运行期发生，kernel 通过 tiling key 进入不同模板路径。</div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">注册与运行时入口 · conceptual</span></div>
+      <div class="mb">IMPL_OP_OPTILING(OpName)
+  .Tiling(TilingFunc)
+  .TilingParse&lt;CompileInfo&gt;(...);
+
+ge::graphStatus TilingFunc(gert::TilingContext* context) {
+  auto shape = context-&gt;GetInputShape(0)-&gt;GetStorageShape();
+  // read shape, attrs, platform info, then compute tiling
+  context-&gt;SetTilingKey(key);
+}</div>
+    </div>
+  </section>
+
+  <section class="floor" id="shape-inference">
+    <div class="kicker">02 · Shape Contract</div>
+    <h2>开发者不决定输入 shape，只决定如何覆盖 shape</h2>
+    <p class="lead">输入 tensor 的 shape 来自调用方。LLM 推理算子常把除最后一维外的所有维相乘当 row/token 数，把最后一维或 weight/gamma 维当 feature/hidden。落到 MatMul，最不稳定的是 <code>M=batch×seq</code>。</p>
+    <table>
+      <thead>
+        <tr><th>算子 / 场景</th><th>shape 读法</th><th>tiling 含义</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>rms_norm</td><td><code>numRow = ∏(前导维)</code>，<code>numCol = ∏(gamma 维)</code></td><td>row 是 token 展平后的行数，col 是归一化 feature 宽度。</td></tr>
+        <tr><td>swiglu</td><td><code>bs_ = ∏(前导维)</code>，<code>d_ = 最后一维</code>，<code>splitD_ = d_/2</code></td><td>B×S 变成动态 token 数，hidden 被拆成两个门控分支。</td></tr>
+        <tr><td>MatMul x @ W</td><td><code>M=batch×seq</code>，<code>K=hidden</code>，<code>N=输出维</code></td><td>K/N 来自 weight，通常固定；M 随请求长度和 batch 变化。</td></tr>
+      </tbody>
+    </table>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>Prefill：M 大</h3>
+        <p>一次处理整个 prompt，seq 较大，MatMul 更接近饱和计算场景。base tile 可以切得更大，算力更容易跑满。</p>
+        <div class="pill-row"><span class="pill good">prompt</span><span class="pill good">large M</span><span class="pill">fuller compute</span></div>
+      </div>
+      <div class="card">
+        <h3>Decode：M 可能小到 1</h3>
+        <p>逐 token 生成，seq=1，batch 也可能很小。MatMul 退化成瘦长形状，核利用率、尾块和 memory traffic 变成主要矛盾。</p>
+        <div class="pill-row"><span class="pill hot">seq=1</span><span class="pill hot">M=1</span><span class="pill warn">low intensity</span></div>
+      </div>
+    </div>
+    <div class="callout"><b>关键纠正：</b>开发者脑中更接近“我的 x 是 [batch, seq, 4096]”，不是先验固定的 “M=512”。工具输入也应从场景范围出发，而不是让用户直接盲调 tile 参数。</div>
+  </section>
+
+  <section class="floor" id="dynamic-keys">
+    <div class="kicker">03 · Dynamic Shape & Tiling Key</div>
+    <h2>同一个 binary 靠 tiling key 覆盖一片 shape</h2>
+    <p class="lead">动态 shape 不是一个 kernel 模板硬扛所有情况。运行期会按真实 shape、dtype、可选输入和属性计算 key，再进入 kernel 里的不同模板实例。每个 key 本质上是一段策略区间。</p>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">声明</div>
+        <div class="arch-boxes"><div class="arch-box">UNKNOWN_DIM = -1</div><div class="arch-box">DynamicShapeSupportFlag(true)</div></div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">运行期</div>
+        <div class="arch-boxes"><div class="arch-box">读 shape / dtype / attr</div><div class="arch-box">GetTilingKey()</div><div class="arch-box">context-&gt;SetTilingKey(key)</div></div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Kernel</div>
+        <div class="arch-boxes"><div class="arch-box">TILING_KEY_IS(K0)</div><div class="arch-box">TILING_KEY_IS(K1)</div><div class="arch-box">TILING_KEY_IS(K2...)</div></div>
+      </div>
+      <div class="arch-note">“按 unroll 层级分别定义 tiling”的真身，是动态 shape 逼出来的多策略覆盖，而不是为了复杂而复杂。</div>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>MoeGatingTopKHash</h3>
+        <p>调研记录里这个算子有 7 个 key，条件包含 expertCount、groupCount、k 上限，以及 input_ids / tid2eid 的 dtype 组合。</p>
+        <div class="pill-row"><span class="pill blue">7 keys</span><span class="pill">dtype combo</span><span class="pill">shape threshold</span></div>
+      </div>
+      <div class="card">
+        <h3>RmsNormDynamicQuant</h3>
+        <p>按“一行是否塞得进 UB”顺序回退：NORMAL → SINGLE_ROW → SLICE_D。key 是把约束判断结果写进 kernel 路径。</p>
+        <div class="pill-row"><span class="pill good">NORMAL</span><span class="pill warn">SINGLE_ROW</span><span class="pill hot">SLICE_D</span></div>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">kernel dispatch · conceptual</span></div>
+      <div class="mb">if (TILING_KEY_IS(K0)) {
+  OpTemplate&lt;unroll_a, buffer_a&gt; op;
+  op.Init(...);
+  op.Process();
+} else if (TILING_KEY_IS(K1)) {
+  OpTemplate&lt;unroll_b, buffer_b&gt; op;
+  op.Init(...);
+  op.Process();
+}</div>
+    </div>
+  </section>
+
+  <section class="floor" id="constraints">
+    <div class="kicker">04 · Hardware Envelope</div>
+    <h2>第一层问题是：base tile 能不能塞进片上 buffer</h2>
+    <p class="lead">硬件容量是 tiling 的硬边界。超过 L0A、L0B、L0C、L1 或 UB 的 base tile 不是慢一点，而是不合法。double buffer 不是改变合法容量，而是在合法基础上要求再留一份空间。</p>
+    <table>
+      <thead>
+        <tr><th>芯片</th><th>L0A</th><th>L0B</th><th>L0C</th><th>L1</th><th>UB</th><th>btSize</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Ascend 950 / DAV_3510</td><td>64KB</td><td>64KB</td><td>128KB</td><td>512KB</td><td>118KB</td><td>0</td></tr>
+        <tr><td>Ascend 910B / 310B / DAV_2201</td><td>64KB</td><td>64KB</td><td>128KB</td><td>512KB</td><td>约 192KB</td><td>1024B</td></tr>
+        <tr><td>Ascend 3113</td><td>32KB</td><td>32KB</td><td>64KB</td><td>512KB</td><td>118KB</td><td>0</td></tr>
+      </tbody>
+    </table>
+    <div class="formula-board">
+      <div class="formula-card"><b>L0A</b><code>baseM * baseK * dtypeBytes ≤ L0A</code><span>A tile 必须完整放入 L0A。</span></div>
+      <div class="formula-card"><b>L0B</b><code>baseK * baseN * dtypeBytes ≤ L0B</code><span>B tile 必须完整放入 L0B。</span></div>
+      <div class="formula-card"><b>L0C</b><code>baseM * baseN * 4 ≤ L0C</code><span>L0C 按 FP32 4 字节累计结果算。</span></div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>合法性包络与提速空间</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1020 390" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 900px">
+          <defs>
+            <marker id="arrow-envelope" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+            </marker>
+          </defs>
+          <text x="60" y="52" font-size="18" font-weight="800" fill="#182033">Base tile candidate</text>
+          <rect x="64" y="82" width="156" height="156" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-width="3"/>
+          <text x="142" y="145" text-anchor="middle" font-size="15" font-weight="800" fill="#92400e">baseM × baseN</text>
+          <text x="142" y="174" text-anchor="middle" font-size="13" fill="#92400e">plus K reduction</text>
+          <path d="M234 160 H314" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-envelope)"/>
+          <g transform="translate(334 54)">
+            <rect x="0" y="0" width="142" height="72" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+            <text x="71" y="30" text-anchor="middle" font-size="14" font-weight="800" fill="#1d4ed8">L0A fit</text>
+            <text x="71" y="52" text-anchor="middle" font-size="12" fill="#64748b">M × K</text>
+            <rect x="0" y="92" width="142" height="72" rx="10" fill="#eff6ff" stroke="#bfdbfe"/>
+            <text x="71" y="122" text-anchor="middle" font-size="14" font-weight="800" fill="#1d4ed8">L0B fit</text>
+            <text x="71" y="144" text-anchor="middle" font-size="12" fill="#64748b">K × N</text>
+            <rect x="0" y="184" width="142" height="72" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+            <text x="71" y="214" text-anchor="middle" font-size="14" font-weight="800" fill="#9a3412">L0C fit</text>
+            <text x="71" y="236" text-anchor="middle" font-size="12" fill="#64748b">M × N × 4B</text>
+          </g>
+          <path d="M496 182 H590" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-envelope)"/>
+          <g transform="translate(610 80)">
+            <rect x="0" y="0" width="160" height="152" rx="12" fill="#ecfdf3" stroke="#bbf7d0"/>
+            <text x="80" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#047857">合法装下</text>
+            <text x="80" y="70" text-anchor="middle" font-size="13" fill="#475467">DB_OFF = 1</text>
+            <text x="80" y="98" text-anchor="middle" font-size="13" fill="#475467">只判一份容量</text>
+            <text x="80" y="126" text-anchor="middle" font-size="13" fill="#475467">base 须 16 对齐</text>
+          </g>
+          <path d="M782 156 H858" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-envelope)"/>
+          <g transform="translate(878 80)">
+            <rect x="0" y="0" width="112" height="152" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+            <text x="56" y="38" text-anchor="middle" font-size="15" font-weight="800" fill="#182033">DB?</text>
+            <text x="56" y="70" text-anchor="middle" font-size="13" fill="#64748b">2 × used</text>
+            <text x="56" y="98" text-anchor="middle" font-size="13" fill="#64748b">≤ capacity</text>
+            <text x="56" y="126" text-anchor="middle" font-size="13" fill="#64748b">才可开</text>
+          </g>
+          <text x="512" y="330" text-anchor="middle" font-size="14" fill="#64748b">合法性先按满容量判断；double buffer 是第二层提速空间，不是第一层合法条件。</text>
+        </svg>
+      </div>
+    </div>
+    <div class="callout"><b>三个反直觉点：</b>L0C 按 FP32 4B 算；double buffer 要两份空间；baseM/baseN 需要按 C0=16 对齐，否则尾块和核利用率会变差。</div>
+  </section>
+
+  <section class="floor" id="cost-model">
+    <div class="kicker">05 · Cost Model</div>
+    <h2>塞得下只是合法，性能还要看算力强度和访存</h2>
+    <p class="lead">调研笔记里确认源码内部有启发式 cost model：算力强度、访存估算、cycle 估算、double buffer 开关和 iterator order 都会影响选择。但这些反馈没有作为 per-shape 曲线直接呈现给开发者。</p>
+    <div class="grid cols-4">
+      <div class="card"><h3>compute intensity</h3><p><code>computeCycle / memoryTraffic</code> 越高越好，是最接近性能甜点的主指标。</p></div>
+      <div class="card"><h3>memory traffic</h3><p>源码估算 A、B 访存项；调研笔记特别记录没有 C 项。</p></div>
+      <div class="card"><h3>block cycles</h3><p><code>CalculateBlockCycles(baseM, baseN, baseK)</code> 估算计算耗时。</p></div>
+      <div class="card"><h3>DB decision</h3><p>比较 <code>dbOnPipeTime</code> 与 <code>dbOffPipeTime</code>，选更短路径。</p></div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>开发者缺失的是 per-shape 决策曲线</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 980 360" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 860px">
+          <polyline points="92,286 92,50 900,50" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="92" y1="286" x2="900" y2="286" stroke="#cbd5e1" stroke-width="2"/>
+          <text x="80" y="42" text-anchor="end" font-size="13" fill="#64748b">intensity</text>
+          <text x="900" y="318" text-anchor="end" font-size="13" fill="#64748b">M=batch×seq</text>
+          <path d="M96 266 C150 248, 190 230, 236 210 C288 186, 344 130, 424 124 C502 118, 548 150, 610 128 C704 92, 760 110, 888 88" fill="none" stroke="#2563eb" stroke-width="5"/>
+          <path d="M96 286 L96 266 C150 248, 190 230, 236 210 C288 186, 344 130, 424 124 C502 118, 548 150, 610 128 C704 92, 760 110, 888 88 L888 286 Z" fill="#dbeafe" opacity=".52"/>
+          <g fill="#fff" stroke="#f59e0b" stroke-width="3">
+            <circle cx="96" cy="266" r="9"/>
+            <circle cx="238" cy="209" r="9"/>
+            <circle cx="610" cy="128" r="9"/>
+            <circle cx="704" cy="92" r="9"/>
+          </g>
+          <g font-size="13" fill="#92400e" font-weight="800">
+            <text x="96" y="244" text-anchor="middle">M=1</text>
+            <text x="238" y="187" text-anchor="middle">align edge</text>
+            <text x="610" y="106" text-anchor="middle">key threshold</text>
+            <text x="704" y="70" text-anchor="middle">sweet spot</text>
+          </g>
+          <rect x="138" y="304" width="700" height="34" rx="8" fill="#f8fafc" stroke="#dfe4ee"/>
+          <text x="488" y="326" text-anchor="middle" font-size="14" fill="#475467">工具价值：把源码里的启发式选择变成开发者可读的合法区间、断点和性能甜点</text>
+        </svg>
+      </div>
+    </div>
+    <div class="callout"><b>产品机会：</b>现有代码能算，但没有把“为什么这个 shape 选这个 tile / key”解释出来。可视化工具应当沿 M 扫描，把合法区、策略翻转点和性能趋势放到同一张图里。</div>
+  </section>
+
+  <section class="floor" id="chip-path">
+    <div class="kicker">06 · Chip Path Difference</div>
+    <h2>结构性芯片差异主要出现在融合算子的数据通路</h2>
+    <p class="lead">910B 与 950 不只是 buffer 大小差异。关键 feature flag 是 <code>ifSupportL0CToUB</code>：950 支持 L0C 到 UB 的直接通路，910B 不支持。这对纯 matmul 影响很小，但会强烈影响 matmul + vector epilogue 的融合路径。</p>
+    <table>
+      <thead>
+        <tr><th>芯片</th><th>ifSupportL0CToUB</th><th>Fixpipe</th><th>融合路径含义</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>910B / DAV_2201</td><td>false</td><td>V220</td><td>Cube 结果需先落 GM workspace，再由 Vector 从 GM 读入 UB。</td></tr>
+        <tr><td>950 / DAV_3510</td><td>true</td><td>V310</td><td>Cube 可从 L0C 直连 UB，Vector epilogue 不必绕 GM workspace。</td></tr>
+      </tbody>
+    </table>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>Fusion 路径：910B 绕 GM，950 直连 UB</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1040 440" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 920px">
+          <defs>
+            <marker id="arrow-chip" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+            </marker>
+            <marker id="arrow-chip-warn" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#b45309"/>
+            </marker>
+          </defs>
+          <text x="160" y="58" text-anchor="middle" font-size="20" font-weight="800" fill="#182033">910B · no L0C→UB</text>
+          <g transform="translate(54 92)">
+            <rect x="0" y="0" width="90" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"/><text x="45" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#1d4ed8">Cube</text>
+            <rect x="138" y="0" width="90" height="58" rx="8" fill="#fff7ed" stroke="#fed7aa"/><text x="183" y="27" text-anchor="middle" font-size="13" font-weight="800" fill="#9a3412">GM</text><text x="183" y="43" text-anchor="middle" font-size="12" fill="#9a3412">workspace</text>
+            <rect x="276" y="0" width="90" height="58" rx="8" fill="#ecfdf3" stroke="#bbf7d0"/><text x="321" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#047857">UB</text>
+            <rect x="414" y="0" width="90" height="58" rx="8" fill="#f8fafc" stroke="#cbd5e1"/><text x="459" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#182033">Vector</text>
+            <path d="M92 29 H130" stroke="#b45309" stroke-width="3" marker-end="url(#arrow-chip-warn)"/>
+            <path d="M230 29 H268" stroke="#b45309" stroke-width="3" marker-end="url(#arrow-chip-warn)"/>
+            <path d="M368 29 H406" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-chip)"/>
+            <text x="252" y="102" text-anchor="middle" font-size="13" fill="#64748b">中间结果绕 GM，Vector tile 与 Cube tile 解耦，但消耗 GM 带宽。</text>
+          </g>
+          <line x1="520" y1="52" x2="520" y2="384" stroke="#dfe4ee" stroke-width="2"/>
+          <text x="782" y="58" text-anchor="middle" font-size="20" font-weight="800" fill="#182033">950 · L0C→UB direct</text>
+          <g transform="translate(590 92)">
+            <rect x="0" y="0" width="90" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"/><text x="45" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#1d4ed8">Cube</text>
+            <rect x="138" y="0" width="90" height="58" rx="8" fill="#ecfdf3" stroke="#bbf7d0"/><text x="183" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#047857">UB</text>
+            <rect x="276" y="0" width="90" height="58" rx="8" fill="#f8fafc" stroke="#cbd5e1"/><text x="321" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#182033">Vector</text>
+            <rect x="138" y="118" width="90" height="58" rx="8" fill="#fff7ed" stroke="#fed7aa" opacity=".45"/><text x="183" y="153" text-anchor="middle" font-size="13" fill="#9a3412">GM avoided</text>
+            <path d="M92 29 H130" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-chip)"/>
+            <path d="M230 29 H268" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-chip)"/>
+            <path d="M183 66 V108" stroke="#2563eb" stroke-dasharray="5 5" stroke-width="2"/>
+            <text x="184" y="222" text-anchor="middle" font-size="13" fill="#64748b">UB 进入 producer/consumer 耦合，fusion 不落 GM，但 tile 协调更紧。</text>
+          </g>
+          <rect x="250" y="322" width="540" height="42" rx="10" fill="#f8fafc" stroke="#dfe4ee"/>
+          <text x="520" y="348" text-anchor="middle" font-size="14" fill="#475467">边界判断：纯 MatMul 差异很小；MatMul + Vector epilogue 才是结构差异主场。</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="safe-default">
+    <div class="kicker">07 · Safe Default</div>
+    <h2>开发者的起点通常是“合法默认”，不是从零猜 tile</h2>
+    <p class="lead">MatMul/Cube 族有内置自动 tiling 算法；自定义或 vector 族通常复制结构相近的现成算子，再改 shape 映射和分支。这个默认能让算子先跑起来，但不保证所有 shape 都快。</p>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>MatMul / Cube：自动 tiling</h3>
+        <p><code>MatmulApiTiling::GetTiling(TCubeTiling&)</code> 会根据 shape 和硬件进入算法流程，算出合法的 TCubeTiling。调研结论是它没有专门 dynamic 路径，也不缓存，每次从头算。</p>
+        <div class="pill-row"><span class="pill good">safe</span><span class="pill">legal first</span><span class="pill warn">not always fast</span></div>
+      </div>
+      <div class="card">
+        <h3>Vector / Custom：模板改造</h3>
+        <p>每个算子一个独立 tiling.cpp，骨架通常一致：读 shape → 算 factor → 设 key。开发者主要改 shape 映射、分支阈值和边界处理。</p>
+        <div class="pill-row"><span class="pill blue">shape map</span><span class="pill blue">factor</span><span class="pill blue">key branch</span></div>
+      </div>
+    </div>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">默认能跑</div>
+        <div class="arch-boxes"><div class="arch-box">自动 tiling / 参考算子</div><div class="arch-box">正确性 golden 对比</div><div class="arch-box">基础 profiling</div></div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">发现慢点</div>
+        <div class="arch-boxes"><div class="arch-box">decode 小 M</div><div class="arch-box">非 16 对齐</div><div class="arch-box">尾块负载不均</div><div class="arch-box">key 阈值断崖</div></div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">调策略</div>
+        <div class="arch-boxes"><div class="arch-box">改 base / split</div><div class="arch-box">增 key 区间</div><div class="arch-box">调 DB / iterator</div><div class="arch-box">重选测试矩阵</div></div>
+      </div>
+      <div class="arch-note">工具不要把自己定位成“从零填 tiling 参数表”。更实际的入口是载入安全默认，然后解释它在哪些 shape 上合法、哪里慢、哪里应该换策略。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="breakpoint-map">
+    <div class="kicker">08 · Breakpoint Map</div>
+    <h2>动态 shape 验证的关键是自动找断点</h2>
+    <p class="lead">外边界通常由 serving 配置给定：<code>M ∈ [1, max_batch × max_seq]</code>。真正危险的是范围内部不平滑：对齐边缘、尾块、tiling key 阈值、full-load 到 split 的翻转，以及最大 shape 的 workspace/fit 风险。</p>
+    <table>
+      <thead>
+        <tr><th>断点</th><th>为什么危险</th><th>能否解析定位</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>M=1</td><td>decode 最瘦场景，算力强度低，往往是最慢点。</td><td>可以，固定下界。</td></tr>
+        <tr><td>对齐边缘</td><td>非 16 或非 base 倍数触发尾块和核利用率下降。</td><td>可以，整除关系。</td></tr>
+        <tr><td>尾块</td><td>shape % tile ≠ 0，末核或末轮工作量少。</td><td>可以，余数关系。</td></tr>
+        <tr><td>tiling key 阈值</td><td>开发者分支条件造成策略断崖。</td><td>可以，读取分支条件。</td></tr>
+        <tr><td>full-load → split</td><td>超过 L1 整块装下临界后策略突变。</td><td>可以，容量不等式。</td></tr>
+        <tr><td>最大 shape</td><td>fit、workspace、blockDim 上限风险。</td><td>可以，边界代入。</td></tr>
+      </tbody>
+    </table>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>沿 M 扫描：从手猜样例到危险地图</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1020 360" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 900px">
+          <line x1="86" y1="190" x2="920" y2="190" stroke="#cbd5e1" stroke-width="6" stroke-linecap="round"/>
+          <line x1="86" y1="190" x2="920" y2="190" stroke="#2563eb" stroke-width="3" stroke-linecap="round"/>
+          <g font-size="13" fill="#475467">
+            <text x="86" y="230" text-anchor="middle">M=1</text>
+            <text x="920" y="230" text-anchor="middle">max_batch × max_seq</text>
+          </g>
+          <g>
+            <circle cx="86" cy="190" r="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="3"/>
+            <circle cx="204" cy="190" r="12" fill="#f8fafc" stroke="#94a3b8" stroke-width="3"/>
+            <circle cx="344" cy="190" r="12" fill="#fff1f2" stroke="#fb7185" stroke-width="3"/>
+            <circle cx="518" cy="190" r="12" fill="#eff6ff" stroke="#60a5fa" stroke-width="3"/>
+            <circle cx="690" cy="190" r="12" fill="#ecfdf3" stroke="#34d399" stroke-width="3"/>
+            <circle cx="920" cy="190" r="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="3"/>
+          </g>
+          <g font-size="13" font-weight="800">
+            <text x="86" y="154" text-anchor="middle" fill="#92400e">decode</text>
+            <text x="204" y="154" text-anchor="middle" fill="#475467">align edge</text>
+            <text x="344" y="154" text-anchor="middle" fill="#9f1239">tail block</text>
+            <text x="518" y="154" text-anchor="middle" fill="#1d4ed8">key threshold</text>
+            <text x="690" y="154" text-anchor="middle" fill="#047857">full→split</text>
+            <text x="920" y="154" text-anchor="middle" fill="#92400e">max fit</text>
+          </g>
+          <rect x="126" y="266" width="768" height="42" rx="10" fill="#f8fafc" stroke="#dfe4ee"/>
+          <text x="510" y="292" text-anchor="middle" font-size="14" fill="#475467">测试 shape 不再靠经验手猜，而是从解析断点自动生成：断点本身 + 两侧邻域 + 最大边界。</text>
+        </svg>
+      </div>
+    </div>
+    <div class="callout"><b>验证策略：</b>正确性用 golden 对比，性能用 profiler；工具先帮开发者选中最该测的 shape，把“猜测试矩阵”变成“覆盖断点地图”。</div>
+  </section>
+
+  <section class="floor" id="product-position">
+    <div class="kicker">09 · Product Position</div>
+    <h2>工具定位应从“切片演示器”升级为“动态 shape 决策台”</h2>
+    <p class="lead">Part I 的 trace 回放回答“某一步在碰哪一片”；这篇真实开发调研补上“tiling 该怎么定、为什么难”。二者合在一起，产品主线应是：输入场景范围，载入安全默认，扫描断点和约束，解释每个 shape 的策略选择。</p>
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>短期页面能力</h3>
+        <div class="rec-item"><div class="rec-num">01</div><div><b>场景输入</b><span>芯片、batch/seq 范围、K/N、dtype、是否 fusion，不把 tile 参数作为第一入口。</span></div></div>
+        <div class="rec-item"><div class="rec-num">02</div><div><b>合法性包络</b><span>显示每个候选 base tile 是否通过 L0A/L0B/L0C/L1/UB/对齐约束。</span></div></div>
+        <div class="rec-item"><div class="rec-num">03</div><div><b>断点扫描</b><span>沿 M 自动标出 decode、尾块、key 阈值、full-load 翻转和最大边界。</span></div></div>
+      </div>
+      <div class="rec-panel">
+        <h3>后续增强</h3>
+        <div class="rec-item"><div class="rec-num">04</div><div><b>性能趋势</b><span>叠加 compute intensity、memory traffic、DB 开关和 profiler 实测点。</span></div></div>
+        <div class="rec-item"><div class="rec-num">05</div><div><b>Key 策略解释</b><span>把源码分支条件映射成 shape 区间，让“为什么换 key”可见。</span></div></div>
+        <div class="rec-item"><div class="rec-num">06</div><div><b>Trace 联动</b><span>对某个断点 shape 执行 trace 回放，继续回答“当前 step 碰哪一片”。</span></div></div>
+      </div>
+    </div>
+    <div class="tension compact">
+      <div><b>输入不是调参</b><span>开发者给的是部署场景和 shape 范围。</span></div>
+      <div><b>起点不是空白</b><span>先载入自动 tiling 或参考算子的安全默认。</span></div>
+      <div><b>输出不是裁判</b><span>工具给策略、解释、断点和测试建议。</span></div>
+    </div>
+  </section>
+
+  <section class="floor" id="evidence">
+    <div class="kicker">Evidence · 源码线索地图</div>
+    <h2>调研结论来自真实 CANN / recipes 源码路径</h2>
+    <p class="lead">下面保留笔记中的关键证据路径。行号可能随版本漂移，引用时应以标识符、函数名和分支条件为准。</p>
+    <table>
+      <thead>
+        <tr><th>结论</th><th>证据路径 / 标识符</th><th>白皮书使用方式</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>运行时 tiling 函数</td><td><code>swiglu_group_quant_tiling.cpp</code> · <code>TilingFunc</code> / <code>IMPL_OP_OPTILING</code></td><td>解释开发者交付的是函数，而不是静态参数。</td></tr>
+        <tr><td>编译期硬件信息</td><td><code>lightning_indexer_tiling.cpp</code> · <code>TilingParse&lt;CompileInfo&gt;</code></td><td>区分编译期和运行期职责。</td></tr>
+        <tr><td>shape 映射套路</td><td><code>rms_norm_dynamic_quant_tiling.cpp</code>、<code>swiglu_group_quant_tiling.cpp</code></td><td>提炼 row/token 与 feature/hidden 的映射。</td></tr>
+        <tr><td>动态 key 分流</td><td><code>moe_gating_top_k_hash_tiling.cpp</code> · <code>GetTilingKey()</code>；<code>swiglu_group_quant.cpp</code> · <code>TILING_KEY_IS</code></td><td>解释一个 binary 如何覆盖一片 shape。</td></tr>
+        <tr><td>硬件容量约束</td><td><code>matmul_tiling_base.cpp</code>、<code>matmul_tiling_algorithm.cpp</code></td><td>构造 L0A/L0B/L0C/L1/UB 的合法性包络。</td></tr>
+        <tr><td>L0C→UB 差异</td><td><code>matmul_chip_cap.h</code>、<code>matmul_feature_trait.h</code></td><td>解释 910B 与 950 在 fused matmul 上的数据通路差异。</td></tr>
+        <tr><td>断点与验证</td><td><code>SplitRows</code>、key 分支条件、full-load / split 判定</td><td>把手工测试矩阵升级成自动断点地图。</td></tr>
+      </tbody>
+    </table>
+    <div class="source-card">
+      <b>原始笔记</b>
+      <a href="./docs/ascend-tiling-真实算子开发流程的调研.md">docs/ascend-tiling-真实算子开发流程的调研.md</a>
+      <span class="small">路径约定：笔记内源码路径相对 <code>~/gitcode/</code>。</span>
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Terms · 术语表</div>
+    <h2>阅读这份白皮书需要区分的概念</h2>
+    <table>
+      <thead>
+        <tr><th>术语</th><th>含义</th><th>在产品里的展示建议</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>TilingFunc</td><td>运行时读取 context 并计算 tiling 的函数。</td><td>显示输入 shape、硬件信息、输出 tiling data 和 key。</td></tr>
+        <tr><td>TilingParse</td><td>编译期解析并保存与 shape 无关的信息。</td><td>放在“环境/平台”侧栏，不当成用户调参。</td></tr>
+        <tr><td>Tiling Key</td><td>运行期策略分流编号，kernel 根据它进入不同模板实例。</td><td>映射为 shape 区间和分支条件。</td></tr>
+        <tr><td>M / K / N</td><td>MatMul 维度；推理里 M=batch×seq 最动态，K/N 多来自 weight。</td><td>把 batch/seq 范围转换成 M 轴。</td></tr>
+        <tr><td>Base Tile</td><td>单个基础计算块，必须满足片上 buffer 容量和对齐约束。</td><td>在约束图中显示 fit / fail 原因。</td></tr>
+        <tr><td>Double Buffer</td><td>用两份 buffer 重叠搬运和计算的提速策略。</td><td>单独作为第二层优化，不混入第一层合法性判断。</td></tr>
+        <tr><td>Full-load / Split</td><td>数据能否整体装入某级缓存导致的策略翻转。</td><td>作为 M 轴上的重要断点。</td></tr>
+        <tr><td>GM Workspace</td><td>融合路径里中间结果落到 GM 的临时空间。</td><td>在 910B fusion 路径中突出带宽代价。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>

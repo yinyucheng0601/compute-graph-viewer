@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MatMul Tiling Workbench</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css?v=20260605-2">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/floating-playback-control/pattern.css">
+  <link rel="stylesheet" href="src/matmul-tiling.css?v=20260606-10">
+</head>
+<body class="mtil-page">
+  <section class="pto-ide-frame mtil-frame" data-ide-frame data-host="standalone" aria-label="MatMul tiling constraint and performance workbench">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome mtil-topbar">
+      <div class="pto-ide-frame__topbar-left">
+        <div class="mtil-brand">
+          <div class="mtil-brand__title">MatMul Tiling</div>
+          <div class="mtil-brand__meta">约束 & 性能 Workbench</div>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-center mtil-topbar__center"></div>
+      <div class="pto-ide-frame__topbar-right mtil-topbar__right">
+        <label class="mtil-select-control">
+          <span>芯片</span>
+          <select id="chipSelect" data-scenario="chip">
+            <option value="ascend910b">910B</option>
+            <option value="ascend950">950</option>
+            <option value="ascend3113">3113</option>
+          </select>
+        </label>
+        <div class="segmented-control segmented-control-muted" aria-label="dtype">
+          <button class="btn btn-sm" type="button" data-segment="dtype" data-value="fp16">fp16</button>
+          <button class="btn btn-sm" type="button" data-segment="dtype" data-value="bf16">bf16</button>
+          <button class="btn btn-sm" type="button" data-segment="dtype" data-value="fp32">fp32</button>
+        </div>
+        <span class="stat-chip" id="legalChip">checking</span>
+        <a class="btn btn-sm btn-ghost" href="index.html" title="打开 trace replayer">Trace</a>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <div class="pto-ide-frame__workarea">
+        <div class="pto-ide-frame__split mtil-main-split" data-ide-split="mtil-main" data-split-direction="horizontal" data-sizes="40,60" data-min-size="380,540" data-gutter-size="10">
+          <section class="pto-ide-frame__pane" data-ide-pane="code">
+            <header class="pto-ide-frame__pane-header mtil-left-header">
+              <div class="segmented-control segmented-control-muted mtil-view-tabs" role="tablist" aria-label="输入视图切换">
+                <button class="btn btn-sm is-selected" type="button" role="tab" data-input-tab="scenario" aria-selected="true">场景参数</button>
+                <button class="btn btn-sm" type="button" role="tab" data-input-tab="code" aria-selected="false">源码</button>
+              </div>
+              <span class="pto-ide-frame__pane-meta">同一份 tiling · 两种视图</span>
+              <span class="mtil-apply-status" id="applyStatus">实时联动</span>
+              <button class="btn btn-sm btn-primary" id="applyInputs" type="button" title="读取当前输入，刷新 Logical / Buffer / Playback 三个视图">Apply</button>
+            </header>
+            <div class="pto-ide-frame__pane-body mtil-left">
+              <div class="mtil-tabpanels">
+                <div class="mtil-tabpanel" data-input-panel="scenario" role="tabpanel">
+                  <section class="panel-shell panel-shell-quiet mtil-panel">
+                    <header class="panel-shell-header">
+                      <div>
+                        <h3 class="panel-shell-title">场景输入</h3>
+                        <span class="panel-shell-meta">M=batch×seq；Advanced 可覆盖 M/N/K</span>
+                      </div>
+                    </header>
+                    <div class="panel-shell-body">
+                      <div class="mtil-key-strip mtil-key-strip--scenarios" id="keyStrip" aria-label="场景 preset"></div>
+                      <div class="mtil-control-grid">
+                        <label class="mtil-field">
+                          <span>batch</span>
+                          <input type="number" min="1" step="1" data-scenario="batch">
+                        </label>
+                        <label class="mtil-field">
+                          <span>seq</span>
+                          <input type="number" min="1" step="1" data-scenario="seq">
+                        </label>
+                        <label class="mtil-field">
+                          <span>K</span>
+                          <input type="number" min="1" step="64" data-scenario="K">
+                        </label>
+                        <label class="mtil-field">
+                          <span>N</span>
+                          <input type="number" min="1" step="64" data-scenario="N">
+                        </label>
+                      </div>
+                      <div class="mtil-derived-row">
+                        <span class="toolbar-readout" id="derivedM">M = -</span>
+                        <span class="toolbar-readout" id="scenarioNote">safe seed</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section class="panel-shell panel-shell-quiet mtil-panel">
+                    <header class="panel-shell-header">
+                      <div>
+                        <h3 class="panel-shell-title">Tiling 参数</h3>
+                        <span class="panel-shell-meta">改 base/singleCore/核数后实时重算约束</span>
+                      </div>
+                    </header>
+                    <div class="panel-shell-body">
+                      <div class="mtil-control-grid mtil-control-grid--wide">
+                        <label class="mtil-field" data-field-host="usedCoreNum">
+                          <span>usedCoreNum</span>
+                          <input type="number" min="1" step="1" data-tiling="usedCoreNum">
+                        </label>
+                        <label class="mtil-field" data-field-host="singleCoreM">
+                          <span>singleCoreM</span>
+                          <input type="number" min="1" step="16" data-tiling="singleCoreM">
+                        </label>
+                        <label class="mtil-field" data-field-host="singleCoreN">
+                          <span>singleCoreN</span>
+                          <input type="number" min="1" step="16" data-tiling="singleCoreN">
+                        </label>
+                        <label class="mtil-field" data-field-host="singleCoreK">
+                          <span>singleCoreK</span>
+                          <input type="number" min="1" step="16" data-tiling="singleCoreK">
+                        </label>
+                        <label class="mtil-field" data-field-host="baseM">
+                          <span>baseM</span>
+                          <input type="number" min="1" step="16" data-tiling="baseM">
+                        </label>
+                        <label class="mtil-field" data-field-host="baseN">
+                          <span>baseN</span>
+                          <input type="number" min="1" step="16" data-tiling="baseN">
+                        </label>
+                        <label class="mtil-field" data-field-host="baseK">
+                          <span>baseK</span>
+                          <input type="number" min="1" step="16" data-tiling="baseK">
+                        </label>
+                      </div>
+
+                      <div class="mtil-strategy-row">
+                        <div class="mtil-strategy-group">
+                          <span>iterateOrder</span>
+                          <div class="segmented-control segmented-control-muted" aria-label="iterate order">
+                            <button class="btn btn-sm" type="button" data-segment="iterateOrder" data-value="0">M-first</button>
+                            <button class="btn btn-sm" type="button" data-segment="iterateOrder" data-value="1">N-first</button>
+                          </div>
+                        </div>
+                        <div class="mtil-strategy-group">
+                          <span>Double Buffer</span>
+                          <div class="mtil-db-group" aria-label="double buffer toggles">
+                            <button class="btn btn-sm mtil-db-toggle" type="button" data-db-toggle="dbL0A" data-buffer-key="L0A" aria-pressed="false">L0A</button>
+                            <button class="btn btn-sm mtil-db-toggle" type="button" data-db-toggle="dbL0B" data-buffer-key="L0B" aria-pressed="false">L0B</button>
+                            <button class="btn btn-sm mtil-db-toggle" type="button" data-db-toggle="dbL0C" data-buffer-key="L0C" aria-pressed="false">L0C</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <label class="mtil-check">
+                        <input type="checkbox" id="advancedMnk" data-scenario-check="advancedMnk">
+                        <span>Advanced：覆盖 M/N/K</span>
+                      </label>
+                      <div class="mtil-control-grid" id="advancedGrid">
+                        <label class="mtil-field">
+                          <span>M</span>
+                          <input type="number" min="1" step="16" data-scenario="overrideM">
+                        </label>
+                        <label class="mtil-field">
+                          <span>N</span>
+                          <input type="number" min="1" step="16" data-scenario="overrideN">
+                        </label>
+                        <label class="mtil-field">
+                          <span>K</span>
+                          <input type="number" min="1" step="16" data-scenario="overrideK">
+                        </label>
+                      </div>
+                      <div class="mtil-note-list" id="constraintNotes"></div>
+                    </div>
+                  </section>
+
+                  <section class="panel-shell panel-shell-quiet mtil-panel">
+                    <header class="panel-shell-header">
+                      <div>
+                        <h3 class="panel-shell-title">性能趋势</h3>
+                        <span class="panel-shell-meta">半定量估算，非实测耗时</span>
+                      </div>
+                      <span class="stat-chip" id="perfLevel">-</span>
+                    </header>
+                    <div class="panel-shell-body">
+                      <div class="mtil-score">
+                        <div>
+                          <span>算力强度</span>
+                          <strong id="intensityValue">-</strong>
+                        </div>
+                        <div>
+                          <span>DB overlap</span>
+                          <strong id="dbGainValue">-</strong>
+                        </div>
+                        <div>
+                          <span>iterateOrder</span>
+                          <strong id="iterateValue">-</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <div class="mtil-tabpanel" data-input-panel="code" role="tabpanel" hidden>
+                  <div class="mtil-source mtil-source--full" id="codeLines" aria-label="MatMul tiling source"></div>
+                  <p class="mtil-tab-note">悬停 / 点击参数行可在架构图上联动定位对应 buffer；场景参数即对这份 tiling 源码的结构化编辑。</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pto-ide-frame__pane" data-ide-pane="viewport">
+            <div class="pto-ide-frame__split mtil-nested-split" data-ide-split="mtil-viewport" data-split-direction="vertical" data-sizes="58,42" data-min-size="280,260" data-gutter-size="10">
+              <section class="pto-ide-frame__pane" data-ide-pane="logical">
+                <header class="pto-ide-frame__pane-header mtil-pane-header">
+                  <div>
+                    <h2 class="pto-ide-frame__pane-title">Logical M×N×K</h2>
+                    <span class="pto-ide-frame__pane-meta">K 是 reduction 进度，L0 tensor 随当前 tile 同步</span>
+                  </div>
+                  <div class="mtil-viewport-actions">
+                    <button class="btn btn-sm btn-icon btn-ghost" id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+                    <button class="btn btn-sm btn-icon btn-ghost" id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+                    <button class="btn btn-sm btn-ghost" id="fitView" type="button">Fit</button>
+                  </div>
+                </header>
+                <div class="pto-ide-frame__pane-body mtil-logical-pane">
+                  <div class="mtil-canvas-stage" id="tilingStage">
+                    <canvas id="tilingCanvas" class="mtil-canvas" width="960" height="520" aria-label="MatMul logical tiling canvas"></canvas>
+                    <div class="mtil-axis-hotspots" id="axisHotspots" aria-label="坐标轴说明入口"></div>
+                    <div class="mtil-axis-panel" id="axisPanel" role="note" aria-live="polite" hidden></div>
+                    <div class="mtil-fallback" id="tilingFallback" hidden>Canvas context unavailable. Showing parameter readouts only.</div>
+                  </div>
+                  <div class="mtil-readout" id="logicalReadout"></div>
+                </div>
+              </section>
+
+              <section class="pto-ide-frame__pane" data-ide-pane="constraint">
+                <header class="pto-ide-frame__pane-header mtil-pane-header">
+                  <div>
+                    <h2 class="pto-ide-frame__pane-title">On-chip Buffer 约束</h2>
+                    <span class="pto-ide-frame__pane-meta" id="capacityMeta">满容量合法；DB 余量单独标记</span>
+                  </div>
+                </header>
+                <div class="pto-ide-frame__pane-body mtil-constraint-pane">
+                  <div class="mtil-buffer-stage" id="bufferStage"></div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="mtil-global-playback" id="playbackMount" aria-label="Tile 步进播放控制"></div>
+
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js?v=20260605-2"></script>
+  <script src="../vendor/pto-design-system/patterns/floating-playback-control/pattern.js"></script>
+  <script src="src/matmul-tiling-model.js?v=20260605-5"></script>
+  <script src="src/matmul-tiling.js?v=20260606-11"></script>
+</body>
+</html>

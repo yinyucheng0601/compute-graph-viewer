@@ -1,4 +1,4 @@
-# Ascend C Tiling Visualization Knowledge Notes
+# Ascend C Tiling Triton Viz可视化知识
 
 本文档用于解释 Ascend C 算子开发中 tiling、GM 数据、循环执行、片上搬运和可视化表达之间的关系。后续页面可以把本文拆成教学卡片、交互说明或可视化旁白。
 
@@ -350,3 +350,5 @@ AIV Vector:
 最终目标不是让用户记住每个 API，而是让用户能回答：
 
 > 当前代码这一行正在处理整块 tensor 的哪一片？这片数据从哪来、到哪去、在哪个硬件对象上被消费？
+
+---

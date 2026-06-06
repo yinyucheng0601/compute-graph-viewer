@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ascend C Tiling 可视化白皮书</title>
+  <link rel="stylesheet" href="./shared.css">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">Ascend C Tiling · 可视化心智模型</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#overview">导览</a>
+      <a href="#gm-logic">GM 逻辑</a>
+      <a href="#trace-model">Trace</a>
+      <a href="#tiling-formula">公式</a>
+      <a href="#axis-model">3D 映射</a>
+      <a href="#instruction-queues">指令队列</a>
+      <a href="#pipeline">流水</a>
+      <a href="#matmul">MatMul</a>
+      <a href="#fusion">Fusion</a>
+      <a href="#source-map">源码线索</a>
+      <a href="#framework">框架</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语</a>
+    </div>
+  </nav>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026 · Ascend C Tiling Visualization</div>
+    <h1>Tiling 不是“把内存切成 3D 方块”，<br>而是把逻辑访问范围落到 GM offset</h1>
+    <p class="lead">这份白皮书把 <code>docs/ascend-tiling-visualization-knowledge.md</code> 的技术笔记整理成网页：先解释 GM、逻辑 tensor、block、tile、progress 的关系，再把 CopyIn / Compute / CopyOut 和官方图中的 16 条指令队列落到可视化设计。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>3</strong><span>核心视图：3D logical tensor、Memory Architecture、Execution Timeline</span></div>
+      <div class="card metric"><strong>16</strong><span>Vector Add 指令序列，拆成 CopyIn、Compute、CopyOut 三段</span></div>
+      <div class="card metric"><strong>2</strong><span>双缓冲 buffer slot，用于解释搬运、计算、搬出重叠</span></div>
+      <div class="card metric"><strong>1</strong><span>关键问题：当前代码这一行到底在处理 tensor 的哪一片</span></div>
+    </div>
+    <div class="callout"><b>核心洞察：</b>GM 仍然是线性 buffer。3D 视口展示的是完整 logical tensor / access space，并高亮当前 trace step 对应的 block、tile、loop slice。</div>
+  </section>
+
+  <section class="floor" id="overview">
+    <div class="kicker">Overview · 阅读地图</div>
+    <h2>从“在哪一块算”走到“数据怎么走”</h2>
+    <p class="lead">Tiling 可视化不能只画一个漂亮 3D 方块。它需要同时回答逻辑空间、硬件路径和执行顺序三类问题。</p>
+    <div class="journey-map">
+      <div class="jm-head"></div>
+      <div class="jm-head">01 GM</div>
+      <div class="jm-head">02 Trace</div>
+      <div class="jm-head">03 Tiling</div>
+      <div class="jm-head">04 指令</div>
+      <div class="jm-head">05 流水</div>
+      <div class="jm-head">06 扩展</div>
+
+      <div class="jm-label">回答问题</div>
+      <div class="jm-cell hot">一整块 tensor 是物理 3D 内存吗？</div>
+      <div class="jm-cell">为什么每一帧只高亮一部分？</div>
+      <div class="jm-cell hot">block/tile/loop 如何变成 GM offset？</div>
+      <div class="jm-cell">CopyIn/Compute/CopyOut 里具体有什么指令？</div>
+      <div class="jm-cell">BUFFER_NUM=2 到底隐藏什么延迟？</div>
+      <div class="jm-cell">MatMul、Fusion 怎么迁移这套模型？</div>
+
+      <div class="jm-label">本页内容</div>
+      <div class="jm-cell">GM 扁平地址、shape/layout/stride 解释</div>
+      <div class="jm-cell">trace event 驱动高亮、source 联动</div>
+      <div class="jm-cell">blockLength、tileLength、gmOffset</div>
+      <div class="jm-cell">三段指令队列、MTE2/V/MTE3、TQue</div>
+      <div class="jm-cell">三条泳道、copy/compute/copyout overlap</div>
+      <div class="jm-cell">M/N/K reduction、C-V handoff、GM avoided</div>
+
+      <div class="jm-label">输出结果</div>
+      <div class="jm-cell">知道 3D 是调试投影，不是物理布局</div>
+      <div class="jm-cell">知道 timeline 每一帧该更新什么</div>
+      <div class="jm-cell">知道源码里的 i 对应 tile progress</div>
+      <div class="jm-cell">知道官方图能补进 Inspector 的具体字段</div>
+      <div class="jm-cell">知道为什么 MVP 可串行，增强版要多泳道</div>
+      <div class="jm-cell">知道复杂算子仍用同一套分工</div>
+    </div>
+  </section>
+
+  <section class="floor" id="gm-logic">
+    <div class="kicker">Concept 01 · GM 与逻辑 tensor</div>
+    <h2>“一整块 tensor”不是物理 3D 内存</h2>
+    <p class="lead">Ascend C 中的 GM 是扁平地址空间。Tensor 的 shape、layout、stride 决定如何解释这段地址；tiling 决定每个 core、每次循环实际处理哪一段 GM。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>GM 是线性 buffer</h3>
+        <p>输入 x、y 和输出 z 通常都是连续 GM 区间。可视化中的体素、网格和高亮块，只是把地址区间反解成逻辑坐标。</p>
+        <div class="pill-row"><span class="pill blue">GM_ADDR</span><span class="pill">GlobalTensor</span></div>
+      </div>
+      <div class="card">
+        <h3>Tensor 是解释方式</h3>
+        <p>shape/layout/stride 把线性地址解释成 1D、2D、3D 或更高维逻辑空间。视图可以变，物理地址仍是线性的。</p>
+        <div class="pill-row"><span class="pill good">shape</span><span class="pill good">stride</span><span class="pill good">layout</span></div>
+      </div>
+      <div class="card">
+        <h3>Tiling 是访问切分</h3>
+        <p>每个 block 和每次 progress 只处理完整逻辑 tensor 的一个 slice。高亮区域代表当前 step 的访问范围。</p>
+        <div class="pill-row"><span class="pill warn">blockIdx</span><span class="pill warn">progress</span><span class="pill warn">tileLength</span></div>
+      </div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>GM buffer 到 logical tensor 的解释关系</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1200 420" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg">
+          <defs>
+            <marker id="arrow-gm" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+            </marker>
+          </defs>
+          <rect x="38" y="76" width="450" height="76" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+          <text x="60" y="55" font-size="18" font-weight="800" fill="#182033">GM · flat address space</text>
+          <g>
+            <rect x="66" y="100" width="80" height="28" fill="#dbeafe" stroke="#93c5fd"/>
+            <rect x="146" y="100" width="80" height="28" fill="#dbeafe" stroke="#93c5fd"/>
+            <rect x="226" y="100" width="80" height="28" fill="#fde68a" stroke="#f59e0b"/>
+            <rect x="306" y="100" width="80" height="28" fill="#dbeafe" stroke="#93c5fd"/>
+            <rect x="386" y="100" width="74" height="28" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="266" y="124" text-anchor="middle" font-size="13" font-weight="800" fill="#92400e">current slice</text>
+          </g>
+          <path d="M490 114 C560 114, 578 214, 640 214" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#arrow-gm)"/>
+          <rect x="574" y="78" width="230" height="58" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+          <text x="689" y="104" text-anchor="middle" font-size="15" font-weight="800" fill="#1d4ed8">shape / layout / stride</text>
+          <text x="689" y="124" text-anchor="middle" font-size="12" fill="#64748b">把线性 offset 解释成逻辑坐标</text>
+          <g transform="translate(690 184)">
+            <text x="178" y="-38" text-anchor="middle" font-size="18" font-weight="800" fill="#182033">Logical access space</text>
+            <text x="178" y="-16" text-anchor="middle" font-size="12" fill="#64748b">由 gmOffset、shape、layout、stride 反解出来的调试网格</text>
+            <g stroke="#cbd5e1" fill="#ffffff">
+              <rect x="0" y="0" width="84" height="54"/>
+              <rect x="84" y="0" width="84" height="54"/>
+              <rect x="168" y="0" width="84" height="54"/>
+              <rect x="252" y="0" width="84" height="54"/>
+              <rect x="0" y="54" width="84" height="54"/>
+              <rect x="84" y="54" width="84" height="54"/>
+              <rect x="168" y="54" width="84" height="54" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+              <rect x="252" y="54" width="84" height="54"/>
+              <rect x="0" y="108" width="84" height="54"/>
+              <rect x="84" y="108" width="84" height="54"/>
+              <rect x="168" y="108" width="84" height="54"/>
+              <rect x="252" y="108" width="84" height="54"/>
+            </g>
+            <rect x="164" y="50" width="92" height="62" rx="4" fill="none" stroke="#f59e0b" stroke-width="4"/>
+            <text x="210" y="84" text-anchor="middle" font-size="14" font-weight="800" fill="#92400e">current tile</text>
+            <text x="210" y="101" text-anchor="middle" font-size="11" fill="#92400e">range = [offset, offset + len)</text>
+            <path d="M-48 34 C36 36, 92 58, 160 78" stroke="#3b82f6" stroke-width="2.4" fill="none" marker-end="url(#arrow-gm)"/>
+            <text x="18" y="30" font-size="12" font-weight="800" fill="#1d4ed8">offset maps here</text>
+            <text x="168" y="194" text-anchor="middle" font-size="13" fill="#64748b">黄色矩形只表示当前 step 的逻辑 tile，不表示物理内存形状</text>
+          </g>
+        </svg>
+      </div>
+      <div class="evidence-caption">左侧是真实内存视角，右侧是调试产品视角。两者由 offset、shape、layout 和 stride 关联。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="trace-model">
+    <div class="kicker">Concept 02 · Trace event 驱动高亮</div>
+    <h2>3D 画面代表“当前帧”，不是静态 tiling 结果</h2>
+    <p class="lead">可视化前端不应该把源码静态翻译成一张固定 3D 图。更稳妥的产品模型是：执行一次样例，记录每个 step 的 event、offset、mask、source line 和硬件路径，再用这些 trace event 驱动画面。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>3D Viewport</h3>
+        <p>回答“这一条 trace step 正在触碰完整 logical tensor 的哪一块”。背景是完整空间，高亮是当前访问集合。</p>
+      </div>
+      <div class="card">
+        <h3>Memory Architecture</h3>
+        <p>回答“这块数据从哪里搬到哪里”。高亮 GM、UB、L1、L0、Vector、Cube 和对应 pipe。</p>
+      </div>
+      <div class="card">
+        <h3>Execution Timeline</h3>
+        <p>回答“CopyIn、Compute、CopyOut、同步和 epilogue 按什么顺序发生”。点击 step 联动源码和视图。</p>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">trace event schema · conceptual</span></div>
+      <div class="mb"><span class="purple">event</span> = {
+  phase: <span class="green">"CopyIn" | "Compute" | "CopyOut"</span>,
+  op: <span class="yellow">"DataCopy" | "Add" | "EnQue" | "DeQue" | "AllocTensor"</span>,
+  blockIdx: 0,
+  progress: i,
+  gmOffset: blockIdx * blockLength + progress * tileLength,
+  range: [gmOffset, gmOffset + tileLength),
+  sourceLine: "CopyIn(progress)",
+  pipe: <span class="green">"MTE2" | "V" | "MTE3" | "Queue"</span>
+}</div>
+    </div>
+    <div class="callout"><b>产品判断：</b>3D tensor 不表达硬件阶段。AIC/AIV handoff、SetFlag/WaitFlag、pipe bubble 应放进 timeline 和 memory architecture；3D 只负责“在哪一块算”。</div>
+  </section>
+
+  <section class="floor" id="tiling-formula">
+    <div class="kicker">Concept 03 · Tiling 公式</div>
+    <h2>Tiling 最终落到 GM offset 和 length</h2>
+    <p class="lead">以 Vector Add 为例，x、y、z 都是 GM 上的扁平 buffer。Tiling 需要决定每个 core 的 blockLength、每次循环的 tileLength，以及当前 progress 对应的 gmOffset。</p>
+    <div class="formula-board">
+      <div class="formula-card">
+        <b>blockLength</b>
+        <code>totalLength / blockNum</code>
+        <span>每个 core 负责的完整逻辑区间长度</span>
+      </div>
+      <div class="formula-card">
+        <b>tileLength</b>
+        <code>blockLength / tileNum / BUFFER_NUM</code>
+        <span>一次循环处理的 tile 长度，双缓冲会影响单 slot 容量</span>
+      </div>
+      <div class="formula-card">
+        <b>gmOffset</b>
+        <code>blockIdx * blockLength + progress * tileLength</code>
+        <span>当前 core、当前循环访问的 GM 起点</span>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="mtbar"><div class="mdt"></div><span class="mtt">Vector Add · current loop slice</span></div>
+      <div class="mb">xGM[gmOffset : gmOffset + tileLength]
+yGM[gmOffset : gmOffset + tileLength]
+zGM[gmOffset : gmOffset + tileLength]</div>
+    </div>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>源码里的 i 是 tile progress</h3>
+        <p><code>for (int i = 0; i &lt; loopCount; i++)</code> 中的 <code>i</code> 通常不是随意计数器，而是当前 core 内的 tile progress。点击第 i 次循环，3D 高亮就应该跳到对应 slice。</p>
+      </div>
+      <div class="card">
+        <h3>尾块和 mask 应该显式展示</h3>
+        <p>当 totalLength 不能整除 blockNum、tileNum 或向量对齐长度时，尾块、padding、mask 是最容易误解的调试点，应该在 Inspector 中显示有效元素数。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="axis-model">
+    <div class="kicker">Concept 04 · 1D 数据如何画成 3D</div>
+    <h2>3D 是执行结构投影，不是原始 tensor 物理形状</h2>
+    <p class="lead">Vector Add 的输入可能只有 1D，但为了教学和调试，可以把访问空间投影到三维：X 表示 tile 内元素，Y 表示当前 core 内的 progress，Z 表示 block/core。</p>
+    <div class="axis-map">
+      <div class="axis-card">
+        <b>X axis</b>
+        <strong>element inside tile</strong>
+        <span>tile 内第几个元素，用于观察 vector lane、对齐和 mask。</span>
+      </div>
+      <div class="axis-card">
+        <b>Y axis</b>
+        <strong>tileIdx / progress</strong>
+        <span>当前 core 内第几次循环，用于观察 loop schedule。</span>
+      </div>
+      <div class="axis-card">
+        <b>Z axis</b>
+        <strong>blockIdx / core</strong>
+        <span>不同 core 负责的 block，用于观察并行切分。</span>
+      </div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>1D Vector Add 的 3D 调试投影</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1200 500" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg">
+          <defs>
+            <marker id="axis-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+            </marker>
+          </defs>
+          <rect x="40" y="34" width="1120" height="420" rx="10" fill="#f8fafc" stroke="#d9e1ec"/>
+          <g transform="translate(220 350)">
+            <line x1="0" y1="0" x2="520" y2="0" stroke="#64748b" stroke-width="2" marker-end="url(#axis-arrow)"/>
+            <line x1="0" y1="0" x2="160" y2="-170" stroke="#64748b" stroke-width="2" marker-end="url(#axis-arrow)"/>
+            <line x1="0" y1="0" x2="0" y2="-250" stroke="#64748b" stroke-width="2" marker-end="url(#axis-arrow)"/>
+            <text x="548" y="6" font-size="15" font-weight="800" fill="#344054">X · element inside tile</text>
+            <text x="178" y="-178" font-size="15" font-weight="800" fill="#344054">Y · progress</text>
+            <text x="-10" y="-270" text-anchor="end" font-size="15" font-weight="800" fill="#344054">Z · blockIdx / core</text>
+            <g>
+              <path d="M20 -24 L370 -24 L500 -154 L150 -154 Z" fill="#dbeafe" stroke="#93c5fd"/>
+              <path d="M40 -54 L390 -54 L520 -184 L170 -184 Z" fill="#e0f2fe" stroke="#93c5fd"/>
+              <path d="M60 -84 L410 -84 L540 -214 L190 -214 Z" fill="#f8fafc" stroke="#cbd5e1"/>
+              <rect x="190" y="-88" width="106" height="32" rx="4" fill="#f59e0b" opacity="0.88"/>
+              <path d="M296 -88 L396 -188" stroke="#f59e0b" stroke-width="4" opacity="0.55"/>
+              <text x="248" y="-96" text-anchor="middle" font-size="13" font-weight="800" fill="#92400e">current tile</text>
+            </g>
+          </g>
+          <g transform="translate(835 108)">
+            <rect x="0" y="0" width="260" height="236" rx="8" fill="#fff" stroke="#d9e1ec"/>
+            <text x="24" y="34" font-size="17" font-weight="800" fill="#182033">读图规则</text>
+            <text x="24" y="72" font-size="14" fill="#475467">1. 背景网格是完整 logical space</text>
+            <text x="24" y="108" font-size="14" fill="#475467">2. 橙色块是当前 trace step</text>
+            <text x="24" y="144" font-size="14" fill="#475467">3. 高亮位置由 gmOffset 反解</text>
+            <text x="24" y="180" font-size="14" fill="#475467">4. 切换 block/progress 会移动高亮</text>
+          </g>
+        </svg>
+      </div>
+      <div class="evidence-caption">这张图的价值不是还原物理内存，而是让开发者看到“哪些 core 切了哪些 tile、当前 step 在整体空间中落在哪里”。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="instruction-queues">
+    <div class="kicker">Concept 05 · 官方图可补充的具体指令信息</div>
+    <h2>Vector Add 可以拆成三段指令队列</h2>
+    <p class="lead">用户给出的两张官方图最有价值的信息，是把 CopyIn、Compute、CopyOut 从抽象阶段拆成了可落到 Inspector 和 timeline 的具体 API 调用。下面按图中的 16 条序列整理。</p>
+    <div class="instruction-columns">
+      <div class="queue-card copyin">
+        <h3>CopyIn · 搬入单元指令队列</h3>
+        <ol class="instruction-list">
+          <li><span>1</span><code>xl = x.AllocTensor()</code></li>
+          <li><span>2</span><code>yl = y.AllocTensor()</code></li>
+          <li><span>3</span><code>DataCopy(xl)</code></li>
+          <li><span>4</span><code>DataCopy(yl)</code></li>
+          <li><span>5</span><code>x.EnQue(xl)</code></li>
+          <li><span>6</span><code>y.EnQue(yl)</code></li>
+        </ol>
+        <p>核心含义：从 GM 读取 x/y 当前 slice，经 MTE2 搬入 Local Memory VECIN，并把 local tensor 放入输入队列。</p>
+      </div>
+      <div class="queue-card compute">
+        <h3>Compute · 计算单元指令队列</h3>
+        <ol class="instruction-list" start="7">
+          <li><span>7</span><code>xl = x.DeQue()</code></li>
+          <li><span>8</span><code>yl = y.DeQue()</code></li>
+          <li><span>9</span><code>zl = z.AllocTensor()</code></li>
+          <li><span>10</span><code>Add(zl, xl, yl)</code></li>
+          <li><span>11</span><code>x.FreeTensor(xl)</code></li>
+          <li><span>12</span><code>y.FreeTensor(yl)</code></li>
+          <li><span>13</span><code>z.EnQue(zl)</code></li>
+        </ol>
+        <p>核心含义：从输入队列取 x/y，在 Vector pipeline 执行 Add，结果 zLocal 入输出队列。</p>
+      </div>
+      <div class="queue-card copyout">
+        <h3>CopyOut · 搬出单元指令队列</h3>
+        <ol class="instruction-list" start="14">
+          <li><span>14</span><code>zl = z.DeQue()</code></li>
+          <li><span>15</span><code>DataCopy(zl)</code></li>
+          <li><span>16</span><code>z.FreeTensor(zl)</code></li>
+        </ol>
+        <p>核心含义：从 VECOUT 队列取 zLocal，经 MTE3 写回 GM 的 z 当前 slice，并释放本地 tensor。</p>
+      </div>
+    </div>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>三段指令队列 · Queue / Pipe / Local Memory 的对应关系</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1200 650" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg">
+          <defs>
+            <marker id="flow-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#14b8a6"/>
+            </marker>
+            <marker id="sync-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"/>
+            </marker>
+          </defs>
+          <rect x="46" y="410" width="1108" height="146" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+          <rect x="20" y="455" width="58" height="70" rx="6" fill="#4369ef"/>
+          <text x="49" y="496" text-anchor="middle" font-size="18" font-weight="900" fill="#fff">GM</text>
+          <rect x="1122" y="455" width="58" height="70" rx="6" fill="#4369ef"/>
+          <text x="1151" y="496" text-anchor="middle" font-size="18" font-weight="900" fill="#fff">GM</text>
+
+          <g font-size="15" font-weight="800" text-anchor="middle">
+            <rect x="120" y="470" width="130" height="48" rx="7" fill="#e5e7eb" stroke="#b8c0cc"/>
+            <text x="185" y="499" fill="#182033">搬入单元</text>
+            <rect x="315" y="452" width="150" height="82" rx="8" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="390" y="487" fill="#182033">LocalMemory</text>
+            <text x="390" y="509" font-size="13" fill="#344054">VECIN</text>
+            <rect x="535" y="470" width="130" height="48" rx="7" fill="#e5e7eb" stroke="#b8c0cc"/>
+            <text x="600" y="499" fill="#182033">计算单元</text>
+            <rect x="735" y="452" width="150" height="82" rx="8" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="810" y="487" fill="#182033">LocalMemory</text>
+            <text x="810" y="509" font-size="13" fill="#344054">VECOUT</text>
+            <rect x="950" y="470" width="130" height="48" rx="7" fill="#e5e7eb" stroke="#b8c0cc"/>
+            <text x="1015" y="499" fill="#182033">搬出单元</text>
+          </g>
+          <g stroke="#14b8a6" stroke-width="3" fill="none">
+            <line x1="78" y1="490" x2="116" y2="490" marker-end="url(#flow-arrow)"/>
+            <line x1="250" y1="490" x2="312" y2="490" marker-end="url(#flow-arrow)"/>
+            <line x1="465" y1="490" x2="532" y2="490" marker-end="url(#flow-arrow)"/>
+            <line x1="665" y1="490" x2="732" y2="490" marker-end="url(#flow-arrow)"/>
+            <line x1="885" y1="490" x2="947" y2="490" marker-end="url(#flow-arrow)"/>
+            <line x1="1080" y1="490" x2="1118" y2="490" marker-end="url(#flow-arrow)"/>
+          </g>
+          <g fill="#182033" font-size="14" font-weight="800">
+            <text x="174" y="386" text-anchor="middle">CopyIn queue</text>
+            <text x="600" y="386" text-anchor="middle">Compute queue</text>
+            <text x="1010" y="386" text-anchor="middle">CopyOut queue</text>
+          </g>
+          <g>
+            <rect x="94" y="56" width="230" height="302" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+            <rect x="94" y="56" width="230" height="42" rx="8" fill="#e0f2fe" stroke="#93c5fd"/>
+            <text x="209" y="83" text-anchor="middle" font-size="16" font-weight="900" fill="#0f172a">搬入单元指令队列</text>
+            <g font-size="13" fill="#0f172a">
+              <text x="116" y="126">1. xl = x.AllocTensor()</text>
+              <text x="116" y="162">2. yl = y.AllocTensor()</text>
+              <text x="116" y="198">3. DataCopy(xl)</text>
+              <text x="116" y="234">4. DataCopy(yl)</text>
+              <text x="116" y="270">5. x.EnQue(xl)</text>
+              <text x="116" y="306">6. y.EnQue(yl)</text>
+            </g>
+            <path d="M209 358 L209 445" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#flow-arrow)"/>
+          </g>
+          <g>
+            <rect x="475" y="28" width="250" height="330" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+            <rect x="475" y="28" width="250" height="42" rx="8" fill="#dcfce7" stroke="#86efac"/>
+            <text x="600" y="55" text-anchor="middle" font-size="16" font-weight="900" fill="#0f172a">计算单元指令队列</text>
+            <g font-size="13" fill="#0f172a">
+              <text x="498" y="98">7. xl = x.DeQue()</text>
+              <text x="498" y="134">8. yl = y.DeQue()</text>
+              <text x="498" y="170">9. zl = z.AllocTensor()</text>
+              <text x="498" y="206">10. Add(zl, xl, yl)</text>
+              <text x="498" y="242">11. x.FreeTensor(xl)</text>
+              <text x="498" y="278">12. y.FreeTensor(yl)</text>
+              <text x="498" y="314">13. z.EnQue(zl)</text>
+            </g>
+            <path d="M600 358 L600 445" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#flow-arrow)"/>
+          </g>
+          <g>
+            <rect x="890" y="148" width="230" height="210" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+            <rect x="890" y="148" width="230" height="42" rx="8" fill="#ffedd5" stroke="#fdba74"/>
+            <text x="1005" y="175" text-anchor="middle" font-size="16" font-weight="900" fill="#0f172a">搬出单元指令队列</text>
+            <g font-size="13" fill="#0f172a">
+              <text x="914" y="220">14. zl = z.DeQue()</text>
+              <text x="914" y="256">15. DataCopy(zl)</text>
+              <text x="914" y="292">16. z.FreeTensor(zl)</text>
+            </g>
+            <path d="M1005 358 L1005 445" stroke="#3b82f6" stroke-width="2" fill="none" marker-end="url(#flow-arrow)"/>
+          </g>
+          <path d="M280 250 C420 300, 420 300, 528 300" stroke="#ef4444" stroke-width="2" fill="none" stroke-dasharray="8 7" marker-end="url(#sync-arrow)"/>
+          <path d="M684 300 C780 312, 814 296, 940 282" stroke="#ef4444" stroke-width="2" fill="none" stroke-dasharray="8 7" marker-end="url(#sync-arrow)"/>
+          <text x="410" y="285" font-size="12" font-weight="800" fill="#b91c1c">SetFlag / WaitFlag</text>
+          <text x="802" y="282" font-size="12" font-weight="800" fill="#b91c1c">Queue sync</text>
+          <g font-size="12" fill="#64748b">
+            <text x="168" y="580">MTE2 · GM → VECIN</text>
+            <text x="575" y="580">Vector · Add</text>
+            <text x="955" y="580">MTE3 · VECOUT → GM</text>
+          </g>
+        </svg>
+      </div>
+      <div class="evidence-caption">青色主线是数据流，红色虚线是队列与 pipe 之间的同步关系。官方图里的 SetFlag/WaitFlag 不一定直接出现在用户代码里，但它们解释了 queue 为什么能跨搬运单元、计算单元、搬出单元协调。</div>
+    </div>
+    <table class="cmp-table">
+      <thead>
+        <tr><th>类别</th><th>代表指令</th><th>可补进页面的 Inspector 字段</th><th>可视化表现</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>资源</td><td><code>AllocTensor</code> / <code>FreeTensor</code></td><td>queue name、slot、LocalTensor name、lifetime</td><td>UB/VECIN/VECOUT slot 出现或释放</td></tr>
+        <tr><td>搬运</td><td><code>DataCopy</code></td><td>pipe=MTE2/MTE3、src/dst、gmOffset、length</td><td>Memory Architecture 高亮 GM ↔ Local Memory</td></tr>
+        <tr><td>队列</td><td><code>EnQue</code> / <code>DeQue</code></td><td>queue depth、producer、consumer、wait reason</td><td>队列水位变化，timeline 显示等待或可消费</td></tr>
+        <tr><td>计算</td><td><code>Add</code></td><td>pipe=Vector、input local tensor、output local tensor</td><td>计算单元发光，tile lens 显示 zLocal 产生</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="pipeline">
+    <div class="kicker">Concept 06 · Double Buffer 与流水并行</div>
+    <h2>MVP 可以串行播放，增强版要显示三条泳道</h2>
+    <p class="lead"><code>BUFFER_NUM = 2</code> 的直觉是让搬入、计算、搬出尽量重叠。概念上，在同一时刻可能 CopyIn tile i+1、Compute tile i、CopyOut tile i-1。</p>
+    <div class="timeline-lanes">
+      <div class="lane">
+        <b>MTE2 / CopyIn lane</b>
+        <div class="lane-track">
+          <span style="left:4%;width:18%">tile i</span>
+          <span style="left:30%;width:18%">tile i+1</span>
+          <span style="left:56%;width:18%">tile i+2</span>
+        </div>
+      </div>
+      <div class="lane">
+        <b>Vector / Compute lane</b>
+        <div class="lane-track">
+          <span class="compute-task" style="left:23%;width:20%">tile i</span>
+          <span class="compute-task" style="left:49%;width:20%">tile i+1</span>
+          <span class="compute-task" style="left:75%;width:20%">tile i+2</span>
+        </div>
+      </div>
+      <div class="lane">
+        <b>MTE3 / CopyOut lane</b>
+        <div class="lane-track">
+          <span class="copyout-task" style="left:45%;width:18%">tile i</span>
+          <span class="copyout-task" style="left:71%;width:18%">tile i+1</span>
+        </div>
+      </div>
+    </div>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>顺序播放用于入门</h3>
+        <p>MVP 可以先展示 CopyIn(i) → Compute(i) → CopyOut(i)，让用户建立 tile 生命周期。</p>
+      </div>
+      <div class="card">
+        <h3>三泳道用于调优</h3>
+        <p>增强版应显示 MTE2、Vector/Cube、MTE3 三条 lane，解释 pipe bubble、搬运等待和计算等待。</p>
+      </div>
+      <div class="card">
+        <h3>队列状态是关键</h3>
+        <p>只有看到 EnQue/DeQue、buffer slot 和 wait reason，用户才能判断 double buffer 是否真正隐藏了延迟。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="matmul">
+    <div class="kicker">Concept 07 · MatMul 迁移</div>
+    <h2>MatMul tiling 切的是 M/N/K，不只是 1D slice</h2>
+    <p class="lead">MatMul 的逻辑公式是 <code>C[M,N] = A[M,K] × B[K,N]</code>。3D 视图可以把 X/Y/Z 映射为 N tile、M tile 和 K reduction step。</p>
+    <div class="grid cols-3">
+      <div class="card">
+        <h3>A tile</h3>
+        <p><code>A[mTile, kTile] → L0A</code>。3D 视口高亮当前 M/K 范围，memory architecture 高亮 L1/L0A 路径。</p>
+      </div>
+      <div class="card">
+        <h3>B tile</h3>
+        <p><code>B[kTile, nTile] → L0B</code>。和 A 共同决定一次 Cube compute 的输入窗口。</p>
+      </div>
+      <div class="card">
+        <h3>C tile</h3>
+        <p><code>Cube → L0C[mTile,nTile] → GM:C</code>。C 本身通常是 2D，K 是 reduction 过程维度。</p>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>轴</th><th>Vector Add 映射</th><th>MatMul 映射</th><th>读者应看到什么</th></tr></thead>
+      <tbody>
+        <tr><td>X</td><td>tile 内元素</td><td>N tile</td><td>输出列方向的切分</td></tr>
+        <tr><td>Y</td><td>progress</td><td>M tile</td><td>输出行方向的切分</td></tr>
+        <tr><td>Z</td><td>blockIdx/core</td><td>K tile / reduction step</td><td>累加过程，而非输出 tensor 物理第三维</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>迁移原则：</b>3D 视图继续回答“在哪一块算”；Memory Architecture 才回答 “A/B/C 经过 L1、L0A、L0B、L0C、Cube 的哪条路径”。</div>
+  </section>
+
+  <section class="floor" id="fusion">
+    <div class="kicker">Concept 08 · Fusion 关注点</div>
+    <h2>Fusion 的重点是中间结果是否少走 GM</h2>
+    <p class="lead">融合算子的价值不只是把激活函数也画出来，而是要显示中间结果有没有绕回 GM workspace。AIC/AIV handoff 应放进 timeline 和 memory architecture，不要硬塞进 tensor 轴。</p>
+    <div class="arch-compare">
+      <div class="screenshot arch-card">
+        <div class="shotbar"><span class="dots"></span>普通拆分路径</div>
+        <div class="shotbody">
+          <div class="arch arch-compact">
+            <div class="arch-layer">
+              <div class="arch-label">AIC Cube</div>
+              <div class="arch-boxes">
+                <div class="arch-box">L0C</div>
+                <div class="arch-box">GM workspace</div>
+              </div>
+            </div>
+            <div class="arch-layer">
+              <div class="arch-label">AIV Vector</div>
+              <div class="arch-boxes">
+                <div class="arch-box">GM workspace</div>
+                <div class="arch-box">UB activation</div>
+                <div class="arch-box">GM output</div>
+              </div>
+            </div>
+            <div class="arch-note">中间结果回到 GM，再被 AIV 读出，内存往返成本更明显。</div>
+          </div>
+        </div>
+      </div>
+      <div class="screenshot arch-card">
+        <div class="shotbar"><span class="dots"></span>更理想的融合路径</div>
+        <div class="shotbody">
+          <div class="arch arch-compact">
+            <div class="arch-layer">
+              <div class="arch-label">AIC Cube</div>
+              <div class="arch-boxes">
+                <div class="arch-box">L0C</div>
+                <div class="arch-box">UB direct</div>
+              </div>
+            </div>
+            <div class="arch-layer">
+              <div class="arch-label">AIV Vector</div>
+              <div class="arch-boxes">
+                <div class="arch-box">UB activation</div>
+                <div class="arch-box">GM output</div>
+                <div class="arch-box">GM workspace avoided</div>
+              </div>
+            </div>
+            <div class="arch-note">页面应高亮 L0C → UB → epilogue，并把 GM workspace 灰掉。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="source-map">
+    <div class="kicker">Evidence · GitCode 源码线索</div>
+    <h2>GitCode 里可补充的非 kernel tiling 材料</h2>
+    <p class="lead">下面的官方文档、流程图和非 kernel tiling 实现都改成 GitCode 链接，后续可以作为页面证据层：它们能帮助把抽象公式、Host 侧 tiling 和高级 API tiling 实现联系起来。</p>
+    <table>
+      <thead><tr><th style="width:24%">来源</th><th>代表文件</th><th style="width:28%">适合补充到页面的信息</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>官方 tiling 文档</td>
+          <td>
+            <ul class="source-links">
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/guide/编程指南/高级编程/高级特性/Aclnn算子工程化开发/Host侧Tiling实现/使用标准CPP语法定义Tiling结构体.md" target="_blank" rel="noreferrer">使用标准 CPP 语法定义 Tiling 结构体</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/api/Utils-API/Tiling数据结构注册/TilingData结构定义.md" target="_blank" rel="noreferrer">TilingData 结构定义</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/api/Utils-API/Tiling模板编程/Tiling模板编程.md" target="_blank" rel="noreferrer">Tiling 模板编程</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/api/Utils-API/Tiling下沉/Tiling下沉.md" target="_blank" rel="noreferrer">Tiling 下沉</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/api/Utils-API/Tiling调测/Tiling调测.md" target="_blank" rel="noreferrer">Tiling 调测</a></li>
+            </ul>
+          </td>
+          <td>tilingData 输入输出、host tiling 流程、算子 tiling 传递数据流</td>
+        </tr>
+        <tr>
+          <td>官方 tiling 图</td>
+          <td>
+            <ul class="source-links">
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/guide/figures/Tiling开发流程图.png" target="_blank" rel="noreferrer">Tiling 开发流程图</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/guide/figures/Tiling实现的输入输出.png" target="_blank" rel="noreferrer">Tiling 实现的输入输出</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/guide/figures/算子Tiling传递数据流.png" target="_blank" rel="noreferrer">算子 Tiling 传递数据流</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/docs/guide/figures/多核及Tiling示意图.png" target="_blank" rel="noreferrer">多核及 Tiling 示意图</a></li>
+            </ul>
+          </td>
+          <td>tiling 开发流程、输入输出边界、host 到 kernel 的数据传递、多核切分语义</td>
+        </tr>
+        <tr>
+          <td>cann-recipes op_host</td>
+          <td>
+            <ul class="source-links">
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/ascendc/src/rms_norm_dynamic_quant/op_host/rms_norm_dynamic_quant_tiling.cpp" target="_blank" rel="noreferrer">rms_norm_dynamic_quant_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/ascendc/src/rms_norm_dynamic_quant/op_host/rms_norm_dynamic_quant_tiling.h" target="_blank" rel="noreferrer">rms_norm_dynamic_quant_tiling.h</a></li>
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/ascendc/src/swiglu_group_quant/op_host/swiglu_group_quant_tiling.cpp" target="_blank" rel="noreferrer">swiglu_group_quant_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/ascendc/src/moe_gating_top_k_hash/op_host/moe_gating_top_k_hash_tiling.cpp" target="_blank" rel="noreferrer">moe_gating_top_k_hash_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/pypto/src/lightning_indexer_pto/op_host/lightning_indexer_tiling.cpp" target="_blank" rel="noreferrer">lightning_indexer_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/cann-recipes-infer/blob/master/ops/pypto/src/deepseek_indexer_attention/op_host/deepseek_indexer_attention_tiling.cpp" target="_blank" rel="noreferrer">deepseek_indexer_attention_tiling.cpp</a></li>
+            </ul>
+          </td>
+          <td>真实算子如何计算 tiling 参数、workspace、blockDim</td>
+        </tr>
+        <tr>
+          <td>asc-devkit adv_api</td>
+          <td>
+            <ul class="source-links">
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/impl/adv_api/tiling/matmul/matmul_tiling.cpp" target="_blank" rel="noreferrer">matmul_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/impl/adv_api/tiling/matmul/matmul_tiling_algorithm.cpp" target="_blank" rel="noreferrer">matmul_tiling_algorithm.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/impl/adv_api/tiling/activation/softmax_tiling.cpp" target="_blank" rel="noreferrer">softmax_tiling.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/impl/adv_api/tiling/normalization/rmsnorm_tiling_impl.cpp" target="_blank" rel="noreferrer">rmsnorm_tiling_impl.cpp</a></li>
+              <li><a href="https://gitcode.com/cann/asc-devkit/blob/master/impl/adv_api/tiling/conv/conv3d_tiling.cpp" target="_blank" rel="noreferrer">conv3d_tiling.cpp</a></li>
+            </ul>
+          </td>
+          <td>高阶 API 对不同算子形态的 tiling 策略封装</td>
+        </tr>
+        <tr>
+          <td>pypto</td>
+          <td>
+            <ul class="source-links">
+              <li><a href="https://gitcode.com/cann/pypto/blob/master/docs/tutorials/development/tiling.md" target="_blank" rel="noreferrer">docs/tutorials/development/tiling.md</a></li>
+              <li><a href="https://gitcode.com/cann/pypto/blob/master/examples/01_beginner/tiling/tiling_config.py" target="_blank" rel="noreferrer">examples/01_beginner/tiling/tiling_config.py</a></li>
+              <li><a href="https://gitcode.com/cann/pypto/blob/master/tools/scripts/tiling_tool.py" target="_blank" rel="noreferrer">tools/scripts/tiling_tool.py</a></li>
+            </ul>
+          </td>
+          <td>教学入口、配置化 tiling、可视化工具输入格式</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="source-card">
+      <b>外部官方参考</b>
+      <span>华为昇腾 CANN 800 算子开发文档中关于 Vector 编程范式、CopyIn/Compute/CopyOut、Queue/Pipe、Local Memory VECIN/VECOUT 和指令队列的说明，可作为本页指令拆解的官方依据。</span>
+      <span><code>https://www.hiascend.com/document/detail/zh/canncommercial/800/developmentguide/opdevg/Ascendcopdevg/atlas_ascendc_10_0016.html</code></span>
+    </div>
+  </section>
+
+  <section class="floor" id="framework">
+    <div class="kicker">Framework · 落地模型</div>
+    <h2>白皮书沉淀成一个可视化数据模型</h2>
+    <p class="lead">把上面的概念落到 <code>pto/tiling/index.html</code> 的后续迭代，可以按 trace step 组织数据，并在三个视图中同步消费。</p>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">Source</div>
+        <div class="arch-boxes">
+          <div class="arch-box">Ascend C 源码行</div>
+          <div class="arch-box">phase / api / instruction id</div>
+          <div class="arch-box">pipe / queue / local tensor</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Trace</div>
+        <div class="arch-boxes">
+          <div class="arch-box">blockIdx</div>
+          <div class="arch-box">progress</div>
+          <div class="arch-box">gmOffset</div>
+          <div class="arch-box">range / mask</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Views</div>
+        <div class="arch-boxes">
+          <div class="arch-box">3D logical tensor 高亮 slice</div>
+          <div class="arch-box">Memory Architecture 高亮 pipe/path</div>
+          <div class="arch-box">Timeline 显示 lane、wait、queue depth</div>
+        </div>
+      </div>
+      <div class="arch-note">一个 step 不应该只存“标题”。它至少要携带 phase、API、硬件 pipe、queue、local tensor、GM range 和源码位置。</div>
+    </div>
+    <div class="callout"><b>落地建议：</b>先给 Vector Add fixture 增加 16 条 instruction 元数据，再把 timeline 从“阶段条”扩成“阶段 + 指令 + pipe lane”。这样能直接吸收官方图的信息。</div>
+  </section>
+
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 结论</div>
+    <h2>读完必须记住的 8 件事</h2>
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>心智模型</h3>
+        <div class="rec-item"><div class="rec-num">01</div><span><b>GM 是扁平地址</b>Tensor 维度是解释方式，3D 是调试投影。</span></div>
+        <div class="rec-item"><div class="rec-num">02</div><span><b>Tiling 切逻辑访问范围</b>最终落到 blockIdx、progress、gmOffset、tileLength。</span></div>
+        <div class="rec-item"><div class="rec-num">03</div><span><b>循环 i 是 tile progress</b>点击 step 应同步移动 3D 高亮、源码和硬件路径。</span></div>
+        <div class="rec-item"><div class="rec-num">04</div><span><b>3D 不表达硬件阶段</b>硬件 pipe 和同步关系应放在 architecture/timeline。</span></div>
+      </div>
+      <div class="rec-panel">
+        <h3>产品落地</h3>
+        <div class="rec-item"><div class="rec-num">05</div><span><b>CopyIn/Compute/CopyOut 是 tile 生命周期</b>不是简单流程图，应显示 queue 和 local tensor 生命周期。</span></div>
+        <div class="rec-item"><div class="rec-num">06</div><span><b>官方图补的是具体指令</b>16 条序列可进入 Inspector、timeline 和源码 badge。</span></div>
+        <div class="rec-item"><div class="rec-num">07</div><span><b>Double buffer 需要多泳道</b>调优阶段必须看到 MTE2、Vector/Cube、MTE3 的重叠和等待。</span></div>
+        <div class="rec-item"><div class="rec-num">08</div><span><b>MatMul/Fusion 仍按同一分工</b>3D 看逻辑范围，architecture 看数据路径，timeline 看同步顺序。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Terms · 术语表</div>
+    <h2>页面中必须稳定使用的术语</h2>
+    <table>
+      <thead><tr><th style="width:18%">术语</th><th>含义</th><th style="width:32%">在可视化里怎么表达</th></tr></thead>
+      <tbody>
+        <tr><td>GM</td><td>Global Memory，全局线性地址空间。</td><td>完整 tensor 数据的物理存放位置，3D 中只显示逻辑解释。</td></tr>
+        <tr><td>Logical tensor space</td><td>由 shape/layout/stride 对 GM 地址的逻辑解释。</td><td>3D 视口背景网格。</td></tr>
+        <tr><td>blockIdx</td><td>当前运行的 core/block 标识。</td><td>可映射到 3D Z 轴或 MatMul 的分块维度。</td></tr>
+        <tr><td>progress</td><td>当前 core 内的 tile 循环进度。</td><td>可映射到 3D Y 轴，并驱动当前高亮 slice。</td></tr>
+        <tr><td>gmOffset</td><td>当前 tile 在 GM 中的起始 offset。</td><td>Inspector 中的核心字段，3D 高亮由它反解。</td></tr>
+        <tr><td>TPipe</td><td>管理本地内存、队列和事件的 pipe 对象。</td><td>显示 queue、buffer slot、SetFlag/WaitFlag 的同步语义。</td></tr>
+        <tr><td>TQue</td><td>跨搬运单元、计算单元传递 LocalTensor 的队列。</td><td>显示 EnQue/DeQue、queue depth、producer/consumer。</td></tr>
+        <tr><td>VECIN / VECOUT</td><td>Vector pipeline 的输入/输出 Local Memory 队列区域。</td><td>Memory Architecture 中的本地 buffer。</td></tr>
+        <tr><td>MTE2 / MTE3</td><td>常用于 GM → Local 和 Local → GM 的搬运 pipeline。</td><td>timeline lane 与 architecture path 高亮。</td></tr>
+        <tr><td>Vector / Cube</td><td>AI Core 上的计算 pipeline。</td><td>Add、Mul 等 Vector 指令或 MatMul Cube 指令高亮。</td></tr>
+        <tr><td>BUFFER_NUM</td><td>本地队列的 buffer slot 数，常见为 2。</td><td>双缓冲时显示 slot 轮换和多泳道重叠。</td></tr>
+        <tr><td>Fusion</td><td>把多个阶段合并，减少中间结果回 GM 的机会。</td><td>高亮 C-V direct route，并标记 GM workspace avoided。</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>
