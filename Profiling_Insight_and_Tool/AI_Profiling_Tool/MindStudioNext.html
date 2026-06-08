@@ -7739,6 +7739,7 @@ def sample_token(logits, temperature=0.8):
         evidence: 'ClusterTimeSummary：computation rank0=231.3 ms / rank1=230.9 ms（第 1 级）vs rank2=400.4 ms / rank3=401.1 ms（第 2 级），差距 +73%；communicationWaitStageTime rank0=318.3 ms、rank1=339.9 ms，是第 2 级的近 2 倍；compute_op_sum 显示 lm_head MatMulV3、Cast(151936)、Exp、Sub/RealDiv 仅出现在含输出层的最后一级',
         impact: '第 1 级每步空转 318–340 ms（占单步 ~40%），整集群单步被第 2 级 400 ms 计算 + 暴露通信钉死，第 1 级算力近半浪费',
         steps: ['将若干 Transformer 层从第 2 级（rank 2/3）迁回第 1 级（rank 0/1），补偿 lm_head+loss+输出嵌入的额外开销，目标两级 computation 均衡到 ~315 ms', '若框架支持不等分 PP，按「第 1 级层数 > 第 2 级层数」配置（最后一级少放 1–2 层）', '重新采集，确认 rank0/1 与 rank2/3 的 computation 差距收敛到 <10%'],
+        stepsRaw: '- **改动位置**：Megatron/训练框架 PP 切分配置（流水线各 stage 的层数分配，如 `--decoder-last-pipeline-num-layers` / 自定义 `pipeline_model_parallel_split_rank`）。\n1. 将若干 Transformer 层从第 2 级（rank 2/3）迁回第 1 级（rank 0/1），补偿最后一级 lm_head + loss + 输出嵌入的额外开销，目标让两级 computation 均衡到 ~315 ms。\n2. 若框架支持不等分 PP，按"第 1 级层数 > 第 2 级层数"配置；典型经验值为最后一级少放 1–2 层 Transformer。\n3. 重新采集，确认 rank0/1 与 rank2/3 的 computation 差距收敛到 <10%。',
         verification: '重采后 ClusterTimeSummary 四卡 computation 极差 < 10%，rank0/1 的 communicationWaitStageTime 由 ~330 ms 降至 < 150 ms',
         visualization: '主：算子视图 — 载入 evidence/rank_2_ascend_pt/kernel_details.csv 按 Type 聚合；辅：Timeline 视图 — 载入 evidence/rank_0_ascend_pt/trace_view.json 观察气泡',
         codeLocations: [] },
@@ -7746,6 +7747,7 @@ def sample_token(logits, temperature=0.8):
         evidence: 'step_trace_time.csv 四卡 Overlapped=0.0，Communication(Not Overlapped)=全部通信（rank0 420 ms、rank2 278 ms）；DP reduceScatter（440+311 MB ~50 ms）+ allGather（220+155 MB ~22 ms）共 ~72 ms 完全暴露',
         impact: '约 72 ms/step 的 DP 梯度 reduce-scatter / 参数 all-gather 本可与反向计算重叠，现完全串行暴露在关键路径上',
         steps: ['打开梯度 reduce-scatter 与反向计算的 overlap（--overlap-grad-reduce），参数 all-gather 与前向 overlap（--overlap-param-gather）', '确认 expandable_segments 下通信流与计算流分流，必要时增大通信桶摊薄启动开销'],
+        stepsRaw: '- **改动位置**：分布式优化器 / DDP 通信配置（`overlap_grad_reduce`、`overlap_param_gather`，或 ZeRO 通信与反向 overlap 开关）。\n1. 打开梯度 reduce-scatter 与反向计算的 overlap（如 Megatron `--overlap-grad-reduce`），参数 all-gather 与前向 overlap（`--overlap-param-gather`）。\n2. 确认 `PYTORCH_NPU_ALLOC_CONF=expandable_segments:True` 下通信流与计算流分流，必要时增大通信桶（bucket）以摊薄启动开销。',
         verification: '重采后 step_trace_time.csv 的 Overlapped > 0，Communication(Not Overlapped) 较当前下降 ≥ 60 ms',
         visualization: 'Timeline 视图 — 载入 evidence/rank_2_ascend_pt/trace_view.json，过滤 hcom_reduceScatter/hcom_allGather 确认其时间段内 device 计算行为空',
         codeLocations: [] },
@@ -7753,6 +7755,7 @@ def sample_token(logits, temperature=0.8):
         evidence: 'kernel_details.csv(rank2)：MatMulV3 输入 4096,151936;151936,1024（lm_head dgrad）单次 18.4 ms、cube_utilization 99.9% 但 aic_mac_ratio=0.27 → MAC 仅 27% 时间在算、MTE2 搬 311 MB 权重受限，单次 MFU ≈ 18%；前向 7.4 ms（MFU ≈ 46%）；loss 链路 Cast(151936) 4×6 ms、Exp 4×8 ms 针对 vocab=151936 大 logits',
         impact: 'lm_head 两方向 MatMul ≈ 51 ms + loss 向量算子 ≈ 68 ms，是第 2 级比第 1 级多出的主体，直接放大 3.1 的级间不均',
         steps: ['采用 fused/vocab-parallel cross-entropy，避免完整 4096×151936 logits 的 Cast→Exp→Sub→Div 多次 GM 往返', 'lm_head dgrad 内存受限：bf16 权重免 Cast、或开启 TP 对 vocab 维切分把 311 MB 权重读分摊到多卡', '若词表共享嵌入，确认未重复存储 fp32 副本'],
+        stepsRaw: '- **改动位置**：输出层/loss 实现（`d:\\Projects\\ProfilingTest\\verl` 或训练框架的 lm_head + cross-entropy 模块）。\n1. 采用 **fused/vocab-parallel cross-entropy**（如 Megatron `vocab_parallel_cross_entropy`），避免完整 `4096×151936` logits 的 Cast→Exp→Sub→Div 多次 GM 往返。\n2. lm_head dgrad 内存受限：考虑 bf16 权重免 Cast、或开启 TP 对 vocab 维切分（当前 TP=1），把 311 MB 权重读分摊到多卡。\n3. 若词表共享嵌入，确认未重复存储 fp32 副本。',
         verification: '重采后 kernel_details.csv 中 lm_head dgrad aic_mac_ratio > 0.4 或单次耗时下降 ≥ 30%；Cast(151936)/Exp 总耗时下降 ≥ 50%',
         visualization: '详情视图 + 算子视图 — 载入 evidence/rank_2_ascend_pt/kernel_details.csv，定位 MatMulV3(151936) 的 aic_mac_ratio/aic_mte2_ratio，确认落在 Memory Roof（MTE2 受限）',
         codeLocations: [] },
@@ -7760,6 +7763,7 @@ def sample_token(logits, temperature=0.8):
         evidence: 'hccl_sum HcclTopOpStats：hcom_allReduce__170（group=embd，ranks [0,2]）Min 34.6 ms(rank0) / Max 121.0 ms(rank2)，传输量同为 622 MB；communication.json(rank2) 该 allReduce Elapse=120.99 ms、Wait=0、HCCS 622 MB @ 19.1 GB/s（真实搬运仅 ~33 ms）→ 约 88 ms 是到达 barrier 后的同步错位',
         impact: '第 2 级在共享嵌入梯度 allReduce 上多停 ~88 ms，是第 2 级 wait（176 ms）的主要来源，进一步拉长关键路径',
         steps: ['该错位本质源于 3.1 的级间不均；优先落地 3.1 后此项会自然缓解', '将嵌入梯度 allReduce 与 DP 通信的发起顺序对齐，或合并到统一通信桶，减少跨级 barrier 等待'],
+        stepsRaw: '- **改动位置**：嵌入梯度 allReduce 的调度位置（PP 首/末级共享 word-embedding 的 grad sync）。\n1. 该错位本质源于 3.1 的级间不均（rank0 还在做自己的 DP reduceScatter/allGather 时 rank2 已到达）；优先落地 3.1 后此项会自然缓解。\n2. 将嵌入梯度 allReduce 与 DP 通信的发起顺序对齐，或合并到统一通信桶，减少跨级 barrier 等待。',
         verification: '重采后 hccl_sum 中 allReduce__170 的 Max/Min 比值由 3.5× 收敛到 < 1.5×',
         visualization: '通信视图 — 对比 group [0,2] 同一 allReduce 在 rank0 与 rank2 的耗时落差（evidence/rank_{0,2}/communication.json）',
         codeLocations: [] },
@@ -7767,6 +7771,7 @@ def sample_token(logits, temperature=0.8):
         evidence: 'step_trace_time.csv / ClusterTimeSummary 的 free：rank0 158.5 ms、rank1 136.8 ms、rank2 131.7 ms、rank3 147.5 ms（占单步 16–20%），四卡分布均匀（非 host 下发型伪快卡）；Preparing 仅 ~0.2 ms，排除数据加载阻塞',
         impact: '~143 ms/step 的纯空闲（既非计算也非通信），疑为 optimizer step、host 侧 launch 间隙与零散小算子未流水所致',
         steps: ['落地 3.1/3.2 后观察 Free 是否随气泡缩小而下降', '若仍偏高，排查 host 侧 aclrtSynchronize 同步点与 launch 间隙，开启下发线程绑核、减少 CPU 侧同步'],
+        stepsRaw: '- **改动位置**：host 下发线程绑核、optimizer/参数更新阶段。\n1. 落地 3.1/3.2 后观察 Free 是否随气泡缩小而下降。\n2. 若仍偏高，排查 host 侧 `aclrtSynchronize*` 同步点与 launch 间隙，开启下发线程绑核、减少 CPU 侧同步。',
         verification: '重采后 free 占比降至 < 12%',
         visualization: 'Timeline 视图 — 载入 evidence/rank_0_ascend_pt/trace_view.json，过滤 host 侧 launch/aclrtSynchronizeDevice 观察 device 行空档',
         codeLocations: [] },
@@ -8072,7 +8077,7 @@ function renderOverview(r) {
       <span class="phs-info-icon" id="phsInfoIcon">ⓘ
         <div class="phs-tooltip" id="phsTooltip">
           <div class="ptt-title">PHS 评分说明</div>
-          <div class="ptt-subtitle">Performance Health Score — 衡量 Ascend NPU 程序综合性能表现的 0–100 评分体系</div>
+          <div class="ptt-subtitle">Performance Health Score — 衡量训练、推理及性能测量等工作负载综合性能表现的 0–100 评分体系</div>
 
           <div class="ptt-section">公式</div>
           <div class="ptt-formula">PHS = w<sub>计算</sub>×计算利用率 + w<sub>通信</sub>×通信效率 + w<sub>调度</sub>×调度效率 + w<sub>内存</sub>×内存带宽利用率 + w<sub>均衡</sub>×负载均衡度</div>
@@ -9207,15 +9212,17 @@ function parseReport(md, filename = '') {
     }
   }
 
-  // Issues
+  // Issues — parse each ### 3.N block
+  // Known field keys used as section boundaries within issue blocks
+  const IS_KNOWN = '(?:证据|影响|修复建议|操作步骤|问题修改完成的验证方式|验证方法|问题举证视图|可视化视图)';
   const issues = [];
   for (const block of md.split(/(?=\n###\s+\d+\.\d+)/)) {
     const hm = block.match(/###\s+(\d+\.\d+)\s+\[([^\]]+)\]\s+(.+?)(?:\n|$)/);
     if (!hm) continue;
-    const gb = key => dedentBlock((block.match(new RegExp(`\\*\\*${key}\\*\\*[：:]([\\s\\S]*?)(?=\\n\\s*-\\s*\\*\\*|\\n###|\\n##|$)`))||[])[1]||'');
-    const stepsRaw = gb('操作步骤') || gb('修复建议');
+    const gb = key => dedentBlock((block.match(new RegExp(`\\*\\*${key}\\*\\*[：:]([\\s\\S]*?)(?=\\n\\s*-\\s*\\*\\*${IS_KNOWN}\\*\\*|\\n###|\\n##|$)`))||[])[1]||'');
+    const stepsRaw = gb('修复建议') || gb('操作步骤');
     const steps = (stepsRaw.match(/^\s*(?:\d+\.|-)\s*(.+)$/gm)||[]).map(s=>s.replace(/^\s*(?:\d+\.|-)\s*/,'').trim());
-    issues.push({id:hm[1],priority:hm[2],title:hm[3].trim(),evidence:gb('证据'),impact:gb('影响'),stepsRaw,steps,verification:gb('验证方法'),visualization:gb('问题举证视图')||gb('可视化视图'),codeLocations:[]});
+    issues.push({id:hm[1],priority:hm[2],title:hm[3].trim(),evidence:gb('证据'),impact:gb('影响'),stepsRaw,steps,verification:gb('问题修改完成的验证方式')||gb('验证方法'),visualization:gb('问题举证视图')||gb('可视化视图'),codeLocations:[]});
   }
 
   const noPs = (md.match(/##\s+4[\s\S]*?(?=\n##\s+5\.)/)||[])[0]?.match(/^-\s+(?!\*\*未排查)(.+)$/gm)?.map(s=>s.replace(/^-\s+/,'').replace(/\*\*/g,''))||[];

@@ -273,6 +273,18 @@
   .cmp-tip-head { font-family: var(--font-mono); font-size: 10px; color: var(--text-3); margin-bottom: 5px;
     padding-bottom: 4px; border-bottom: 1px solid var(--border); letter-spacing: .04em; }
 
+  .disteff-blocks { display: flex; gap: 10px; width: 100%; margin-top: 8px; }
+  .disteff-block { flex: 1; background: rgba(33,33,33,.04); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .disteff-label { font-size: 11px; color: var(--text-2); font-family: var(--font-mono); letter-spacing: .03em; line-height: 1.3; }
+  .disteff-bar-wrap { position: relative; height: 22px; }
+  .disteff-bar-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 8px; background: rgba(33,33,33,.08); border-radius: 999px; overflow: visible; }
+  .disteff-bar-fill { height: 100%; border-radius: 999px; transition: width .3s; }
+  .disteff-target-line { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--green); border-radius: 1px; z-index: 2; }
+  .disteff-meta { display: flex; justify-content: space-between; align-items: center; }
+  .disteff-val { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
+  .disteff-target-label { font-size: 9px; font-family: var(--font-mono); white-space: nowrap; }
+  .disteff-chart { margin-top: 4px; min-height: 70px; }
+
   @media (max-width: 980px) {
     .grid-3 { grid-template-columns: 1fr; }
     .diag { grid-template-columns: 1fr; }
@@ -389,10 +401,15 @@ const TASKS = {
     key: [
       { type:"mfu", label:"MFU (模型算力利用率)", value:"35%", key:"mfu", peak:0.65,
         breakdown:{compute:0.62,comm:0.28,other:0.10} },
-      { label:"loss", value:"0.12", band:"green-bottom", key:"loss" },
-      { label:"acc", value:"0.91", band:"green-top", key:"acc" },
-      { label:"rew (reward)", value:"48", bad:true, band:"red", key:"rew",
-        anom:"⚠ 异常：reward 在 step 1180 后骤增，疑似 reward hacking" } ],
+      { type:"gpuutil", label:"GPU 利用率", value:"41%", key:"gpu",
+        stepBreakdown:{fwd:420,bwd:680,opt:180,comm:350,data:90} },
+      { type:"disteff", label:"8×H800 并行效率",
+        gauges:[
+          {key:"bubbleRate", label:"Pipeline Bubble", value:"10%", target:0.05, lte:true},
+          {key:"overlapRatio", label:"通信/计算重叠", value:"74%", target:0.85, lte:false},
+          {key:"nvlinkUtil",  label:"NVLink 带宽利用", value:"60%", target:0.80, lte:false}
+        ]},
+      { label:"loss", value:"0.12", band:"green-bottom", key:"loss" } ],
     series: {
       loss:[0.62,0.55,0.49,0.46,0.40,0.37,0.33,0.30,0.31,0.27,0.24,0.22,0.20,0.18,0.16,0.14,0.13,0.12,0.12,0.12],
       acc:[0.55,0.58,0.60,0.63,0.62,0.66,0.69,0.71,0.74,0.77,0.80,0.83,0.85,0.87,0.88,0.90,0.90,0.91,0.91,0.91],
@@ -408,7 +425,10 @@ const TASKS = {
       temp:[55,58,60,62,63,64,65,66,66,67,67,68,68,68,69,68,68,68,68,68],
       sstep:[3.1,3.0,2.8,2.7,2.6,2.5,2.55,2.48,2.4,2.45,2.38,2.42,2.36,2.4,2.35,2.38,2.34,2.37,2.36,2.37],
       diagBefore:[20,22,24,26,27,29,31,36,42,46,48,49],
-      diagAfter:[20,22,24,26,27,29,31,31,31,30,31,31] },
+      diagAfter:[20,22,24,26,27,29,31,31,31,30,31,31],
+      bubbleRate:[0.12,0.11,0.10,0.12,0.11,0.10,0.09,0.11,0.10,0.12,0.10,0.11,0.09,0.10,0.11,0.10,0.09,0.10,0.11,0.10],
+      overlapRatio:[0.70,0.72,0.74,0.71,0.73,0.75,0.76,0.74,0.72,0.75,0.73,0.74,0.76,0.73,0.74,0.75,0.73,0.74,0.75,0.74],
+      nvlinkUtil:[0.55,0.58,0.60,0.57,0.59,0.62,0.61,0.63,0.60,0.62,0.59,0.61,0.63,0.60,0.62,0.61,0.63,0.60,0.62,0.60] },
     source: `数据为符合 RLHF/PPO 业务的构造数据。`
   },
 
@@ -862,6 +882,60 @@ function renderAll(){
           </div>
         </div>
       </div>`;
+    } else if(k.type === 'disteff'){
+      const gs = k.gauges.map(gi=>{
+        const v=parseFloat(gi.value)/100;
+        const good=gi.lte?v<=gi.target:v>=gi.target;
+        const col=good?'var(--green)':gi.lte?'var(--red)':'var(--orange)';
+        const barPct = Math.min(v*100, 100).toFixed(0);
+        const targetPct = (gi.target*100).toFixed(0);
+        const cmp = gi.lte ? '<' : '>';
+        return `<div class="disteff-block">
+          <div class="disteff-label">${gi.label}</div>
+          <div class="disteff-bar-wrap">
+            <div class="disteff-bar-track">
+              <div class="disteff-bar-fill" style="width:${barPct}%;background:${col};"></div>
+            </div>
+            <div class="disteff-target-line" style="left:${targetPct}%;" title="目标 ${cmp}${targetPct}%"></div>
+          </div>
+          <div class="disteff-meta">
+            <span class="disteff-val" style="color:${col}">${gi.value}</span>
+            <span class="disteff-target-label" style="color:var(--green)">目标 ${cmp}${targetPct}% ${good?'✓':'✗'}</span>
+          </div>
+          <div class="disteff-chart"></div>
+        </div>`;
+      }).join('');
+      top = `<div class="km-top" style="flex-direction:column;align-items:flex-start;gap:0;">
+        <div class="km-label">${k.label}</div>
+        <div class="disteff-blocks">${gs}</div>
+      </div>`;
+    } else if(k.type === 'gpuutil'){
+      const bd = k.stepBreakdown;
+      const total = bd.fwd + bd.bwd + bd.opt + bd.comm + bd.data;
+      top = `<div class="km-top" style="flex-direction:column;align-items:flex-start;gap:0;">
+        <div class="km-label">${k.label}</div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:4px;margin-bottom:10px;">
+          <div class="km-val">${k.value}</div>
+          <span style="font-size:11px;color:var(--orange);font-family:var(--font-mono)">目标 &gt;80%</span>
+        </div>
+        <div style="width:100%;">
+          <div style="font-size:10px;color:var(--text-3);font-family:var(--font-mono);margin-bottom:5px;letter-spacing:.03em;">Step 时间分解（总 ${total}ms / step）</div>
+          <div style="height:8px;border-radius:999px;overflow:hidden;display:flex;">
+            <div style="flex:${bd.fwd};background:var(--blue);"></div>
+            <div style="flex:${bd.bwd};background:#7c3aed;"></div>
+            <div style="flex:${bd.opt};background:var(--orange);"></div>
+            <div style="flex:${bd.comm};background:var(--red);"></div>
+            <div style="flex:${bd.data};background:rgba(33,33,33,.18);"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:10px;font-family:var(--font-mono);">
+            <span style="color:var(--blue)">▪ fwd ${bd.fwd}ms</span>
+            <span style="color:#7c3aed">▪ bwd ${bd.bwd}ms</span>
+            <span style="color:var(--orange)">▪ opt ${bd.opt}ms</span>
+            <span style="color:var(--red)">▪ comm ${bd.comm}ms</span>
+            <span style="color:var(--text-3)">▪ data ${bd.data}ms</span>
+          </div>
+        </div>
+      </div>`;
     } else {
       top = `<div class="km-top"><div><div class="km-label">${k.label}</div>
           <div class="km-val${k.bad?' bad':''}">${k.value}</div></div>
@@ -1016,6 +1090,54 @@ function mfuChart(el, data, peak){
   </svg>`;
 }
 
+function gpuutilChart(el, data){
+  const w = el.clientWidth||460, h=150, pad=12;
+  const maxV = 1.0;
+  const Y = v => pad + (h-pad*2)*(1 - v/maxV);
+  const stepX = (w-pad*2)/(data.length-1);
+  const line = data.map((v,i)=>(i?'L':'M')+(pad+i*stepX).toFixed(1)+' '+Y(v).toFixed(1)).join(' ');
+  const area = line+` L ${w-pad} ${h-pad} L ${pad} ${h-pad} Z`;
+  const ty = Y(0.80).toFixed(1);
+  el.innerHTML = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <line x1="${pad}" y1="${ty}" x2="${w-pad}" y2="${ty}" stroke="var(--orange)" stroke-width="1" stroke-dasharray="4 3" opacity=".75"/>
+    <text x="${w-pad-4}" y="${(+ty-3).toFixed(1)}" font-size="9" fill="var(--orange)" font-family="monospace" text-anchor="end">目标 80%</text>
+    <path d="${area}" fill="var(--blue)" opacity="0.06"/>
+    <path d="${line}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function disteffChart(el, gauges, series){
+  const card = el.closest('.card');
+  const charts = card.querySelectorAll('.disteff-chart');
+  el.style.display = 'none';
+  const axis = card.querySelector('.km-axis');
+  const title = card.querySelector('.km-axis-title');
+  if(axis) axis.style.display = 'none';
+  if(title) title.style.display = 'none';
+  gauges.forEach((g, pi) => {
+    const chartEl = charts[pi];
+    if(!chartEl) return;
+    const data = series[g.key] || [];
+    if(!data.length){ chartEl.style.display = 'none'; return; }
+    const w = chartEl.clientWidth || 140, h = 80, pad = 8;
+    const allV = [...data, g.target];
+    const minV = Math.min(...allV) * 0.85, maxV = Math.max(...allV) * 1.15;
+    const rng = (maxV - minV) || 1;
+    const Y = v => pad + (h - pad * 2) * (1 - (v - minV) / rng);
+    const sx = (w - pad * 2) / (data.length - 1);
+    const pts = data.map((v, i) => (i ? 'L' : 'M') + (pad + i * sx).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+    const ty = Y(g.target).toFixed(1);
+    const lastV = data[data.length - 1];
+    const good = g.lte ? lastV <= g.target : lastV >= g.target;
+    const col = good ? 'var(--green)' : g.lte ? 'var(--red)' : 'var(--orange)';
+    chartEl.innerHTML = `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <line x1="${pad}" y1="${ty}" x2="${(w - pad).toFixed(1)}" y2="${ty}" stroke="var(--green)" stroke-width="1" stroke-dasharray="3 2" opacity=".5"/>
+      <path d="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${(pad + (data.length - 1) * sx).toFixed(1)}" cy="${Y(lastV).toFixed(1)}" r="2.5" fill="${col}"/>
+    </svg>`;
+  });
+}
+
 function drawCharts(){
   const t = TASKS[current];
   splitChart(document.getElementById('diagSplit'),
@@ -1030,6 +1152,11 @@ function drawCharts(){
       dualChart(el, t.series[k.keys[0]], t.series[k.keys[1]], k.labels);
     } else if(k.type === 'mfu'){
       mfuChart(el, t.series[k.key], k.peak);
+    } else if(k.type === 'gpuutil'){
+      gpuutilChart(el, t.series[k.key]);
+    } else if(k.type === 'disteff'){
+      disteffChart(el, k.gauges, t.series);
+      return;
     } else {
       const bandY = bigChart(el, t.series[k.key], '#1863dc', k.band);
       if(!k.anom && bandY!=null)
