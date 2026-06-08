@@ -25,6 +25,14 @@
         { "text": "Qwen2 HuggingFace 实现", "url": "https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen2/modeling_qwen2.py" }
       ]
     },
+    "token_embedding_weight": {
+      "what": "Embedding 的可学习权重矩阵。训练前向时被 Embedding Lookup 读取；反向时根据 token 位置累积稀疏梯度，优化器再更新对应行。该权重与 LM Head 共享。",
+      "idEn": "shared embedding parameter",
+      "clusters": ["Parameter Store", "QWen Transformer"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "上一训练 step 更新后的权重值" }],
+      "outputs": [{ "to": "token_embedding", "desc": "按 token ID 查表，输出隐藏向量" }],
+      "params": "151,936×4,096 · tied with LM Head · BF16/FP32 master weight"
+    },
     "rope_cache": {
       "what": "RoPE（旋转位置编码）预计算缓存：存储各序列位置的 cos/sin 旋转矩阵，在每个 Decoder Block 的 Apply RoPE 节点中使用。Qwen-7B 使用超大 RoPE base（1,000,000）以支持长上下文。",
       "idEn": "rotary position embedding cache (cos/sin tables)",
@@ -57,6 +65,14 @@
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }
       ]
     },
+    "attn_norm_gamma": {
+      "what": "Attention RMSNorm 的可学习缩放参数 γ。它不是算子实现的一部分，而是 RMSNorm 前向读取、反向产生梯度、优化器更新的模型参数。",
+      "idEn": "attention RMSNorm gamma parameter",
+      "clusters": ["Parameter Store", "Decoder Layer ×32"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "每个训练 step 更新 γ" }],
+      "outputs": [{ "to": "attn_norm", "desc": "缩放归一化后的隐藏状态" }],
+      "params": "4,096 · no bias"
+    },
     "qkv_linear": {
       "what": "QKV 投影层：将归一化隐藏状态用三个独立线性层分别投影为 Query、Key、Value 向量。Qwen-7B 使用 GQA（分组查询注意力），Q 有 28 头，K/V 各 4 头，显著降低 KV 缓存显存。多卡 TP 中为 column-parallel，每卡持有权重的一列分片，AllGather 输入后本地 MatMul。",
       "idEn": "query-key-value linear projection (GQA)",
@@ -69,6 +85,14 @@
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" },
         { "text": "Megatron-LM TP arXiv:1909.08053", "url": "https://arxiv.org/abs/1909.08053" }
       ]
+    },
+    "qkv_weight": {
+      "what": "Q/K/V 三组线性投影权重。训练前向被 MatMul 读取，反向由 MatMulGrad 生成 dW；TP 场景下通常按列分片，梯度同步策略决定多卡权重是否保持一致。",
+      "idEn": "QKV projection weights",
+      "clusters": ["Parameter Store", "Self Attention"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "上一 step 更新后的 Q/K/V 权重分片" }],
+      "outputs": [{ "to": "qkv_linear", "desc": "参与 Q/K/V 投影 MatMul" }],
+      "params": "Q 4096×3584 · K/V 4096×512 each · column-parallel shard"
     },
     "rotary_apply": {
       "what": "将 RoPE 旋转位置编码作用于 Q 和 K 向量，使每个 token 的注意力分数天然编码相对位置距离。V 向量不旋转。旋转通过复数乘法实现：将每对相邻维度视为复数分量，乘以对应位置角度的旋转因子。",
@@ -113,6 +137,14 @@
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }
       ]
     },
+    "attn_out_weight": {
+      "what": "Attention 输出投影权重。row-parallel 场景下权重和 dW 的分片/归约方式会影响训练对齐，是算子移植后需要重点核对的参数对象。",
+      "idEn": "attention output projection weight",
+      "clusters": ["Parameter Store", "Self Attention"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "更新后的 O-proj 权重分片" }],
+      "outputs": [{ "to": "attn_output_linear", "desc": "参与输出投影 MatMul" }],
+      "params": "3584×4096 · row-parallel shard"
+    },
     "mlp_norm": {
       "what": "MLP（FFN）前的 RMSNorm。结构与 attn_norm 完全相同，但作用对象是 Attention 子层 + 残差之后的隐藏状态，为 SwiGLU FFN 做输入归一化。",
       "idEn": "MLP / FFN input pre-normalization (RMSNorm)",
@@ -124,6 +156,14 @@
         { "text": "RMSNorm 论文 arXiv:1910.07467", "url": "https://arxiv.org/abs/1910.07467" },
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }
       ]
+    },
+    "mlp_norm_gamma": {
+      "what": "MLP RMSNorm 的可学习缩放参数 γ。它在前向中缩放归一化结果，在反向中获得 dγ，随后由优化器更新。",
+      "idEn": "MLP RMSNorm gamma parameter",
+      "clusters": ["Parameter Store", "Decoder Layer ×32"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "每个训练 step 更新 γ" }],
+      "outputs": [{ "to": "mlp_norm", "desc": "缩放归一化后的隐藏状态" }],
+      "params": "4,096 · no bias"
     },
     "mlp_gate_linear": {
       "what": "SwiGLU 门控分支（gate_proj）：将隐藏状态投影到中间维度，经 SiLU 激活后与 Up 分支做逐元素相乘，实现门控机制。多卡 TP 中为 column-parallel，Ascend 将 AllGather + MatMul 融合为 AllGatherMatmulAicpu 算子。",
@@ -138,6 +178,14 @@
         { "text": "Megatron-LM TP arXiv:1909.08053", "url": "https://arxiv.org/abs/1909.08053" }
       ]
     },
+    "gate_weight": {
+      "what": "SwiGLU gate_proj 权重。算子前向读取它生成门控分支，反向输出 dW；如果移植算子数值存在微差，dW 会逐步放大为 weight drift。",
+      "idEn": "SwiGLU gate projection weight",
+      "clusters": ["Parameter Store", "SwiGLU MLP"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "更新后的 gate_proj 权重分片" }],
+      "outputs": [{ "to": "mlp_gate_linear", "desc": "参与 gate_proj MatMul" }],
+      "params": "4096×18944 · column-parallel shard"
+    },
     "mlp_up_linear": {
       "what": "SwiGLU 上投影分支（up_proj）：将隐藏状态投影到中间维度，作为门控的被乘数。与 gate_proj 并行计算，两者维度完全相同，最终做逐元素乘积（Hadamard 积）。多卡 TP 中为 column-parallel。",
       "idEn": "SwiGLU up projection (column-parallel in TP)",
@@ -149,6 +197,14 @@
         { "text": "SwiGLU 论文 arXiv:2002.05202", "url": "https://arxiv.org/abs/2002.05202" },
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }
       ]
+    },
+    "up_weight": {
+      "what": "SwiGLU up_proj 权重。与 gate_proj 并行被读取，反向梯度需要和 gate 分支一起检查，避免分支数值差异造成后续 down_proj 输入漂移。",
+      "idEn": "SwiGLU up projection weight",
+      "clusters": ["Parameter Store", "SwiGLU MLP"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "更新后的 up_proj 权重分片" }],
+      "outputs": [{ "to": "mlp_up_linear", "desc": "参与 up_proj MatMul" }],
+      "params": "4096×18944 · column-parallel shard"
     },
     "silu_multiply": {
       "what": "SwiGLU 激活与门控相乘：对 gate_proj 输出施加 SiLU(x) = x·σ(x) 激活，再与 up_proj 输出逐元素相乘，即 SwiGLU = SiLU(gate) ⊗ up。这是 Qwen 替代 ReLU/GELU 的核心激活，在保持较低参数量的同时提升表达能力。",
@@ -176,6 +232,14 @@
         { "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }
       ]
     },
+    "down_weight": {
+      "what": "SwiGLU down_proj 权重。row-parallel 下投影通常伴随 ReduceScatter，训练诊断时需要同时看 MatMul 数值、通信归约和 dW 更新。",
+      "idEn": "SwiGLU down projection weight",
+      "clusters": ["Parameter Store", "SwiGLU MLP"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "更新后的 down_proj 权重分片" }],
+      "outputs": [{ "to": "mlp_down_linear", "desc": "参与 down_proj MatMul" }],
+      "params": "18944×4096 · row-parallel shard"
+    },
     "final_norm": {
       "what": "最终 RMSNorm：在全部 32 个 Decoder Block 处理完毕后，对最终隐藏状态归一化，再送入语言模型头（LM Head）。确保输出向量的尺度稳定，利于 LM Head 的线性投影。",
       "idEn": "final (post-transformer) RMSNorm before LM Head",
@@ -185,6 +249,14 @@
       "params": "参数量 4,096（γ，无偏置）",
       "sources": [{ "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }]
     },
+    "final_norm_gamma": {
+      "what": "最终 RMSNorm 的可学习缩放参数 γ。该参数直接影响 LM Head 输入尺度，训练末端 loss 分叉时需要和 LM Head 权重一起看。",
+      "idEn": "final RMSNorm gamma parameter",
+      "clusters": ["Parameter Store", "QWen Transformer"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "每个训练 step 更新 γ" }],
+      "outputs": [{ "to": "final_norm", "desc": "缩放最终隐藏状态" }],
+      "params": "4,096 · no bias"
+    },
     "lm_head": {
       "what": "语言模型头（Language Model Head）：将最终隐藏状态用线性层投影到词表大小，得到每个位置下一 token 的原始分数（logits）。权重与 token_embedding 共享（tied weights），节省约 622 M 参数。训练时 logits 送入 Cross-Entropy；推理时经 softmax 后采样。",
       "idEn": "language model head — final linear projection to vocabulary",
@@ -193,6 +265,14 @@
       "outputs": [{ "to": "output_logits", "desc": "Logits [batch, seq_len, 151936]，覆盖整个词表" }],
       "params": "权重矩阵 4096×151936（与 token_embedding 共享）",
       "sources": [{ "text": "Qwen 技术报告 arXiv:2309.16609", "url": "https://arxiv.org/abs/2309.16609" }]
+    },
+    "shared_lm_weight": {
+      "what": "LM Head 使用的共享词表权重，与 Embedding Weight 绑定。训练中同一个参数对象同时影响输入查表和输出投影，任何更新漂移都会同时反馈到输入侧和 loss 侧。",
+      "idEn": "tied LM Head / embedding weight",
+      "clusters": ["Parameter Store", "QWen Transformer"],
+      "inputs": [{ "from": "optimizer_adamw", "desc": "由 embedding 与 lm_head 共同贡献梯度后更新" }],
+      "outputs": [{ "to": "lm_head", "desc": "最终隐藏状态投影到词表 logits" }],
+      "params": "4096×151,936 · tied with Embedding Weight"
     },
     "output_logits": {
       "what": "模型最终输出的 token logits（原始分数）。训练时对最后一个 token 位置取 Cross-Entropy 损失（预测下一词）；推理时对全序列末位经 softmax → 采样/贪心解码得到下一 token，再 append 到序列继续生成。",

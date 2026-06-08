@@ -16,7 +16,8 @@
     problemMap: null,
     nodeEls: [],            // DOM node groups, index-aligned to graph.nodes
     nodeById: {},           // nodeId -> { el, node }
-    edgeEls: [],            // { el, source, target }
+    edgeEls: [],            // { el, source, target, edge }
+    edgeTagEls: [],         // { el, source, target }
     clusterEls: [],         // { el, cluster, toggle, icon }
     clusterChildren: {},
     collapsed: null,        // Set of collapsed cluster ids
@@ -77,6 +78,84 @@
 
   function esc(value) {
     return GEW.util && GEW.util.escapeHtml ? GEW.util.escapeHtml(value) : String(value == null ? '' : value);
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(attrs || {}).forEach(function (key) {
+      var val = attrs[key];
+      if (val == null) return;
+      el.setAttribute(key, val);
+    });
+    return el;
+  }
+
+  function edgeTypeKey(edge) {
+    return String((edge && (edge.edgeType || edge.type || edge.tag)) || 'edge')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'edge';
+  }
+
+  function edgeTagText(edge) {
+    if (!edge) return '';
+    return String(edge.tag || edge.edgeTypeLabel || edge.label || edge.edgeType || '').trim();
+  }
+
+  function edgeTagTooltip(edge) {
+    var key = edgeTypeKey(edge);
+    var custom = edge && (edge.tooltip || edge.tip || edge.description);
+    if (custom) return String(custom);
+    var tips = {
+      activation: 'Activation：前向激活张量，在算子之间传递 hidden states、Q/K/V 或 logits。',
+      parameter: 'Parameter：模型可学习参数，例如 weight、bias、RMSNorm γ；前向被读取，反向产生梯度，优化器更新。',
+      state: 'State：运行时状态或缓存张量，例如 RoPE Cache、KV Cache；通常不属于可学习参数。',
+      gradient: 'Gradient：反向传播产生的梯度，用于后续参数更新和多卡同步。',
+      update: 'Update：优化器根据梯度和 optimizer state 写回参数的新值。',
+      communication: 'Communication：多卡通信数据流，例如 AllReduce、ReduceScatter、AllGather 或 P2P。',
+      comm: 'Communication：多卡通信数据流，例如 AllReduce、ReduceScatter、AllGather 或 P2P。',
+    };
+    return tips[key] || 'Edge：节点之间的数据或依赖关系。';
+  }
+
+  function edgeTagWidth(label) {
+    return Math.max(42, Math.min(86, String(label || '').length * 5.6 + 17));
+  }
+
+  function nodeAnchor(node, anchor) {
+    if (!node) return null;
+    var key = String(anchor || '').toLowerCase();
+    var x = node.x;
+    var y = node.y;
+    if (key === 'left') x = node.x - node.width / 2;
+    else if (key === 'right') x = node.x + node.width / 2;
+    if (key === 'top') y = node.y - node.height / 2;
+    else if (key === 'bottom') y = node.y + node.height / 2;
+    return { x: x, y: y };
+  }
+
+  function routedEdgePath(edge) {
+    if (!edge || (!edge.sourceAnchor && !edge.targetAnchor)) return null;
+    var sourceEntry = S.nodeById[edge.source];
+    var targetEntry = S.nodeById[edge.target];
+    if (!sourceEntry || !targetEntry) return null;
+    var source = nodeAnchor(sourceEntry.node, edge.sourceAnchor);
+    var target = nodeAnchor(targetEntry.node, edge.targetAnchor);
+    if (!source || !target) return null;
+    var curve = String(edge.curve || '').toLowerCase();
+    if (curve === 'horizontal') {
+      var midX = (source.x + target.x) / 2;
+      return 'M ' + source.x + ' ' + source.y + ' C ' + midX + ' ' + source.y + ', ' + midX + ' ' + target.y + ', ' + target.x + ' ' + target.y;
+    }
+    var midY = (source.y + target.y) / 2;
+    return 'M ' + source.x + ' ' + source.y + ' C ' + source.x + ' ' + midY + ', ' + target.x + ' ' + midY + ', ' + target.x + ' ' + target.y;
+  }
+
+  function applyEdgeRoutes() {
+    S.edgeEls.forEach(function (entry) {
+      var path = routedEdgePath(entry.edge);
+      if (path) entry.el.setAttribute('d', path);
+    });
   }
 
   function priorityClass(priority) {
@@ -235,6 +314,62 @@
       }
     });
   }
+
+  function drawEdgeTypeTags() {
+    if (!S.svg) return;
+    var old = S.svg.querySelector('.gew-edge-type-tags');
+    if (old) old.remove();
+    S.edgeTagEls = [];
+
+    var layer = svgEl('g', {
+      class: 'gew-edge-type-tags',
+    });
+
+    S.edgeEls.forEach(function (entry) {
+      var label = edgeTagText(entry.edge);
+      if (!label || !entry.el || typeof entry.el.getTotalLength !== 'function') return;
+      var pt;
+      try {
+        var len = entry.el.getTotalLength();
+        if (!len) return;
+        pt = entry.el.getPointAtLength(len * 0.5);
+      } catch (_) {
+        return;
+      }
+
+      var w = edgeTagWidth(label);
+      var h = 18;
+      var group = svgEl('g', {
+        class: 'gew-edge-type-tag',
+        transform: 'translate(' + pt.x.toFixed(1) + ' ' + pt.y.toFixed(1) + ')',
+        'data-edge-type': edgeTypeKey(entry.edge),
+        'aria-label': edgeTagTooltip(entry.edge),
+      });
+      var title = svgEl('title');
+      title.textContent = edgeTagTooltip(entry.edge);
+      group.appendChild(title);
+      group.appendChild(svgEl('rect', {
+        x: -w / 2,
+        y: -h / 2,
+        width: w,
+        height: h,
+        rx: h / 2,
+        ry: h / 2,
+      }));
+      var text = svgEl('text', {
+        x: 0,
+        y: 0.5,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'central',
+      });
+      text.textContent = label;
+      group.appendChild(text);
+      layer.appendChild(group);
+      S.edgeTagEls.push({ el: group, source: entry.source, target: entry.target });
+    });
+
+    S.svg.appendChild(layer);
+  }
 	
 	  function fitZoom() {
 	    if (!S.container) return 1;
@@ -295,6 +430,7 @@
       el.classList.remove('is-graph-selected');
     });
     S.edgeEls.forEach(function (e) { e.el.style.opacity = ''; });
+    S.edgeTagEls.forEach(function (e) { e.el.style.opacity = ''; });
   }
 
   // highlight nodeId + dim unrelated nodes/edges (neighbors stay lit)
@@ -317,6 +453,10 @@
       var touches = e.source === nodeId || e.target === nodeId;
       e.el.style.opacity = touches ? '' : DIM_OPACITY;
     });
+    S.edgeTagEls.forEach(function (e) {
+      var touches = e.source === nodeId || e.target === nodeId;
+      e.el.style.opacity = touches ? '' : DIM_OPACITY;
+    });
   }
 
   // --- cluster collapse/expand (port of updateClusterVisibility) ---
@@ -332,6 +472,9 @@
       if (node) el.style.display = hiddenNodes[node.id] ? 'none' : '';
     });
     S.edgeEls.forEach(function (e) {
+      e.el.style.display = (hiddenNodes[e.source] || hiddenNodes[e.target]) ? 'none' : '';
+    });
+    S.edgeTagEls.forEach(function (e) {
       e.el.style.display = (hiddenNodes[e.source] || hiddenNodes[e.target]) ? 'none' : '';
     });
     S.clusterEls.forEach(function (c) {
@@ -508,6 +651,12 @@
         if (!node) return;
         el.dataset.nodeId = node.id;       // pattern does not expose id; set it ourselves
         el.style.cursor = 'pointer';
+        if (String(node.typeLabel || '').toLowerCase() === 'parameter') {
+          el.classList.add('is-parameter-object');
+        }
+        if (String(node.typeLabel || '').toLowerCase() === 'state') {
+          el.classList.add('is-state-object');
+        }
         if (node.reportPriority) {
           el.classList.add('is-problem-' + String(node.reportPriority).toLowerCase());
         }
@@ -541,8 +690,10 @@
       });
       S.edgeEls = edgeDom.map(function (el, i) {
         var edge = visibleEdges[i] || {};
-        return { el: el, source: edge.source, target: edge.target };
+        return { el: el, source: edge.source, target: edge.target, edge: edge };
       });
+      applyEdgeRoutes();
+      drawEdgeTypeTags();
 
       // Cluster groups + collapse toggles.
       S.clusterEls = Array.prototype.slice.call(

@@ -2,8 +2,8 @@
 
 PTO 是面向 Ascend NPU 算子开发、编译 Pass 分析、执行泳道和硬件数据路径理解的本地可视化工作台。项目主体是静态前端，优先使用 HTML、CSS 和原生 JavaScript；少数实验模块使用独立的 Vite 或 Node 子工程。
 
-**线上入口**：https://yinyucheng0601.github.io/compute-graph-viewer/launch.html  
-**启动台 v2**：https://yinyucheng0601.github.io/compute-graph-viewer/launch-v2.html
+**线上入口**：[launch.html](https://yinyucheng0601.github.io/compute-graph-viewer/launch.html)  
+**启动台 v2**：[launch-v2.html](https://yinyucheng0601.github.io/compute-graph-viewer/launch-v2.html)
 
 ---
 
@@ -35,7 +35,7 @@ npx serve .
 | 入口 | 文件 / 链接 | 用途 |
 |------|-------------|------|
 | 启动台 | `launch.html` | 项目总启动页，聚合高保真工作台、实验模块和演示入口 |
-| 启动台 v2 | https://yinyucheng0601.github.io/compute-graph-viewer/launch-v2.html | GitHub Pages 版本的 CANN PTO 启动台 v2，使用卡片预览、白皮书 SVG 封面和顶部导航 |
+| 启动台 v2 | [launch-v2.html](https://yinyucheng0601.github.io/compute-graph-viewer/launch-v2.html) | GitHub Pages 版本的 CANN PTO 启动台 v2，使用卡片预览、白皮书 SVG 封面和顶部导航 |
 | 演示页 | `low-fi/ppt-web.html` | 演示汇报入口 |
 | 设计系统技能 | [pto-design-system](https://github.com/yinyucheng0601/pto-design-system) | PTO 设计系统专用技能仓库 |
 
