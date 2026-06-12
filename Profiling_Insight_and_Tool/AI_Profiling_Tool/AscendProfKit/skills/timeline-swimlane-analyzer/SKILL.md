@@ -1,7 +1,7 @@
 ---
 name: timeline-swimlane-analyzer
-description: 面向 Ascend Profiling timeline（trace_view.json / msprof_*.json 及 db 中带 startNs/endNs 的区间表）的"泳道时序结构"分析技能。专门补齐聚合统计型 skill 无法给出的几何派生指标——关键路径（最长链路）、计算-通信重叠率、跨泳道对齐间隙、泳道空挡比例与最大间隔、PP 流水线 bubble 率、step 间抖动与长尾、per-step 周期归一，以及推理 prefill/decode 时序拆解。
-keywords: [timeline, 泳道, swimlane, trace_view, 关键路径, critical-path, 最长链路, 重叠率, overlap, bubble, 气泡, 空挡, gap, 间隔, 抖动, jitter, 长尾, prefill, decode, PP, 流水线]
+description: 面向 Ascend Profiling timeline（trace_view.json / msprof_*.json 及 db 中带 startNs/endNs 的区间表）的"泳道时序结构"分析技能。专门补齐聚合统计型 skill 无法给出的几何派生指标——关键路径（最长链路）、计算-通信重叠率、算子利用率（AI Core time-based）、泳道空挡比例、PP 流水线 bubble 率、step 间抖动、通信抖动（逐 step 通信 CV）、per-step 周期归一，以及推理 prefill/decode 时序拆解。
+keywords: [timeline, 泳道, swimlane, trace_view, 关键路径, critical-path, 最长链路, 重叠率, overlap, bubble, 气泡, 空挡, gap, 间隔, 抖动, jitter, 通信抖动, comm_jitter, 算子利用率, op_utilization, AI Core, 长尾, prefill, decode, PP, 流水线]
 metadata:
   type: skill
 ---
@@ -15,11 +15,11 @@ metadata:
 从带时间轴的 timeline 数据中，量化下列其他 skill 无法直接给出的结构性指标，并按"是否在关键路径上"对优化收益排序：
 
 1. 关键路径（最长链路）与各类耗时在关键路径上的占比
-2. 计算-通信重叠率 + 跨泳道对齐间隙（暴露通信 exposed communication）
-3. 泳道空挡比例 + 泳道最大间隔（按泳道排名）
+2. 计算-通信重叠率 + 跨泳道对齐间隙
+3. **算子利用率**（AI Core time-based）+ 泳道空挡比例（按泳道排名）
 4. Host/Device 与 CPU/IO 重叠（下发瓶颈 & 数据加载阻塞）
 5. 流水线并行 PP bubble 率
-6. step 间抖动 / 长尾 + per-step 周期归一
+6. step 间抖动 / 长尾 + **通信抖动**（逐 step 通信 CV）+ per-step 周期归一
 7. 真·热点定位（最高单任务，按关键路径加权，而非裸耗时）
 8. 推理时序补充（prefill / decode 分离、TTFT / TPOT）
 
@@ -30,14 +30,14 @@ metadata:
 | 算子 TopK 裸耗时 | `ascend_pytorch_profiler_db_explorer` | 本 skill 只在其结果上叠"是否落在关键路径"加权 |
 | 各维度耗时占比、free_analysis | `msprof-analyze-cli` | 本 skill 做**泳道粒度**的空挡/重叠，而非整卡聚合 |
 | 慢卡 / 慢链路 | `cluster-fast-slow-rank-detector` | 本 skill 补 step 间**抖动/长尾**（单 rank 时间维度），非跨 rank |
-| MFU / 计算利用率 | `op-mfu-calculator` / `performance-health-score` | 本 skill 不算 MFU，只判断算子是否在关键路径 |
+| MFU / FLOPs-based 计算利用率 | `op-mfu-calculator` / `performance-health-score` | 本 skill 算 **time-based 算子利用率**（AI Core 忙时/step 跨度），不算 FLOPs-based MFU；两者互补——time-based 看"是否有空泡"，MFU 看"空泡之外算子跑得有多快" |
 | Host 下发瓶颈定性 | `cluster-fast-slow-rank-detector` / dispatch_view | 本 skill 量化 host↔device **重叠率**与 launch gap 分布 |
 
 > 当问题本质是"哪个算子最耗时 / 通信带宽多少 / 是不是慢卡"时，**不要用本 skill**，回到对应聚合 skill。本 skill 只回答"时序结构"类问题。
 
 ## 触发条件
 
-用户问题包含或等价于：关键路径 / 最长链路 / 串行链 / 计算通信有没有重叠 / 通信被不被掩盖 / 暴露通信 / 泳道空挡 / 哪条泳道最闲 / 流水线气泡 / PP bubble / step 抖动 / 长尾 step / 周期性掉速 / prefill decode 拆分 / TTFT / TPOT。
+用户问题包含或等价于：关键路径 / 最长链路 / 串行链 / 计算通信有没有重叠 / 通信被不被掩盖 / 暴露通信 / 泳道空挡 / 哪条泳道最闲 / 算子利用率 / AI Core 利用率 / 算力有没有被打满 / 流水线气泡 / PP bubble / step 抖动 / 通信抖动 / 通信不稳定 / 长尾 step / 周期性掉速 / prefill decode 拆分 / TTFT / TPOT。
 
 ## 数据来源
 
@@ -102,15 +102,23 @@ python <本技能目录>/scripts/timeline_geometry.py <trace_view.json> --json
 - **判读**：重叠率 < 70%（TP/DP 梯度同步场景）→ 通信掩盖不足，是头号抓手，常见根因：通信流与计算流未并发、依赖过紧、`overlap_comm` 开关未开、micro-batch 太少。
 - **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，对齐 Ascend Hardware 与 Communication 两条泳道，看通信块下方是否有计算块覆盖。
 
-### 3. 泳道空挡比例 + 泳道最大间隔
+### 3. 算子利用率 + 泳道空挡比例
 
-- **定义**：单条泳道上"无区间覆盖"的总时长占比（空挡比例），以及泳道内相邻区间最大的一段空隙（最大间隔）。回答"哪条泳道最闲 / 哪里卡了一下"。
+- **定义**：
+  - **算子利用率（op_utilization）**：device 计算泳道（Ascend Hardware / AI Core / NPU）所有区间忙时并集 ÷ step 总跨度。纯 time-based，不依赖 FLOPs，直接反映"算力有没有被使用"。
+  - **泳道空挡比例**：单条泳道上"无区间覆盖"的总时长占 (泳道末−泳道首) 的比例，按比例对各泳道排名，找出最空闲泳道。
 - **算法**：
-  1. 对每条泳道，按 `ts` 排序区间，`忙时 = Σ dur`（重叠区间先做并集），`空挡比例 = 1 − 忙时 ÷ (泳道末-泳道首)`。
-  2. 相邻间隙 `gap_i = 区间[i+1].ts − 区间[i].(ts+dur)`；记录 `max gap` 与 gap 分布（直方图 / P95）。
-  3. **按空挡比例对泳道排名**，输出 Top 空闲泳道。
-- **判读关键**：区分"**本该闲**"（该泳道非瓶颈资源）与"**异常等待**"（device 泳道空挡 = 算力被饿死）。单点 max gap 要看是否一次性（初始化 / save ckpt）——结合维度 6 的 per-step 归一剔除异常 step。device 泳道空挡比例 > 10% 通常指向 host 下发跟不上（转维度 4）。
-- **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，定位 Ascend Hardware 泳道最大空白段，向上看同时刻 host 在做什么。
+  1. **算子利用率**：
+     - 收集所有匹配 device 泳道正则（`Ascend Hardware|NPU|AI Core|Device`）的区间，做区间并集（merge overlapping intervals）。
+     - `op_utilization = busy_union_us ÷ step_span_us`；step_span = timeline 内 gstart→gend（一个稳定 step 的跨度，建议先 per-step 归一取典型 step）。
+     - 脚本 `timeline_geometry.py --json` 的 `op_util.op_utilization` 直接输出此值。
+  2. **泳道空挡比例**：
+     - 对每条泳道：`忙时 = 区间并集长度`，`空挡比例 = 1 − 忙时 ÷ span`，按空挡比例降序排名，输出 Top N。
+     - 记录相邻间隙 P95（用于判断是偶发还是持续性空档）。
+- **判读**：
+  - `op_utilization < 60%` → 算力大量空置；结合关键路径占比（维度 1）和泳道空挡排名定位根因：若空挡集中在 device 计算泳道 → PP bubble / 通信阻塞 / host 下发不及（转维度 4/5）。
+  - 泳道空挡区分"**本该闲**"（非瓶颈泳道）与"**异常等待**"（device 计算泳道空挡 > 10%）。
+- **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，定位 Ascend Hardware 泳道空白段，向上看同时刻 host 在做什么。
 
 ### 4. Host/Device 与 CPU/IO 重叠（下发瓶颈 & 数据加载）
 
@@ -131,15 +139,23 @@ python <本技能目录>/scripts/timeline_geometry.py <trace_view.json> --json
 - **判读**：实测远大于理论 → micro-batch 数偏少 / stage 切分不均（某 stage 计算明显长）/ 重计算放大正向。方向：增大 num_microbatch、均衡 stage 切分、用 interleaved/1F1B 调度。
 - **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，看各 PP rank 计算块之间的三角空白与 P2P 等待。
 
-### 6. step 间抖动 / 长尾 + per-step 周期归一
+### 6. step 间抖动 / 通信抖动 / 长尾 + per-step 周期归一
 
-- **定义**：各 step 耗时的离散度（抖动）、超长尾 step，以及把 timeline 按 step 折叠归一以剔除一次性事件污染。
+- **定义**：
+  - **step 抖动（step_cv）**：各 step 总耗时的离散度，CV = std/mean。
+  - **通信抖动（comm_jitter）**：逐 step 通信耗时的 CV，独立于 step 总耗时抖动，专门衡量通信时延的稳定性。
+  - **长尾 step**：超过 P95 或 1.5×median 的异常 step。
+  - **per-step 周期归一**：把 timeline 折叠到典型 step，剔除一次性事件污染。
 - **算法**：
-  1. 用 `step_trace_time.csv` 取每 step 总耗时，算 `mean / P50 / P95 / max`，`抖动 = (max − min) ÷ mean` 或 `std/mean`(CV)。
-  2. 标出长尾 step（> P95 或 > 1.5×median），回到 timeline 看该 step 多了什么（ckpt save / eval / GC / 通信重传）。
-  3. **per-step 归一**：选一个"典型 step"（取中位耗时那个）做维度 1-5 的结构分析，避免首 step、编译 step、save step 把全局最大值带偏。
-- **判读**：CV > 10% → 训练不稳定，先治抖动再谈单 step 优化；周期性长尾 → 多半是 ckpt/eval/GC（host 侧）。
-- **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，对长尾 step 与典型 step 做并排对比。
+  1. 从 `step_trace_time.csv` 取每 step 总耗时列，算 `mean / P50 / P95 / max / CV`；脚本 `timeline_geometry.py --step-trace <csv>` 的 `jitter.cv` 即 step_cv。
+  2. **通信抖动**：同一 CSV，取 `Communication(Not Overlapped)` 列（优先）或 `Communication` 列，收集每 step 通信时长 `{c_i}`，`comm_jitter = std({c_i}) / mean({c_i})`；脚本输出 `comm_jitter.cv`。若该列缺失则标注 N/A。
+  3. 标出长尾 step（> P95 或 > 1.5×median），回到 timeline 看该 step 多了什么（ckpt / eval / GC / 通信重传）。
+  4. **per-step 归一**：选中位耗时那个 step 做维度 1–5 的结构分析，避免首 step、编译 step、save step 把全局最大值带偏。
+- **判读**：
+  - `step_cv > 10%` → 训练不稳定，先治抖动再谈单 step 优化；周期性长尾 → 多半是 ckpt/eval/GC（host 侧）。
+  - `comm_jitter > 15%` → 通信时延不稳定，即使 step 整体 CV 正常也可能存在周期性通信慢；常见根因：慢链路、跨交换机拥塞、HCCL 重传、某 rank 内存分配干扰。应结合 `cluster-fast-slow-rank-detector` 跨 rank 维度交叉验证。
+  - `step_cv` 低但 `comm_jitter` 高 → 通信抖动被计算掩盖，是潜在风险；`comm_jitter` 低但 `step_cv` 高 → 抖动来自计算侧（GC / host 调度 / 非稳态 kernel）。
+- **举证视图**：Timeline 视图（系统调优）— `trace_view.json`，对长尾 step 与典型 step 做并排对比；通信抖动问题加看通信视图（communication_matrix.json）。
 
 ### 7. 真·热点定位（最高单任务，按关键路径加权）
 
@@ -172,6 +188,8 @@ python <本技能目录>/scripts/timeline_geometry.py <trace_view.json> --json
 | PP bubble 偏大 | 实测 bubble 率远大于 `(p-1)/(p-1+m)` 理论值 | micro-batch 少 / stage 切分不均 / 重计算放大 | 增大 num_microbatch、均衡 stage、interleaved 1F1B |
 | step 抖动大 | step 耗时 CV > 10% 或存在 >1.5×median 的长尾 step | 训练不稳定，全局最大值被异常 step 污染 | 先 per-step 归一取典型 step 再分析；周期长尾排查 ckpt/eval/GC |
 | 裸热点优化无效 | TopK 耗时榜首不在关键路径 | 该任务可被并行掩盖，压它不省 step | 改打"关键路径热点榜"榜首 |
+| 算力大量空置 | op_utilization < 60%，device 泳道有大段空白 | AI Core 被饿死：空泡 / PP bubble / host 下发不及 / 通信阻塞 | 对照关键路径占比和维度 4/5 定位具体原因；不要只看算子耗时排名 |
+| step CV 正常但通信不稳定 | step_cv < 10% 但 comm_jitter > 15% | 通信抖动被计算掩盖，是潜在故障信号 | 结合 cluster-fast-slow-rank-detector 查慢链路 / HCCL 重传；comm_jitter 持续高时须排查物理链路 |
 | 推理 prefill/decode 混判 | 用整体 timeline 看推理，瓶颈结论摇摆 | 两阶段瓶颈不同（算力 vs 访存） | 按请求边界拆 prefill/decode，分别用 TTFT / TPOT 归因 |
 
 ---
@@ -182,4 +200,4 @@ python <本技能目录>/scripts/timeline_geometry.py <trace_view.json> --json
 - **与 PHS 的关系**：本 skill 的"关键路径占比 / 重叠率 / 空挡比例"可作为 `performance-health-score` 中**调度效率、通信效率**子项的佐证与优化后预估依据，但**不改 PHS 公式**。
 - **每个问题点必附举证视图**：调用 `msinsight-view-selector`，本 skill 的结构性问题默认映射到 **Timeline 视图（系统调优）**，热点类辅以算子视图，推理类用 Timeline 视图（服务化调优）。
 - **时间单位**：原始 ns/μs 一律换算为 ms 后写入证据字段。
-- **指标看板数据块（MUST）**：本 skill 算出的结构化指标，除写入报告正文外，**必须**按 `profiling-workflow/SKILL.md` 规则 7 在报告末尾追加 `<!-- METRICS {json} -->` 块，供 MindStudioNext 总览页"指标看板"消费。键名对应：`critical_path_ratio` / `overlap_ratio` / `exposed_comm` / `max_lane_idle` / `max_lane_gap` / `host_launch_gap_ratio` / `pp_bubble_ratio` / `step_cv`；`timeline_geometry.py --json` 的输出可直接映射，未测得的键整键省略（看板留空）。
+- **指标看板数据块（MUST）**：本 skill 算出的结构化指标，除写入报告正文外，**必须**按 `profiling-workflow/SKILL.md` 规则 7 在报告末尾追加可见 Markdown 表格，供 MindStudioNext 总览页"指标看板"消费。键名对应：`critical_path_ratio` / `op_utilization` / `overlap_ratio` / `host_launch_gap_ratio` / `pp_bubble_ratio` / `step_cv` / `max_lane_idle` / `comm_jitter`；`timeline_geometry.py --json` 的 `critical_path.critical_path_ratio`、`op_util.op_utilization`、`overlap.overlap_ratio`、`jitter.cv`（即 `step_cv`）、`comm_jitter.cv` 可直接映射，未测得的键整行省略（看板留空）。

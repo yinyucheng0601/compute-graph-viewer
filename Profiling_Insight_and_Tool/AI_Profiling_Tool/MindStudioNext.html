@@ -4866,27 +4866,15 @@ class SwimlaneRenderer {
                     <div class="ovm-status">暂无数据</div>
                   </div>
 
+                  <div class="ovm-card ovm-na" data-metric="op_utilization" data-unit="%" data-dir="high" data-warn="60">
+                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">算子利用率</span><span class="ovm-info" data-tip="AI Core（Cube + Vector）忙时占 step 总时长的比例（time-based，非 FLOPs-based）。< 60% 通常说明调度空泡或内存访问瓶颈导致算力被饿死，结合关键路径占比与空挡比例定位根因。">?</span></div>
+                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
+                    <div class="ovm-status">暂无数据</div>
+                  </div>
+
                   <div class="ovm-card ovm-na" data-metric="overlap_ratio" data-unit="%" data-dir="high" data-warn="70">
                     <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">计算-通信重叠率</span><span class="ovm-info" data-tip="通信被计算掩盖的比例（优先取 trace 内 Overlap Analysis 轨道）。< 70% 表示通信掩盖不足，暴露通信进入关键路径。">?</span></div>
                     <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
-                    <div class="ovm-status">暂无数据</div>
-                  </div>
-
-                  <div class="ovm-card ovm-na" data-metric="exposed_comm" data-unit="ms">
-                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">暴露通信</span><span class="ovm-info" data-tip="未被计算掩盖、直接进入关键路径的通信时长。越低越好，无固定阈值。">?</span></div>
-                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">ms</span></div>
-                    <div class="ovm-status">暂无数据</div>
-                  </div>
-
-                  <div class="ovm-card ovm-na" data-metric="max_lane_idle" data-unit="%" data-dir="low" data-warn="10">
-                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">最空闲泳道空挡</span><span class="ovm-info" data-tip="最空闲泳道的空挡比例。device 计算泳道空挡 > 10% 通常指向 host 下发跟不上（算力被饿死）。">?</span></div>
-                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
-                    <div class="ovm-status">暂无数据</div>
-                  </div>
-
-                  <div class="ovm-card ovm-na" data-metric="max_lane_gap" data-unit="ms">
-                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">泳道最大间隔</span><span class="ovm-info" data-tip="单条泳道内相邻区间的最大空隙。结合 per-step 归一排除一次性事件（初始化 / save ckpt）。">?</span></div>
-                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">ms</span></div>
                     <div class="ovm-status">暂无数据</div>
                   </div>
 
@@ -4904,6 +4892,18 @@ class SwimlaneRenderer {
 
                   <div class="ovm-card ovm-na" data-metric="step_cv" data-unit="%" data-dir="low" data-warn="10">
                     <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">step 抖动 (CV)</span><span class="ovm-info" data-tip="step 耗时离散度（CV = std/mean）。> 10% 训练不稳定，应先 per-step 归一取典型 step 再分析。">?</span></div>
+                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
+                    <div class="ovm-status">暂无数据</div>
+                  </div>
+
+                  <div class="ovm-card ovm-na" data-metric="max_lane_idle" data-unit="%" data-dir="low" data-warn="10">
+                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">最空闲泳道空挡</span><span class="ovm-info" data-tip="最空闲泳道的空挡比例。device 计算泳道空挡 > 10% 通常指向 host 下发跟不上（算力被饿死）。">?</span></div>
+                    <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
+                    <div class="ovm-status">暂无数据</div>
+                  </div>
+
+                  <div class="ovm-card ovm-na" data-metric="comm_jitter" data-unit="%" data-dir="low" data-warn="15">
+                    <div class="ovm-head"><span class="ovm-dot"></span><span class="ovm-name">通信抖动 (CV)</span><span class="ovm-info" data-tip="逐 step 通信耗时的变异系数（CV = std/mean）。> 15% 表示通信时延不稳定，可能存在慢链路、网络拥塞或 HCCL 重传，是慢卡排查的辅助信号。">?</span></div>
                     <div class="ovm-body"><span class="ovm-value">—</span><span class="ovm-unit">%</span></div>
                     <div class="ovm-status">暂无数据</div>
                   </div>
@@ -8144,7 +8144,7 @@ loss = vocab_parallel_cross_entropy(logits, labels)
     metrics: {
       critical_path_ratio: { value: 62, note: '末级 (compute+transmit)/step；约 38% 为 bubble/free' },
       overlap_ratio:       { value: 0, status: 'bad', note: 'Overlapped 全为 0，通信全暴露' },
-      exposed_comm:        { value: 102, note: '纯传输暴露/卡；另有 ~248ms 为 PP bubble 等待(communicationWaitStageTime)' },
+      op_utilization:      { value: 58, note: 'device Cube+Vector 忙时占 step 的 58%；约 42% 为 PP bubble / free 空泡' },
       pp_bubble_ratio:     { value: 39, note: '首级 batchSendRecv 空等 ~313ms / 810ms' },
     },
     actions: [
@@ -9811,13 +9811,13 @@ function parseReport(md, filename = '') {
 // 可见的「时序结构指标看板」表格 → r.metrics（规则 7）。中文指标名↔看板 key 固定映射。
 const METRIC_LABEL_KEY = {
   '关键路径占比': 'critical_path_ratio',
+  '算子利用率': 'op_utilization',
   '计算-通信重叠率': 'overlap_ratio',
-  '暴露通信': 'exposed_comm',
-  '最空闲泳道空挡': 'max_lane_idle',
-  '泳道最大间隔': 'max_lane_gap',
   'Host 下发间隙占比': 'host_launch_gap_ratio',
   'PP 流水线 bubble 率': 'pp_bubble_ratio',
   'step 抖动 (CV)': 'step_cv',
+  '最空闲泳道空挡': 'max_lane_idle',
+  '通信抖动 (CV)': 'comm_jitter',
 };
 function parseMetricsTable(md) {
   // 截取「时序结构指标看板」标题到下一个 ##/### 或文末之间的区段

@@ -278,6 +278,34 @@
     background:rgba(24,99,220,.05); border:1px solid rgba(24,99,220,.12);
     border-radius:12px; padding:9px 13px; margin-bottom:12px; }
 
+  /* drill-down horizontal chain */
+  .dd-spike-title { font-family:var(--font-display); font-size:13px; font-weight:600; color:var(--red);
+    margin-bottom:11px; line-height:1.45; letter-spacing:-.01em; }
+  .dd-chain { display:flex; gap:0; margin-bottom:14px; align-items:stretch; }
+  .dd-sep { display:flex; align-items:center; padding:0 4px; flex-shrink:0; }
+  .dd-sep-arrow { display:flex; align-items:center; gap:0; color:rgba(180,35,24,.65); }
+  .dd-sep-line { width:16px; height:3px; background:rgba(180,35,24,.50); border-radius:2px; }
+  .dd-sep-head { font-size:22px; font-weight:900; line-height:1; margin-left:-3px; }
+  .dd-node { flex:1; min-width:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .dd-node.warn-node { border-color:rgba(180,92,23,.30); }
+  .dd-node.crit-node { border-color:rgba(180,35,24,.22); }
+  .dd-node-head { padding:6px 10px 5px; font-size:10px; font-family:var(--font-mono); letter-spacing:.04em; display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+  .dd-node-head.warn { background:rgba(180,92,23,.07); }
+  .dd-node-head.crit { background:rgba(180,35,24,.05); }
+  .dd-node-head-row { display:flex; justify-content:space-between; align-items:center; gap:4px; }
+  .dd-node-layer { color:var(--text-3); text-transform:uppercase; }
+  .dd-node-link { font-size:10px; font-family:var(--font-mono); color:var(--blue); text-decoration:none; white-space:nowrap; flex-shrink:0; }
+  .dd-node-link:hover { text-decoration:underline; }
+  .dd-node-title { font-size:12px; font-weight:600; color:var(--text); line-height:1.3; }
+  .dd-node-title.warn { color:var(--orange); }
+  .dd-node-title.crit { color:var(--red); }
+  .dd-node-body { padding:7px 10px 9px; flex:1; }
+  .dd-metric { display:flex; justify-content:space-between; align-items:baseline; gap:5px; padding:3px 0; font-size:11px; border-bottom:1px solid rgba(33,33,33,.05); }
+  .dd-metric:last-child { border-bottom:none; }
+  .dd-metric-k { color:var(--text-3); white-space:nowrap; flex-shrink:0; }
+  .dd-metric-v { font-family:var(--font-mono); font-weight:600; color:var(--text); text-align:right; min-width:0; word-break:break-all; }
+  .dd-metric-v.bad { color:var(--red); }
+
   /* framework-layer checklist (#10) */
   .fw-check { border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:14px; background:rgba(33,33,33,.015); }
   .fw-check-title { font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:8px;
@@ -606,6 +634,22 @@
 | 10 | **【原文】**「将后向的梯度 AllReduce 与前向的计算重叠」；「解决 MoE 模型的负载均衡、AlltoAll 通信压缩问题」；「异步数据加载等工程细节」<br>智能诊断仅给出超参建议（调 init_kl_coef），未排查框架层因素（梯度同步延迟、数据 batch 解析告警关联、reward 模型负载不均），可能治标不治本 | DPO/infra 框架任务诊断区在现有 `paras` 建议前插入"框架层排查清单"：3 条逐项检查（通信异常 ✓/✗、数据告警关联 ✓/✗、卡间负载均衡 ✓/✗），全部通过后才显示超参调整建议；清单结果由 `diag.frameworkChecks:[{label,pass,detail}]` 驱动 | ✅ 已完成 |
 
 ---
+
+## DeepSeek-R1 3.2 _ infra 框架（#11）
+
+### 背景
+
+任务：**DeepSeek-R1 3.2 _ infra 框架**，AI 完成 loss spike 根因三级下钻定位链路：loss spike 现象（提供 spike 时刻 MFU、NPU 利用率、通信延迟快照）→ Rank 5 硬件异常（温度 89℃ 触发降频、频率降至额定 62%、正在执行 lightning_index_prolog_quant）→ lightning_index_prolog_quant int32 索引溢出（batch×seq×layer 超 INT32_MAX，quant_scale_table 越界读取，NaN 传播导致 loss spike）。提供修复建议（int32→int64）及修复后 loss 恢复曲线预览。
+
+---
+
+## 改造清单-3
+
+| # | 问题 | 改法 | 状态 |
+|---|------|------|------|
+| 11 | **DeepSeek-R1 3.2 infra 先导实验**：已有 Qwen2.5-7B infra 框架任务，需新增一条 loss spike 诊断场景的 DeepSeek 任务记录，演示 AI 完成三级下钻的完整定位链路 | 在 `TASKS` 顶部新增 `deepseek32` 任务：① 因果链诊断卡包含 3 个节点（spike 时刻全集群画像 → Rank 5 温度/频率/算子定位 → lightning_index_prolog_quant int32 越界根因），每节点附带具体量化数据；② 修复建议含 int64 改造方案及 CHECK_LE 守卫；③ 诊断对比图展示修复前 spike 曲线与修复后预估恢复曲线；④ 指标卡片展示 MFU 诊断卡（54%→31% spike）、NPU 利用率 step 分解、分布式并行效率三项仪表 | ✅ 已完成 |
+
+---
 </script>
 <div class="app">
   <aside class="sidebar">
@@ -622,6 +666,7 @@
     <div class="tabs-row">
       <div class="tabs">
         <div class="tab active" data-tab="overview">总览</div>
+        <div class="tab" data-tab="charts">图表</div>
         <div class="tab" data-tab="hparams">超参</div>
         <div class="tab" data-tab="events">事件</div>
         <div class="tab" data-tab="logs">日志</div>
@@ -659,6 +704,8 @@
 
       <div id="scaleSection"></div>
     </div>
+
+    <div id="tab-charts" style="display:none"></div>
 
     <div id="tab-hparams" style="display:none">
       <div id="hparamsContent"></div>
@@ -1287,6 +1334,7 @@
     </div>
     <div class="float-tabs">
       <div class="float-tab active" data-tab="overview">总览</div>
+      <div class="float-tab" data-tab="charts">图表</div>
       <div class="float-tab" data-tab="hparams">超参</div>
       <div class="float-tab" data-tab="events">事件</div>
       <div class="float-tab" data-tab="logs">日志</div>
@@ -1304,6 +1352,135 @@
 //  · qwen / dpo 任务为符合业务的构造数据
 // ============================================================
 const TASKS = {
+  deepseek32: {
+    name: "DeepSeek-R1 3.2 _ infra 框架", dot: "red", status: "var(--red)",
+    title: "DeepSeek-R1 3.2 _ infra 框架 [loss spike 异常]", creator: "wzh",
+    description: "infra 框架先导实验，AI 完成 loss spike 根因三级下钻定位：spike 现象 → Rank 5 硬件异常 → lightning_index_prolog_quant 算子 int32 越界",
+    metrics: [
+      { label: "loss",          value: "3.20",  key: "loss",      shown: true  },
+      { label: "MFU",           value: "31%",   key: "mfu",       shown: true  },
+      { label: "NPU 利用率",    value: "41%",   key: "npu",       shown: true  },
+      { label: "通信延迟",      value: "380ms", key: "comm",      shown: true  },
+      { label: "grad_norm",     value: "48.3",  key: "grad_norm", shown: false },
+      { label: "学习率 (lr)",   value: "6e-5",  key: "lr",        shown: false },
+      { label: "吞吐量 tokens/s", value: "0.9万", key: "tput",   shown: false },
+      { label: "NPU显存占用",   value: "91%",   key: "vram",      shown: false },
+      { label: "NPU温度",       value: "89℃",  key: "temp",      shown: false },
+      { label: "s/step (步耗时)", value: "4.12s", key: "sstep",  shown: false },
+    ],
+    runtime: { big: "0小时47分", stepCur: "580", stepTotal: "3000", epochCur: "1", epochTotal: "3",
+      pct: 19, barColor: "var(--red)", live: false,
+      info: [["机器信息","16 × Ascend 910B 64GB"],["资源信息","128 vCPU / 1024GB"],
+        ["计算节点","node-npu-03"],["代码目录","/workspace/deepseek-r1-3.2"],
+        ["镜像","mindspore:2.3.0-cann8.0"],["执行命令","msrun --nproc_per_node=16 train.py --model deepseek-r1-3.2b --seq_len 4096"]] },
+    artifacts: [
+      { name:"ckpt-500", meta:"loss 0.44" }, { name:"ckpt-400", meta:"loss 0.46" },
+      { name:"ckpt-300", meta:"loss 0.50", best:true }, { name:"ckpt-200", meta:"loss 0.55" } ],
+    events: [
+      { c:"var(--red)", t:"loss spike 至 1.85，触发自动暂停；Rank 5 lightning_index_prolog_quant 算子 int32 越界", time:"00:47", step:580 },
+      { c:"var(--red)", t:"Rank 5 温度 89℃（阈值 85℃）触发 DVFS 降频至额定 62%，正执行量化索引预计算核函数", time:"00:44", step:562 },
+      { c:"#ffab00", t:"AllReduce P99 延迟 spike 至 380ms（正常 ~120ms），触发全 rank 同步等待风暴", time:"00:43", step:548 } ],
+    diag: {
+      drilldown: {
+        title: "step 580 · loss 出现 spike，grad_norm 大幅激增至 48.3",
+        nodes: [
+          {
+            layer: "L1 · 现象层",
+            tag: "warn",
+            title: "Loss Spike 触发",
+            metrics: [
+              { k: "loss",       v: "0.41 → 3.20",   bad: true },
+              { k: "MFU",        v: "54% → 31%",     bad: true },
+              { k: "NPU 利用率", v: "73% → 41%",     bad: true },
+              { k: "AllReduce",  v: "120ms → 380ms", bad: true },
+              { k: "grad_norm",  v: "1.3 → 48.3",    bad: true },
+            ]
+          },
+          {
+            layer: "L2 · Rank 定位",
+            tag: "crit",
+            title: "Rank 5 硬件异常",
+            link: "https://yinyucheng0601.github.io/compute-graph-viewer/Profiling_Insight_and_Tool/AI_Profiling_Tool/MindStudioNext.html",
+            metrics: [
+              { k: "芯片温度",    v: "89℃ (阈值85℃)", bad: true },
+              { k: "核心频率",    v: "62% 额定",       bad: true },
+              { k: "当前算子",    v: "lightning_index_prolog_quant", bad: true },
+              { k: "算子耗时占比", v: "37% / step",    bad: true },
+            ]
+          },
+          {
+            layer: "L3 · 算子根因",
+            tag: "crit",
+            title: "int32 索引越界",
+            link: "https://yinyucheng0601.github.io/compute-graph-viewer/graphviz/deepseek_v32_report_overlay_demo.html",
+            metrics: [
+              { k: "溢出路径",    v: "32×4096×17",          bad: true },
+              { k: "超出 INT32_MAX", v: "+80.7M",           bad: true },
+              { k: "quant_scale", v: "越界读取随机值",        bad: true },
+              { k: "loss 贡献",   v: "0.03 → 82.4 (单层)", bad: true },
+            ]
+          }
+        ]
+      },
+      recommend: `<b>修复方案：</b>将 <span class="hl">lightning_index_prolog_quant</span> 核函数内 3 处索引计算从 <span class="hl">int32 → int64</span>，并在算子入口添加 <code>CHECK_LE(batch * seq * layers, INT64_MAX)</code> 守卫；预计修复后约 <span class="hl">50 step</span> 内 loss 恢复至正常水位 ≈ 0.42，NPU 利用率回升至 ≥70%，AllReduce 延迟恢复 ~120ms。`,
+      before: { cap:"修复前（spike 中）", val:"loss 3.2 ↑", color:"var(--red)", key:"diagBefore" },
+      after:  { cap:"修复后预估", val:"loss 0.42 ✓", color:"var(--green)", key:"diagAfter" } },
+    key: [
+      { type:"mfu", label:"MFU（spike 前 54%）", value:"31%", key:"mfu", peak:0.65,
+        breakdown:{compute:0.48, comm:0.40, other:0.12} },
+      { type:"gpuutil", label:"NPU 利用率", value:"41%", key:"npu",
+        stepBreakdown:{fwd:380, bwd:620, opt:160, comm:490, data:80} },
+      { type:"disteff", label:"16×Ascend 910B 并行效率",
+        gauges:[
+          {key:"bubbleRate",   label:"Pipeline Bubble", value:"18%", target:0.05, lte:true},
+          {key:"overlapRatio", label:"通信/计算重叠",   value:"52%", target:0.85, lte:false},
+          {key:"nvlinkUtil",   label:"HCCS 带宽利用",   value:"45%", target:0.80, lte:false}
+        ]},
+      { label:"loss", value:"3.20", bad:true, band:"red", key:"loss",
+        anom:"⚠ step 580 loss spike 至 3.20 · Rank 5 lightning_index_prolog_quant int32 越界" }
+    ],
+    series: {
+      loss:      [0.68,0.64,0.60,0.57,0.55,0.52,0.49,0.47,0.45,0.44,0.43,0.42,0.41,0.41,0.42,3.20,1.78,1.92,1.85,1.87],
+      mfu:       [0.52,0.53,0.54,0.53,0.55,0.54,0.53,0.55,0.54,0.52,0.53,0.54,0.53,0.54,0.42,0.35,0.31,0.33,0.32,0.31],
+      npu:       [0.70,0.72,0.73,0.71,0.74,0.73,0.71,0.73,0.74,0.72,0.73,0.74,0.72,0.73,0.60,0.50,0.41,0.44,0.42,0.41],
+      comm:      [118,122,120,125,119,123,121,124,120,122,118,121,123,125,195,295,380,365,372,378],
+      grad_norm: [1.2,1.3,1.1,1.4,1.2,1.3,1.1,1.5,1.3,1.2,1.4,1.3,1.2,1.4,9.2,31.5,48.3,44.8,46.2,48.3],
+      lr:        [1,2,4,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6],
+      tput:      [1.9,2.0,2.1,2.0,2.2,2.1,2.0,2.1,2.2,2.0,2.1,2.2,2.1,2.1,1.6,1.2,0.9,1.0,1.0,0.9],
+      vram:      [0.78,0.80,0.82,0.83,0.84,0.85,0.86,0.86,0.87,0.88,0.88,0.89,0.89,0.90,0.91,0.91,0.91,0.91,0.91,0.91],
+      temp:      [62,64,65,66,67,67,68,68,69,69,69,70,70,70,79,86,89,88,88,89],
+      sstep:     [2.8,2.7,2.6,2.7,2.5,2.6,2.7,2.5,2.6,2.7,2.5,2.6,2.5,2.6,3.2,3.8,4.1,4.0,4.1,4.1],
+      diagBefore:[0.49,0.47,0.45,0.44,0.43,0.42,0.41,0.41,3.20,1.78,1.92,1.87],
+      diagAfter: [0.49,0.47,0.45,0.44,0.43,0.42,0.41,0.41,0.42,0.42,0.41,0.42],
+      bubbleRate:[0.14,0.15,0.14,0.16,0.15,0.14,0.15,0.14,0.16,0.15,0.14,0.16,0.15,0.16,0.18,0.20,0.22,0.21,0.21,0.22],
+      overlapRatio:[0.58,0.60,0.62,0.59,0.61,0.63,0.60,0.62,0.60,0.61,0.62,0.60,0.61,0.60,0.56,0.53,0.52,0.54,0.53,0.52],
+      nvlinkUtil:[0.50,0.52,0.53,0.51,0.53,0.54,0.52,0.53,0.52,0.53,0.52,0.54,0.52,0.53,0.48,0.46,0.45,0.46,0.46,0.45] },
+    source: `数据为符合 DeepSeek-R1 3.2 infra 框架先导实验的构造数据（loss spike / lightning_index_prolog_quant int32 越界场景）。`,
+    hparams: [
+      { name: "lr", value: "6e-5", history: [
+        { step: null, from: null, to: "1e-4", note: "初始配置" },
+        { step: 200, from: "1e-4", to: "6e-5", note: "手动调整 — 降低学习率改善早期梯度震荡" }
+      ]},
+      { name: "seq_len", value: "4096", history: [
+        { step: null, from: null, to: "2048", note: "初始配置" },
+        { step: 1, from: "2048", to: "4096", note: "⚠ 根因触发配置 — seq_len 扩大后 batch×seq×layer_idx 超出 int32 上界，触发 lightning_index_prolog_quant 越界" }
+      ]},
+      { name: "batch_size", value: "32", history: [
+        { step: null, from: null, to: "32", note: "初始配置" }
+      ]},
+      { name: "lightning_idx_dtype", value: "int32", history: [
+        { step: null, from: null, to: "int32", note: "初始配置（存在越界风险，seq_len×batch×layer_idx≥2^31 时触发）" },
+        { step: 580, from: "int32", to: "int64", note: "⚠ AI 修复建议 — 修复 lightning_index_prolog_quant 核函数中 3 处索引计算精度" }
+      ]},
+      { name: "tp_degree", value: "4", history: [
+        { step: null, from: null, to: "4", note: "初始配置" }
+      ]},
+      { name: "pp_degree", value: "4", history: [
+        { step: null, from: null, to: "4", note: "初始配置" }
+      ]},
+    ]
+  },
+
   qwen: {
     name: "Qwen2.5-7B _ infra 框架", dot: "blue", status: "var(--blue)",
     title: "Qwen2.5-7B _ infra 框架", creator: "wzh", description: "大模型训练推理框架的开发专家，做框架开发先导实验，闭环deepseek：<a href=\"https://chat.deepseek.com/share/rzr5f81w0s5ur688q3\" target=\"_blank\">DeepSeek 对话记录</a>",
@@ -1356,7 +1533,7 @@ const TASKS = {
     series: {
       loss:[0.62,0.55,0.49,0.46,0.40,0.37,0.33,0.30,0.31,0.27,0.24,0.22,0.20,0.18,0.16,0.14,0.13,0.12,0.12,0.12],
       acc:[0.55,0.58,0.60,0.63,0.62,0.66,0.69,0.71,0.74,0.77,0.80,0.83,0.85,0.87,0.88,0.90,0.90,0.91,0.91,0.91],
-      rew:[8,9,11,12,14,15,17,18,20,21,23,24,26,27,28,30,31,33,44,48],
+      rew:[8,9,11,12,14,15,17,18,20,21,23,24,26,27,28,30,31,33,34,35],
       kl:[0.05,0.08,0.10,0.13,0.16,0.20,0.23,0.27,0.30,0.32,0.35,0.37,0.39,0.41,0.43,0.44,0.46,0.47,0.47,0.48],
       mfu:[0.30,0.33,0.36,0.34,0.37,0.39,0.36,0.38,0.40,0.37,0.39,0.35,0.36,0.38,0.34,0.36,0.35,0.37,0.34,0.35],
       gpu:[0.36,0.40,0.44,0.42,0.45,0.48,0.43,0.46,0.49,0.41,0.44,0.39,0.42,0.45,0.40,0.43,0.41,0.44,0.40,0.41],
@@ -1485,12 +1662,12 @@ const TASKS = {
     name: "Qwen2.5-14B _ infra RL", dot: "red", status: "var(--red)",
     title: "Qwen2.5-14B _ infra RL [Qwen2.5-14B · 已中断]", creator: "wzh", description: "infra专家做RL训练看板，闭环deepseek问题：<a href=\"https://chat.deepseek.com/share/kiceh0k2whcrxgjdhw\" target=\"_blank\">DeepSeek 对话记录</a>",
     metrics: [
-      { label: "loss", value: "2.95", key: "loss", shown: true },
+      { label: "logps/chosen", value: "-203", key: "logpsC", shown: true },
       { label: "rewards/acc", value: "0.32", key: "acc", shown: true },
       { label: "GPU利用率", value: "38%", key: "gpu", shown: true },
       { label: "rewards/margin", value: "-1.5", key: "margin", shown: true },
-      { label: "logps/chosen", value: "-182", key: "logpsC", shown: false },
-      { label: "logps/rejected", value: "-205", key: "logpsR", shown: false },
+      { label: "loss", value: "2.95", key: "loss", shown: false },
+      { label: "logps/rejected", value: "-175", key: "logpsR", shown: false },
       { label: "grad_norm", value: "21.4", key: "grad", shown: false },
       { label: "学习率 (lr)", value: "5e-6", key: "lr", shown: false },
       { label: "GPU显存占用", value: "76%", key: "vram", shown: false },
@@ -1519,8 +1696,8 @@ const TASKS = {
       after:  { cap:"修改后预估", val:"loss 0.45 ✓", color:"var(--green)", key:"diagAfter" } },
     key: [
       { type:"dual", label:"logps 偏好对比", keys:["logpsC","logpsR"], labels:["chosen","rejected"],
-        values:["-182","-205"], bad:true,
-        anom:"⚠ chosen 下降快于 rejected，区分度持续塌缩" },
+        values:["-203","-175"], bad:true,
+        anom:"⚠ chosen 下降快于 rejected（-83 vs -57），区分度持续塌缩" },
       { label:"loss", value:"2.95", bad:true, band:"red", key:"loss",
         anom:"⚠ 异常：loss 自 step ~120 起发散" },
       { label:"rewards/accuracies", value:"0.32", bad:true, band:"red", key:"acc",
@@ -1528,13 +1705,13 @@ const TASKS = {
       { label:"grad_norm", value:"21.4", bad:true, band:"red", key:"grad",
         anom:"⚠ 多次触顶" } ],
     series: {
-      loss:[0.69,0.66,0.64,0.61,0.60,0.58,0.62,0.70,0.85,1.10,1.45,1.80,2.10,2.40,2.60,2.70,2.80,2.85,2.90,2.95],
+      loss:[0.69,0.65,0.62,0.60,0.59,0.57,0.61,0.68,0.80,1.05,1.38,1.72,2.05,2.32,2.55,2.63,2.74,2.82,2.88,2.95],
       acc:[0.52,0.55,0.58,0.60,0.61,0.59,0.55,0.50,0.46,0.42,0.40,0.38,0.37,0.36,0.35,0.34,0.34,0.33,0.33,0.32],
       gpu:[0.40,0.42,0.41,0.43,0.40,0.39,0.38,0.40,0.37,0.39,0.38,0.36,0.38,0.37,0.39,0.38,0.37,0.38,0.39,0.38],
       margin:[0.10,0.30,0.50,0.70,0.80,0.70,0.50,0.20,-0.10,-0.40,-0.70,-0.90,-1.10,-1.20,-1.30,-1.35,-1.40,-1.42,-1.45,-1.50],
       grad:[2,3,4,5,6,7,9,11,13,15,17,18,19,20,21,21.2,21.3,21.4,21.4,21.4],
-      logpsC:[-120,-128,-135,-140,-148,-152,-158,-162,-166,-170,-172,-175,-177,-178,-179,-180,-181,-181,-182,-182],
-      logpsR:[-118,-122,-128,-132,-138,-145,-152,-160,-168,-176,-182,-188,-192,-196,-198,-200,-202,-203,-204,-205],
+      logpsC:[-120,-126,-133,-140,-148,-155,-162,-168,-174,-179,-183,-187,-190,-192,-194,-196,-198,-199,-201,-203],
+      logpsR:[-118,-121,-125,-130,-134,-139,-143,-148,-152,-156,-159,-162,-165,-167,-169,-171,-172,-173,-174,-175],
       lr:[1,2,3,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
       vram:[0.66,0.68,0.70,0.71,0.72,0.73,0.73,0.74,0.74,0.75,0.75,0.75,0.76,0.76,0.76,0.76,0.76,0.76,0.76,0.76],
       kl:[0.5,1.2,2.5,4,6,9,13,18,25,34,45,58,72,88,105,120,135,148,160,172],
@@ -1637,6 +1814,31 @@ const TASKS = {
 //   各任务用相同的分组/key 命名，泳道才能横向对齐、支持「只看差异」。
 // ============================================================
 const COMPARE_PARAMS = {
+  deepseek32: [
+    { group:"运行参数", items:[
+      { key:"卡型规格", value:"16×Ascend 910B" },
+      { key:"训练时长", value:"0小时47分（暂停）" },
+      { key:"总 step",  value:"3000" },
+      { key:"评估准确度", value:"N/A（spike 中）" },
+      { key:"s/step",   value:"4.12s", better:"low" },
+      { key:"显存占用", value:"91%",  better:"low" },
+      { key:"吞吐量",   value:"0.9万 tok/s" } ]},
+    { group:"环境参数", items:[
+      { key:"框架",   value:"MindSpore 2.3.0" },
+      { key:"镜像",   value:"mindspore:2.3.0-cann8.0" },
+      { key:"CUDA",   value:"CANN 8.0" },
+      { key:"计算节点", value:"node-npu-03" } ]},
+    { group:"指令参数", items:[
+      { key:"启动方式", value:"msrun" },
+      { key:"nproc_per_node", value:"16" },
+      { key:"入口脚本", value:"train.py" } ]},
+    { group:"配置参数", items:[
+      { key:"TP", value:"4" }, { key:"PP", value:"4" }, { key:"DP", value:"1" },
+      { key:"GradAcc", value:"4" }, { key:"attn_kernel", value:"flash_quant" }, { key:"量化", value:"int8" } ]},
+    { group:"超参数", items:[
+      { key:"lr", value:"6e-5" }, { key:"batch_size", value:"32" },
+      { key:"seq_len", value:"4096" }, { key:"lightning_idx_dtype", value:"int32→int64(修复)" } ]},
+  ],
   qwen: [
     { group:"运行参数", items:[
       { key:"卡型规格", value:"8×H800" },
@@ -1921,7 +2123,7 @@ function tickLiveCards(){
 }
 
 // ---------- render ----------
-let current = "qwen";
+let current = Object.keys(TASKS)[0];
 
 function renderSidebar(){
   document.getElementById('taskList').innerHTML = Object.entries(TASKS).map(([id,t])=>
@@ -2001,7 +2203,30 @@ function renderAll(){
           </div>
         </div>`).join('')}
     </div>` : '';
-  const adviceBody = d.causal
+  const adviceBody = d.drilldown
+    ? `<div class="dd-spike-title">${d.drilldown.title}</div>
+       <div class="dd-chain">
+        ${d.drilldown.nodes.map((node, i) => `
+          ${i > 0 ? `<div class="dd-sep"><div class="dd-sep-arrow"><div class="dd-sep-line"></div><span class="dd-sep-head">→</span></div></div>` : ''}
+          <div class="dd-node ${node.tag}-node">
+            <div class="dd-node-head ${node.tag}">
+              <div class="dd-node-head-row">
+                <span class="dd-node-layer">${node.layer}</span>
+                ${node.link ? `<a href="${node.link}" target="_blank" rel="noopener" class="dd-node-link">查看 ↗</a>` : ''}
+              </div>
+              <span class="dd-node-title ${node.tag}">${node.title}</span>
+            </div>
+            <div class="dd-node-body">
+              ${node.metrics.map(m => `<div class="dd-metric">
+                <span class="dd-metric-k">${m.k}</span>
+                <span class="dd-metric-v${m.bad?' bad':''}">${m.v}</span>
+              </div>`).join('')}
+            </div>
+          </div>`).join('')}
+       </div>
+       ${d.recommend ? `<div class="diag-recommend">${d.recommend}</div>` : ''}
+       <div class="btns"><button class="btn primary">一键修改</button><button class="btn ghost">查看详情</button></div>`
+    : d.causal
     ? `<div class="causal-wrap">${d.causal.map(c => `
         <div class="causal-row">
           <span class="causal-step-col">step ${c.step}</span>
@@ -2157,6 +2382,7 @@ function renderAll(){
   renderScaleSection();
   renderEventsTab();
   renderHparamsTab();
+  renderChartsTab();
   const _at = document.querySelector('.tab.active');
   if(_at && _at.dataset.tab==='dashboard' && dashSource==='task') dashApply();
 }
@@ -2170,7 +2396,6 @@ function renderCards(){
        <div class="mc-info"><span class="label">${c.label}</span><span class="value">${c.value}</span></div>
        <div class="spark">${sparkSVG(t.series[c.key],'#1863dc')}</div></div>`).join('')
     : `<div class="metric-card" style="justify-content:center;color:var(--text-3)">未选择任何指标</div>`;
-  startCardsTicker();
 }
 
 function renderDropdown(){
@@ -2519,6 +2744,7 @@ function initTabs(){
       const panel = document.getElementById('tab-'+tab.dataset.tab);
       if(panel) panel.style.display='';
       if(tab.dataset.tab==='overview') drawCharts();
+      if(tab.dataset.tab==='charts') renderChartsTab();
       if(tab.dataset.tab==='hparams') renderHparamsTab();
       const _isDash = tab.dataset.tab==='dashboard';
       const _tgl = document.getElementById('dashSourceToggle');
@@ -2630,6 +2856,134 @@ function renderEventsTab(){
     }).join('')}</tbody></table>`;
 }
 
+// ---------- render charts tab（当前任务数据趋势，与对比页同指标集 + 多图联动气泡）----------
+function renderChartsTab(){
+  chartTabCharts = [];
+  const t = TASKS[current];
+  const el = document.getElementById('tab-charts');
+  if(!el) return;
+  const color = dotColor(current);
+  const metrics = CMP_METRICS.filter(m => cmpSeries(current, m));
+  if(!metrics.length){
+    el.innerHTML = '<div class="card" style="padding:32px 24px;text-align:center;color:var(--text-3);">暂无图表数据</div>';
+    return;
+  }
+  const firstKey = (metrics[0].alias && metrics[0].alias[current]) || metrics[0].id;
+  const stepMax = Math.round(parseFloat(t.runtime.stepCur)) ||
+    (t.series[firstKey] ? t.series[firstKey].length : 20);
+
+  el.innerHTML = `
+    <div class="section-title" style="margin-top:0;margin-bottom:16px;">
+      数据趋势
+      <span style="font-size:12px;font-weight:400;color:var(--text-3);font-family:var(--font-mono)">
+        当前任务 · step 0 – ${stepMax}
+      </span>
+    </div>
+    <div class="cmp-grid">${metrics.map((m,i)=>{
+      const data = cmpSeries(current, m);
+      const lastVal = data[data.length-1];
+      return `<div class="card" style="padding:14px;min-width:0;">
+        <div class="cmp-chart-head">
+          <span class="cmp-chart-head-left">
+            <span class="cmp-chart-title">${m.label}</span>
+          </span>
+          <span id="chtabVal${i}" style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--text)">${fmtNum(lastVal)}</span>
+        </div>
+        <div class="km-chart" id="chtab${i}" style="cursor:crosshair;"></div>
+        <div class="km-axis" id="chtabAx${i}"></div>
+        <div class="km-axis-title">step</div>
+      </div>`;
+    }).join('')}</div>`;
+
+  const ticks = 4;
+  metrics.forEach((m,i)=>{
+    const chartEl = document.getElementById('chtab'+i);
+    if(!chartEl) return;
+    const data = cmpSeries(current, m);
+    bigChart(chartEl, data, color, null);
+    overlayEventLines(chartEl, t.events, stepMax);
+    const ax = document.getElementById('chtabAx'+i);
+    if(ax) ax.innerHTML = Array.from({length:ticks+1},(_,j)=>
+      `<span>${Math.round(stepMax*j/ticks)}</span>`).join('');
+
+    // 在 SVG 内注入联动竖线 + 数据点容器
+    const svg = chartEl.querySelector('svg');
+    if(!svg) return;
+    const vb = svg.viewBox.baseVal;
+    const w = vb.width||460, h = vb.height||150, pad = 12;
+
+    const vline = document.createElementNS('http://www.w3.org/2000/svg','line');
+    vline.setAttribute('x1','0'); vline.setAttribute('y1',String(pad));
+    vline.setAttribute('x2','0'); vline.setAttribute('y2',String(h-pad));
+    vline.setAttribute('stroke','rgba(33,33,33,.32)');
+    vline.setAttribute('stroke-width','1');
+    vline.setAttribute('stroke-dasharray','3 3');
+    vline.style.display = 'none';
+    svg.appendChild(vline);
+
+    const dotsG = document.createElementNS('http://www.w3.org/2000/svg','g');
+    svg.appendChild(dotsG);
+
+    // 单图气泡（定位在 .km-chart 内）
+    const tip = document.createElement('div');
+    tip.className = 'cmp-chart-tip';
+    chartEl.appendChild(tip);
+
+    const n = data.length;
+    const span = n > 1 ? n-1 : 1;
+    const X = idx => pad + idx*(w-pad*2)/span;
+    const minV = Math.min(...data), maxV = Math.max(...data), rng = (maxV-minV)||1;
+    const Y = v => pad + (h-pad*2)*(1-(v-minV)/rng);
+
+    chartTabCharts.push({ chartEl, m, data, n, w, X, Y, vline, dotsG, tip, color, stepMax, span,
+      valEl: document.getElementById('chtabVal'+i) });
+
+    chartEl.addEventListener('mousemove', e=>{
+      const rect = chartEl.getBoundingClientRect();
+      const px = (e.clientX - rect.left) / rect.width * w;
+      let idx = Math.round((px - pad) / ((w-pad*2)/span));
+      idx = Math.max(0, Math.min(n-1, idx));
+      syncChartsTab(idx);
+    });
+    chartEl.addEventListener('mouseleave', hideChartsTab);
+  });
+}
+
+function syncChartsTab(idx){
+  chartTabCharts.forEach(c=>{
+    const safeIdx = Math.min(idx, c.n-1);
+    const x = c.X(safeIdx).toFixed(1);
+    c.vline.setAttribute('x1',x); c.vline.setAttribute('x2',x);
+    c.vline.style.display = '';
+    const v = c.data[safeIdx];
+    c.dotsG.innerHTML = `<circle cx="${x}" cy="${c.Y(v).toFixed(1)}" r="3.5" fill="${c.color}" stroke="#fff" stroke-width="1.5"/>`;
+    const stepVal = Math.round(safeIdx/c.span*c.stepMax);
+    c.tip.innerHTML = `<div class="cmp-tip-head">step ${stepVal}</div>
+      <div class="cmp-tip-row">
+        <span class="cmp-tip-dot" style="background:${c.color}"></span>
+        <span class="cmp-tip-name">${c.m.label}</span>
+        <span class="cmp-tip-val">${fmtNum(v)}</span>
+      </div>`;
+    c.tip.style.display = 'block';
+    const aw = c.chartEl.clientWidth;
+    const pxX = c.X(safeIdx)/c.w*aw;
+    const tw = c.tip.offsetWidth;
+    let left = pxX < aw/2 ? pxX+10 : pxX-tw-10;
+    c.tip.style.left = Math.max(2, Math.min(left, aw-tw-2))+'px';
+    c.tip.style.top = '4px';
+    if(c.valEl) c.valEl.textContent = fmtNum(v);
+  });
+}
+
+function hideChartsTab(){
+  chartTabCharts.forEach(c=>{
+    c.vline.style.display = 'none';
+    c.dotsG.innerHTML = '';
+    c.tip.style.display = 'none';
+    if(c.valEl) c.valEl.textContent = fmtNum(c.data[c.n-1]);
+  });
+}
+
 // ---------- render hparams tab ----------
 function renderHparamsTab(){
   const t = TASKS[current];
@@ -2732,6 +3086,7 @@ let compareMode = false;
 const compareSel = new Set(['qwen','pythia','dpo']);   // 默认勾选：健康基线 + 真实参照 + 异常任务
 let baselineKey = 'qwen';                              // 默认以健康的 qwen RLHF 为基线
 let cmpCharts = [];
+let chartTabCharts = [];
 // #9 参数对比状态
 let compareTab = 'chart';      // 'chart' 图表对比 | 'param' 参数对比
 let markBest = true;           // 标记最优（默认开）

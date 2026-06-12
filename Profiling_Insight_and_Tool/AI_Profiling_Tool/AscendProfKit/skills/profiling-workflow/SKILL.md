@@ -406,16 +406,18 @@ get_skill("msinsight-view-selector")
 
 ### 字段约定（标准指标名 ↔ 看板 key）
 
+按优先级排序，首列写法一字不差，前端按此映射看板 key：
+
 | 指标（首列固定写法） | 看板 key | 单位 | 值范围 |
 |---|---|---|---|
 | 关键路径占比 | `critical_path_ratio` | % | 0–100 |
+| 算子利用率 | `op_utilization` | % | 0–100 |
 | 计算-通信重叠率 | `overlap_ratio` | % | 0–100 |
-| 暴露通信 | `exposed_comm` | ms | 数字 |
-| 最空闲泳道空挡 | `max_lane_idle` | % | 0–100 |
-| 泳道最大间隔 | `max_lane_gap` | ms | 数字 |
 | Host 下发间隙占比 | `host_launch_gap_ratio` | % | 0–100 |
 | PP 流水线 bubble 率 | `pp_bubble_ratio` | % | 0–100 |
 | step 抖动 (CV) | `step_cv` | % | 数字 |
+| 最空闲泳道空挡 | `max_lane_idle` | % | 0–100 |
+| 通信抖动 (CV) | `comm_jitter` | % | 数字 |
 
 列含义：
 

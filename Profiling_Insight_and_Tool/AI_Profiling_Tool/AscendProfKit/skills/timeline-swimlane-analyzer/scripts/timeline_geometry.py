@@ -282,11 +282,82 @@ def analyze_jitter(path):
     }
 
 
+def analyze_comm_jitter(path):
+    """从 step_trace_time.csv 计算逐 step 通信耗时的 CV（通信抖动）。单位微秒→ms。"""
+    try:
+        header, rows = parse_csv_simple(path)
+    except OSError as ex:
+        return {"error": f"读取失败: {ex}"}
+    if not rows:
+        return {"error": "step_trace_time.csv 为空"}
+
+    def fnum(d, key):
+        try:
+            return float(d.get(key, "") or 0)
+        except ValueError:
+            return 0.0
+
+    comm_cols = [c for c in header
+                 if re.search(r"Communication\(Not Overlapped\)|communication.*not.*overlapped", c, re.I)]
+    if not comm_cols:
+        comm_cols = [c for c in header if re.search(r"^Communication$|^Comm$", c, re.I)]
+    if not comm_cols:
+        return {"error": "step_trace_time.csv 中未找到通信耗时列", "header": header}
+
+    comm_col = comm_cols[0]
+    steps = []
+    for r in rows:
+        if any(k in r for k in ("Step", "step", "Step ID")):
+            val = fnum(r, comm_col)
+            if val > 0:
+                steps.append(val)
+
+    if len(steps) < 2:
+        return {"error": f"通信时长序列仅 {len(steps)} 个 step，无法计算 CV"}
+
+    steps_ms = [s * US_TO_MS for s in steps]
+    mean = sum(steps_ms) / len(steps_ms)
+    if mean <= 0:
+        return {"error": "通信时长均值为 0"}
+    var = sum((x - mean) ** 2 for x in steps_ms) / len(steps_ms)
+    std = var ** 0.5
+    return {
+        "n_steps": len(steps_ms),
+        "mean_ms": mean,
+        "std_ms": std,
+        "cv": std / mean,
+        "source_col": comm_col,
+    }
+
+
+def analyze_op_utilization(lanes, proc_name, device_re, gstart, gend):
+    """AI Core 利用率 = device 计算泳道忙时 / step 总跨度（time-based，非 FLOPs-based）。"""
+    total = (gend - gstart) if (gstart is not None and gend is not None) else 0.0
+    if total <= 0:
+        return {"error": "无法确定 step 跨度"}
+
+    dev_iv = []
+    for (pid, tid), ivs in lanes.items():
+        pname = proc_name.get(pid, "")
+        if re.search(device_re, pname or "", re.I):
+            dev_iv.extend((s, e) for s, e, _ in ivs)
+
+    if not dev_iv:
+        return {"error": "未识别到计算泳道（device_re 无匹配）"}
+
+    _, busy, _ = merge_union([(s, e, "") for s, e in dev_iv])
+    return {
+        "busy_ms": busy * US_TO_MS,
+        "total_ms": total * US_TO_MS,
+        "op_utilization": min(1.0, busy / total),
+    }
+
+
 def fmt(v, n=2):
     return f"{v:.{n}f}"
 
 
-def print_report(args, lanes_rows, gstart, gend, overlap, crit, jitter):
+def print_report(args, lanes_rows, gstart, gend, overlap, crit, jitter, comm_jitter, op_util):
     print("=" * 72)
     print("Timeline 泳道时序结构分析  (单位: ms)")
     print("=" * 72)
@@ -331,6 +402,27 @@ def print_report(args, lanes_rows, gstart, gend, overlap, crit, jitter):
             print(f"  长尾 step 序号: {jitter['longtail_step_idx'] or '无'}")
             if jitter["cv"] > 0.10:
                 print("  ⚠ CV > 10%：训练不稳定，先 per-step 归一取典型 step 再分析（见 SKILL 维度6）")
+
+    print("\n[新增] 算子利用率（AI Core time-based）")
+    if "error" in op_util:
+        print(f"  {op_util['error']}")
+    else:
+        util_pct = op_util["op_utilization"] * 100
+        print(f"  device 忙时: {fmt(op_util['busy_ms'])} ms | step 跨度: {fmt(op_util['total_ms'])} ms | "
+              f"算子利用率: {fmt(util_pct)}%")
+        if util_pct < 60:
+            print("  ⚠ 算子利用率 < 60%：大量空泡/等待，结合关键路径占比与空挡比例定位根因")
+
+    if comm_jitter is not None:
+        print("\n[新增] 通信抖动（逐 step 通信 CV）")
+        if "error" in comm_jitter:
+            print(f"  {comm_jitter['error']}")
+        else:
+            print(f"  step 数: {comm_jitter['n_steps']} | 通信均值: {fmt(comm_jitter['mean_ms'])} ms | "
+                  f"std: {fmt(comm_jitter['std_ms'])} ms | CV: {fmt(comm_jitter['cv']*100)}%")
+            print(f"  来源列: {comm_jitter['source_col']}")
+            if comm_jitter["cv"] > 0.15:
+                print("  ⚠ CV > 15%：通信时延不稳定，排查慢链路 / 网络拥塞 / HCCL 重传")
     print("=" * 72)
 
 
@@ -360,6 +452,8 @@ def main():
     crit = analyze_critical_path(lanes, proc_name, overlap, args.device_regex,
                                  args.comm_regex, gstart, gend)
     jitter = analyze_jitter(args.step_trace) if args.step_trace else None
+    comm_jitter = analyze_comm_jitter(args.step_trace) if args.step_trace else None
+    op_util = analyze_op_utilization(lanes, proc_name, args.device_regex, gstart, gend)
 
     # 清理内部字段
     overlap.pop("_dev_iv", None)
@@ -367,10 +461,11 @@ def main():
 
     if args.json:
         out = {"lanes": lanes_rows, "overlap": overlap,
-               "critical_path": crit, "jitter": jitter}
+               "critical_path": crit, "jitter": jitter,
+               "comm_jitter": comm_jitter, "op_util": op_util}
         print(json.dumps(out, ensure_ascii=False, indent=2))
     else:
-        print_report(args, lanes_rows, gstart, gend, overlap, crit, jitter)
+        print_report(args, lanes_rows, gstart, gend, overlap, crit, jitter, comm_jitter, op_util)
     return 0
 
 
