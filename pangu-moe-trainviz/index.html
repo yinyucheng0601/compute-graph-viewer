@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrainScope · 盘古训练透视</title>
+
+<!-- 设计系统 token + 基线 -->
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+<!-- 消费的 pattern css（顺序：model-graphviz → training-graphviz → workbench → 折线图） -->
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/model-graphviz/pattern.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/model-training-graphviz/pattern.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/training-metrics-chart/pattern.css">
+<!-- 产品侧 -->
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="workbench-frame ts-root">
+
+  <!-- 顶部品牌条 -->
+  <header class="ts-header">
+    <div class="ts-brand">
+      <h1>TrainScope · 盘古训练透视</h1>
+      <span class="ts-sub">Pangu Pro MoE · 3D 并行 DP32/PP8/TP4 · 训练正确性排障</span>
+      <span class="ts-fault">事故：Step2000 后 val loss 振荡 · 零硬件报错</span>
+    </div>
+  </header>
+
+  <!-- 外层 vertical split：主区 / 通信 dock -->
+  <div class="pto-workbench-shell__panes ts-outer">
+
+    <!-- 主区（结构容器，无边框） -->
+    <section class="pto-workbench-shell__pane ts-area" id="main-area">
+      <div class="pto-workbench-shell__panes ts-main">
+
+        <!-- ④ 参数信号面板 -->
+        <section class="pto-workbench-shell__pane ts-pane" id="param-rail">
+          <div class="pane-head">参数信号 <span class="ph-sub">信号 · 读到异常</span></div>
+          <div class="pane-caption">左读信号 → 中定位算子 → 右看畸变</div>
+          <div class="pane-body pto-workbench-shell__pane-body" id="param-rail-body"></div>
+        </section>
+
+        <!-- ② 整网架构图（主舞台） -->
+        <section class="pto-workbench-shell__pane ts-pane" id="graph-stage">
+          <div class="pane-head">整网架构 · Pangu Pro MoE
+            <span class="spacer"></span>
+            <button class="btn btn-sm btn-ghost" id="trace-btn" title="右键画布亦可">追溯梯度流</button>
+          </div>
+          <div class="pane-body graph-body pto-workbench-shell__pane-body" id="graph-canvas"></div>
+        </section>
+
+        <!-- ② 权重 / Shape Inspector -->
+        <section class="pto-workbench-shell__pane ts-pane" id="inspector">
+          <div class="pane-head">权重 / Shape Inspector <span class="ph-sub">证据 · 看清畸变</span></div>
+          <div class="pane-caption">读中央选中节点的权重、shape 与路由分配证据</div>
+          <div class="pane-body pto-workbench-shell__pane-body" id="inspector-body"></div>
+        </section>
+
+      </div>
+    </section>
+
+    <!-- ⑤ 通信 + 效果 dock（左右并排 · 共用一个播放条 · 高度可拖） -->
+    <section class="pto-workbench-shell__pane ts-pane" id="comm-dock">
+      <div class="pane-head">通信 + 效果 <span class="ph-sub">物理流量 · 训练指标 · 共用 step 时间轴</span></div>
+      <div class="pane-body ts-dock-body pto-workbench-shell__pane-body">
+        <div class="dock-cols">
+          <div class="dock-col" id="dock-timeline-col">
+            <div class="dock-col-head">① 模型效果 <span class="dch-sub">train/val loss · eval · 框选设兴趣窗口</span></div>
+            <div id="dock-timeline"></div>
+          </div>
+          <div class="dock-col" id="dock-mesh-col">
+            <div class="dock-col-head">⑤ 分布式通信 · NPU Mesh <span class="dch-sub">8 DP × 4 TP · All-to-All 流量</span></div>
+            <div id="dock-mesh"></div>
+          </div>
+        </div>
+        <div id="dock-transport"></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- 数据（globals） -->
+<script src="data/graph.js"></script>
+<script src="data/timeseries.js"></script>
+<script src="data/comm.js"></script>
+<script src="data/weight.js"></script>
+<!-- pattern js（顺序：model-graphviz → training-graphviz → workbench → 折线图） -->
+<script src="../vendor/pto-design-system/patterns/model-graphviz/pattern.js"></script>
+<script src="../vendor/pto-design-system/patterns/model-training-graphviz/pattern.js"></script>
+<script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+<script src="../vendor/pto-design-system/patterns/training-metrics-chart/pattern.js"></script>
+<!-- 产品 js -->
+<script src="js/bus.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/param-rail.js"></script>
+<script src="js/graph-view.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/comm-dock.js"></script>
+<script src="js/info.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
