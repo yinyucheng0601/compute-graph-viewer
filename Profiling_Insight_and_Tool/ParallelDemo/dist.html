@@ -283,6 +283,7 @@
   .app.code-collapsed{grid-template-columns:380px 1fr 36px}
   .app.code-collapsed .col-code{overflow:hidden;padding:0 var(--space-2)}
   .app.code-collapsed #codeStickyHdr,
+  .app.code-collapsed #fnetBody,
   .app.code-collapsed #code{display:none}
   .code-collapsed-strip{display:none;flex-direction:column;align-items:center;padding-top:var(--space-3);gap:var(--space-3)}
   .app.code-collapsed .code-collapsed-strip{display:flex}
@@ -309,6 +310,57 @@
   .dag-n-comm{background:rgba(4,215,147,.1);border:1px solid rgba(4,215,147,.35);color:var(--success);text-align:center;width:100%}
   .dag-n-act{background:rgba(155,123,255,.1);border:1px solid rgba(155,123,255,.35);color:var(--dv-purple);text-align:center;width:100%}
   .dag-conn{color:var(--foreground-muted);font-size:11px;flex-shrink:0;opacity:.5}
+
+  /* ── Operator DAG accuracy notes ── */
+  .dag-note{margin-top:9px;padding-top:8px;border-top:1px solid var(--border-subtle);width:100%;display:flex;flex-direction:column;gap:4px}
+  .dag-note-row{font-size:9.5px;line-height:1.5;color:var(--foreground-secondary);display:flex;gap:5px;align-items:baseline}
+  .dag-note-tag{flex-shrink:0;font-size:8.5px;font-weight:700;padding:0 5px;border-radius:3px;line-height:1.6}
+  .dag-note-tag.ok{background:rgba(4,215,147,.14);color:var(--success)}
+  .dag-note-tag.warn{background:rgba(255,170,59,.14);color:var(--warning)}
+  .dag-note-tag.miss{background:rgba(255,75,123,.14);color:var(--danger)}
+
+  /* ── Right-panel mode tabs (真实源码 / 整网算子图) ── */
+  .panel-mode-tabs{display:flex;gap:var(--space-1)}
+  .pmode{font-size:var(--font-size-body-sm);font-weight:var(--font-weight-semibold);padding:var(--space-1) var(--space-3);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:transparent;color:var(--foreground-muted);cursor:pointer;transition:color var(--duration-base),border-color var(--duration-base),background var(--duration-base)}
+  .pmode:hover{color:var(--foreground)}
+  .pmode.on{background:var(--surface-3);color:var(--primary);border-color:var(--primary)}
+
+  /* ── Full-network operator graph (in-panel) ── */
+  #fnetBody{display:flex;flex-direction:column;align-items:center;padding-top:var(--space-2)}
+  .fnet-stage{align-self:stretch;font-size:var(--font-size-label-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--warning);font-weight:700;margin:var(--space-3) 0 var(--space-2);padding:3px var(--space-2);background:rgba(255,170,59,.08);border-radius:var(--radius-sm)}
+  .fnet-stage:first-child{margin-top:0}
+  .fnet-layer{width:100%;max-width:340px;border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3) var(--space-3);margin-bottom:var(--space-2);background:var(--surface-1);cursor:pointer;transition:border-color var(--duration-base),box-shadow var(--duration-base),background var(--duration-base)}
+  .fnet-layer:hover{border-color:var(--border-strong)}
+  .fnet-layer-hdr{font-size:var(--font-size-body-sm);font-weight:var(--font-weight-semibold);color:var(--primary);margin-bottom:var(--space-1)}
+  .fnet-layer .dag-flow{margin-top:5px;padding-top:5px}
+  .fnet-pp{font-size:var(--font-size-label-xs);color:var(--success);font-weight:600;text-align:center;margin:var(--space-1) 0 var(--space-3);font-family:var(--font-mono)}
+  .fnet-hint{align-self:stretch;font-size:var(--font-size-label-xs);color:var(--foreground-muted);line-height:1.5;margin-bottom:var(--space-2);padding:var(--space-2);background:var(--surface-2);border-radius:var(--radius-sm)}
+  /* 正向联动：拓扑计算流动 → 整网图层片段点亮（绿） */
+  .fnet-layer.fnet-flow{border-color:rgba(4,215,147,.85);background:rgba(4,215,147,.08);box-shadow:0 0 10px rgba(4,215,147,.25)}
+  /* 反向联动：选中整层（点分组标题，蓝） */
+  .fnet-layer.fnet-sel{border-color:var(--primary);background:rgba(67,105,239,.10);box-shadow:0 0 12px rgba(67,105,239,.30)}
+  .fnet-layer-hdr{cursor:pointer}
+  .fnet-layer-hdr:hover{text-decoration:underline}
+  .fnet-layer .dag-n{cursor:pointer}
+  /* 反向联动：选中最小算子节点（蓝描边，不挪动布局） */
+  .dag-n.dag-n-sel{outline:2px solid var(--primary);outline-offset:1px;box-shadow:0 0 10px rgba(67,105,239,.55);position:relative;z-index:1}
+  /* 正向联动（算子级）：计算流动时层内算子逐个点亮（绿描边） */
+  .dag-n.dag-n-flow{outline:2px solid rgba(4,215,147,.9);outline-offset:1px;box-shadow:0 0 10px rgba(4,215,147,.5);position:relative;z-index:2}
+
+  /* ── 整网算子图 帮助气泡 ── */
+  .fnet-help{position:relative;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--border-strong);color:var(--foreground-muted);font-size:11px;font-weight:700;cursor:help;flex-shrink:0;user-select:none}
+  .fnet-help:hover,.fnet-help:focus-within{color:var(--primary);border-color:var(--primary);outline:none}
+  .fnet-help-pop{position:absolute;top:calc(100% + 8px);right:0;width:300px;background:var(--surface-2);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:var(--space-3);box-shadow:var(--shadow-md);z-index:60;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease,visibility .15s ease;text-align:left;font-weight:400;cursor:default}
+  .fnet-help:hover .fnet-help-pop,.fnet-help:focus-within .fnet-help-pop{opacity:1;visibility:visible;transform:translateY(0)}
+  .fnet-help-pop .hp-title{font-size:var(--font-size-body-sm);font-weight:700;color:var(--foreground);margin-bottom:2px}
+  .fnet-help-pop .hp-sub{font-size:var(--font-size-label-xs);color:var(--warning);font-weight:600;margin-bottom:var(--space-2)}
+  .fnet-help-pop .hp-row{font-size:9.5px;line-height:1.5;color:var(--foreground-secondary);display:flex;gap:5px;align-items:baseline;margin-bottom:4px}
+  .fnet-help-pop .hp-tag{flex-shrink:0;font-size:8.5px;font-weight:700;padding:0 5px;border-radius:3px;line-height:1.6}
+  .fnet-help-pop .hp-tag.ok{background:rgba(4,215,147,.14);color:var(--success)}
+  .fnet-help-pop .hp-tag.warn{background:rgba(255,170,59,.14);color:var(--warning)}
+  /* 反向联动：拓扑图中被命中的权重格子与所在卡（蓝） */
+  .wdiag-layer-box.wdiag-pick{background:rgba(67,105,239,.22)!important;border-color:rgba(67,105,239,.95)!important;border-style:solid!important;color:var(--foreground)!important;box-shadow:0 0 6px rgba(67,105,239,.55)}
+  .wdiag-card.wdiag-card-pick{border-color:var(--primary)!important;box-shadow:0 0 0 1px var(--primary),0 0 12px rgba(67,105,239,.4)}
 </style>
 </head>
 <body>
@@ -425,17 +477,40 @@
   <!-- ============ RIGHT: CODE ============ -->
   <div class="col col-code" id="codePanel">
     <div class="code-sticky-hdr" id="codeStickyHdr">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)">
-        <h2 style="position:static;padding:0;margin:0" id="codePanelTitle">真实源码（picotron · 随配置高亮）</h2>
-        <button class="reset" id="codeCollapseBtn" title="折叠源码面板">▶ 收起</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);gap:var(--space-2)">
+        <div class="panel-mode-tabs" id="panelModeTabs">
+          <button class="pmode on" data-mode="code" id="pmodeCode">真实源码</button>
+          <button class="pmode" data-mode="fnet" id="pmodeFnet">🧬 整网算子图</button>
+        </div>
+        <button class="reset" id="codeCollapseBtn" title="折叠面板">▶ 收起</button>
       </div>
-      <div class="tabs" id="tabs"></div>
-      <div class="src-meta" id="srcMeta"></div>
+      <div id="codeModeHdr">
+        <div class="tabs" id="tabs"></div>
+        <div class="src-meta" id="srcMeta"></div>
+      </div>
+      <div id="fnetModeHdr" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)">
+          <div class="src-meta" id="fnetSub" style="margin:0"></div>
+          <span class="fnet-help" id="fnetHelp" tabindex="0" title="正向联动与真实业务逻辑">?
+            <div class="fnet-help-pop">
+              <div class="hp-title">正向联动符合真实业务逻辑吗？</div>
+              <div class="hp-sub">方向对，但调度是简化的</div>
+              <div class="hp-row"><span class="hp-tag ok">符合</span><span>顺序 emb→blocks→norm→head 是真实前向依赖链</span></div>
+              <div class="hp-row"><span class="hp-tag ok">符合</span><span>stage 串行反映 PP 前向依赖（p 算完才给 p+1）</span></div>
+              <div class="hp-row"><span class="hp-tag ok">符合</span><span>DP 副本 / TP 分片同时点亮，符合真实并发</span></div>
+              <div class="hp-row"><span class="hp-tag warn">简化</span><span>只有前向，没有反向 / optimizer</span></div>
+              <div class="hp-row"><span class="hp-tag warn">简化</span><span>PP 为朴素串行；真实是 1F1B 交错，多 stage 同时忙</span></div>
+              <div class="hp-row"><span class="hp-tag warn">简化</span><span>点亮时长是装饰性的，不按真实 FLOPs</span></div>
+            </div>
+          </span>
+        </div>
+      </div>
     </div>
     <pre id="code"></pre>
+    <div id="fnetBody" style="display:none"></div>
     <div class="code-collapsed-strip" id="codeCollapsedStrip">
-      <button class="reset" id="codeExpandBtn" title="展开源码面板">◀</button>
-      <span class="code-collapsed-label">真实源码</span>
+      <button class="reset" id="codeExpandBtn" title="展开面板">◀</button>
+      <span class="code-collapsed-label" id="codeCollapsedLabel">真实源码</span>
     </div>
   </div>
 </div>
@@ -1487,6 +1562,7 @@ function _waClear(){
   wd.querySelectorAll('.wdiag-layer-box').forEach(el=>el.classList.remove('af'));
   const la=$('wLogitsArrow'),lc=$('wLogitsCard');
   if(la)la.classList.remove('af'); if(lc)lc.classList.remove('af');
+  _syncFnetFlow();
 }
 
 function _waTick(){
@@ -1508,6 +1584,7 @@ function _waTick(){
           if(li>0 && boxes[li-1]) boxes[li-1].classList.remove('af'); // 前一层熄灭
           if(boxes[li]) boxes[li].classList.add('af');
         });
+        _syncFnetFlow(step>0?step:Math.floor(stageDurLocal*0.75)); // 把本层停留时间作为算子扫描时长
       },li*step);
     }
   }
@@ -1676,11 +1753,12 @@ function _animSplitPath(path,len,dur){
 }
 
 // =================== OPERATOR DAG (per-layer tooltip) ===================
-function layerDagHTML(kind, t) {
-  const H=state.hidden, tp=state.tp, V=32000, E=state.experts, ep=state.ep;
+function layerDagHTML(kind, t, noHeader) {
+  const H=state.hidden, tp=state.tp, V=32000, E=state.experts, ep=state.ep, cp=state.cp;
   const Htp  = tp>1 ? `H/${tp}`  : 'H';
   const H4tp = tp>1 ? `4H/${tp}` : '4H';
   const Vtp  = tp>1 ? `V/${tp}`  : 'V';
+  const S    = cp>1 ? `seq/${cp}` : 'seq';   // CP 把序列维切到各卡
   const sh   = s => `<div class="dag-shape">${s}</div>`;
   const arr  = () => `<div class="dag-arr">↓</div>`;
   const opN  = s => `<div class="dag-n dag-n-op">${s}</div>`;
@@ -1689,56 +1767,234 @@ function layerDagHTML(kind, t) {
   const actN  = s => `<div class="dag-n dag-n-act">${s}</div>`;
   const cn   = () => `<span class="dag-conn">→</span>`;
   const erow = (...items) => `<div class="dag-erow">${items.join('')}</div>`;
-  let h = `<div class="dag-hdr">算子图</div>`;
+  let h = noHeader ? '' : `<div class="dag-hdr">算子图</div>`;
   switch(kind) {
     case 'emb':
+      // picotron VocabParallelEmbedding：按词表维切 (V/tp × H)，各卡查自己词表区间、其余置零，再 all-reduce 求和
       h += sh('token [B, seq]'); h += arr();
-      h += erow(wN('W_emb',`V×${Htp}`), cn(), opN('VocabEmbedding'));
-      if(tp>1){h+=arr();h+=commN('all-gather → H');}
-      h+=arr(); h+=sh('act [B, seq, H]');
+      h += erow(wN('W_emb',`${Vtp}×H`), cn(), opN('VocabParallel Embedding'));
+      if(tp>1){h+=arr();h+=commN('all-reduce');}
+      h+=arr(); h+=sh(`act [B, ${S}, H]`);
       break;
     case 'attn':
-      h+=sh('x [B, seq, H]'); h+=arr();
+      h+=sh(`x [B, ${S}, H]`); h+=arr();
+      h+=erow(wN('γ','[H]'), cn(), opN('RMSNorm (pre-attn)')); h+=arr();
       h+=erow(wN('W_Q/K/V',`H×${Htp}`), cn(), opN('QKV Linear (col-∥)'));
-      h+=arr(); h+=sh(`Q/K/V [B, seq, ${Htp}]`); h+=arr();
-      h+=actN('Scaled Dot-Product'); h+=arr();
-      h+=sh(`attn [B, seq, ${Htp}]`); h+=arr();
+      h+=arr(); h+=sh(`Q/K/V [B, ${S}, ${Htp}]`); h+=arr();
+      if(cp>1){h+=commN('ring all-gather K/V (CP)'); h+=arr();}
+      h+=actN('RoPE → Scaled Dot-Product'); h+=arr();
+      h+=sh(`attn [B, ${S}, ${Htp}]`); h+=arr();
       h+=erow(wN('W_O',`${Htp}×H`), cn(), opN('Out Proj (row-∥)'));
       if(tp>1){h+=arr();h+=commN('all-reduce');}
-      h+=arr(); h+=sh('x + res [B, seq, H]');
+      h+=arr(); h+=sh(`x + res [B, ${S}, H]`);
       break;
     case 'mlp':
-      h+=sh('x [B, seq, H]'); h+=arr();
-      h+=erow(wN('W_up',`H×${H4tp}`), cn(), opN('up_proj (col-∥)'));
-      h+=arr(); h+=actN('SiLU'); h+=arr();
+      // Llama 风格 SwiGLU：down( SiLU(gate(x)) ⊙ up(x) )，gate 与 up 两路列切投影
+      h+=sh(`x [B, ${S}, H]`); h+=arr();
+      h+=erow(wN('γ','[H]'), cn(), opN('RMSNorm (pre-mlp)')); h+=arr();
+      h+=erow(wN('W_gate / W_up',`H×${H4tp}`), cn(), opN('gate & up (col-∥)'));
+      h+=arr(); h+=actN('SiLU(gate) ⊙ up'); h+=arr();
       h+=erow(wN('W_dn',`${H4tp}×H`), cn(), opN('down_proj (row-∥)'));
       if(tp>1){h+=arr();h+=commN('all-reduce');}
-      h+=arr(); h+=sh('x + res [B, seq, H]');
+      h+=arr(); h+=sh(`x + res [B, ${S}, H]`);
       break;
     case 'moe': {
-      const perCard=ep>1?Math.ceil(E/tp):E;
-      h+=sh('x [B, seq, H]'); h+=arr();
-      h+=erow(wN('W_router',`H×${E}`), cn(), opN('gate / router'));
+      const perCard=ep>1?Math.ceil(E/ep):E;
+      h+=sh(`x [B, ${S}, H]`); h+=arr();
+      h+=erow(wN('γ','[H]'), cn(), opN('RMSNorm (pre-moe)')); h+=arr();
+      h+=erow(wN('W_router',`H×${E}`), cn(), opN('gate / router (top-2)'));
       h+=arr();
       if(ep>1){h+=commN('all-to-all dispatch');h+=arr();}
       h+=erow(wN(`W_exp×${perCard}`,'H×4H'), cn(), opN(`Expert FFN ×${perCard}`));
       if(ep>1){h+=arr();h+=commN('all-to-all combine');}
-      h+=arr(); h+=sh('x + res [B, seq, H]');
+      h+=arr(); h+=sh(`x + res [B, ${S}, H]`);
       break;
     }
     case 'norm':
-      h+=sh('x [B, seq, H]'); h+=arr();
-      h+=erow(wN('γ, β','[H]'), cn(), opN('LayerNorm'));
-      h+=arr(); h+=sh('norm [B, seq, H]');
+      h+=sh(`x [B, ${S}, H]`); h+=arr();
+      h+=erow(wN('γ','[H]'), cn(), opN('Final RMSNorm'));
+      h+=arr(); h+=sh(`norm [B, ${S}, H]`);
       break;
     case 'head':
-      h+=sh('x [B, seq, H]'); h+=arr();
+      // 列切到 V/tp，训练用 VocabParallel CrossEntropy（只 all-reduce 标量 loss），不聚合完整 logits
+      h+=sh(`x [B, ${S}, H]`); h+=arr();
       h+=erow(wN('W_head',`H×${Vtp}`), cn(), opN('lm_head (col-∥)'));
-      if(tp>1){h+=arr();h+=commN('all-gather → V');}
-      h+=arr(); h+=sh('logits [B, seq, V]');
+      h+=arr(); h+=sh(`logits [B, ${S}, ${Vtp}]`);
+      if(tp>1){h+=arr();h+=commN('VocabParallel CrossEntropy (all-reduce loss)');}
       break;
   }
   return `<div class="dag-flow">${h}</div>`;
+}
+
+// 算子图准确性说明：哪些准 (ok) / 哪些是简化 (warn) / 缺什么 (miss)
+const DAG_NOTES = {
+  emb: [
+    ['ok','按词表维切 V/tp + all-reduce，与 picotron VocabParallelEmbedding 一致'],
+    ['warn','V 写死 32000；位置编码用 RoPE，不在本层'],
+  ],
+  attn: [
+    ['ok','pre-norm RMSNorm、QKV 列切 / O 行切 + all-reduce、CP 序列切都正确'],
+    ['warn','未区分 GQA（K/V 头数 < Q），笼统按 H/tp 切'],
+    ['miss','缺 num_heads / head_dim 真实值、attention mask、反向传播'],
+  ],
+  mlp: [
+    ['ok','SwiGLU（gate&up 列切 → down 行切 + all-reduce）结构正确'],
+    ['warn','中间维写死 4H，真实 intermediate_size 未必等于 4H'],
+    ['miss','缺反向传播'],
+  ],
+  moe: [
+    ['ok','router top-2、all-to-all dispatch/combine 流程正确'],
+    ['miss','网格无真实 EP 轴：此处每卡按 E/ep，世界图卡片框仍按 E/tp，两者不一致'],
+    ['miss','缺负载均衡 aux loss、容量因子 capacity factor、反向'],
+  ],
+  norm: [
+    ['ok','Final RMSNorm 全卡复制、不切分，正确'],
+  ],
+  head: [
+    ['ok','列切 V/tp + VocabParallel CrossEntropy（只 all-reduce 标量 loss）'],
+    ['warn','通常与 Embedding 共享权重，本图未画出共享关系'],
+  ],
+};
+function layerDagNoteHTML(kind){
+  const rows=DAG_NOTES[kind]; if(!rows) return '';
+  const L={ok:'准',warn:'简化',miss:'缺'};
+  return `<div class="dag-note"><div class="dag-hdr">准确性说明</div>`+
+    rows.map(([c,txt])=>`<div class="dag-note-row"><span class="dag-note-tag ${c}">${L[c]}</span><span>${txt}</span></div>`).join('')+
+    `</div>`;
+}
+
+// =================== 整网算子计算图（拼接所有层片段）===================
+// 每个 layerDagHTML 片段都遵循同一激活契约：输入/输出都是 [B, S, H]
+// （emb 产出该张量，head 消费它），因此可按 stageLayers 顺序首尾相接，
+// 并在 PP stage 边界插入 send/recv，得到一张端到端计算图。
+function fullNetDagHTML(){
+  const pp=state.pp, S=state.cp>1?`seq/${state.cp}`:'seq';
+  let h='';
+  for(let p=0;p<pp;p++){
+    const layers=stageLayers(p);
+    if(pp>1){
+      const ranks=`rank ${rankOf(0,p,0,0)}`+(state.world>1?' …':'');
+      h+=`<div class="fnet-stage">Pipeline Stage ${p} · ${ranks}</div>`;
+    }
+    layers.forEach(l=>{
+      const m=l.name.match(/Block (\d+)/), bi=m?m[1]:'';
+      h+=`<div class="fnet-layer" data-kind="${l.kind}" data-bi="${bi}" title="点击：在拓扑图中高亮该层的硬件分布">`+
+         `<div class="fnet-layer-hdr">${l.name}</div>`+
+         layerDagHTML(l.kind, 0, true)+`</div>`;
+    });
+    if(p<pp-1) h+=`<div class="fnet-pp">↓ PP send/recv · activations [B, ${S}, H]</div>`;
+  }
+  return h;
+}
+let panelMode='code';  // 'code' | 'fnet'
+function renderFnet(){
+  if(!$('fnetBody')) return;
+  _clearOpSweep();
+  const hint=`<div class="fnet-hint">🖱 点击<b>算子节点</b>（如 RMSNorm、W_Q/K/V）→ 选中该最小节点；点击<b>分组标题</b>（如 Block 0 · MLP）→ 选中整层。两者都会在拓扑图高亮承载它的权重格子与所在卡（硬件分布）。<br>▶️ 拓扑<b>计算流动</b>时，当前层在此图同步点亮，并逐<b>算子</b>扫过（绿色）。</div>`;
+  $('fnetBody').innerHTML=hint+fullNetDagHTML();
+  // 为每层内的最小算子节点编号，作为节点级选中的稳定键
+  $('fnetBody').querySelectorAll('.fnet-layer').forEach(fl=>{
+    fl.querySelectorAll('.dag-n').forEach((n,i)=>n.dataset.ni=i);
+  });
+  $('fnetSub').textContent=`${state.blocks} 层 · dp=${state.dp} pp=${state.pp} cp=${state.cp} tp=${state.tp}`+
+    (state.enMoE?` · MoE(E=${state.experts}, ep=${state.ep})`:'');
+  _reapplyFnetSel();
+}
+
+// ── 联动：整网图层片段 与 拓扑图权重格子 的唯一键 = kind:blockIndex ──
+function _layerKey(ds){ return ds.kind+':'+(ds.bi||''); }
+
+// 正向：拓扑“计算流动”点亮的层 → 整网图对应片段点亮，并在层内逐算子扫过（算子级流动）
+let _opSweepTmrs=[], _opSweepKey=null;
+function _clearOpSweep(){
+  _opSweepTmrs.forEach(clearTimeout); _opSweepTmrs=[]; _opSweepKey=null;
+  document.querySelectorAll('.dag-n.dag-n-flow').forEach(n=>n.classList.remove('dag-n-flow'));
+}
+function _startOpSweep(host,dwellMs){
+  _clearOpSweep();
+  const nodes=[...host.querySelectorAll('.dag-n')];
+  if(!nodes.length) return;
+  _opSweepKey=_layerKey(host.dataset);
+  const step=Math.max(55,Math.floor((dwellMs||600)/nodes.length));
+  nodes.forEach((n,i)=>_opSweepTmrs.push(setTimeout(()=>{
+    nodes.forEach(x=>x.classList.remove('dag-n-flow'));  // 单点移动式高亮
+    n.classList.add('dag-n-flow');
+  },i*step)));
+}
+function _syncFnetFlow(dwellMs){
+  const fb=$('fnetBody'); if(!fb) return;
+  const wd=$('worldDiagram'); if(!wd) return;
+  const live=new Set();
+  wd.querySelectorAll('.wdiag-layer-box.af').forEach(b=>live.add(_layerKey(b.dataset)));
+  let activeKey=null, activeEl=null;
+  fb.querySelectorAll('.fnet-layer').forEach(fl=>{
+    const k=_layerKey(fl.dataset), on=live.has(k);
+    fl.classList.toggle('fnet-flow',on);
+    if(on){activeKey=k; activeEl=fl;}
+  });
+  if(!activeKey){ _clearOpSweep(); return; }
+  if(activeKey!==_opSweepKey) _startOpSweep(activeEl,dwellMs);  // 切到新层 → 重启算子扫描
+}
+
+// 反向：选中整网图节点 → 高亮拓扑图中所有承载该算子的权重格子与卡
+// 选中粒度：ni=-1 表示整层（点分组标题“Block i · MLP”）；ni>=0 表示该层内第 ni 个最小算子节点
+let _fnetSel=null;  // {key, ni}
+function _clearPick(){
+  document.querySelectorAll('.fnet-layer.fnet-sel').forEach(e=>e.classList.remove('fnet-sel'));
+  document.querySelectorAll('.dag-n.dag-n-sel').forEach(e=>e.classList.remove('dag-n-sel'));
+  document.querySelectorAll('.wdiag-layer-box.wdiag-pick').forEach(e=>e.classList.remove('wdiag-pick'));
+  document.querySelectorAll('.wdiag-card.wdiag-card-pick').forEach(e=>e.classList.remove('wdiag-card-pick'));
+}
+function _applyPick(key,scroll){
+  const wd=$('worldDiagram'); if(!wd) return; let first=null;
+  wd.querySelectorAll('.wdiag-layer-box').forEach(b=>{
+    if(_layerKey(b.dataset)!==key) return;
+    b.classList.add('wdiag-pick');
+    const card=b.closest('.wdiag-card'); if(card){card.classList.add('wdiag-card-pick'); if(!first)first=card;}
+  });
+  if(scroll&&first) first.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+// 点击整网图：分组标题 → 整层；最小算子节点 → 该节点
+function onFnetClick(target){
+  const fl=target.closest('.fnet-layer'); if(!fl) return;
+  const key=_layerKey(fl.dataset);
+  const node=target.closest('.dag-n');                 // 最小节点
+  const isHdr=!!target.closest('.fnet-layer-hdr');     // 分组标题
+  let ni=-1;
+  if(node && !isHdr) ni=+node.dataset.ni;              // 选最小节点；标题优先判定为整层
+  const same=_fnetSel && _fnetSel.key===key && _fnetSel.ni===ni;
+  _clearPick();
+  if(same){_fnetSel=null;return;}                      // 再次点击同一目标 → 取消
+  _fnetSel={key,ni};
+  if(ni>=0) node.classList.add('dag-n-sel');           // 节点级：只点亮该算子
+  else      fl.classList.add('fnet-sel');              // 层级：点亮整张卡片
+  _applyPick(key,true);
+}
+// 配置变化重渲后，恢复之前的选中态（拓扑 + 整网都重建过）
+function _reapplyFnetSel(){
+  if(!_fnetSel) return;
+  const fb=$('fnetBody'); if(!fb) return;
+  let host=null;
+  fb.querySelectorAll('.fnet-layer').forEach(fl=>{ if(_layerKey(fl.dataset)===_fnetSel.key) host=fl; });
+  if(!host){_fnetSel=null;return;}
+  if(_fnetSel.ni>=0){
+    const node=host.querySelector(`.dag-n[data-ni="${_fnetSel.ni}"]`);
+    if(node) node.classList.add('dag-n-sel'); else _fnetSel.ni=-1;
+  }
+  if(_fnetSel.ni<0) host.classList.add('fnet-sel');
+  _applyPick(_fnetSel.key,false);
+}
+function setPanelMode(mode){
+  panelMode=mode;
+  const isCode=mode==='code';
+  $('pmodeCode').classList.toggle('on',isCode);
+  $('pmodeFnet').classList.toggle('on',!isCode);
+  $('codeModeHdr').style.display=isCode?'':'none';
+  $('fnetModeHdr').style.display=isCode?'none':'';
+  $('code').style.display=isCode?'':'none';
+  $('fnetBody').style.display=isCode?'none':'';
+  if($('codeCollapsedLabel')) $('codeCollapsedLabel').textContent=isCode?'真实源码':'整网算子图';
+  if(!isCode) renderFnet();
 }
 
 // =================== WDIAG LAYER TOOLTIP ===================
@@ -1762,7 +2018,8 @@ function bindWdiagTooltips(){
       tip.innerHTML=
         `<div class="tip-title">${blockTitle}${LAYER_KIND_LABEL[kind]||kind}</div>`+
         `<div class="tip-desc">${LAYER_DESC[kind]||''}</div>`+
-        layerDagHTML(kind, +t);
+        layerDagHTML(kind, +t)+
+        layerDagNoteHTML(kind);
       _moveTip(e); tip.classList.add('vis');
     });
     el.addEventListener('mousemove',_moveTip);
@@ -1800,6 +2057,7 @@ function update(scrollToHl, scrollCtrlId){
   $('vExperts').textContent=state.experts; $('vBatch').textContent=state.batch;
   $('vSteps').textContent=state.steps; $('vLr').textContent=state.lr.toExponential(1);
   renderCode(scrollToHl, scrollCtrlId); renderViz(); renderHints(); renderWorldDiagram(); renderConclusion();
+  if(panelMode==='fnet') renderFnet();
 }
 // 改配置时：若该控件关联某源码文件，自动切到对应 Tab 并定位高亮行
 function onControlChange(e){
@@ -1833,9 +2091,6 @@ function updateLibUI(){
   if($('headerSub')) $('headerSub').textContent=isPico
     ?'基于 huggingface/picotron 真实逻辑'
     :'基于 pytorch/torchtitan 真实逻辑';
-  if($('codePanelTitle')) $('codePanelTitle').textContent=isPico
-    ?'真实源码（picotron · 随配置高亮）'
-    :'真实源码（torchtitan · 随配置高亮）';
 }
 $('libSelect').addEventListener('change',e=>{
   currentLib=e.target.value;
@@ -1886,7 +2141,14 @@ const _app=document.querySelector('.app');
 $('codeCollapseBtn').onclick=()=>_app.classList.add('code-collapsed');
 $('codeExpandBtn').onclick=()=>_app.classList.remove('code-collapsed');
 
+// ── 右侧面板页签：真实源码 / 整网算子图 ──
+$('pmodeCode').onclick=()=>setPanelMode('code');
+$('pmodeFnet').onclick=()=>setPanelMode('fnet');
+// 反向联动：点击整网图节点 → 高亮拓扑图硬件分布（事件委托，#fnetBody 元素稳定）
+$('fnetBody').addEventListener('click',e=>onFnetClick(e.target));
+
 renderTabs(); update(false);
+setPanelMode('fnet');
 </script>
 </body>
 </html>
