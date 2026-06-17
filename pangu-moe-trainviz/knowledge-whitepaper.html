@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>大模型并行放置白皮书：从 rank 到 PP / TP / DP / CP / EP</title>
+  <link rel="stylesheet" href="./shared.css">
+  <style>
+    .topnav .navlinks {
+      max-width: min(72vw, 1200px);
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .whitepaper-svg {
+      width: min(100%, var(--svg-width, 960px));
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    section.floor > .lead {
+      width: 100%;
+      max-width: none;
+    }
+
+    .section-intro {
+      margin-bottom: 1rem;
+    }
+
+    .mini-note {
+      color: #526070;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    .evidence-list a,
+    .terms-table a {
+      word-break: break-all;
+    }
+
+    .parallel-matrix td:first-child,
+    .parallel-matrix th:first-child,
+    .terms-table td:first-child,
+    .terms-table th:first-child {
+      white-space: nowrap;
+    }
+
+    .scope-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rank-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.4rem 0.72rem;
+      border-radius: 999px;
+      background: rgba(29, 78, 216, 0.08);
+      color: #1d4ed8;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .badge-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 0.9rem;
+    }
+
+    .caption-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .caption-grid .card p {
+      margin-bottom: 0;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1rem;
+    }
+
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.42rem 0.72rem;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #243244;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    .legend-dot {
+      width: 0.72rem;
+      height: 0.72rem;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .section-table td,
+    .section-table th {
+      vertical-align: top;
+    }
+
+    .quote-box {
+      padding: 1rem 1.15rem;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(244, 247, 251, 0.9), rgba(255, 255, 255, 0.98));
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      color: #243244;
+      line-height: 1.75;
+    }
+
+    .quote-box b {
+      color: #0f172a;
+    }
+
+    .index-table th,
+    .index-table td {
+      vertical-align: top;
+    }
+
+    .index-table td:first-child,
+    .index-table th:first-child {
+      white-space: nowrap;
+      width: 5.5rem;
+    }
+
+    .index-table td:nth-child(2),
+    .index-table th:nth-child(2) {
+      width: 18%;
+    }
+
+    .index-link {
+      color: inherit;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .index-link:hover {
+      color: #1d4ed8;
+    }
+
+    .svg-chip text {
+      pointer-events: none;
+    }
+
+    @media (max-width: 960px) {
+      .scope-grid,
+      .caption-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">Parallel Placement Whitepaper</div>
+    <div class="navlinks">
+      <a href="#cover">封面</a>
+      <a href="#index">目录</a>
+      <a href="#official-structure">官方结构</a>
+      <a href="#scope">基本对象</a>
+      <a href="#dp">DP</a>
+      <a href="#fsdp">FSDP</a>
+      <a href="#pp">PP</a>
+      <a href="#tp">TP</a>
+      <a href="#spcp">SP/CP</a>
+      <a href="#ep">EP</a>
+      <a href="#combined">多维叠加</a>
+      <a href="#product-guidance">产品表达</a>
+      <a href="#findings">结论</a>
+      <a href="#terms">术语</a>
+      <a href="#evidence">依据</a>
+    </div>
+  </nav>
+
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <defs>
+      <symbol id="chip-shell" viewBox="0 0 220 140">
+        <rect x="4" y="4" width="212" height="132" rx="16" fill="#dbe5f0" stroke="#94a3b8" stroke-width="2"/>
+        <rect x="20" y="18" width="180" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <circle cx="22" cy="22" r="5.5" fill="#94a3b8"/>
+        <circle cx="198" cy="22" r="5.5" fill="#94a3b8"/>
+        <circle cx="22" cy="118" r="5.5" fill="#94a3b8"/>
+        <circle cx="198" cy="118" r="5.5" fill="#94a3b8"/>
+      </symbol>
+      <symbol id="chip-shell-tall" viewBox="0 0 220 280">
+        <rect x="4" y="4" width="212" height="272" rx="16" fill="#dbe5f0" stroke="#94a3b8" stroke-width="2"/>
+        <rect x="20" y="18" width="180" height="244" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <circle cx="22" cy="22" r="5.5" fill="#94a3b8"/>
+        <circle cx="198" cy="22" r="5.5" fill="#94a3b8"/>
+        <circle cx="22" cy="258" r="5.5" fill="#94a3b8"/>
+        <circle cx="198" cy="258" r="5.5" fill="#94a3b8"/>
+      </symbol>
+      <symbol id="chip-shell-compact" viewBox="0 0 160 120">
+        <rect x="4" y="4" width="152" height="112" rx="8" fill="#dbe5f0" stroke="#94a3b8" stroke-width="2"/>
+        <rect x="18" y="18" width="124" height="84" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <circle cx="18" cy="18" r="5" fill="#94a3b8"/>
+        <circle cx="142" cy="18" r="5" fill="#94a3b8"/>
+        <circle cx="18" cy="102" r="5" fill="#94a3b8"/>
+        <circle cx="142" cy="102" r="5" fill="#94a3b8"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <section class="floor" id="cover">
+    <div class="kicker">Whitepaper · 2026 · Parallel Placement</div>
+    <h1>大模型训练并行放置白皮书<br>Rank / Device Placement 的语义边界与产品表达</h1>
+    <p class="lead">本文面向 TrainScope 的并行放置建模，系统区分 <code>device</code>、<code>rank</code>、<code>worker</code>、<code>stage</code>、<code>expert</code> 等对象，并说明 DP（Data Parallel，数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、PP（Pipeline Parallel，流水线并行）、TP（Tensor Parallel，张量并行）、SP/CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）与 EP（Expert Parallel，专家并行）分别对应的数据、模型状态、层段、张量、序列和专家维度。报告结论是：产品界面应表达“多维运行时放置”，而不是把所有并行语义压缩为“每张卡承载哪些层/算子”。</p>
+    <div class="grid cols-4">
+      <div class="card metric"><strong>6</strong><span>需要区分的并行方式：DP、FSDP、PP、TP、SP/CP、EP</span></div>
+      <div class="card metric"><strong>5</strong><span>产品字段：device、rank、PP、TP、DP、CP/SP、EP</span></div>
+      <div class="card metric"><strong>1</strong><span>核心判断：训练放置是多维 placement，而非单一层归属</span></div>
+      <div class="card metric"><strong>2</strong><span>工程落点：复用 ParallelDemo 计算逻辑，重构 TrainScope 视图模型</span></div>
+    </div>
+    <div class="callout"><b>核心结论：</b>“每张卡承载哪些层/算子”仅能覆盖 PP（Pipeline Parallel，流水线并行）中的层段放置语义；对于 TP（Tensor Parallel，张量并行）、DP（Data Parallel，数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、SP/CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）和 EP（Expert Parallel，专家并行），更准确的产品表达应为“该 rank/device 在多个并行维度上的运行时放置关系”。</div>
+  </section>
+
+  <section class="floor" id="index">
+    <div class="kicker">Index · 阅读路径</div>
+    <h2>按语义建模与产品落地顺序组织</h2>
+    <p class="lead">报告先定义基础对象，再依据官方语义拆解各类并行方式，最后落到 TrainScope 的数据字段、视图层级和交互文案。目录按照“分析对象、设计意义、交付结论”组织。</p>
+    <table class="index-table">
+      <thead>
+        <tr>
+          <th>编号</th>
+          <th>章节</th>
+          <th>分析对象</th>
+          <th>设计意义</th>
+          <th>交付结论</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill blue">01</span></td>
+          <td><a class="index-link" href="#official-structure">官方结构</a></td>
+          <td>对齐不同并行方式的核心切分对象。</td>
+          <td>避免把不同并行语义统一误解为层切分。</td>
+          <td>建立并行方式与切分对象的总表。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">02</span></td>
+          <td><a class="index-link" href="#scope">基本对象</a></td>
+          <td>区分 card、device、rank、worker、stage、expert。</td>
+          <td>对象层级决定后续图表、tooltip 和数据模型是否准确。</td>
+          <td>明确标题、tooltip 和 placementMap 应该落在哪些字段上。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">03</span></td>
+          <td><a class="index-link" href="#dp">DP（Data Parallel，数据并行）</a></td>
+          <td>说明完整模型副本如何处理不同数据 shard。</td>
+          <td>明确 DP（Data Parallel，数据并行）不表达层段归属。</td>
+          <td>区分数据 shard、样本、mini-batch tensor 与模型参数副本。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">04</span></td>
+          <td><a class="index-link" href="#fsdp">FSDP（Fully Sharded Data Parallel，全分片数据并行）</a></td>
+          <td>说明参数、梯度、优化器状态如何分片与重建。</td>
+          <td>FSDP（Fully Sharded Data Parallel，全分片数据并行）表达训练状态管理，而非层归属。</td>
+          <td>明确 state shard、all-gather、reshard 的展示位置。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">05</span></td>
+          <td><a class="index-link" href="#pp">PP（Pipeline Parallel，流水线并行）</a></td>
+          <td>说明模型如何按连续层段切分为多个 stage。</td>
+          <td>PP（Pipeline Parallel，流水线并行）是层段归属表达的主要适用场景。</td>
+          <td>给出可用于 inspector 的层段范围文案。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">06</span></td>
+          <td><a class="index-link" href="#tp">TP（Tensor Parallel，张量并行）</a></td>
+          <td>说明同一层内部的算子和矩阵如何分片。</td>
+          <td>TP（Tensor Parallel，张量并行）表达 shard 关系，而非整层归属。</td>
+          <td>明确应展示 <code>QKV shard 2/8</code>，而非“负责 Attention 层”。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">07</span></td>
+          <td><a class="index-link" href="#spcp">SP / CP（Sequence / Context Parallel，序列 / 上下文并行）</a></td>
+          <td>说明长序列和上下文窗口如何分片。</td>
+          <td>SP/CP（Sequence / Context Parallel，序列 / 上下文并行）解决 token 维度负载，而非层切分。</td>
+          <td>给出 sequence shard / context shard 的页面表达。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">08</span></td>
+          <td><a class="index-link" href="#ep">EP（Expert Parallel，专家并行）</a></td>
+          <td>说明 Gate 如何将 token 路由到不同 expert 与 rank。</td>
+          <td>MoE 场景中需要避免把 <code>expert ↔ rank ↔ card</code> 固定为 1:1 关系。</td>
+          <td>明确产品应展示 expert placement，而非 MoE 层归属。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">09</span></td>
+          <td><a class="index-link" href="#combined">多维叠加</a></td>
+          <td>说明一个 rank 如何同时落在 PP、TP、DP、CP、EP 上。</td>
+          <td>真实训练的 placement 是多维坐标交叉，而非单一分类。</td>
+          <td>形成 placement 视图的主心智模型。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">10</span></td>
+          <td><a class="index-link" href="#product-guidance">产品表达</a></td>
+          <td>说明 TrainScope 如何复用 ParallelDemo 逻辑并重构视图。</td>
+          <td>这决定数据接口、聚合层级和文案口径是否正确。</td>
+          <td>形成可落地的字段、标题与 tooltip 建议。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="official-structure">
+    <div class="kicker">Official Structure · 官方语义边界</div>
+    <h2>并行方式的切分对象与语义边界</h2>
+    <p class="lead">不同并行方式虽然都以“并行”命名，但其官方语义指向的数据对象并不相同。先建立切分对象总表，可以为后续图表和产品字段提供一致的判断依据。</p>
+    <table class="parallel-matrix">
+      <thead>
+        <tr>
+          <th>并行方式</th>
+          <th>核心切分对象</th>
+          <th>最接近的官方语义</th>
+          <th>适合的页面表达</th>
+          <th>不推荐的误导表达</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>DP（Data Parallel，数据并行）</td>
+          <td>数据 batch shard</td>
+          <td>同一模型副本跑不同数据，再同步梯度</td>
+          <td><code>DP7 replica</code></td>
+          <td>“这张卡负责第 12-24 层”</td>
+        </tr>
+        <tr>
+          <td>FSDP（Fully Sharded Data Parallel，全分片数据并行）</td>
+          <td>参数 / 梯度 / 优化器状态</td>
+          <td>训练状态分片，前后向按需 all-gather / reshard</td>
+          <td><code>state shard 3/8</code></td>
+          <td>“卡 12 负责 MLP 层”</td>
+        </tr>
+        <tr>
+          <td>PP（Pipeline Parallel，流水线并行）</td>
+          <td>连续层段 / stage 子模块</td>
+          <td>每个 stage 运行模型的一部分</td>
+          <td><code>PP5 · layers 36-42</code></td>
+          <td>“TP2 负责第 36-42 层”</td>
+        </tr>
+        <tr>
+          <td>TP（Tensor Parallel，张量并行）</td>
+          <td>同一层内部的张量 / 算子分片</td>
+          <td>列切 / 行切的线性层并行</td>
+          <td><code>QKV shard 2/8</code></td>
+          <td>“卡 7 独自承载 Attention 层”</td>
+        </tr>
+        <tr>
+          <td>SP / CP（Sequence / Context Parallel，序列 / 上下文并行）</td>
+          <td>sequence / context shard</td>
+          <td>参数复制但输入序列被切开</td>
+          <td><code>sequence shard 1/4</code></td>
+          <td>“CP3 承载第 20 层”</td>
+        </tr>
+        <tr>
+          <td>EP（Expert Parallel，专家并行）</td>
+          <td>experts / expert shards</td>
+          <td>每个 worker 持有一个或多个专家</td>
+          <td><code>experts 152-159</code></td>
+          <td>“卡 19 负责整个 MoE 层”</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>章节组织原则：</b>后续章节均按照“实现目标 / 设计理由 / 代码或配置落点 / 验证方法”展开，目标是将并行语义落实为 TrainScope 的界面字段、数据模型和 tooltip，而非仅给出概念定义。</div>
+  </section>
+
+  <section class="floor" id="scope">
+    <div class="kicker">Scope · 基本对象</div>
+    <h2>card、device、rank、worker、stage、expert 的层级关系</h2>
+    <p class="lead section-intro">若产品界面仅使用“卡”作为统一描述，硬件位置、运行时身份、层段分工与专家放置容易被混合表达。本节先建立对象层级，作为后续 placement 建模的基础。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>对象层级图 · 物理设备、运行时身份与并行坐标</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 600" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="scopeArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+            </marker>
+          </defs>
+          <rect x="40" y="40" width="364" height="206" rx="14" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+          <text x="222" y="80" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">物理层</text>
+          <g class="svg-chip">
+            <use href="#chip-shell-compact" x="56" y="108" width="164" height="123"/>
+            <text x="138" y="158" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">host_03</text>
+            <text x="138" y="194" text-anchor="middle" font-size="13" fill="#526070">machine / node</text>
+          </g>
+          <g class="svg-chip">
+            <use href="#chip-shell-compact" x="224" y="108" width="164" height="123"/>
+            <text x="306" y="158" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">device_5</text>
+            <text x="306" y="194" text-anchor="middle" font-size="13" fill="#526070">card / NPU</text>
+          </g>
+
+          <rect x="432" y="40" width="364" height="206" rx="14" fill="#eefbf3" stroke="#86efac" stroke-width="2"/>
+          <text x="614" y="80" text-anchor="middle" font-size="22" font-weight="800" fill="#047857">运行时层</text>
+          <g class="svg-chip">
+            <use href="#chip-shell-compact" x="440" y="108" width="164" height="123"/>
+            <text x="522" y="158" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">rank_237</text>
+            <text x="522" y="194" text-anchor="middle" font-size="13" fill="#526070">global rank</text>
+          </g>
+          <g class="svg-chip">
+            <use href="#chip-shell-compact" x="620" y="108" width="164" height="123"/>
+            <text x="702" y="158" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">worker</text>
+            <text x="702" y="194" text-anchor="middle" font-size="13" fill="#526070">process / member</text>
+          </g>
+
+          <rect x="818" y="40" width="324" height="500" rx="14" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+          <text x="980" y="80" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">并行坐标层</text>
+          <g font-size="15" font-weight="700" fill="#0f172a">
+            <use href="#chip-shell-compact" x="838" y="118" width="144" height="108"/>
+            <text x="910" y="180" text-anchor="middle">PP5</text>
+            <use href="#chip-shell-compact" x="990" y="118" width="144" height="108"/>
+            <text x="1062" y="180" text-anchor="middle">TP2</text>
+            <use href="#chip-shell-compact" x="838" y="268" width="144" height="108"/>
+            <text x="910" y="330" text-anchor="middle">DP7</text>
+            <use href="#chip-shell-compact" x="990" y="268" width="144" height="108"/>
+            <text x="1062" y="330" text-anchor="middle">CP1</text>
+            <use href="#chip-shell-compact" x="914" y="418" width="144" height="108"/>
+            <text x="986" y="480" text-anchor="middle">EP19</text>
+          </g>
+          <rect x="848" y="552" width="264" height="38" rx="10" fill="#fff" stroke="#fdba74"/>
+          <text x="980" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#9a3412">同一个 rank 会同时落在多个并行维度中</text>
+
+          <path d="M388 166 L432 166" stroke="#3b82f6" stroke-width="3" fill="none" marker-end="url(#scopeArrow)"/>
+          <path d="M784 166 L818 166" stroke="#16a34a" stroke-width="3" fill="none" marker-end="url(#scopeArrow)"/>
+
+          <rect x="84" y="310" width="688" height="132" rx="14" fill="#ffffff" stroke="#dbe5f0"/>
+          <text x="428" y="344" text-anchor="middle" font-size="18" font-weight="800" fill="#0f172a">推荐的产品表达</text>
+          <text x="428" y="376" text-anchor="middle" font-size="15" fill="#243244">rank_237 运行在 host_03 / device_5 上，属于 PP5 / TP2 / DP7 / CP1 / EP19 这五个并行坐标</text>
+          <text x="428" y="406" text-anchor="middle" font-size="14" fill="#526070">先定义物理位置，再定义运行时身份，最后展示并行坐标。不应将三层关系压缩为“卡 237 负责哪几层”。</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">读图顺序：左侧表示物理设备，中间表示运行时身份，右侧表示并行坐标；TrainScope 需要展示的是三层关系叠加后的 placement。</div>
+    </div>
+    <div class="grid scope-grid">
+      <div class="card">
+        <h3>实现目标</h3>
+        <p>在页面上同时表达物理位置与运行时身份，避免将 <code>device</code> 和 <code>rank</code> 混为同义词。</p>
+      </div>
+      <div class="card">
+        <h3>设计理由</h3>
+        <p><code>card</code> 是硬件对象，<code>rank</code> 是分布式通信成员。两者在演示场景中可能一一对应，但语义层级并不相同。</p>
+      </div>
+      <div class="card">
+        <h3>代码或配置落点</h3>
+        <p><code>placementMap</code> 至少需要包含 <code>host</code>、<code>device</code>、<code>globalRank</code>、<code>localRank</code>、<code>pp</code>、<code>tp</code>、<code>dp</code>、<code>cp</code>、<code>ep</code> 等字段，不能仅保留 <code>cardId</code>。</p>
+      </div>
+      <div class="card">
+        <h3>验证方法</h3>
+        <p>检查任意 rank 的 tooltip 是否能够同时回答“运行在哪个 device 上”和“属于哪些并行组”。</p>
+      </div>
+    </div>
+    <div class="quote-box"><b>命名原则：</b>产品总标题建议使用 <code>Runtime Placement</code>、<code>Rank / Device Placement</code> 或“rank/device 并行放置关系”，避免使用“每张卡承载哪些层/算子”作为总括表达。后文涉及缩写时，统一按“缩写（英文全称，中文全称）”理解。</div>
+  </section>
+
+  <section class="floor" id="dp">
+    <div class="kicker">Parallel 01 · Data Parallel</div>
+    <h2>DP（Data Parallel，数据并行）：完整模型副本跑不同数据，再做梯度同步</h2>
+    <p class="lead">DP（Data Parallel，数据并行）的核心语义是多个 rank 持有同一份模型副本，各自处理不同的数据 shard，并在反向传播阶段同步梯度。它描述的是数据切分与梯度同步关系，而非模型层段切分。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>DP 主图 · 多个老师拿同一本答案书，批不同学生作业</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 700" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="dpArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+            </marker>
+          </defs>
+          <text x="590" y="50" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">所有 rank 都有同一份模型参数 tensor，但输入的样本 / mini-batch shard 不同</text>
+          <rect x="96" y="84" width="988" height="84" rx="22" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+          <text x="590" y="112" text-anchor="middle" font-size="18" font-weight="800" fill="#1d4ed8">全局训练数据集 / 本 step 的大 batch</text>
+          <g font-size="14" font-weight="700">
+            <rect x="132" y="122" width="208" height="24" rx="10" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="236" y="139" text-anchor="middle" fill="#1d4ed8">样本 shard A · 例如 samples 0-511</text>
+            <rect x="362" y="122" width="208" height="24" rx="10" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="466" y="139" text-anchor="middle" fill="#1d4ed8">样本 shard B · 例如 samples 512-1023</text>
+            <rect x="592" y="122" width="208" height="24" rx="10" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="696" y="139" text-anchor="middle" fill="#1d4ed8">样本 shard C · 例如 samples 1024-1535</text>
+            <rect x="822" y="122" width="226" height="24" rx="10" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="935" y="139" text-anchor="middle" fill="#1d4ed8">样本 shard D · 例如 samples 1536-2047</text>
+          </g>
+
+          <g transform="translate(70,202)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="220" height="280"/>
+            <text x="110" y="42" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">rank_0 · DP0</text>
+            <rect x="34" y="72" width="152" height="62" rx="12" fill="#ffffff" stroke="#60a5fa"/>
+            <text x="110" y="96" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">相同的模型参数 tensor</text>
+            <text x="110" y="117" text-anchor="middle" font-size="12" fill="#526070">Embedding → Blocks → Head</text>
+            <rect x="34" y="154" width="152" height="60" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="110" y="178" text-anchor="middle" font-size="15" font-weight="700" fill="#1d4ed8">输入 x_A / label_A</text>
+            <text x="110" y="198" text-anchor="middle" font-size="12" fill="#526070">来自样本 shard A</text>
+            <text x="110" y="246" text-anchor="middle" font-size="12" fill="#526070">不同的是这批样本</text>
+          </g>
+          <g transform="translate(340,202)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="220" height="280"/>
+            <text x="110" y="42" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">rank_1 · DP1</text>
+            <rect x="34" y="72" width="152" height="62" rx="12" fill="#ffffff" stroke="#60a5fa"/>
+            <text x="110" y="96" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">相同的模型参数 tensor</text>
+            <text x="110" y="117" text-anchor="middle" font-size="12" fill="#526070">Embedding → Blocks → Head</text>
+            <rect x="34" y="154" width="152" height="60" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="110" y="178" text-anchor="middle" font-size="15" font-weight="700" fill="#1d4ed8">输入 x_B / label_B</text>
+            <text x="110" y="198" text-anchor="middle" font-size="12" fill="#526070">来自样本 shard B</text>
+            <text x="110" y="246" text-anchor="middle" font-size="12" fill="#526070">不是模型结构不同</text>
+          </g>
+          <g transform="translate(610,202)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="220" height="280"/>
+            <text x="110" y="42" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">rank_2 · DP2</text>
+            <rect x="34" y="72" width="152" height="62" rx="12" fill="#ffffff" stroke="#60a5fa"/>
+            <text x="110" y="96" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">相同的模型参数 tensor</text>
+            <text x="110" y="117" text-anchor="middle" font-size="12" fill="#526070">Embedding → Blocks → Head</text>
+            <rect x="34" y="154" width="152" height="60" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="110" y="178" text-anchor="middle" font-size="15" font-weight="700" fill="#1d4ed8">输入 x_C / label_C</text>
+            <text x="110" y="198" text-anchor="middle" font-size="12" fill="#526070">来自样本 shard C</text>
+            <text x="110" y="246" text-anchor="middle" font-size="12" fill="#526070">只是在喂不同 batch</text>
+          </g>
+          <g transform="translate(880,202)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="220" height="280"/>
+            <text x="110" y="42" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">rank_3 · DP3</text>
+            <rect x="34" y="72" width="152" height="62" rx="12" fill="#ffffff" stroke="#60a5fa"/>
+            <text x="110" y="96" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">相同的模型参数 tensor</text>
+            <text x="110" y="117" text-anchor="middle" font-size="12" fill="#526070">Embedding → Blocks → Head</text>
+            <rect x="34" y="154" width="152" height="60" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+            <text x="110" y="178" text-anchor="middle" font-size="15" font-weight="700" fill="#1d4ed8">输入 x_D / label_D</text>
+            <text x="110" y="198" text-anchor="middle" font-size="12" fill="#526070">来自样本 shard D</text>
+            <text x="110" y="246" text-anchor="middle" font-size="12" fill="#526070">参数副本仍然相同</text>
+          </g>
+
+          <path d="M236 146 L180 202" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#dpArrow)"/>
+          <path d="M466 146 L450 202" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#dpArrow)"/>
+          <path d="M696 146 L720 202" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#dpArrow)"/>
+          <path d="M935 146 L990 202" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#dpArrow)"/>
+
+          <path d="M180 518 C320 548, 860 548, 1000 518" fill="none" stroke="#2563eb" stroke-width="4" stroke-dasharray="10 8"/>
+          <text x="590" y="540" text-anchor="middle" font-size="15" font-weight="800" fill="#1d4ed8">backward 后做 gradient all-reduce，同步的是模型更新，不是把各自的数据再拼回去</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：多个老师拿着同一本答案标准批不同学生作业。这里“数据不同”指的是每个人拿到的样本集合不同，例如不同 mini-batch shard；不是说模型参数 tensor 长得不一样。</div>
+    </div>
+    <table class="section-table">
+      <thead>
+        <tr><th>项</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>实现目标</td><td>提升吞吐，让多个 rank 同时处理不同数据 shard。</td></tr>
+        <tr><td>设计理由</td><td>DP（Data Parallel，数据并行）不切分模型结构；训练正确性的关键在于梯度同步，而非层归属。这里的数据 shard 指样本或 mini-batch 的切分，不表示模型 tensor 被切分。</td></tr>
+        <tr><td>代码或配置落点</td><td>页面上应显示 <code>DP replica id</code>、<code>sample range / batch shard</code>、<code>input tensor slice for this replica</code>、<code>gradient sync group</code>，而不是显示层段范围。</td></tr>
+        <tr><td>验证方法</td><td>检查多个 DP rank 是否展示同样的模型结构描述，但数据 shard 不同；通信面板应反映梯度同步。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b><code>DP7 replica</code> 或“完整模型副本之一，处理当前 step 的样本 / mini-batch shard”是准确表达；“这张卡负责第几层”不属于 DP（Data Parallel，数据并行）语义。</div>
+  </section>
+
+  <section class="floor" id="fsdp">
+    <div class="kicker">Parallel 02 · Fully Sharded Data Parallel</div>
+    <h2>FSDP（Fully Sharded Data Parallel，全分片数据并行）：训练状态分片与按需重建</h2>
+    <p class="lead">FSDP（Fully Sharded Data Parallel，全分片数据并行）的重点是训练状态与显存管理：参数、梯度和优化器状态以分片形式保存，并在前向或反向传播的特定阶段按需 all-gather，再在使用后 reshard。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>FSDP 主图 · 一本大书拆成多份，轮到某章时再拼起来</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 620" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="fsArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#059669"/>
+            </marker>
+          </defs>
+          <text x="590" y="52" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">每个 rank 只带部分训练状态，使用时再临时 all-gather</text>
+          <g transform="translate(80,126)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="190" height="182"/>
+            <text x="95" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#047857">rank_0</text>
+            <rect x="36" y="68" width="118" height="24" rx="8" fill="#a7f3d0"/>
+            <rect x="36" y="100" width="78" height="24" rx="8" fill="#bbf7d0"/>
+            <rect x="36" y="132" width="58" height="24" rx="8" fill="#d1fae5"/>
+            <text x="95" y="165" text-anchor="middle" font-size="12" fill="#526070">param / grad / optim shard</text>
+          </g>
+          <g transform="translate(300,126)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="190" height="182"/>
+            <text x="95" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#047857">rank_1</text>
+            <rect x="36" y="68" width="80" height="24" rx="8" fill="#a7f3d0"/>
+            <rect x="36" y="100" width="126" height="24" rx="8" fill="#bbf7d0"/>
+            <rect x="36" y="132" width="64" height="24" rx="8" fill="#d1fae5"/>
+            <text x="95" y="165" text-anchor="middle" font-size="12" fill="#526070">不同分片长度只是示意</text>
+          </g>
+          <g transform="translate(520,126)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="190" height="182"/>
+            <text x="95" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#047857">rank_2</text>
+            <rect x="36" y="68" width="96" height="24" rx="8" fill="#a7f3d0"/>
+            <rect x="36" y="100" width="52" height="24" rx="8" fill="#bbf7d0"/>
+            <rect x="36" y="132" width="118" height="24" rx="8" fill="#d1fae5"/>
+            <text x="95" y="165" text-anchor="middle" font-size="12" fill="#526070">状态各持一部分</text>
+          </g>
+          <g transform="translate(740,126)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="190" height="182"/>
+            <text x="95" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#047857">rank_3</text>
+            <rect x="36" y="68" width="108" height="24" rx="8" fill="#a7f3d0"/>
+            <rect x="36" y="100" width="66" height="24" rx="8" fill="#bbf7d0"/>
+            <rect x="36" y="132" width="92" height="24" rx="8" fill="#d1fae5"/>
+            <text x="95" y="165" text-anchor="middle" font-size="12" fill="#526070">不是完整模型副本常驻</text>
+          </g>
+
+          <rect x="372" y="356" width="436" height="96" rx="18" fill="#ffffff" stroke="#6ee7b7" stroke-width="2"/>
+          <text x="590" y="390" text-anchor="middle" font-size="18" font-weight="800" fill="#047857">forward 前 / backward 前按需 all-gather</text>
+          <text x="590" y="420" text-anchor="middle" font-size="14" fill="#243244">用完再 reshard，显存里长期常驻的是分片状态，不是完整常驻副本</text>
+
+          <path d="M175 308 L420 356" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#fsArrow)"/>
+          <path d="M395 308 L500 356" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#fsArrow)"/>
+          <path d="M615 308 L590 356" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#fsArrow)"/>
+          <path d="M835 308 L680 356" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#fsArrow)"/>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：一本很厚的参考书被拆成多份，老师们平时只背自己那一份；轮到某章要用时，才临时把那章拼齐。</div>
+    </div>
+    <table class="section-table">
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>实现目标</td><td>降低显存占用，让更大的模型可训练。</td></tr>
+        <tr><td>设计理由</td><td>FSDP（Fully Sharded Data Parallel，全分片数据并行）切分的是参数、梯度与优化器状态，这与“哪张卡负责哪一段层”属于不同问题。</td></tr>
+        <tr><td>代码或配置落点</td><td>页面应展示 <code>state shard</code>、<code>all-gather window</code>、<code>reshard point</code> 等语义，而不是层标签。</td></tr>
+        <tr><td>验证方法</td><td>检查同一模块在不同 rank 上是否展示成状态切片；前后向关键阶段是否存在 gather / reshard 事件说明。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b>可以写“该 rank 持有模型参数/梯度/优化器状态的一部分分片；前后向期间按需 all-gather”，不要写“卡 12 负责 MLP 层”。</div>
+  </section>
+
+  <section class="floor" id="pp">
+    <div class="kicker">Parallel 03 · Pipeline Parallel</div>
+    <h2>PP（Pipeline Parallel，流水线并行）：连续层段切分与流水执行</h2>
+    <p class="lead">PP（Pipeline Parallel，流水线并行）将模型切分为多个连续 stage，每个 stage 运行一段连续层，micro-batch 沿流水线顺序推进。因此，PP 是最适合展示层段范围的并行方式。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>PP 主图 · 工厂流水线按工序分站</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="ppArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/>
+            </marker>
+          </defs>
+          <text x="590" y="54" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">模型被切成连续 stage，micro-batch 从前往后流动</text>
+          <g transform="translate(70,138)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="240" height="214"/>
+            <text x="120" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">PP0</text>
+            <rect x="28" y="68" width="184" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="120" y="90" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Embedding</text>
+            <rect x="28" y="112" width="184" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="120" y="134" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">layers 0-11</text>
+            <rect x="56" y="166" width="128" height="28" rx="9" fill="#fed7aa" stroke="#fb923c"/>
+            <text x="120" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#9a3412">micro-batch 0</text>
+          </g>
+          <g transform="translate(350,138)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="240" height="214"/>
+            <text x="120" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">PP1</text>
+            <rect x="28" y="90" width="184" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="120" y="112" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">layers 12-23</text>
+            <rect x="56" y="166" width="128" height="28" rx="9" fill="#fed7aa" stroke="#fb923c"/>
+            <text x="120" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#9a3412">micro-batch 1</text>
+          </g>
+          <g transform="translate(630,138)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="240" height="214"/>
+            <text x="120" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">PP2</text>
+            <rect x="28" y="90" width="184" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="120" y="112" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">layers 24-35</text>
+            <rect x="56" y="166" width="128" height="28" rx="9" fill="#fed7aa" stroke="#fb923c"/>
+            <text x="120" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#9a3412">micro-batch 2</text>
+          </g>
+          <g transform="translate(910,138)" class="svg-chip">
+            <use href="#chip-shell-tall" x="0" y="0" width="200" height="214"/>
+            <text x="100" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#c2410c">PP3</text>
+            <rect x="20" y="68" width="160" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="100" y="90" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">layers 36-47</text>
+            <rect x="20" y="112" width="160" height="34" rx="10" fill="#ffffff" stroke="#fb923c"/>
+            <text x="100" y="134" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">LM Head</text>
+            <rect x="36" y="166" width="128" height="28" rx="9" fill="#fed7aa" stroke="#fb923c"/>
+            <text x="100" y="184" text-anchor="middle" font-size="13" font-weight="700" fill="#9a3412">micro-batch 3</text>
+          </g>
+          <path d="M310 248 L348 248" stroke="#ea580c" stroke-width="3" fill="none" marker-end="url(#ppArrow)"/>
+          <path d="M590 248 L628 248" stroke="#ea580c" stroke-width="3" fill="none" marker-end="url(#ppArrow)"/>
+          <path d="M870 248 L908 248" stroke="#ea580c" stroke-width="3" fill="none" marker-end="url(#ppArrow)"/>
+          <rect x="218" y="418" width="744" height="76" rx="18" fill="#fff" stroke="#fdba74" stroke-width="2"/>
+          <text x="590" y="451" text-anchor="middle" font-size="18" font-weight="800" fill="#c2410c">PP 最适合回答“哪一段层落在哪个 stage 上”</text>
+          <text x="590" y="476" text-anchor="middle" font-size="14" fill="#243244">因此 <code>layers 36-42</code>、<code>stage 5</code> 这类文案在 PP 语义下是准确的。</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：工厂流水线把一件产品拆成若干站，每一站只负责自己那段工序，上一站做完交给下一站。</div>
+    </div>
+    <table class="section-table">
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>实现目标</td><td>把深模型按层段切开，让不同 stage 并行工作。</td></tr>
+        <tr><td>设计理由</td><td>只有 PP 在官方语义上直接对应“这个 stage 运行模型的哪一部分”。</td></tr>
+        <tr><td>代码或配置落点</td><td>适合在 <code>placementMap</code> 中直接保存 <code>layerStart</code>、<code>layerEnd</code>、<code>stageId</code>，并在 inspector 中显示层段范围。</td></tr>
+        <tr><td>验证方法</td><td>切换 stage 时，界面必须显示连续层段；micro-batch 流转顺序应与 stage 顺序一致。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b><code>PP5 · layers 36-42</code>、“该 stage 执行第 36-42 层的前后向”这类说法是可靠的。</div>
+  </section>
+
+  <section class="floor" id="tp">
+    <div class="kicker">Parallel 04 · Tensor Parallel</div>
+    <h2>TP（Tensor Parallel，张量并行）：同层张量分片与协同计算</h2>
+    <p class="lead">TP（Tensor Parallel，张量并行）的核心语义是在同一层内部切分张量或线性层权重，由多个 rank 协同完成该层计算。它回答“该层如何分片”，而非“该层归属哪个 rank”。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>TP 主图 · 一张大矩阵按列或按行分给多人同时计算</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="tpArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/>
+            </marker>
+          </defs>
+          <text x="590" y="52" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">同一层的线性算子被切成多个 shard，不是整层交给一张卡</text>
+
+          <rect x="78" y="118" width="320" height="250" rx="22" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2"/>
+          <text x="238" y="154" text-anchor="middle" font-size="22" font-weight="800" fill="#6d28d9">同一层：Attention / MLP</text>
+          <rect x="126" y="196" width="224" height="124" rx="10" fill="#ffffff" stroke="#a78bfa"/>
+          <line x1="182" y1="196" x2="182" y2="320" stroke="#7c3aed" stroke-dasharray="6 6"/>
+          <line x1="238" y1="196" x2="238" y2="320" stroke="#7c3aed" stroke-dasharray="6 6"/>
+          <line x1="294" y1="196" x2="294" y2="320" stroke="#7c3aed" stroke-dasharray="6 6"/>
+          <text x="154" y="338" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">shard 0</text>
+          <text x="210" y="338" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">shard 1</text>
+          <text x="266" y="338" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">shard 2</text>
+          <text x="322" y="338" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">shard 3</text>
+
+          <g transform="translate(470,104)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="180" height="110"/>
+            <text x="90" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#6d28d9">rank_0</text>
+            <text x="90" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">QKV shard 0/4</text>
+            <text x="90" y="88" text-anchor="middle" font-size="12" fill="#526070">同层协同计算</text>
+          </g>
+          <g transform="translate(470,234)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="180" height="110"/>
+            <text x="90" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#6d28d9">rank_1</text>
+            <text x="90" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">QKV shard 1/4</text>
+            <text x="90" y="88" text-anchor="middle" font-size="12" fill="#526070">不是独占整层</text>
+          </g>
+          <g transform="translate(700,104)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="180" height="110"/>
+            <text x="90" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#6d28d9">rank_2</text>
+            <text x="90" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">QKV shard 2/4</text>
+            <text x="90" y="88" text-anchor="middle" font-size="12" fill="#526070">列切 / 行切</text>
+          </g>
+          <g transform="translate(700,234)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="180" height="110"/>
+            <text x="90" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#6d28d9">rank_3</text>
+            <text x="90" y="66" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">QKV shard 3/4</text>
+            <text x="90" y="88" text-anchor="middle" font-size="12" fill="#526070">需要同层通信</text>
+          </g>
+
+          <path d="M398 228 L466 160" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#tpArrow)"/>
+          <path d="M398 246 L466 290" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#tpArrow)"/>
+          <path d="M398 264 L696 160" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#tpArrow)"/>
+          <path d="M398 282 L696 290" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#tpArrow)"/>
+
+          <rect x="936" y="130" width="180" height="208" rx="18" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2"/>
+          <text x="1026" y="164" text-anchor="middle" font-size="18" font-weight="800" fill="#6d28d9">类比</text>
+          <text x="1026" y="204" text-anchor="middle" font-size="14" fill="#243244">一张超大表格</text>
+          <text x="1026" y="230" text-anchor="middle" font-size="14" fill="#243244">不是前 10 页给甲</text>
+          <text x="1026" y="256" text-anchor="middle" font-size="14" fill="#243244">后 10 页给乙</text>
+          <text x="1026" y="282" text-anchor="middle" font-size="14" fill="#243244">而是同一页的不同列块</text>
+          <text x="1026" y="308" text-anchor="middle" font-size="14" fill="#243244">同时分给多人计算</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：四个人同时算同一页表格的不同列块。每个人都在参与这一层，但没有谁“独自拥有”这一层。</div>
+    </div>
+    <table class="section-table">
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>实现目标</td><td>把单层内部的大矩阵与大算子切开，扩展单层可并行规模。</td></tr>
+        <tr><td>设计理由</td><td>TP（Tensor Parallel，张量并行）的官方语义是行切 / 列切，体现的是同层协同计算，而非整层归属。</td></tr>
+        <tr><td>代码或配置落点</td><td>适合显示 <code>op name</code>、<code>tensor shard id</code>、<code>group size</code>，如 <code>Attention QKV shard 2/8</code>。</td></tr>
+        <tr><td>验证方法</td><td>切换到 TP（Tensor Parallel，张量并行）视图时，同一层应同时出现在多个 rank 上；说明文字必须强调 shard，而非层归属。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b><code>卡 7 / rank_7 持有 Attention QKV 的 TP shard 2/8</code> 是准确的；“卡 7 负责 Attention 层”会误导。</div>
+  </section>
+
+  <section class="floor" id="spcp">
+    <div class="kicker">Parallel 05 · Sequence / Context Parallel</div>
+    <h2>SP / CP（Sequence / Context Parallel，序列并行 / 上下文并行）：序列与上下文维度切分</h2>
+    <p class="lead">SP / CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）的核心语义是将 token 序列或上下文窗口切分为多个 shard，由多个 rank 分担长序列计算压力。它描述“哪个 rank 处理哪段 sequence/context”，而非层段归属。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>SP / CP 主图 · 一本长小说被拆成连续片段阅读</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="cpArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/>
+            </marker>
+          </defs>
+          <text x="590" y="52" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">参数仍是同一套规则，切开的是 sequence / context 窗口</text>
+          <rect x="84" y="146" width="1012" height="102" rx="24" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+          <text x="590" y="118" text-anchor="middle" font-size="20" font-weight="800" fill="#0f172a">一条很长的 token 序列</text>
+          <g font-size="16" font-weight="700">
+            <rect x="112" y="178" width="240" height="38" rx="12" fill="#cffafe" stroke="#22d3ee"/>
+            <text x="232" y="202" text-anchor="middle" fill="#155e75">sequence shard 0</text>
+            <rect x="362" y="178" width="240" height="38" rx="12" fill="#a5f3fc" stroke="#22d3ee"/>
+            <text x="482" y="202" text-anchor="middle" fill="#155e75">sequence shard 1</text>
+            <rect x="612" y="178" width="240" height="38" rx="12" fill="#67e8f9" stroke="#22d3ee"/>
+            <text x="732" y="202" text-anchor="middle" fill="#155e75">sequence shard 2</text>
+            <rect x="862" y="178" width="206" height="38" rx="12" fill="#22d3ee" stroke="#06b6d4"/>
+            <text x="965" y="202" text-anchor="middle" fill="#0c4a6e">sequence shard 3</text>
+          </g>
+          <g transform="translate(144,322)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="200" height="120"/>
+            <text x="100" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#0e7490">rank_0</text>
+            <text x="100" y="68" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">CP0 / SP0</text>
+            <text x="100" y="92" text-anchor="middle" font-size="12" fill="#526070">token 0-2047</text>
+          </g>
+          <g transform="translate(390,322)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="200" height="120"/>
+            <text x="100" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#0e7490">rank_1</text>
+            <text x="100" y="68" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">CP1 / SP1</text>
+            <text x="100" y="92" text-anchor="middle" font-size="12" fill="#526070">token 2048-4095</text>
+          </g>
+          <g transform="translate(636,322)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="200" height="120"/>
+            <text x="100" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#0e7490">rank_2</text>
+            <text x="100" y="68" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">CP2 / SP2</text>
+            <text x="100" y="92" text-anchor="middle" font-size="12" fill="#526070">token 4096-6143</text>
+          </g>
+          <g transform="translate(882,322)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="200" height="120"/>
+            <text x="100" y="36" text-anchor="middle" font-size="20" font-weight="800" fill="#0e7490">rank_3</text>
+            <text x="100" y="68" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">CP3 / SP3</text>
+            <text x="100" y="92" text-anchor="middle" font-size="12" fill="#526070">token 6144-8191</text>
+          </g>
+          <path d="M232 216 L244 322" stroke="#0891b2" stroke-width="2.5" fill="none" marker-end="url(#cpArrow)"/>
+          <path d="M482 216 L490 322" stroke="#0891b2" stroke-width="2.5" fill="none" marker-end="url(#cpArrow)"/>
+          <path d="M732 216 L736 322" stroke="#0891b2" stroke-width="2.5" fill="none" marker-end="url(#cpArrow)"/>
+          <path d="M965 216 L982 322" stroke="#0891b2" stroke-width="2.5" fill="none" marker-end="url(#cpArrow)"/>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：一本很长的小说被切成连续片段给不同人阅读，大家用同样的规则处理文字，但每人只处理自己那段 token。</div>
+    </div>
+    <table class="section-table">
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>实现目标</td><td>在长上下文场景下把 sequence 维切开，降低单 rank 的序列负载。</td></tr>
+        <tr><td>设计理由</td><td>SP / CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）回答的是“哪段 token 由哪个 rank 处理”，而非“哪层由哪个 rank 处理”。</td></tr>
+        <tr><td>代码或配置落点</td><td>适合展示 <code>sequence shard id</code>、<code>token range</code>、<code>context window</code>。</td></tr>
+        <tr><td>验证方法</td><td>同一层或模块在多个 SP/CP rank 上仍然存在，但 token range 不同；说明文字必须明确是序列切分。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b><code>CP1 · sequence shard 1/4</code>、“负责当前上下文窗口的一段 token”是准确的；“CP3 承载第 20 层”不准确。</div>
+  </section>
+
+  <section class="floor" id="ep">
+    <div class="kicker">Parallel 06 · Expert Parallel</div>
+    <h2>EP（Expert Parallel，专家并行）：专家放置与动态路由</h2>
+    <p class="lead">EP（Expert Parallel，专家并行）的核心语义是专家放置与 token 路由：Gate 决定 token 被路由到哪个 expert，而 expert 再分布到多个 rank 上。它表达 expert placement，而非整个 MoE 层的单点归属。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>EP 主图 · 医院分诊台把病人送到不同专科医生</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 580" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="epArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+            </marker>
+          </defs>
+          <text x="590" y="52" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">Gate 负责分诊，rank 持有的是 experts / expert shards</text>
+          <rect x="100" y="170" width="220" height="150" rx="24" fill="#fee2e2" stroke="#fca5a5" stroke-width="2"/>
+          <text x="210" y="210" text-anchor="middle" font-size="22" font-weight="800" fill="#b91c1c">Router / Gate</text>
+          <text x="210" y="244" text-anchor="middle" font-size="14" fill="#243244">token 按分数路由</text>
+          <text x="210" y="270" text-anchor="middle" font-size="14" fill="#243244">不是直接绑定某张卡</text>
+
+          <g transform="translate(438,100)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="220" height="140"/>
+            <text x="110" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#b91c1c">rank_19</text>
+            <rect x="28" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="116" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="28" y="98" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <text x="66" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 152</text>
+            <text x="154" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 153</text>
+            <text x="66" y="116" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 154</text>
+          </g>
+          <g transform="translate(724,100)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="220" height="140"/>
+            <text x="110" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#b91c1c">rank_20</text>
+            <rect x="28" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="116" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="28" y="98" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <text x="66" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 155</text>
+            <text x="154" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 156</text>
+            <text x="66" y="116" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 157</text>
+          </g>
+          <g transform="translate(581,314)" class="svg-chip">
+            <use href="#chip-shell" x="0" y="0" width="220" height="140"/>
+            <text x="110" y="34" text-anchor="middle" font-size="20" font-weight="800" fill="#b91c1c">rank_21</text>
+            <rect x="28" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="116" y="58" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <rect x="28" y="98" width="76" height="28" rx="10" fill="#fecaca" stroke="#f87171"/>
+            <text x="66" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 158</text>
+            <text x="154" y="76" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 159</text>
+            <text x="66" y="116" text-anchor="middle" font-size="12" font-weight="700" fill="#7f1d1d">expert 160</text>
+          </g>
+
+          <path d="M322 220 L434 168" stroke="#dc2626" stroke-width="2.5" fill="none" marker-end="url(#epArrow)"/>
+          <path d="M322 244 L720 168" stroke="#dc2626" stroke-width="2.5" fill="none" marker-end="url(#epArrow)"/>
+          <path d="M322 268 L580 350" stroke="#dc2626" stroke-width="2.5" fill="none" marker-end="url(#epArrow)"/>
+
+          <rect x="82" y="390" width="396" height="100" rx="18" fill="#fff" stroke="#fca5a5" stroke-width="2"/>
+          <text x="280" y="426" text-anchor="middle" font-size="18" font-weight="800" fill="#b91c1c">不应默认 expert_group_19 ↔ rank_19 ↔ card_19 永远一一对应</text>
+          <text x="280" y="456" text-anchor="middle" font-size="14" fill="#243244">演示图中的一一对应只用于降低阅读成本。真实产品应展示 expert bucket 当前投影到哪些 rank / device。</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">类比：医院分诊台把病人送去不同专科医生。医生分散在不同诊室里，病人去哪个医生由 gate 决定，不是先固定绑卡再解释语义。</div>
+    </div>
+    <table class="section-table">
+      <thead><tr><th>项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>实现目标</td><td>在 MoE 层内部把 experts 分布到多个 rank 上，提升专家总容量与并发。</td></tr>
+        <tr><td>设计理由</td><td>EP（Expert Parallel，专家并行）的主体对象是 experts；它描述“某个 rank 持有哪些 experts 或 expert shards”，而非“某张卡负责整个 MoE 层”。</td></tr>
+        <tr><td>代码或配置落点</td><td>适合在 <code>placementMap</code> 中展示 <code>expertIds</code>、<code>expertShardRange</code>、<code>gate route target</code>。</td></tr>
+        <tr><td>验证方法</td><td>从任意 token 或 expert bucket 出发，页面能追到它被路由到哪个 rank/device；并且不假设 1:1 固定映射。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>页面口径：</b><code>EP19 · experts 152-159</code>、“该 rank 持有当前 MoE 层的一部分 experts / expert shards”是准确的；“卡 19 负责 MoE 层”不准确。</div>
+  </section>
+
+  <section class="floor" id="combined">
+    <div class="kicker">Framework · 多维并行叠加</div>
+    <h2>真实训练不是单选题，而是多维坐标叠加</h2>
+    <p class="lead">同一个 rank 往往同时属于 `PP（Pipeline Parallel，流水线并行）`、`TP（Tensor Parallel，张量并行）`、`DP（Data Parallel，数据并行）`、`CP（Context Parallel，上下文并行）`、`EP（Expert Parallel，专家并行）` 多个维度。真正的 placement 视图，必须把这些标签叠加起来表达。</p>
+    <div class="screenshot">
+      <div class="shotbar"><span class="dots"></span>组合主图 · 一个 rank 的多维身份</div>
+      <div class="shotbody flush">
+        <svg viewBox="0 0 1180 560" xmlns="http://www.w3.org/2000/svg" class="whitepaper-svg" style="--svg-width: 980px">
+          <defs>
+            <marker id="comboArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/>
+            </marker>
+          </defs>
+          <text x="590" y="54" text-anchor="middle" font-size="26" font-weight="800" fill="#0f172a">一个 rank = 物理位置 + 运行时身份 + 多个并行坐标</text>
+          <rect x="104" y="180" width="300" height="250" rx="22" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+          <text x="254" y="222" text-anchor="middle" font-size="22" font-weight="800" fill="#1d4ed8">host_03 / device_5</text>
+          <text x="254" y="254" text-anchor="middle" font-size="16" fill="#243244">global rank_237</text>
+          <g class="svg-chip">
+            <use href="#chip-shell" x="154" y="276" width="200" height="120"/>
+            <text x="254" y="330" text-anchor="middle" font-size="20" font-weight="800" fill="#0f172a">rank_237</text>
+            <text x="254" y="355" text-anchor="middle" font-size="12" fill="#526070">一个具体进程 / 通信成员</text>
+          </g>
+
+          <g transform="translate(500,92)">
+            <rect x="0" y="0" width="580" height="450" rx="24" fill="#fff" stroke="#dbe5f0" stroke-width="2"/>
+            <text x="280" y="38" text-anchor="middle" font-size="22" font-weight="800" fill="#0f172a">在这个 rank 上叠加的多个维度</text>
+            <text x="280" y="66" text-anchor="middle" font-size="13" font-weight="600" fill="#64748b">同一左边界的 2.5D 拆层视图：五层语义标签，不是五张卡</text>
+            <path d="M120 92 L120 462" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 8"/>
+            <g font-size="13" font-weight="700">
+              <g opacity="0.98">
+                <path d="M120 118 L420 118 L454 100 L154 100 Z" fill="#ffedd5" stroke="#fdba74" stroke-width="1.5"/>
+                <path d="M420 118 L454 100 L454 144 L420 162 Z" fill="#fed7aa" stroke="#fdba74" stroke-width="1.5"/>
+                <rect x="120" y="118" width="300" height="44" rx="10" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+                <text x="270" y="137" text-anchor="middle" font-weight="800" fill="#c2410c">PP5</text>
+                <text x="270" y="154" text-anchor="middle" font-size="12" fill="#7c2d12">layers 36-42</text>
+              </g>
+              <g opacity="0.98">
+                <path d="M120 190 L420 190 L454 172 L154 172 Z" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
+                <path d="M420 190 L454 172 L454 216 L420 234 Z" fill="#ddd6fe" stroke="#c4b5fd" stroke-width="1.5"/>
+                <rect x="120" y="190" width="300" height="44" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2"/>
+                <text x="270" y="209" text-anchor="middle" font-weight="800" fill="#6d28d9">TP2</text>
+                <text x="270" y="226" text-anchor="middle" font-size="12" fill="#4c1d95">QKV shard 2/8</text>
+              </g>
+              <g opacity="0.98">
+                <path d="M120 262 L420 262 L454 244 L154 244 Z" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+                <path d="M420 262 L454 244 L454 288 L420 306 Z" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1.5"/>
+                <rect x="120" y="262" width="300" height="44" rx="10" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+                <text x="270" y="281" text-anchor="middle" font-weight="800" fill="#1d4ed8">DP7</text>
+                <text x="270" y="298" text-anchor="middle" font-size="12" fill="#1e3a8a">replica group</text>
+              </g>
+              <g opacity="0.98">
+                <path d="M120 334 L420 334 L454 316 L154 316 Z" fill="#cffafe" stroke="#67e8f9" stroke-width="1.5"/>
+                <path d="M420 334 L454 316 L454 360 L420 378 Z" fill="#a5f3fc" stroke="#67e8f9" stroke-width="1.5"/>
+                <rect x="120" y="334" width="300" height="44" rx="10" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+                <text x="270" y="353" text-anchor="middle" font-weight="800" fill="#0e7490">CP1</text>
+                <text x="270" y="370" text-anchor="middle" font-size="12" fill="#155e75">token 2048-4095</text>
+              </g>
+              <g opacity="0.98">
+                <path d="M120 406 L420 406 L454 388 L154 388 Z" fill="#fee2e2" stroke="#fca5a5" stroke-width="1.5"/>
+                <path d="M420 406 L454 388 L454 432 L420 450 Z" fill="#fecaca" stroke="#fca5a5" stroke-width="1.5"/>
+                <rect x="120" y="406" width="300" height="44" rx="10" fill="#fef2f2" stroke="#fca5a5" stroke-width="2"/>
+                <text x="270" y="425" text-anchor="middle" font-weight="800" fill="#b91c1c">EP19</text>
+                <text x="270" y="442" text-anchor="middle" font-size="12" fill="#7f1d1d">experts 152-159</text>
+              </g>
+            </g>
+            <text x="270" y="486" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">五块板的左边界对齐，表示它们都绑定到左侧同一个 rank/device</text>
+          </g>
+
+          <path d="M354 304 L494 304" stroke="#1d4ed8" stroke-width="3" fill="none" marker-end="url(#comboArrow)"/>
+          <rect x="158" y="552" width="864" height="46" rx="16" fill="#ffffff" stroke="#dbe5f0"/>
+          <text x="590" y="580" text-anchor="middle" font-size="16" font-weight="800" fill="#0f172a">TrainScope 要表达的是：一个 rank/device 在多个并行维度上的运行时放置关系</text>
+        </svg>
+      </div>
+      <div class="evidence-caption">读图顺序：先看左边的 rank 身份，再看右边叠加的五类坐标。真正的 placement 是多维标签交叉，而不是单个归类。</div>
+    </div>
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">物理轴</div>
+        <div class="arch-boxes">
+          <div class="arch-box">host / node</div>
+          <div class="arch-box">slot / device</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">运行时轴</div>
+        <div class="arch-boxes">
+          <div class="arch-box">global rank</div>
+          <div class="arch-box">local rank</div>
+          <div class="arch-box">communication groups</div>
+        </div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">并行轴</div>
+        <div class="arch-boxes">
+          <div class="arch-box">PP layer range</div>
+          <div class="arch-box">TP op shard</div>
+          <div class="arch-box">DP replica</div>
+          <div class="arch-box">CP/SP sequence shard</div>
+          <div class="arch-box">EP experts</div>
+        </div>
+      </div>
+      <div class="arch-note">这三层共同组成 placement engine 的输出模型。ParallelDemo 算对的是这层逻辑，不是右侧画几张卡的示意排版。</div>
+    </div>
+  </section>
+
+  <section class="floor" id="product-guidance">
+    <div class="kicker">Product Guidance · 产品表达建议</div>
+    <h2>TrainScope 应复用 ParallelDemo 的 placement 逻辑，而不是复用它的少量卡片示意</h2>
+    <p class="lead">ParallelDemo 对的地方，是 rank 坐标推导、组关系推导、PP 层段分配这套 placement engine。TrainScope 真正要做的是把这套逻辑转成可扩展到真实盘古训练规模的数据层和聚合视图。</p>
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>应复用的部分</h3>
+        <p><code>rankOf(d,p,c,t)</code> 这种坐标推导、<code>tp/pp/dp/cp</code> group 计算、<code>distributeLayers()</code> 这类 stage 层分配逻辑。</p>
+        <div class="pill-row">
+          <span class="pill good">placement engine</span>
+          <span class="pill good">pure data</span>
+          <span class="pill good">group semantics</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>不应直接复用的部分</h3>
+        <p>只画几张卡的示意布局、把 expert bucket 简化成与 rank 一一对应、把真实集群压成单一平面卡片图。</p>
+        <div class="pill-row">
+          <span class="pill hot">few-card demo</span>
+          <span class="pill hot">1:1 假设</span>
+          <span class="pill hot">平面小样</span>
+        </div>
+      </div>
+    </div>
+    <div class="rec-grid">
+      <div class="rec-panel">
+        <h3>字段与标题</h3>
+        <div class="rec-item">
+          <div class="rec-num">01</div>
+          <div><b>总标题</b><span>使用 <code>Runtime Placement</code>、<code>Rank / Device Placement</code>，不要用“每张卡承载哪些层/算子”。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">02</div>
+          <div><b>核心字段</b><span><code>device</code>、<code>rank</code>、<code>PP (Pipeline Parallel)</code>、<code>TP (Tensor Parallel)</code>、<code>DP (Data Parallel)</code>、<code>CP/SP (Context/Sequence Parallel)</code>、<code>EP (Expert Parallel)</code>。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">03</div>
+          <div><b>tooltip 文案</b><span>例如 <code>rank_237 / device_5: PP5 layer 36-42, TP2 shard, DP7 replica, EP19 experts 152-159</code>。</span></div>
+        </div>
+      </div>
+      <div class="rec-panel">
+        <h3>数据与视图</h3>
+        <div class="rec-item">
+          <div class="rec-num">04</div>
+          <div><b>数据层</b><span>把 ParallelDemo 的坐标推导抽成共享 `parallel-placement.js`，输出纯 placement 数据。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">05</div>
+          <div><b>视图层</b><span>真实规模采用聚合视图：cluster / host / group / rank window，多级钻取，不试图平铺 1k+ 卡。</span></div>
+        </div>
+        <div class="rec-item">
+          <div class="rec-num">06</div>
+          <div><b>MoE 特别注意</b><span>不要默认 <code>expert_group ↔ rank ↔ card</code> 一一对应；应展示“当前 projection 到哪些 rank / device”。</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callout"><b>一句话建议：</b>复用 ParallelDemo 的并行分配计算逻辑，重做 TrainScope 的数据模型和聚合视图；逻辑复用，视图重做。</div>
+  </section>
+
+  <section class="floor" id="findings">
+    <div class="kicker">Findings · 总结</div>
+    <h2>把这件事记成三条判断</h2>
+    <p class="lead">如果只保留最重要的结论，应该是下面三条。</p>
+    <div class="tension">
+      <div><b>核心判断</b><span>真实大模型训练不是“卡按层和算子分配”一句话能说完，而是多个并行维度共同定义 placement。</span></div>
+      <div><b>准确边界</b><span>“哪张卡负责哪几层”只适用于 PP（Pipeline Parallel，流水线并行）；TP、DP、FSDP、SP/CP、EP 都需要更精确的语义字段。</span></div>
+      <div><b>产品方向</b><span>TrainScope 的正确标题是 placement，不是 layer ownership；ParallelDemo 提供的是计算引擎，不是最终 UI 结构。</span></div>
+    </div>
+    <div class="quote-box">
+      <b>最终结论：</b>对 `PP（Pipeline Parallel，流水线并行）` 来说，“每张卡承载哪些层”基本准确；对 `TP（Tensor Parallel，张量并行）` 来说，这句话只说对一半；对 `DP（Data Parallel，数据并行）/ FSDP（Fully Sharded Data Parallel，全分片数据并行）/ CP（Context Parallel，上下文并行）` 来说基本不准确；对 `EP（Expert Parallel，专家并行）` 来说，应改成“该 rank/device 持有哪些 experts 或 expert shards”。
+    </div>
+  </section>
+
+  <section class="floor" id="terms">
+    <div class="kicker">Terms · 术语表</div>
+    <h2>页面字段与术语建议</h2>
+    <p class="lead">这一节可直接作为 TrainScope 文案与 inspector 字段设计参考。</p>
+    <table class="terms-table">
+      <thead>
+        <tr><th>缩写 / 术语</th><th>完整中英文全称</th><th>推荐展示</th><th>含义</th><th>不建议写法</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>device</td><td>device / card / accelerator（设备 / 卡 / 加速器）</td><td><code>host_03 / device_5</code></td><td>物理设备位置</td><td>只写“卡 237”</td></tr>
+        <tr><td>rank</td><td>global rank / local rank（全局 / 本地运行时编号）</td><td><code>global_rank_237</code></td><td>运行时通信成员编号</td><td>把 rank 与 card 当同义词</td></tr>
+        <tr><td>DP</td><td>Data Parallel（数据并行）</td><td><code>DP7 replica</code></td><td>完整模型副本所属数据并行组</td><td>“负责第 12-24 层”</td></tr>
+        <tr><td>FSDP</td><td>Fully Sharded Data Parallel（全分片数据并行）</td><td><code>state shard 3/8</code></td><td>参数、梯度、优化器状态分片</td><td>“卡 12 负责 MLP 层”</td></tr>
+        <tr><td>PP</td><td>Pipeline Parallel（流水线并行）</td><td><code>PP5 · layers 36-42</code></td><td>该 stage 承担的层段</td><td>省略层段范围</td></tr>
+        <tr><td>TP</td><td>Tensor Parallel（张量并行）</td><td><code>Attention QKV shard 2/8</code></td><td>同一层内部的张量分片</td><td>“负责 Attention 层”</td></tr>
+        <tr><td>SP</td><td>Sequence Parallel（序列并行）</td><td><code>sequence shard 1/4</code></td><td>当前处理的序列片段</td><td>“承载第 20 层”</td></tr>
+        <tr><td>CP</td><td>Context Parallel（上下文并行）</td><td><code>context shard 1/4</code></td><td>当前处理的上下文窗口分片</td><td>“承载第 20 层”</td></tr>
+        <tr><td>EP</td><td>Expert Parallel（专家并行）</td><td><code>experts 152-159</code></td><td>该 rank 持有的专家或专家分片</td><td>“负责整个 MoE 层”</td></tr>
+        <tr><td>placementMap</td><td>runtime placement map（运行时放置映射）</td><td><code>{host, device, rank, pp, tp, dp, cp, ep}</code></td><td>TrainScope 的核心数据对象</td><td>只留 <code>rank ↔ node</code> 的 1:1 简化表</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="floor" id="evidence">
+    <div class="kicker">Evidence · 官方依据</div>
+    <h2>这份白皮书直接参考的官方文档</h2>
+    <p class="lead">以下资料分别定义了 DDP（DistributedDataParallel，分布式数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、Pipeline Parallel（流水线并行）、Tensor Parallel（张量并行）、Sequence Parallel（序列并行）和 MoE Expert Parallel（专家并行）的官方或主流实现语义。</p>
+    <table class="evidence-list">
+      <thead>
+        <tr><th>来源</th><th>对应章节</th><th>链接</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PyTorch DistributedDataParallel</td>
+          <td>DP（Data Parallel，数据并行）：梯度同步、模型副本、输入切分由用户控制</td>
+          <td><a href="https://docs.pytorch.org/docs/2.12/generated/torch.nn.parallel.DistributedDataParallel.html">https://docs.pytorch.org/docs/2.12/generated/torch.nn.parallel.DistributedDataParallel.html</a></td>
+        </tr>
+        <tr>
+          <td>PyTorch FullyShardedDataParallel</td>
+          <td>FSDP（Fully Sharded Data Parallel，全分片数据并行）：参数、梯度、优化器状态分片；all-gather / reshard</td>
+          <td><a href="https://docs.pytorch.org/docs/2.12/fsdp.html">https://docs.pytorch.org/docs/2.12/fsdp.html</a></td>
+        </tr>
+        <tr>
+          <td>PyTorch Pipeline Parallelism</td>
+          <td>PP（Pipeline Parallel，流水线并行）：stage 包装模型的一部分</td>
+          <td><a href="https://docs.pytorch.org/docs/2.12/distributed.pipelining.html">https://docs.pytorch.org/docs/2.12/distributed.pipelining.html</a></td>
+        </tr>
+        <tr>
+          <td>PyTorch Tensor Parallelism</td>
+          <td>TP / SP（Tensor Parallel / Sequence Parallel，张量并行 / 序列并行）：ColwiseParallel、RowwiseParallel、SequenceParallel</td>
+          <td><a href="https://docs.pytorch.org/docs/2.12/distributed.tensor.parallel.html">https://docs.pytorch.org/docs/2.12/distributed.tensor.parallel.html</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core MoE</td>
+          <td>EP（Expert Parallel，专家并行）：experts 分配到不同 worker，每个 worker 处理一个或多个 experts</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/moe.html">https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/moe.html</a></td>
+        </tr>
+        <tr>
+          <td>DeepSpeed MoE Tutorial</td>
+          <td>EP（Expert Parallel，专家并行）：ep_size 组内 rank 共同分配该层 experts</td>
+          <td><a href="https://www.deepspeed.ai/tutorials/mixture-of-experts/">https://www.deepspeed.ai/tutorials/mixture-of-experts/</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>使用方式：</b>前面的 SVG 图不是在替代官方定义，而是在把这些定义转成产品界面可落地的心智模型和字段设计。</div>
+  </section>
+</body>
+</html>
