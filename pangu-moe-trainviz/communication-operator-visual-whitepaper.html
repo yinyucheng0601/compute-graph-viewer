@@ -1,0 +1,2587 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>openPangu 并行通信可视化白皮书</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/swimlane-task/pattern.css">
+  <script>
+    (function applyStoredTheme() {
+      try {
+        const queryTheme = new URLSearchParams(window.location.search).get('theme');
+        const storedTheme = localStorage.getItem('pangu-moe-whitepaper-theme');
+        if (queryTheme === 'light' || queryTheme === 'dark') {
+          document.documentElement.dataset.theme = queryTheme;
+        } else if (storedTheme === 'light' || storedTheme === 'dark') {
+          document.documentElement.dataset.theme = storedTheme;
+        }
+      } catch (error) {
+        document.documentElement.dataset.theme = 'dark';
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      --viz-dp: #5b8def;
+      --viz-tp: #a97ae6;
+      --viz-pp: #f2a23a;
+      --viz-ep: #e46b8a;
+      --viz-cp: #38b8b2;
+      --viz-zero: #76b85a;
+      --viz-vpp: #d7b84e;
+      --viz-net: #43a3d9;
+      --viz-muted: #8b929e;
+      --viz-ink: color-mix(in srgb, var(--foreground) 92%, transparent);
+      --viz-weak: color-mix(in srgb, var(--foreground) 58%, var(--background));
+      --viz-line: color-mix(in srgb, var(--foreground) 16%, transparent);
+      --viz-panel: color-mix(in srgb, var(--surface-2) 90%, transparent);
+      --viz-panel-strong: color-mix(in srgb, var(--surface-3) 90%, transparent);
+    }
+
+    * {
+      box-sizing: border-box;
+      letter-spacing: 0;
+    }
+
+    html {
+      min-height: 100%;
+      scroll-behavior: smooth;
+      background: var(--background);
+    }
+
+    body {
+      min-height: 100vh;
+      height: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
+      display: block;
+      margin: 0;
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--surface-3) 32%, transparent), transparent 320px),
+        var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    :root[data-theme='light'],
+    :root[data-theme='light'] body {
+      background: #F8F8F8;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .page-shell {
+      min-height: 100vh;
+    }
+
+    .viz-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: var(--comp-toolbar-height);
+      background: transparent;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 16px;
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 10px;
+      font: var(--text-label);
+      color: var(--foreground);
+    }
+
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-default);
+      background: linear-gradient(135deg, var(--viz-tp), var(--viz-ep) 50%, var(--viz-cp));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
+      flex: 0 0 auto;
+    }
+
+    .brand-title {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .nav-links::-webkit-scrollbar {
+      display: none;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .nav-link {
+      flex: 0 0 auto;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 9px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+
+    .nav-link:hover {
+      color: var(--foreground);
+      background: var(--state-hover);
+      border-color: var(--border-subtle);
+    }
+
+    .theme-toggle {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--button-secondary-border);
+      border-radius: var(--button-radius);
+      background: var(--button-secondary-bg);
+      color: var(--button-secondary-fg);
+      box-shadow: var(--button-secondary-shadow);
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+
+    .theme-toggle:hover {
+      background: var(--button-secondary-bg-hover);
+      border-color: var(--border-default);
+    }
+
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--button-focus-ring);
+      outline-offset: 2px;
+    }
+
+    .theme-toggle svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .theme-toggle .moon-icon,
+    :root[data-theme='light'] .theme-toggle .sun-icon {
+      display: none;
+    }
+
+    :root[data-theme='light'] .theme-toggle .moon-icon {
+      display: block;
+    }
+
+    .hero {
+      min-height: calc(100vh - var(--comp-toolbar-height));
+      display: grid;
+      grid-template-columns: minmax(0, .82fr) minmax(520px, 1.18fr);
+      gap: 18px;
+      padding: 28px 24px 26px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .hero-copy {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      justify-content: center;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: max-content;
+      max-width: 100%;
+      height: 24px;
+      padding: 0 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      background: var(--state-muted);
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .eyebrow-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--viz-ep);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--viz-ep) 18%, transparent);
+    }
+
+    .hero h1 {
+      max-width: 760px;
+      margin: 0;
+      color: var(--foreground);
+      font: 700 34px / 1.16 var(--font-sans);
+    }
+
+    .hero h1 span {
+      color: var(--foreground-secondary);
+      font-weight: 600;
+    }
+
+    .hero-line {
+      max-width: 700px;
+      color: var(--foreground-secondary);
+      font: var(--text-body);
+    }
+
+    .object-chips,
+    .mini-legend,
+    .metric-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .chip {
+      min-width: 0;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 9px;
+      border: 1px solid var(--comp-tag-border);
+      border-radius: var(--radius-pill);
+      background: var(--comp-tag-bg);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+
+    .chip b {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+
+    .scope-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .scope-tile {
+      min-width: 0;
+      min-height: 74px;
+      padding: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      background: var(--surface-1);
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+    }
+
+    .scope-glyph {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      border: 1px solid color-mix(in srgb, var(--accent-color) 48%, var(--border-subtle));
+      background: var(--surface-1);
+      color: var(--accent-color);
+      display: inline-grid;
+      place-items: center;
+      place-self: center;
+      font: 700 10px / 1 var(--font-mono);
+    }
+
+    .scope-tile strong {
+      display: block;
+      min-width: 0;
+      color: var(--foreground);
+      font: var(--text-label);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .scope-tile div span {
+      display: block;
+      margin-top: 4px;
+      color: var(--foreground-muted);
+      font: 400 11px / 1.35 var(--font-sans);
+    }
+
+    .hero-visual {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: clamp(600px, 68vh, 760px) 210px;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .visual-surface,
+    .inspector-panel,
+    .source-panel {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--panel-radius);
+      background: var(--viz-panel);
+      box-shadow: var(--card-shadow);
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .visual-surface {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .surface-title {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px 0;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+
+    .surface-title strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+
+    .viz-svg {
+      width: 100%;
+      min-height: 0;
+      flex: 1 1 auto;
+      display: block;
+    }
+
+    .viz-svg .hover-target {
+      cursor: pointer;
+      transition: opacity .12s ease;
+    }
+
+    .viz-svg .linked-fill {
+      transition: fill .12s ease, stroke .12s ease;
+    }
+
+    .viz-svg.is-hovering .hover-target {
+      opacity: .58;
+    }
+
+    .viz-svg.is-hovering .hover-target.is-linked {
+      opacity: 1;
+    }
+
+    .viz-svg.is-hovering .hover-target.is-linked .linked-fill {
+      fill: var(--linked-fill, color-mix(in srgb, var(--accent-color) 14%, var(--surface-1)));
+      stroke: var(--linked-stroke, var(--accent-color));
+    }
+
+    .viz-tooltip {
+      position: fixed;
+      z-index: 80;
+      display: none;
+      max-width: 320px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      background: var(--background-elevated);
+      color: var(--foreground);
+      box-shadow: var(--shadow-lg);
+      pointer-events: none;
+      font: var(--text-body-sm);
+    }
+
+    .viz-tooltip.is-visible {
+      display: block;
+    }
+
+    .viz-tooltip strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--foreground);
+      font: var(--text-label);
+    }
+
+    .viz-tooltip span {
+      display: block;
+      color: var(--foreground-secondary);
+    }
+
+    .timeline-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 180px;
+      cursor: pointer;
+    }
+
+    .section {
+      min-height: calc(100vh - var(--comp-toolbar-height));
+      padding: 58px 24px 44px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section-head {
+      max-width: 1420px;
+      margin: 0 auto 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+    }
+
+    .section-kicker {
+      margin: 0 0 6px;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .section h2 {
+      margin: 0;
+      color: var(--foreground);
+      font: 700 26px / 1.18 var(--font-sans);
+    }
+
+    .one-line {
+      margin-top: 8px;
+      max-width: 920px;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .visual-board {
+      max-width: 1420px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(640px, 1fr) 320px;
+      grid-template-rows: clamp(620px, 70vh, 760px) 230px;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .operator-surface {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .timeline-surface {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    .inspector-panel {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .inspector-panel h3 {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-title-2);
+    }
+
+    .inspector-block {
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .inspector-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .inspector-value {
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      line-height: 1.55;
+    }
+
+    .inspector-list {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .inspector-list li {
+      display: grid;
+      grid-template-columns: 9px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .inspector-list li::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      margin-top: 6px;
+      border-radius: 999px;
+      background: var(--accent-color);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 14%, transparent);
+    }
+
+    .source-panel {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .pressure-surface {
+      height: min(74vh, 760px);
+      min-height: 620px;
+    }
+
+    .source-panel h2 {
+      margin: 0;
+      font: var(--text-title-1);
+    }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .source-item {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      background: var(--surface-1);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .source-item strong {
+      display: block;
+      color: var(--foreground);
+      font: var(--text-label);
+      margin-bottom: 6px;
+    }
+
+    .source-item code {
+      color: var(--foreground);
+      font: var(--text-mono);
+      word-break: break-all;
+    }
+
+    .footer-space {
+      padding: 44px 24px 56px;
+    }
+
+    .svg-label {
+      font-family: var(--font-sans);
+      fill: var(--foreground);
+    }
+
+    .svg-muted {
+      font-family: var(--font-sans);
+      fill: var(--foreground-muted);
+    }
+
+    .svg-mono {
+      font-family: var(--font-mono);
+      fill: var(--foreground-secondary);
+    }
+
+    @media (max-width: 1120px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .hero-visual {
+        min-height: 680px;
+      }
+
+      .visual-board {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(440px, 62vh) 250px auto;
+      }
+
+      .operator-surface,
+      .timeline-surface,
+      .inspector-panel {
+        grid-column: 1;
+      }
+
+      .operator-surface {
+        grid-row: 1;
+      }
+
+      .timeline-surface {
+        grid-row: 2;
+      }
+
+      .inspector-panel {
+        grid-row: 3;
+      }
+
+      .source-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .viz-topbar {
+        padding: 0 10px;
+      }
+
+      .brand-title {
+        max-width: 180px;
+      }
+
+      .topbar-actions {
+        gap: 6px;
+      }
+
+      .hero,
+      .section {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .hero h1 {
+        font-size: 28px;
+      }
+
+      .scope-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head {
+        grid-template-columns: 1fr;
+      }
+
+      .visual-board {
+        grid-template-rows: 470px 250px auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="viz-topbar" aria-label="页面导航">
+      <a class="brand-lockup" href="./knowledge-whitepaper.html" title="返回知识白皮书">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-title">openPangu 并行通信可视化白皮书</span>
+      </a>
+      <div class="topbar-actions">
+        <nav class="nav-links" aria-label="章节">
+          <a class="nav-link" href="#overview">Overview</a>
+          <a class="nav-link" href="#pressure">Pressure</a>
+          <a class="nav-link" href="#dp">DP</a>
+          <a class="nav-link" href="#tp">TP</a>
+          <a class="nav-link" href="#pp">PP</a>
+          <a class="nav-link" href="#ep">EP</a>
+          <a class="nav-link" href="#cp">SP/CP</a>
+          <a class="nav-link" href="#zero">ZeRO</a>
+          <a class="nav-link" href="#vpp">VPP</a>
+          <a class="nav-link" href="#network">Network</a>
+        </nav>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换到浅色模式" title="切换到浅色模式">
+          <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20.8 14.4A8.4 8.4 0 0 1 9.6 3.2a8.9 8.9 0 1 0 11.2 11.2Z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero" id="overview" aria-labelledby="overview-title">
+      <div class="hero-copy">
+        <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>基于本地 openPangu-Ultra-MoE-718B 对象</span>
+        <h1 id="overview-title">把 DP、TP、PP、EP、SP/CP、ZeRO 画到同一条算子链上 <span>看通信真正发生在哪里</span></h1>
+        <div class="hero-line">每一节都对齐同一条算子链：上方看通信落在哪些算子，下方看这些通信进入 pipeline 的相对窗口。</div>
+        <div class="object-chips" aria-label="统一对象">
+          <span class="chip"><b>61 blocks</b> Dense×3 + MoE×58</span>
+          <span class="chip"><b>hidden 7680</b></span>
+          <span class="chip"><b>256 experts</b> + shared</span>
+          <span class="chip"><b>top-8</b> routing</span>
+          <span class="chip"><b>rank_299</b> PP5 · TP3 · DP2 · EP19</span>
+        </div>
+        <div class="scope-grid" aria-label="并行策略作用层次">
+          <div class="scope-tile" style="--accent-color: var(--viz-tp)"><span class="scope-glyph">TP</span><div><strong>层内 · Tensor 维度</strong><span>张量切分、本地 GEMM、集合通信</span></div></div>
+          <div class="scope-tile" style="--accent-color: var(--viz-pp)"><span class="scope-glyph">PP</span><div><strong>层间 · Stage / 子图</strong><span>stage 划分、micro-batch 调度</span></div></div>
+          <div class="scope-tile" style="--accent-color: var(--viz-ep)"><span class="scope-glyph">EP</span><div><strong>MoE 专家层</strong><span>expert 放置、token 路由、All-to-All</span></div></div>
+          <div class="scope-tile" style="--accent-color: var(--viz-dp)"><span class="scope-glyph">DP</span><div><strong>数据批次</strong><span>模型副本、梯度同步、bucket overlap</span></div></div>
+          <div class="scope-tile" style="--accent-color: var(--viz-zero)"><span class="scope-glyph">Z</span><div><strong>参数 / 梯度 / 优化器状态</strong><span>状态分片、按需 all-gather / reduce-scatter</span></div></div>
+          <div class="scope-tile" style="--accent-color: var(--viz-cp)"><span class="scope-glyph">CP</span><div><strong>序列或上下文维度</strong><span>序列切分、KV / attention 状态通信</span></div></div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <div class="visual-surface">
+          <svg class="viz-svg" id="overview-map" viewBox="0 0 980 700" preserveAspectRatio="xMidYMin meet" role="img" aria-label="openPangu MoE 算子架构图"></svg>
+        </div>
+        <div class="visual-surface">
+          <div class="surface-title"><strong>总览 pipeline 时序</strong><span>每种策略进入关键路径的位置</span></div>
+          <canvas class="timeline-canvas" data-timeline="overview" aria-label="总览 pipeline 时序图"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="pressure" aria-labelledby="pressure-title">
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Typical Communication Pressure</div>
+          <h2 id="pressure-title">最典型的通信压力画成数据流</h2>
+          <div class="one-line">先看“传的是什么”：梯度、层内 partial tensor、stage activation / dActivation、token、KV / attention state。</div>
+        </div>
+        <div class="metric-chip-row" aria-label="通信压力摘要">
+          <span class="chip"><b>activation A</b> forward</span>
+          <span class="chip"><b>gradient dA / dW</b> backward</span>
+          <span class="chip"><b>token / KV</b> dynamic</span>
+        </div>
+      </div>
+      <div class="source-panel">
+        <div class="visual-surface pressure-surface">
+          <div class="surface-title"><strong>通信压力速览</strong><span>每个策略先看数据从哪里流向哪里</span></div>
+          <svg class="viz-svg" id="pressure-map" viewBox="0 0 980 620" role="img" aria-label="DP TP PP EP CP SP 典型通信压力可视化"></svg>
+        </div>
+      </div>
+    </section>
+
+    <main id="strategy-root" aria-label="并行策略章节"></main>
+
+    <section class="footer-space" aria-labelledby="source-title">
+      <div class="source-panel">
+        <h2 id="source-title">来源与边界</h2>
+        <div class="source-grid">
+          <div class="source-item"><strong>本地文章</strong><code>/Users/yin/Downloads/超节点技术深度篇三：大模型并行通信拆解：DP、TP、PP、EP、CP 到底在网络里发生了什么.html</code></div>
+          <div class="source-item"><strong>本地 openPangu 规格</strong><code>pangu-moe-trainviz/PRD-训练透视.md</code></div>
+          <div class="source-item"><strong>本地算子链</strong><code>data/graph-ultramoe-718b.js · op-rank-timeline.html</code></div>
+          <div class="source-item"><strong>Ascend HCCL 文档</strong><a href="https://www.hiascend.com/document/detail/zh/canncommercial/80RC3/developmentguide/hccl/hcclug/hcclug_000001.html"><code>HCCL 概述：AllReduce / AllGather / ReduceScatter / AlltoAll，HCCS / RoCE / PCIe</code></a></div>
+          <div class="source-item"><strong>MindSpeed Core 文档</strong><a href="https://gitee.com/ascend/MindSpeed"><code>DP / TP / PP / VPP / SP / 分布式优化器 / MoE dispatcher / CoC</code></a></div>
+        </div>
+        <div class="mini-legend" aria-label="端到端主动能力条件">
+          <span class="chip">统一 IR</span>
+          <span class="chip">切分传播 / Reshard</span>
+          <span class="chip">通信建模</span>
+          <span class="chip">训练语义</span>
+          <span class="chip">推理语义</span>
+          <span class="chip">代价模型</span>
+          <span class="chip">合法性 / fallback</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="../vendor/pto-design-system/patterns/swimlane-task/pattern.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const COLORS = {
+        dp: '#5b8def',
+        tp: '#a97ae6',
+        pp: '#f2a23a',
+        ep: '#e46b8a',
+        cp: '#38b8b2',
+        zero: '#76b85a',
+        vpp: '#d7b84e',
+        network: '#43a3d9',
+        muted: '#8b929e',
+        ink: '#dce3ee',
+        weak: '#8b929e',
+        panel: '#111821',
+        line: 'rgba(255,255,255,0.16)'
+      };
+
+      const MODEL = {
+        name: 'openPangu-Ultra-MoE-718B',
+        focus: 'rank_299 · PP5 / TP3 / DP2 / CP0 / EP19',
+        config: 'TP8 · PP16 · DP32 · EP32 · CP1',
+        expert: 'EP19 · E152-E159'
+      };
+
+      const OPS = [
+        { id: 'embedding', label: 'Embedding', sub: 'vocab shard' },
+        { id: 'dense', label: 'Dense ×3', sub: 'early blocks' },
+        { id: 'attention', label: 'MLA Attention', sub: 'QKV / O-Proj' },
+        { id: 'norm', label: 'RMSNorm', sub: 'local' },
+        { id: 'router', label: 'Router Top-8', sub: 'gate' },
+        { id: 'dispatch', label: 'A2A Dispatch', sub: 'tokens → experts' },
+        { id: 'experts', label: 'Expert FFN', sub: '256 + shared' },
+        { id: 'combine', label: 'A2A Combine', sub: 'experts → tokens' },
+        { id: 'residual', label: 'Residual', sub: 'local' },
+        { id: 'head', label: 'LM Head', sub: 'vocab logits' }
+      ];
+
+      const STRATEGIES = [
+        {
+          id: 'dp',
+          nav: 'DP',
+          title: 'DP · 梯度同步不是只看总带宽',
+          one: '前向和反向在各副本本地执行；反向梯度按 bucket 进入 All-Reduce / Reduce-Scatter。',
+          scope: '数据批次',
+          primitive: 'Grad bucket · All-Reduce',
+          network: 'Scale-Out 为主，bucket overlap 降低暴露时间',
+          metric: 'bucket size · overlap ratio · cross-HBD p99',
+          color: COLORS.dp,
+          ops: ['embedding', 'dense', 'attention', 'experts', 'head'],
+          bullets: [
+            '普通 kernel 只看到本地 tensor。',
+            '训练 runtime 决定 bucket、反向依赖和 optimizer step。',
+            '瓶颈常在跨 HBD / 跨节点同步尾延迟。'
+          ],
+          timeline: [
+            { lane: 'PP4 · DP2', tasks: [[2, 18, 'F mb0'], [24, 16, 'B mb0'], [42, 18, 'grad bucket', 'comm'], [66, 18, 'optimizer']] },
+            { lane: 'PP5 · rank_299', tasks: [[8, 18, 'F mb1'], [31, 17, 'B mb1'], [50, 20, 'All-Reduce', 'comm'], [73, 14, 'step']] },
+            { lane: 'PP6 · DP2', tasks: [[14, 17, 'F mb2'], [38, 16, 'B mb2'], [58, 16, 'bucket sync', 'comm'], [79, 12, 'step']] },
+            { lane: 'DP group', tasks: [[50, 32, 'ring/tree AR', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'tp',
+          nav: 'TP',
+          title: 'TP · 层内集合通信进入算子关键路径',
+          one: 'TP 是跨设备 tensor shard；tiling 是单 kernel 内部 tile 调度，二者不是同一层切分。',
+          scope: '层内 Tensor 维度',
+          primitive: 'All-Reduce · Reduce-Scatter · All-Gather',
+          network: 'Scale-Up / HBD，低 p99 比平均带宽更关键',
+          metric: 'per-layer collective latency · shard shape · matmul aspect',
+          color: COLORS.tp,
+          ops: ['embedding', 'attention', 'experts', 'head'],
+          bullets: [
+            '强相关算子：Embedding、QKV、O-Proj、MLP gate/up/down、LM Head。',
+            '弱相关算子：Norm、activation、residual 多为本地处理。',
+            'tiling 影响 UB/L2/cache 复用；TP 改变分布式 owner 和通信。'
+          ],
+          timeline: [
+            { lane: 'PP4', tasks: [[4, 14, 'QKV'], [19, 10, 'AR', 'comm'], [33, 15, 'MLP']] },
+            { lane: 'PP5 · TP3', tasks: [[10, 15, 'QKV shard'], [26, 9, 'All-Reduce', 'comm', true], [39, 16, 'O/MLP shard'], [57, 11, 'RS/AG', 'comm']] },
+            { lane: 'PP6', tasks: [[18, 14, 'QKV'], [34, 9, 'AR', 'comm'], [47, 15, 'MLP']] },
+            { lane: 'TP group 0-7', tasks: [[25, 43, 'layer critical path collectives', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'pp',
+          nav: 'PP',
+          title: 'PP · Stage 边界决定气泡和融合边界',
+          one: 'PP 切的是层间子图；融合算子通常只能留在 stage 内，跨 stage 要落到 Send / Recv。',
+          scope: '层间 Stage / 子图',
+          primitive: 'Activation Send/Recv · Grad Send/Recv',
+          network: '相邻 stage 低延迟链路；跨超节点 stage 要谨慎',
+          metric: 'bubble ratio · stage balance · micro-batch count',
+          color: COLORS.pp,
+          ops: ['dense', 'attention', 'norm', 'router', 'dispatch', 'experts', 'combine', 'residual'],
+          bullets: [
+            '图编译器负责 stage 内 layout、融合和依赖。',
+            'PP 调度器负责 1F1B、micro-batch、virtual stage。',
+            '跨 stage 融合会被 activation 边界打断。'
+          ],
+          timeline: [
+            { lane: 'PP4', tasks: [[2, 16, 'F0'], [21, 16, 'F1'], [48, 15, 'B1'], [67, 15, 'B0']] },
+            { lane: 'PP5 · rank_299', tasks: [[9, 16, 'F0'], [28, 16, 'F1'], [42, 5, 'recv', 'comm'], [55, 15, 'B1'], [74, 15, 'B0']] },
+            { lane: 'PP6', tasks: [[16, 16, 'F0'], [35, 16, 'F1'], [62, 15, 'B1'], [81, 15, 'B0']] },
+            { lane: 'boundary', tasks: [[42, 12, 'Send/Recv', 'comm', true], [87, 9, 'bubble']] }
+          ]
+        },
+        {
+          id: 'ep',
+          nav: 'EP',
+          title: 'EP · MoE 的网络核心是 Token All-to-All',
+          one: 'Router 先选 top-8；dispatch 把 token 发到专家所在 rank，combine 再收回。',
+          scope: 'MoE 专家层',
+          primitive: 'Token Dispatch / Combine All-to-All',
+          network: 'Scale-Up 优先；token 分布不均会制造热点',
+          metric: 'expert load · token bytes · A2A skew · hotspot rank',
+          color: COLORS.ep,
+          ops: ['router', 'dispatch', 'experts', 'combine'],
+          bullets: [
+            'Expert placement 决定 token 要跨几跳。',
+            'All-to-All 流量分布由 router 动态决定。',
+            'MoE runtime 负责路由、容量和负载均衡。'
+          ],
+          timeline: [
+            { lane: 'PP4', tasks: [[6, 14, 'Router'], [22, 15, 'Dispatch', 'comm'], [40, 16, 'Expert']] },
+            { lane: 'PP5 · EP19', tasks: [[12, 13, 'Top-8'], [28, 16, 'A2A dispatch', 'comm', true], [47, 18, 'E152-E159'], [68, 14, 'A2A combine', 'comm', true]] },
+            { lane: 'PP6', tasks: [[18, 13, 'Router'], [35, 14, 'Dispatch', 'comm'], [52, 16, 'Expert']] },
+            { lane: 'EP group', tasks: [[28, 54, 'token shuffle + expert compute', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'cp',
+          nav: 'SP/CP',
+          title: 'SP/CP · 长序列把 Attention 和 KV 状态绑在一起',
+          one: '序列或上下文维切分会改变 attention 输入范围，并引入 KV / activation 状态交换。',
+          scope: '序列 / 上下文维度',
+          primitive: 'Sequence All-Gather · Ring P2P · KV exchange',
+          network: 'Scale-Up 内低延迟；长上下文会牵动 HBM / CXL / KV pool',
+          metric: 'context length · KV bytes · attention wait · cache locality',
+          color: COLORS.cp,
+          ops: ['attention', 'norm', 'residual'],
+          bullets: [
+            '训练看 activation / attention state 通信。',
+            '推理看 KV Cache、Prefill / Decode 和请求调度。',
+            'CP/SP 常和重计算、显存策略一起调。'
+          ],
+          timeline: [
+            { lane: 'PP4', tasks: [[4, 14, 'Attn'], [21, 9, 'KV P2P', 'comm'], [34, 15, 'MLP']] },
+            { lane: 'PP5 · CP0', tasks: [[10, 16, 'local seq'], [28, 14, 'context exchange', 'comm', true], [46, 16, 'attn merge']] },
+            { lane: 'PP6', tasks: [[18, 14, 'Attn'], [35, 9, 'KV P2P', 'comm'], [48, 15, 'MLP']] },
+            { lane: 'CP group', tasks: [[28, 35, 'seq ring / kv state', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'zero',
+          nav: 'ZeRO',
+          title: 'ZeRO · 状态分片改变参数生命周期',
+          one: '参数、梯度、优化器状态分散持有；forward 前 gather，backward 后 scatter。',
+          scope: '参数 / 梯度 / 优化器状态',
+          primitive: 'Param All-Gather · Grad Reduce-Scatter',
+          network: 'DP 域内通信；显存节省和通信暴露时间互换',
+          metric: 'state shard size · gather window · optimizer memory',
+          color: COLORS.zero,
+          ops: ['embedding', 'attention', 'experts', 'head'],
+          bullets: [
+            '普通 kernel 仍消费完整或局部可见 tensor。',
+            '训练 runtime 管 saved tensor、重计算、梯度累积。',
+            '规划器决定状态 shard 与算子 layout 的对齐。'
+          ],
+          timeline: [
+            { lane: 'PP4', tasks: [[2, 10, 'AG param', 'comm'], [15, 18, 'F'], [48, 12, 'RS grad', 'comm']] },
+            { lane: 'PP5 · rank_299', tasks: [[8, 12, 'All-Gather', 'comm', true], [23, 18, 'F/B'], [56, 14, 'Reduce-Scatter', 'comm', true], [74, 12, 'shard step']] },
+            { lane: 'PP6', tasks: [[16, 10, 'AG param', 'comm'], [29, 18, 'F'], [62, 12, 'RS grad', 'comm']] },
+            { lane: 'ZeRO group', tasks: [[8, 78, 'state lifecycle: gather → compute → scatter → update', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'vpp',
+          nav: 'VPP',
+          title: 'VPP / Micro-batch · 调度层填流水空泡',
+          one: 'VPP 把一个物理 stage 切成多个虚拟 chunk，用更多 micro-batch 提高管线利用率。',
+          scope: '流水线调度层',
+          primitive: 'Virtual stage handoff · recompute window',
+          network: '与 PP 同链路；主要改变调度和显存峰值',
+          metric: 'bubble ratio · recompute cost · activation memory',
+          color: COLORS.vpp,
+          ops: ['dense', 'attention', 'router', 'experts', 'residual'],
+          bullets: [
+            'VPP 不是新 kernel，而是 stage 内子图重排。',
+            'micro-batch 影响空泡、激活驻留和重计算窗口。',
+            'MindSpeed 自动调优会把 TP/PP/EP/DP/SP/CP/ZeRO/VPP 一起纳入搜索。'
+          ],
+          timeline: [
+            { lane: 'PP4 chunks', tasks: [[2, 10, 'F0.a'], [15, 10, 'F0.b'], [42, 10, 'B0.b'], [55, 10, 'B0.a']] },
+            { lane: 'PP5 · v0/v1', tasks: [[8, 10, 'F0.a'], [21, 10, 'F1.a'], [34, 10, 'F0.b'], [47, 10, 'B0.b'], [60, 10, 'B1.a']] },
+            { lane: 'PP6 chunks', tasks: [[14, 10, 'F0.a'], [27, 10, 'F1.a'], [53, 10, 'B0.b'], [66, 10, 'B1.a']] },
+            { lane: 'schedule', tasks: [[8, 68, 'interleaved 1F1B', 'comm', true]] }
+          ]
+        },
+        {
+          id: 'network',
+          nav: 'Network',
+          title: 'Network · Scale-Up、Scale-Out、Frontend 分层承载',
+          one: 'TP/EP/P2P 高频通信优先走 Scale-Up；DP 和跨超节点扩展进入 Scale-Out；Frontend 不进训练关键路径。',
+          scope: '网络拓扑层',
+          primitive: 'HBD / Scale-Out / control plane',
+          network: '把通信 primitive 映射到物理层，而不是只看并行名词',
+          metric: 'hop count · p99 latency · contention · overlap',
+          color: COLORS.network,
+          ops: ['attention', 'dispatch', 'experts', 'combine', 'head'],
+          bullets: [
+            'Scale-Up：TP、EP、P2P、高频集合通信。',
+            'Scale-Out：DP、跨 HBD 扩展、跨超节点 PP。',
+            'Frontend：管理、存储、控制，不承载训练关键路径。'
+          ],
+          timeline: [
+            { lane: 'Scale-Up', tasks: [[7, 23, 'TP collectives', 'comm'], [34, 34, 'EP A2A', 'comm', true]] },
+            { lane: 'Scale-Out', tasks: [[50, 30, 'DP sync', 'comm', true], [82, 10, 'cross PP']] },
+            { lane: 'Frontend', tasks: [[2, 12, 'launch'], [87, 8, 'checkpoint']] },
+            { lane: 'critical path', tasks: [[7, 73, 'compute + comm overlap window', 'comm', true]] }
+          ]
+        }
+      ];
+
+      const TIMELINES = {
+        overview: [
+          { lane: 'TP', tasks: [[8, 17, 'QKV/O-Proj'], [26, 9, 'AR', 'comm'], [40, 14, 'MLP']] },
+          { lane: 'PP', tasks: [[4, 15, 'F0'], [22, 15, 'F1'], [56, 15, 'B1'], [75, 12, 'bubble']] },
+          { lane: 'EP', tasks: [[28, 12, 'Router'], [42, 16, 'Dispatch', 'comm'], [61, 13, 'Combine', 'comm']] },
+          { lane: 'DP/ZeRO', tasks: [[5, 10, 'param AG', 'comm'], [50, 24, 'grad sync', 'comm'], [78, 10, 'step']] }
+        ]
+      };
+
+      const INSPECTOR_GUIDES = {
+        dp: {
+          plain: '把同一个模型复制到多张卡，每张卡吃不同 batch。反向结束后，要把梯度合成同一份更新方向。',
+          ascend: 'MindSpeed 数据并行文档把 DP 描述为模型副本 + 数据分割 + 梯度同步；异步 DDP 会把梯度放入 bucket，bucket 满了就先发通信。',
+          primitives: 'HCCL AllReduce；使用分布式优化器时常见 ReduceScatter + AllGather。',
+          watch: '看反向后半段是否被 grad bucket 拖住；跨节点时重点看 Scale-Out 尾延迟和 bucket overlap。',
+          tips: [
+            'DP 不是切模型，而是复制模型。',
+            'DP 慢通常不是单个算子慢，而是梯度同步暴露在 step 末尾。',
+            'bucket 越早启动，越容易和后续反向计算重叠。'
+          ]
+        },
+        tp: {
+          plain: '把一层里的大矩阵切到多张卡上。每张卡算一部分，关键点再用集合通信拼回完整结果。',
+          ascend: 'MindSpeed 张量并行文档说明了参数矩阵横切/纵切：前向或反向会在 AllReduce、AllGather 间切换。',
+          primitives: 'HCCL AllReduce / AllGather / ReduceScatter；CoC 特性也围绕 Matmul + 通信组合做重叠。',
+          watch: '盯 Embedding、QKV/O-Proj、Expert/MLP、LM Head 这些大矩阵位置；这些点会进入层内关键路径。',
+          tips: [
+            'TP 是分布式张量切分，不是单算子 tiling。',
+            'Norm、Residual 多数是本地路径，不是 TP 通信主角。',
+            'TP 通信更适合低延迟 Scale-Up 链路。'
+          ]
+        },
+        pp: {
+          plain: '把模型层切成几个 stage，像流水线一样把 micro-batch 逐段传下去。',
+          ascend: 'MindSpeed 流水线并行文档强调 stage 划分、接力式并行、预热与冷却；stage 边界传 activation 和梯度。',
+          primitives: 'Send / Recv；跨 stage 的 activation 与 dActivation 传递。',
+          watch: '看 stage 是否负载均衡、pipeline bubble 是否太大，以及边界是否把融合和重计算切断。',
+          tips: [
+            'PP 切的是层间子图，不是切一层里的矩阵。',
+            'stage 边界越多，调度越复杂，bubble 和通信都会变明显。',
+            'micro-batch 数量会直接影响流水线利用率。'
+          ]
+        },
+        ep: {
+          plain: 'MoE 先让 Router 给 token 选专家，再把 token 发到专家所在卡，算完后收回来。',
+          ascend: 'MindSpeed MoE AlltoAll dispatcher 文档提到 token permutation、AlltoAll、AllGather 和专家计算之间的串并行关系。',
+          primitives: 'HCCL AlltoAll / AllGather；token dispatch 和 combine 是主要通信段。',
+          watch: '看 Router 后 token 是否分布不均；专家热点会让某些 rank 等待，A2A p99 比平均值更重要。',
+          tips: [
+            'EP 通信量由 token 路由动态决定，不是固定矩阵大小。',
+            '专家计算之间没有强依赖时，可以尝试通信和专家计算重叠。',
+            '共享专家和路由专家要分开看负载。'
+          ]
+        },
+        cp: {
+          plain: '把长序列按 token 范围切开，让每张卡只保存和计算一段上下文。',
+          ascend: 'MindSpeed 序列并行文档说明 SP 会按序列维切 LayerNorm、Dropout 等输入，降低激活冗余；长序列并行进一步围绕 Attention 状态交换。',
+          primitives: 'Sequence AllGather、Ring P2P、KV / attention state exchange。',
+          watch: '看 Attention 前后有没有等待 KV 或上下文状态；序列越长，状态交换和显存压力越明显。',
+          tips: [
+            'SP/CP 主要缓解长序列的激活和上下文状态压力。',
+            '它常和 TP、重计算一起出现。',
+            '不要把它和 batch 维切分混在一起。'
+          ]
+        },
+        zero: {
+          plain: '把参数、梯度、优化器状态分散存，不让每张卡都保存完整训练状态。',
+          ascend: 'MindSpeed 分布式优化器文档说明：DP 规模大于 1 时，梯度 ReduceScatter 后做局部更新，再 AllGather 汇总权重。',
+          primitives: 'ReduceScatter 梯度；AllGather 参数或权重；必要时还有参数 gather window。',
+          watch: '看显存省下来了多少，以及 gather/scatter 是否暴露在计算前后。',
+          tips: [
+            'ZeRO 不是新的模型结构，而是训练状态的生命周期管理。',
+            '显存省了，通信窗口会增加。',
+            '和 DP bucket、optimizer step 一起看最清楚。'
+          ]
+        },
+        vpp: {
+          plain: '在不增加设备数的情况下，把一个物理 pipeline stage 再切成多个虚拟小段。',
+          ascend: 'MindSpeed 虚拟流水线文档说明 VPP 用更多阶段和更多通信，换取更低的 pipeline 空泡率。',
+          primitives: 'Virtual stage handoff；micro-batch 调度；必要时叠加 recompute window。',
+          watch: '看 bubble 是否下降，以及 activation 驻留、重计算和通信次数是否反过来变成成本。',
+          tips: [
+            'VPP 依赖 PP，通常要求 pipeline parallel size 大于等于 2。',
+            'VPP 会影响权重保存/加载的切分模式。',
+            '它优化的是调度利用率，不是单个 kernel 性能。'
+          ]
+        },
+        network: {
+          plain: '把通信原语映射到物理链路：哪些该走卡间高速链路，哪些会扩展到跨节点网络。',
+          ascend: 'CANN HCCL 文档说明 HCCL 是昇腾集合通信库，支持 AllReduce、AllGather、ReduceScatter、AlltoAll 等原语，并基于 HCCS、RoCE、PCIe 链路实现。',
+          primitives: 'Scale-Up 看 HCCS/PCIe 等近端链路；Scale-Out 看 RoCE 等跨节点链路；Frontend 只做控制面。',
+          watch: '看通信域初始化、建链、执行通信操作是否稳定；训练瓶颈通常体现在执行通信阶段的等待。',
+          tips: [
+            '网络层不是一种并行策略，而是承载所有通信策略的物理基础。',
+            '同一个 AllReduce 在不同拓扑上延迟可能完全不同。',
+            '先判断通信域，再判断原语，再看链路。'
+          ]
+        }
+      };
+
+      function mountSections() {
+        const root = document.getElementById('strategy-root');
+        root.innerHTML = STRATEGIES.map((strategy) => {
+          const guide = INSPECTOR_GUIDES[strategy.id];
+          return `
+          <section class="section" id="${strategy.id}" style="--accent-color: ${strategy.color}" aria-labelledby="${strategy.id}-title">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">${strategy.nav} · ${strategy.scope}</div>
+                <h2 id="${strategy.id}-title">${strategy.title}</h2>
+                <div class="one-line">${strategy.one}</div>
+              </div>
+              <div class="metric-chip-row" aria-label="${strategy.nav} 摘要">
+                <span class="chip"><b>${strategy.primitive}</b></span>
+                <span class="chip">${strategy.scope}</span>
+              </div>
+            </div>
+            <div class="visual-board">
+              <div class="visual-surface operator-surface">
+                <div class="surface-title"><strong>算子层大图</strong><span>${MODEL.focus}</span></div>
+                <svg class="viz-svg" data-map="${strategy.id}" viewBox="0 0 980 700" preserveAspectRatio="xMidYMin meet" role="img" aria-label="${strategy.title} 算子层大图"></svg>
+              </div>
+              <div class="visual-surface timeline-surface">
+                <div class="surface-title"><strong>Pipeline 时序图</strong><span>micro-batch / stage / comm overlap</span></div>
+                <canvas class="timeline-canvas" data-timeline="${strategy.id}" aria-label="${strategy.title} pipeline 时序图"></canvas>
+              </div>
+              <aside class="inspector-panel" style="--accent-color: ${strategy.color}" aria-label="${strategy.nav} 判断点">
+                <h3>${strategy.nav} 机制说明</h3>
+                <div class="inspector-block"><span class="inspector-label">先看一句话</span><span class="inspector-value">${guide.plain}</span></div>
+                <div class="inspector-block"><span class="inspector-label">Ascend 上怎么发生</span><span class="inspector-value">${guide.ascend}</span></div>
+                <div class="inspector-block"><span class="inspector-label">通信原语</span><span class="inspector-value">${guide.primitives}</span></div>
+                <div class="inspector-block"><span class="inspector-label">看图抓什么</span><span class="inspector-value">${guide.watch}</span></div>
+                <div class="inspector-block"><span class="inspector-label">容易误解</span><ul class="inspector-list">${guide.tips.map((item) => `<li>${item}</li>`).join('')}</ul></div>
+              </aside>
+            </div>
+          </section>
+        `;
+        }).join('');
+      }
+
+      function svgEl(tag, attrs = {}, children = []) {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        Object.entries(attrs).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          node.setAttribute(key, String(value));
+        });
+        children.forEach((child) => node.appendChild(child));
+        return node;
+      }
+
+      function text(x, y, value, attrs = {}) {
+        return svgEl('text', {
+          x, y,
+          class: attrs.class || 'svg-label',
+          'font-size': attrs.size || 12,
+          'font-weight': attrs.weight || 500,
+          'text-anchor': attrs.anchor || 'middle',
+          fill: attrs.fill,
+          'dominant-baseline': attrs.baseline || 'middle'
+        }, [document.createTextNode(value)]);
+      }
+
+      function rect(x, y, width, height, attrs = {}) {
+        return svgEl('rect', {
+          x, y, width, height,
+          class: attrs.class,
+          rx: attrs.rx ?? 10,
+          fill: attrs.fill || 'rgba(255,255,255,0.04)',
+          stroke: attrs.stroke || 'rgba(255,255,255,0.12)',
+          'stroke-width': attrs.strokeWidth || 1,
+          opacity: attrs.opacity
+        });
+      }
+
+      function path(d, attrs = {}) {
+        return svgEl('path', {
+          d,
+          fill: 'none',
+          stroke: attrs.stroke || COLORS.line,
+          'stroke-width': attrs.width || 1.5,
+          'stroke-dasharray': attrs.dash || '',
+          opacity: attrs.opacity || 1,
+          'pointer-events': attrs.pointerEvents,
+          'marker-end': attrs.marker ? `url(#${attrs.marker})` : ''
+        });
+      }
+
+      function line(x1, y1, x2, y2, attrs = {}) {
+        return svgEl('line', {
+          x1, y1, x2, y2,
+          stroke: attrs.stroke || COLORS.line,
+          'stroke-width': attrs.width || 1.2,
+          'stroke-dasharray': attrs.dash || '',
+          opacity: attrs.opacity || 1,
+          'marker-end': attrs.marker ? `url(#${attrs.marker})` : ''
+        });
+      }
+
+      function alpha(hex, value) {
+        const clean = hex.replace('#', '');
+        const number = parseInt(clean, 16);
+        const r = number >> 16;
+        const g = (number >> 8) & 255;
+        const b = number & 255;
+        return `rgba(${r},${g},${b},${value})`;
+      }
+
+      function addDefs(svg, id, color) {
+        const defs = svgEl('defs');
+        const marker = svgEl('marker', {
+          id: `arrow-${id}`,
+          markerWidth: 8,
+          markerHeight: 8,
+          refX: 7,
+          refY: 4,
+          orient: 'auto',
+          markerUnits: 'strokeWidth'
+        });
+        marker.appendChild(svgEl('path', { d: 'M0,0 L8,4 L0,8 Z', fill: color }));
+        defs.appendChild(marker);
+
+        const glow = svgEl('filter', { id: `glow-${id}`, x: '-30%', y: '-30%', width: '160%', height: '160%' });
+        glow.appendChild(svgEl('feGaussianBlur', { stdDeviation: 3, result: 'blur' }));
+        glow.appendChild(svgEl('feColorMatrix', { in: 'blur', type: 'matrix', values: '1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 .55 0', result: 'glow' }));
+        const merge = svgEl('feMerge');
+        merge.appendChild(svgEl('feMergeNode', { in: 'glow' }));
+        merge.appendChild(svgEl('feMergeNode', { in: 'SourceGraphic' }));
+        glow.appendChild(merge);
+        defs.appendChild(glow);
+        svg.appendChild(defs);
+      }
+
+      function drawBase(svg, strategy) {
+        svg.innerHTML = '';
+        const color = strategy.color || COLORS.network;
+        addDefs(svg, strategy.id, color);
+        svg.appendChild(rect(18, 18, 944, 664, { rx: 18, fill: 'rgba(255,255,255,0.025)', stroke: 'rgba(255,255,255,0.10)' }));
+        svg.appendChild(text(44, 42, MODEL.name, { anchor: 'start', class: 'svg-label', size: 13, weight: 700 }));
+        svg.appendChild(text(936, 42, MODEL.config, { anchor: 'end', class: 'svg-mono', size: 11 }));
+      }
+
+      function drawDeviceCell(svg, x, y, w, h, label, sub, color, active) {
+        svg.appendChild(rect(x, y, w, h, {
+          rx: 8,
+          fill: active ? alpha(color, 0.18) : 'rgba(255,255,255,0.035)',
+          stroke: active ? alpha(color, 0.74) : 'rgba(255,255,255,0.12)',
+          strokeWidth: active ? 1.4 : 1
+        }));
+        svg.appendChild(text(x + w / 2, y + h / 2 - 5, label, { size: 10.5, weight: active ? 700 : 600, fill: active ? color : undefined }));
+        if (sub) svg.appendChild(text(x + w / 2, y + h / 2 + 12, sub, { class: 'svg-muted', size: 9 }));
+      }
+
+      const ARCH_STACK = [
+        { id: 'embedding', label: 'Embedding', sub: 'vocab / hidden owner' },
+        { id: 'dense', label: 'Dense blocks ×3', sub: 'early decoder blocks' },
+        { id: 'attention', label: 'MLA QKV + Attention', sub: 'QKV / attn / O-Proj' },
+        { id: 'norm', label: 'RMSNorm + Residual', sub: 'local activation path' },
+        { id: 'router', label: 'Router Top-8', sub: 'token → expert choice' },
+        { id: 'dispatch', label: 'A2A Dispatch', sub: 'tokens leave rank' },
+        { id: 'experts', label: 'Expert FFN', sub: '256 routed + shared expert' },
+        { id: 'combine', label: 'A2A Combine', sub: 'expert outputs return' },
+        { id: 'head', label: 'Final Norm + LM Head', sub: 'logits / loss path' }
+      ];
+
+      const OVERLAYS = {
+        overview: {
+          leftTitle: 'Parallel scopes',
+          leftSub: 'same rank_299 projected through every strategy',
+          rightTitle: 'Fabric placement',
+          rightSub: 'map primitive to Scale-Up / Scale-Out / control plane',
+          flowLabel: 'strategy overlay',
+          metric: 'scope · primitive · topology',
+          nodes: ['embedding', 'dense', 'attention', 'norm', 'router', 'dispatch', 'experts', 'combine', 'head'],
+          from: ['attention', 'dispatch', 'experts', 'head'],
+          side: 'scope'
+        },
+        dp: {
+          leftTitle: 'Same model replicas',
+          leftSub: 'DP0-DP3 process different sample shards',
+          rightTitle: 'Gradient domain',
+          rightSub: 'bucket All-Reduce / Reduce-Scatter after backward',
+          flowLabel: 'dW bucket sync',
+          metric: 'overlap ratio · cross-HBD p99',
+          nodes: ['embedding', 'dense', 'attention', 'experts', 'head'],
+          from: ['head', 'experts', 'attention'],
+          side: 'replicas'
+        },
+        tp: {
+          leftTitle: 'TP group 0-7',
+          leftSub: 'rank_299 = TP3 owns one tensor shard',
+          rightTitle: 'Layer collectives',
+          rightSub: 'QKV / O-Proj / MLP / LM Head enter critical path',
+          flowLabel: 'AR / RS / AG',
+          metric: 'per-layer latency · shard shape',
+          nodes: ['embedding', 'attention', 'experts', 'head'],
+          from: ['embedding', 'attention', 'experts', 'head'],
+          side: 'tp'
+        },
+        pp: {
+          leftTitle: 'Pipeline stages',
+          leftSub: 'PP5 owns one contiguous block range',
+          rightTitle: 'Stage boundary',
+          rightSub: 'activation Send/Recv cuts fusion across stages',
+          flowLabel: 'A / dA handoff',
+          metric: 'bubble ratio · stage balance',
+          nodes: ['dense', 'attention', 'norm', 'router', 'dispatch', 'experts', 'combine'],
+          from: ['dense', 'attention', 'experts'],
+          side: 'stages'
+        },
+        ep: {
+          leftTitle: 'Token routing',
+          leftSub: 'router chooses top-8 experts per token',
+          rightTitle: MODEL.expert,
+          rightSub: 'dispatch / combine All-to-All around Expert FFN',
+          flowLabel: 'token A2A',
+          metric: 'expert load · A2A skew',
+          nodes: ['router', 'dispatch', 'experts', 'combine'],
+          from: ['router', 'dispatch', 'experts', 'combine'],
+          side: 'experts'
+        },
+        cp: {
+          leftTitle: 'Sequence shards',
+          leftSub: 'same block, different token ranges',
+          rightTitle: 'KV / attention state',
+          rightSub: 'ring P2P or sequence All-Gather around attention',
+          flowLabel: 'KV exchange',
+          metric: 'context length · KV bytes',
+          nodes: ['attention', 'norm', 'residual'],
+          from: ['attention', 'norm'],
+          side: 'sequence'
+        },
+        zero: {
+          leftTitle: 'State shards',
+          leftSub: 'Param / Grad / Optimizer states are sharded',
+          rightTitle: 'Param lifecycle',
+          rightSub: 'All-Gather before compute, Reduce-Scatter after backward',
+          flowLabel: 'AG → compute → RS',
+          metric: 'gather window · optimizer memory',
+          nodes: ['embedding', 'attention', 'experts', 'head'],
+          from: ['embedding', 'attention', 'experts', 'head'],
+          side: 'state'
+        },
+        vpp: {
+          leftTitle: 'Virtual chunks',
+          leftSub: 'PP5 split into v0 / v1 / v2 chunks',
+          rightTitle: 'Interleaved 1F1B',
+          rightSub: 'more micro-batches trade bubble for activation memory',
+          flowLabel: 'chunk handoff',
+          metric: 'bubble ratio · recompute cost',
+          nodes: ['dense', 'attention', 'router', 'experts', 'combine'],
+          from: ['dense', 'attention', 'experts'],
+          side: 'chunks'
+        },
+        network: {
+          leftTitle: 'Topology layer',
+          leftSub: 'map primitive to Scale-Up / Scale-Out / Frontend',
+          rightTitle: 'Placement rule',
+          rightSub: 'TP/EP high frequency stays Scale-Up; DP expands Scale-Out',
+          flowLabel: 'primitive → fabric',
+          metric: 'hop count · p99 · contention',
+          nodes: ['attention', 'dispatch', 'experts', 'combine', 'head'],
+          from: ['attention', 'dispatch', 'experts', 'head'],
+          side: 'network'
+        }
+      };
+
+      function archLayout() {
+        const x = 350;
+        const y = 150;
+        const width = 280;
+        const height = 27;
+        const gap = 6;
+        const points = {};
+        ARCH_STACK.forEach((item, index) => {
+          const top = y + index * (height + gap);
+          points[item.id] = {
+            x,
+            y: top,
+            w: width,
+            h: height,
+            cx: x + width / 2,
+            cy: top + height / 2,
+            left: x,
+            right: x + width
+          };
+        });
+        return points;
+      }
+
+      function hoverGroup(keys, titleValue, tipValue) {
+        const keyValue = Array.isArray(keys) ? keys.join(' ') : keys;
+        return svgEl('g', {
+          class: 'hover-target',
+          'data-link-key': keyValue,
+          'data-tip-title': titleValue,
+          'data-tip': tipValue
+        });
+      }
+
+      function setLinkTone(group, tone) {
+        if (!group || !tone) return group;
+        group.style.setProperty('--linked-stroke', tone);
+        group.style.setProperty('--linked-fill', alpha(tone, 0.14));
+        return group;
+      }
+
+      function linkKeys(...groups) {
+        const keys = [];
+        const seen = new Set();
+        groups.flat(Infinity).filter(Boolean).forEach((key) => {
+          if (seen.has(key)) return;
+          seen.add(key);
+          keys.push(key);
+        });
+        return keys;
+      }
+
+      function strategyOps(id) {
+        return STRATEGIES.find((item) => item.id === id)?.ops || [];
+      }
+
+      function drawTransformerCore(svg, strategy, overlay, color) {
+        const activeIds = new Set([...(overlay.nodes || []), ...(strategy.ops || [])]);
+        const active = (id) => activeIds.has(id);
+        const points = {};
+
+        const addNode = (id, x, y, w, h, label, sub, tone = color, options = {}) => {
+          const isActive = active(id) || !!options.forceActive;
+          const g = hoverGroup(linkKeys(id, options.keys), label, `${strategy.nav} 在这段模型算子附近产生切分、路由或同步压力；箭头保持自下而上的前向数据流。`);
+          setLinkTone(g, tone);
+          g.appendChild(rect(x, y, w, h, {
+            class: 'linked-fill',
+            rx: options.rx ?? 8,
+            fill: isActive ? 'var(--surface-2)' : 'var(--surface-1)',
+            stroke: isActive ? alpha(tone, 0.78) : 'var(--border-default)',
+            strokeWidth: isActive ? 1.75 : 1
+          }));
+          g.appendChild(text(x + w / 2, y + h / 2 - (sub ? 6 : 0), label, { size: options.size || 10.4, weight: isActive ? 800 : 650, fill: isActive ? tone : undefined }));
+          if (sub) g.appendChild(text(x + w / 2, y + h / 2 + 10, sub, { class: 'svg-muted', size: options.subSize || 8.8 }));
+          svg.appendChild(g);
+          points[id] = { x, y, w, h, cx: x + w / 2, cy: y + h / 2, left: x, right: x + w, top: y, bottom: y + h };
+          return points[id];
+        };
+
+        svg.appendChild(text(490, 72, 'Transformer-style openPangu MoE 架构底座', { size: 13, weight: 800 }));
+        addNode('output', 350, 90, 280, 38, 'Output logits', 'vocab 153600', COLORS.dp, { forceActive: active('head'), keys: ['head'], size: 11.8, subSize: 9.4 });
+        addNode('head', 350, 146, 280, 42, 'LM Head', 'hidden → vocab', COLORS.tp, { size: 12.2, subSize: 9.4 });
+        addNode('final_norm', 350, 207, 280, 36, 'Final RMSNorm', 'local tensor', COLORS.muted, { forceActive: active('head') || active('norm'), keys: ['head', 'norm'], size: 11.6, subSize: 9.1 });
+
+        const block = hoverGroup(linkKeys('decoder-block', 'attention', 'norm', 'router', 'dispatch', 'experts', 'combine'), 'MoE Decoder Block ×58', 'openPangu 的主体是重复 MoE decoder block；图形参考 Transformer 中 N× block 容器，内部展开 attention、norm、router、expert 和残差路径。');
+        block.appendChild(rect(286, 258, 408, 300, { rx: 22, fill: 'var(--surface-1)', stroke: alpha(COLORS.pp, 0.50), strokeWidth: 1.6 }));
+        block.appendChild(text(490, 284, 'MoE Decoder Block ×58', { size: 14.5, weight: 800, fill: COLORS.pp }));
+        block.appendChild(text(490, 307, 'repeated Transformer block', { class: 'svg-muted', size: 10.3 }));
+        block.appendChild(text(704, 410, 'N×', { anchor: 'start', size: 16, weight: 800, fill: COLORS.pp }));
+        svg.appendChild(block);
+
+        addNode('attention', 330, 326, 320, 44, 'MLA Attention', 'QKV / O-Proj', COLORS.tp, { size: 11.8, subSize: 9.1 });
+        addNode('norm', 330, 389, 320, 38, 'Add & Norm', 'residual merge', COLORS.zero, { size: 11.2, subSize: 8.7 });
+        addNode('router', 330, 445, 320, 38, 'Router Top-8', 'gate', COLORS.ep, { size: 11.2, subSize: 8.7 });
+        addNode('dispatch', 330, 501, 320, 42, 'A2A → Expert FFN → A2A', 'dispatch · expert · combine', COLORS.ep, { forceActive: active('experts') || active('combine'), keys: ['experts', 'combine'], size: 10.6, subSize: 8.4 });
+        points.experts = points.dispatch;
+        points.combine = points.dispatch;
+
+        addNode('dense', 350, 574, 280, 38, 'Dense Decoder Block ×3', 'early dense blocks', COLORS.pp, { size: 11.6, subSize: 9 });
+        addNode('embedding', 350, 630, 280, 40, 'Input Embedding', 'tokens + position', COLORS.tp, { size: 11.6, subSize: 9 });
+
+        const pos = hoverGroup(linkKeys('position-encoding', 'embedding'), 'Positional Encoding', '位置编码作为统一入口的一部分，和 token embedding 合并后进入同一条向上模型算子链。');
+        setLinkTone(pos, COLORS.cp);
+        pos.appendChild(path('M285,650 C292,634 306,634 313,650 C320,666 334,666 341,650', { stroke: COLORS.cp, width: 1.5, opacity: 0.78 }));
+        pos.appendChild(svgEl('circle', { class: 'linked-fill', cx: 338, cy: 650, r: 8, fill: 'var(--surface-1)', stroke: alpha(COLORS.cp, 0.56), 'stroke-width': 1.2 }));
+        pos.appendChild(line(333, 650, 343, 650, { stroke: COLORS.cp, width: 1.1, opacity: 0.78 }));
+        pos.appendChild(line(338, 645, 338, 655, { stroke: COLORS.cp, width: 1.1, opacity: 0.78 }));
+        pos.appendChild(text(280, 674, 'position', { anchor: 'start', class: 'svg-muted', size: 8.5 }));
+        pos.appendChild(path('M346,650 C348,650 349,649 350,649', { stroke: COLORS.cp, width: 1.3, opacity: 0.70, marker: `arrow-${strategy.id}` }));
+        svg.appendChild(pos);
+
+        const arrow = (from, to, tone = color, attrs = {}) => {
+          if (!from || !to) return;
+          svg.appendChild(line(from.cx, from.top, to.cx, to.bottom, {
+            stroke: tone,
+            width: attrs.width || 1.5,
+            opacity: attrs.opacity || 0.72,
+            marker: `arrow-${strategy.id}`
+          }));
+        };
+
+        arrow(points.head, points.output, COLORS.network);
+        arrow(points.final_norm, points.head, COLORS.network);
+        arrow(points.attention, points.final_norm, COLORS.network);
+        arrow(points.norm, points.attention, COLORS.network);
+        arrow(points.router, points.norm, COLORS.network);
+        arrow(points.dispatch, points.router, COLORS.network);
+        arrow(points.dense, points.dispatch, COLORS.network);
+        arrow(points.embedding, points.dense, COLORS.network);
+
+        const residual = (start, end, side, tone, label, keys, tip) => {
+          const offset = side === 'right' ? 34 : -34;
+          const sx = side === 'right' ? start.right : start.left;
+          const ex = side === 'right' ? end.right : end.left;
+          const cx = sx + offset;
+          const loopPath = `M${sx},${start.cy} C${cx},${start.cy} ${cx},${end.cy} ${ex},${end.cy}`;
+          const g = hoverGroup(linkKeys(`loop-${label}`, keys), label, tip);
+          setLinkTone(g, tone);
+          g.appendChild(path(loopPath, {
+            stroke: 'rgba(0,0,0,0.001)',
+            width: 14,
+            pointerEvents: 'stroke'
+          }));
+          g.appendChild(path(loopPath, {
+            stroke: tone,
+            width: 1.7,
+            marker: `arrow-${strategy.id}`,
+            opacity: 0.72
+          }));
+          svg.appendChild(g);
+        };
+        residual(points.attention, points.norm, 'right', COLORS.tp, '残差', ['attention', 'norm', 'residual'], 'Attention 输出和残差路径在 Add & Norm 汇合；这条回路表示 Transformer block 内部的 skip connection。');
+        residual(points.router, points.dispatch, 'left', COLORS.ep, '路由', ['router', 'dispatch', 'experts', 'combine'], 'Router 先决定 token 的专家目标，随后进入 A2A dispatch 和 Expert FFN；这条侧向路径强调 MoE 路由关系。');
+        residual(points.dispatch, points.norm, 'right', COLORS.zero, '专家回流', ['dispatch', 'experts', 'combine', 'norm', 'residual'], 'Expert FFN 结果经过 combine 回到原 token 顺序后，再和残差路径汇合到 Add & Norm。');
+
+        return points;
+      }
+
+      function drawUnifiedArchitecture(svg, strategy) {
+        drawBase(svg, strategy);
+        const overlay = OVERLAYS[strategy.id] || OVERLAYS.network;
+        const color = strategy.color || COLORS.network;
+        const left = svgEl('g');
+        left.appendChild(rect(42, 154, 220, 420, { rx: 16, fill: 'var(--surface-1)', stroke: alpha(color, 0.34) }));
+        left.appendChild(text(62, 180, overlay.leftTitle, { anchor: 'start', size: 13, weight: 800, fill: color }));
+        left.appendChild(text(62, 201, overlay.leftSub, { anchor: 'start', class: 'svg-muted', size: 10 }));
+        drawSideObject(left, strategy, overlay);
+        svg.appendChild(left);
+
+        const points = drawTransformerCore(svg, strategy, overlay, color);
+
+        const right = svgEl('g');
+        right.appendChild(rect(732, 154, 204, 420, { rx: 16, fill: 'var(--surface-1)', stroke: alpha(color, 0.34) }));
+        right.appendChild(text(750, 180, overlay.rightTitle, { anchor: 'start', size: 13, weight: 800, fill: color }));
+        right.appendChild(text(750, 201, overlay.rightSub, { anchor: 'start', class: 'svg-muted', size: 10 }));
+        drawRightObject(right, strategy, overlay);
+        svg.appendChild(right);
+
+        drawUnifiedFlows(svg, strategy, overlay, points);
+      }
+
+      function drawSideObject(group, strategy, overlay) {
+        const color = strategy.color || COLORS.network;
+        const linkedItem = (keys, titleValue, tipValue, tone = color) => setLinkTone(hoverGroup(keys, titleValue, tipValue), tone);
+        if (overlay.side === 'scope') {
+          const scopeLinks = {
+            TP: strategyOps('tp'),
+            PP: strategyOps('pp'),
+            EP: strategyOps('ep'),
+            DP: strategyOps('dp'),
+            Z: strategyOps('zero'),
+            CP: strategyOps('cp')
+          };
+          const scopeTips = {
+            TP: '层内张量分片主要出现在 Embedding、Attention 投影、Expert/MLP 与 LM Head；通信形态以 All-Reduce、Reduce-Scatter、All-Gather 为主。',
+            PP: 'Pipeline stage 切分的是层间子图；stage 边界会产生 activation / dActivation Send-Recv，并限制跨 stage 融合。',
+            EP: 'MoE 专家并行围绕 Router、token dispatch、Expert FFN 和 combine 展开；网络压力来自 token All-to-All。',
+            DP: '数据并行复制完整模型，前后向本地执行；反向后按 gradient bucket 做同步，常看跨节点尾延迟。',
+            Z: 'ZeRO 把参数、梯度和优化器状态分片保存；计算前后需要参数 gather 与梯度 reduce-scatter。',
+            CP: '序列或上下文切分集中影响 Attention 和 KV / attention state；长上下文会放大状态交换与等待时间。'
+          };
+          [
+            ['TP', COLORS.tp, 'layer tensor'],
+            ['PP', COLORS.pp, 'stage graph'],
+            ['EP', COLORS.ep, 'MoE experts'],
+            ['DP', COLORS.dp, 'batch replicas'],
+            ['Z', COLORS.zero, 'state shards'],
+            ['CP', COLORS.cp, 'sequence']
+          ].forEach(([label, c, sub], i) => {
+            const x = 84 + (i % 2) * 76;
+            const y = 232 + Math.floor(i / 2) * 48;
+            const item = linkedItem(linkKeys(`overview-scope-${label}`, scopeLinks[label]), `${label} 相关算子`, scopeTips[label], c);
+            item.appendChild(rect(x, y, 62, 30, { class: 'linked-fill', rx: 8, fill: 'var(--surface-1)', stroke: alpha(c, 0.44) }));
+            item.appendChild(text(x + 12, y + 13, label, { anchor: 'start', size: 10, weight: 800, fill: c }));
+            item.appendChild(text(x + 12, y + 24, sub, { anchor: 'start', class: 'svg-muted', size: 7.7 }));
+            group.appendChild(item);
+          });
+          group.appendChild(text(84, 384, 'overview uses the same operator stack', { anchor: 'start', class: 'svg-muted', size: 9.4 }));
+          return;
+        }
+        if (overlay.side === 'replicas') {
+          for (let i = 0; i < 4; i += 1) {
+            const x = 82 + (i % 2) * 86;
+            const y = 232 + Math.floor(i / 2) * 70;
+            const active = i === 2;
+            const item = linkedItem(linkKeys(`dp-replica-${i}`, overlay.nodes), `DP${i}`, 'DP 副本共享同一模型算子链，通信主要在反向梯度 bucket 同步阶段出现。');
+            item.appendChild(rect(x, y, 70, 48, { class: 'linked-fill', rx: 10, fill: active ? 'var(--surface-2)' : 'var(--surface-1)', stroke: active ? color : alpha(color, 0.40), strokeWidth: active ? 1.6 : 1 }));
+            item.appendChild(text(x + 35, y + 18, `DP${i}`, { size: 10, weight: 800, fill: active ? color : undefined }));
+            item.appendChild(text(x + 35, y + 34, active ? 'rank_299' : `batch ${i}`, { class: 'svg-muted', size: 8.8 }));
+            group.appendChild(item);
+          }
+          return;
+        }
+        if (overlay.side === 'tp') {
+          for (let i = 0; i < 8; i += 1) {
+            const x = 84 + (i % 4) * 42;
+            const y = 236 + Math.floor(i / 4) * 54;
+            const active = i === 3;
+            const item = linkedItem(linkKeys(`tp-rank-${i}`, strategy.ops), `TP${i}`, 'TP rank 持有同一层的张量分片，关键通信位于 Embedding、MLA Attention、Expert/MLP 与 LM Head 周围。');
+            item.appendChild(rect(x, y, 32, 34, { class: 'linked-fill', rx: 8, fill: active ? 'var(--surface-2)' : 'var(--surface-1)', stroke: active ? color : alpha(color, 0.42), strokeWidth: active ? 1.8 : 1 }));
+            item.appendChild(text(x + 16, y + 17, `T${i}`, { size: 9.2, weight: 800, fill: active ? color : undefined }));
+            group.appendChild(item);
+          }
+          group.appendChild(text(84, 362, 'same layer · tensor shards', { anchor: 'start', class: 'svg-muted', size: 9.4 }));
+          return;
+        }
+        if (overlay.side === 'stages') {
+          ['PP4', 'PP5', 'PP6', 'PP7'].forEach((label, i) => {
+            const y = 230 + i * 42;
+            const active = label === 'PP5';
+            const item = linkedItem(linkKeys(`pp-stage-${label}`, strategy.ops), label, 'PP stage 持有一段连续层或子图，stage 边界负责 activation 与 dActivation 的传递。');
+            item.appendChild(rect(84, y, 150, 28, { class: 'linked-fill', rx: 8, fill: active ? 'var(--surface-2)' : 'var(--surface-1)', stroke: active ? color : alpha(color, 0.38), strokeWidth: active ? 1.6 : 1 }));
+            item.appendChild(text(100, y + 14, label, { anchor: 'start', size: 9.8, weight: 800, fill: active ? color : undefined }));
+            item.appendChild(text(178, y + 14, active ? 'rank_299' : 'block range', { class: 'svg-muted', size: 8.8 }));
+            group.appendChild(item);
+          });
+          return;
+        }
+        if (overlay.side === 'experts') {
+          ['tok A', 'tok B', 'tok C', 'tok D'].forEach((label, i) => {
+            const x = 84 + (i % 2) * 76;
+            const y = 232 + Math.floor(i / 2) * 54;
+            const item = linkedItem(linkKeys(`ep-token-${i}`, strategy.ops), label, 'Router 把 token 分到专家桶，随后经过 dispatch、Expert FFN 和 combine 回到原 token 顺序。');
+            item.appendChild(rect(x, y, 56, 30, { class: 'linked-fill', rx: 8, fill: 'var(--surface-1)', stroke: alpha(color, 0.40) }));
+            item.appendChild(text(x + 28, y + 15, label, { size: 9, weight: 800, fill: color }));
+            group.appendChild(item);
+          });
+          group.appendChild(path('M112,292 C128,326 154,326 174,292', { stroke: color, width: 1.8, marker: `arrow-${strategy.id}` }));
+          group.appendChild(text(84, 362, 'router top-8 creates token buckets', { anchor: 'start', class: 'svg-muted', size: 9.4 }));
+          return;
+        }
+        if (overlay.side === 'sequence') {
+          ['0-32k', '32-64k', '64-96k', '96-131k'].forEach((label, i) => {
+            const y = 232 + i * 36;
+            const item = linkedItem(linkKeys(`cp-range-${i}`, strategy.ops), label, 'SP/CP 将序列范围分片，Attention 需要交换 KV 或 attention state 后才能完成局部与全局上下文计算。');
+            item.appendChild(rect(84, y, 150, 22, { class: 'linked-fill', rx: 7, fill: i === 0 ? 'var(--surface-2)' : 'var(--surface-1)', stroke: i === 0 ? color : alpha(color, 0.38) }));
+            item.appendChild(text(100, y + 11, i === 0 ? `CP0 · ${label}` : label, { anchor: 'start', size: 8.8, weight: 700, fill: i === 0 ? color : undefined }));
+            group.appendChild(item);
+          });
+          return;
+        }
+        if (overlay.side === 'state') {
+          ['Param', 'Grad', 'Opt'].forEach((label, i) => {
+            const y = 232 + i * 54;
+            const c = [COLORS.tp, COLORS.dp, color][i];
+            const item = linkedItem(linkKeys(`zero-${label.toLowerCase()}`, strategy.ops), `${label} shard`, 'ZeRO 状态分片改变参数、梯度和优化器状态的驻留位置，计算窗口前后需要 gather 或 scatter。', c);
+            item.appendChild(rect(84, y, 150, 34, { class: 'linked-fill', rx: 9, fill: 'var(--surface-1)', stroke: alpha(c, 0.44) }));
+            item.appendChild(text(102, y + 17, `${label} shard`, { anchor: 'start', size: 9.6, weight: 800, fill: c }));
+            group.appendChild(item);
+          });
+          return;
+        }
+        if (overlay.side === 'chunks') {
+          const chunkKeys = [['dense'], ['router', 'dispatch', 'experts', 'combine'], ['attention', 'norm']];
+          ['v0 dense', 'v1 MoE', 'v2 attn'].forEach((label, i) => {
+            const y = 232 + i * 54;
+            const c = [COLORS.tp, COLORS.ep, COLORS.cp][i];
+            const item = linkedItem(linkKeys(`vpp-chunk-${i}`, chunkKeys[i]), label, 'VPP chunk 是同一物理 stage 内的虚拟子图，用更细的 micro-batch 调度减少 pipeline bubble。', c);
+            item.appendChild(rect(84, y, 150, 34, { class: 'linked-fill', rx: 9, fill: 'var(--surface-1)', stroke: alpha(c, 0.44) }));
+            item.appendChild(text(102, y + 17, label, { anchor: 'start', size: 9.6, weight: 800, fill: c }));
+            group.appendChild(item);
+          });
+          return;
+        }
+        const fabricKeys = [
+          ['embedding', 'attention', 'router', 'dispatch', 'experts', 'combine', 'head'],
+          ['embedding', 'dense', 'attention', 'experts', 'head'],
+          []
+        ];
+        ['Scale-Up', 'Scale-Out', 'Frontend'].forEach((label, i) => {
+          const y = 232 + i * 54;
+          const c = [COLORS.tp, COLORS.dp, COLORS.vpp][i];
+          const item = linkedItem(linkKeys(`network-fabric-${i}`, fabricKeys[i]), label, `${label} 承载对应通信域的流量，用于判断链路延迟、带宽和拥塞是否进入训练关键路径。`, c);
+          item.appendChild(rect(84, y, 150, 34, { class: 'linked-fill', rx: 9, fill: 'var(--surface-1)', stroke: alpha(c, 0.44) }));
+          item.appendChild(text(102, y + 17, label, { anchor: 'start', size: 9.6, weight: 800, fill: c }));
+          group.appendChild(item);
+        });
+      }
+
+      function drawRightObject(group, strategy, overlay) {
+        const color = strategy.color || COLORS.network;
+        const shortLabel = (label) => String(label).length > 28 ? `${String(label).slice(0, 27)}…` : label;
+        const linkedItem = (keys, titleValue, tipValue, tone = color) => setLinkTone(hoverGroup(keys, titleValue, tipValue), tone);
+        const rows = strategy.id === 'overview'
+          ? ['TP/EP/P2P → Scale-Up', 'DP/cross-node → Scale-Out', 'Frontend = control only']
+          : [
+              overlay.flowLabel,
+              overlay.metric,
+              strategy.network
+            ];
+        const rowKeySets = strategy.id === 'overview'
+          ? [
+              ['embedding', 'attention', 'router', 'dispatch', 'experts', 'combine', 'head'],
+              ['embedding', 'dense', 'attention', 'experts', 'head'],
+              []
+            ]
+          : [
+              overlay.from,
+              overlay.nodes,
+              overlay.from
+            ];
+        const rowTips = strategy.id === 'overview'
+          ? [
+              'Scale-Up 适合 TP、EP 和 P2P 这类高频、低延迟敏感通信；它们通常贴近 Attention、Expert 和 LM Head 等关键算子。',
+              'Scale-Out 主要承载 DP 梯度同步和跨节点扩展流量；重点观察 bucket overlap、跨节点尾延迟和是否压住反向关键路径。',
+              'Frontend 负责调度、控制、加载和观测，不应承载训练 step 内的高频数据通信。'
+            ]
+          : [
+              `${overlay.flowLabel} 表示这类通信进入算子链的位置；关注它是否压住当前 step 的计算关键路径。`,
+              `${overlay.metric} 是判断该策略是否成为瓶颈的主要观测项，通常需要和 timeline 中的等待窗口一起看。`,
+              `${strategy.network}。这决定通信更适合放在 Scale-Up、Scale-Out，还是仅作为控制面事件处理。`
+            ];
+        rows.forEach((label, i) => {
+          const y = 232 + i * 54;
+          const item = linkedItem(linkKeys(`${strategy.id}-right-row-${i}`, rowKeySets[i]), shortLabel(label), rowTips[i]);
+          item.appendChild(rect(752, y, 154, 34, { class: 'linked-fill', rx: 9, fill: i === 0 ? 'var(--surface-2)' : 'var(--surface-1)', stroke: i === 0 ? alpha(color, 0.62) : 'var(--border-subtle)' }));
+          item.appendChild(text(764, y + 17, shortLabel(label), { anchor: 'start', size: i === 0 ? 9.4 : 8.8, weight: i === 0 ? 800 : 650, fill: i === 0 ? color : undefined }));
+          group.appendChild(item);
+        });
+        if (strategy.id === 'ep') {
+          for (let i = 0; i < 8; i += 1) {
+            const x = 754 + (i % 4) * 37;
+            const y = 356 + Math.floor(i / 4) * 22;
+            const item = linkedItem(linkKeys(`ep-expert-slot-${i}`, ['experts']), `expert slot ${i}`, '专家槽位表示 Expert FFN 的放置位置，token dispatch 到达后在这里执行专家 MLP。');
+            item.appendChild(rect(x, y, 29, 14, { class: 'linked-fill', rx: 4, fill: 'var(--surface-1)', stroke: alpha(color, 0.42) }));
+            group.appendChild(item);
+          }
+        }
+      }
+
+      function drawUnifiedFlows(svg, strategy, overlay, points) {
+        const color = strategy.color || COLORS.network;
+        const flowNames = {
+          embedding: 'Emb',
+          dense: 'Dense',
+          attention: 'Attn',
+          norm: 'Norm',
+          router: 'Router',
+          dispatch: 'A2A out',
+          experts: 'Expert',
+          combine: 'A2A in',
+          head: 'Head'
+        };
+        overlay.from.forEach((opId, index) => {
+          const p = points[opId];
+          if (!p) return;
+          const targetY = Math.max(220, Math.min(552, p.cy));
+          const flowPath = `M${p.right},${p.cy} C${680},${p.cy} 700,${targetY} 732,${targetY}`;
+          const g = hoverGroup(linkKeys(`${strategy.id}-flow-${opId}`, opId), `${flowNames[opId] || opId} → ${overlay.rightTitle}`, `${overlay.flowLabel} 由 ${flowNames[opId] || opId} 附近进入侧向通信说明；右侧面板用于判断它落在通信域、指标或拓扑位置。`);
+          setLinkTone(g, color);
+          g.appendChild(path(flowPath, {
+            stroke: 'rgba(0,0,0,0.001)',
+            width: 14,
+            pointerEvents: 'stroke'
+          }));
+          g.appendChild(path(flowPath, {
+            stroke: color,
+            width: index === 0 ? 2.4 : 1.8,
+            dash: index % 2 ? '5 4' : '',
+            opacity: index === 0 ? 0.88 : 0.66,
+            marker: `arrow-${strategy.id}`
+          }));
+          svg.appendChild(g);
+        });
+        const leftStart = strategy.id === 'pp' ? 'dense' : overlay.from[0];
+        const lp = points[leftStart] || points.attention;
+        const leftPath = `M262,284 C292,284 306,${lp.cy} ${lp.left},${lp.cy}`;
+        const g = hoverGroup(linkKeys(`${strategy.id}-left-flow`, overlay.nodes, overlay.from, leftStart), overlay.leftTitle, overlay.leftSub);
+        setLinkTone(g, color);
+        g.appendChild(path(leftPath, {
+          stroke: 'rgba(0,0,0,0.001)',
+          width: 14,
+          pointerEvents: 'stroke'
+        }));
+        g.appendChild(path(leftPath, {
+          stroke: color,
+          width: 1.9,
+          dash: '6 4',
+          opacity: 0.72,
+          marker: `arrow-${strategy.id}`
+        }));
+        svg.appendChild(g);
+      }
+
+      function drawDP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawTP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawPP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawEP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawCP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawZERO(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawVPP(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawNetwork(svg, strategy) {
+        drawUnifiedArchitecture(svg, strategy);
+      }
+
+      function drawPressureMap() {
+        const svg = document.getElementById('pressure-map');
+        if (!svg) return;
+        svg.innerHTML = '';
+        addDefs(svg, 'pressure', COLORS.network);
+        svg.appendChild(rect(18, 18, 944, 584, { rx: 18, fill: 'rgba(255,255,255,0.025)', stroke: 'rgba(255,255,255,0.10)' }));
+        svg.appendChild(text(44, 46, '典型通信压力 = 哪类 Tensor 在哪些 rank 之间移动', { anchor: 'start', size: 13, weight: 700 }));
+        svg.appendChild(text(936, 46, 'A: activation · dA/dW: gradient · KV: attention state', { anchor: 'end', class: 'svg-mono', size: 10.5 }));
+
+        const panels = [
+          { id: 'dp', title: 'DP', sub: '多份模型副本各算一批数据', pressure: '梯度同步 · All-Reduce', color: COLORS.dp, x: 44, y: 78, w: 276, h: 214 },
+          { id: 'tp', title: 'TP', sub: '一层矩阵切到多张卡', pressure: '层内高频同步 · low latency', color: COLORS.tp, x: 352, y: 78, w: 276, h: 214 },
+          { id: 'pp', title: 'PP', sub: '模型层切成 stage', pressure: 'activation 与 dA 双向传递', color: COLORS.pp, x: 660, y: 78, w: 276, h: 214 },
+          { id: 'ep', title: 'EP', sub: '专家放到不同设备', pressure: 'token 分发 / 汇聚 · All-to-All', color: COLORS.ep, x: 196, y: 334, w: 276, h: 214 },
+          { id: 'cp', title: 'CP/SP', sub: '长序列或上下文维切开', pressure: 'Attention 状态 / KV 交换', color: COLORS.cp, x: 508, y: 334, w: 276, h: 214 }
+        ];
+
+        panels.forEach((panel) => {
+          svg.appendChild(rect(panel.x, panel.y, panel.w, panel.h, { rx: 16, fill: alpha(panel.color, 0.075), stroke: alpha(panel.color, 0.44) }));
+          svg.appendChild(text(panel.x + 16, panel.y + 24, panel.title, { anchor: 'start', size: 18, weight: 800, fill: panel.color }));
+          svg.appendChild(text(panel.x + 16, panel.y + 49, panel.sub, { anchor: 'start', class: 'svg-muted', size: 10.5 }));
+          svg.appendChild(text(panel.x + panel.w - 16, panel.y + 24, panel.pressure, { anchor: 'end', class: 'svg-muted', size: 10.2 }));
+        });
+
+        drawDpPressure(svg, panels[0]);
+        drawTpPressure(svg, panels[1]);
+        drawPpPressure(svg, panels[2]);
+        drawEpPressure(svg, panels[3]);
+        drawCpPressure(svg, panels[4]);
+      }
+
+      function drawDpPressure(svg, panel) {
+        const replicas = [
+          [panel.x + 24, panel.y + 86, 'Replica 0'],
+          [panel.x + 104, panel.y + 86, 'Replica 1'],
+          [panel.x + 184, panel.y + 86, 'Replica 2']
+        ];
+        replicas.forEach(([x, y, label], index) => {
+          drawDeviceCell(svg, x, y, 68, 58, label, `dW${index}`, panel.color, index === 1);
+          for (let i = 0; i < 3; i += 1) {
+            svg.appendChild(rect(x + 12 + i * 15, y + 40, 10, 8, { rx: 2, fill: alpha(panel.color, 0.20 + i * 0.06), stroke: alpha(panel.color, 0.25) }));
+          }
+        });
+        svg.appendChild(rect(panel.x + 65, panel.y + 164, 146, 34, { rx: 10, fill: alpha(panel.color, 0.16), stroke: alpha(panel.color, 0.50) }));
+        svg.appendChild(text(panel.x + 138, panel.y + 181, 'All-Reduce Grad Buckets', { size: 10.5, weight: 700, fill: panel.color }));
+        replicas.forEach(([x, y]) => {
+          svg.appendChild(path(`M${x + 34},${y + 58} C${x + 34},${panel.y + 154} ${panel.x + 138},${panel.y + 148} ${panel.x + 138},${panel.y + 164}`, {
+            stroke: panel.color,
+            width: 1.6,
+            marker: 'arrow-pressure',
+            opacity: 0.72
+          }));
+        });
+      }
+
+      function drawTpPressure(svg, panel) {
+        const mx = panel.x + 28;
+        const my = panel.y + 92;
+        svg.appendChild(text(mx, my - 16, 'Linear / Attention Weight', { anchor: 'start', size: 10.5, weight: 700, fill: panel.color }));
+        for (let i = 0; i < 4; i += 1) {
+          svg.appendChild(rect(mx + i * 44, my, 38, 64, { rx: 5, fill: alpha(panel.color, 0.12 + i * 0.04), stroke: alpha(panel.color, 0.42) }));
+          svg.appendChild(text(mx + i * 44 + 19, my + 25, `TP${i}`, { size: 9.5, weight: 700, fill: panel.color }));
+          svg.appendChild(text(mx + i * 44 + 19, my + 44, `Y${i}`, { class: 'svg-muted', size: 9 }));
+        }
+        svg.appendChild(rect(panel.x + 184, panel.y + 110, 66, 46, { rx: 10, fill: alpha(panel.color, 0.16), stroke: alpha(panel.color, 0.50) }));
+        svg.appendChild(text(panel.x + 217, panel.y + 128, 'All-Reduce', { size: 9.5, weight: 700, fill: panel.color }));
+        svg.appendChild(text(panel.x + 217, panel.y + 144, 'partial Y', { class: 'svg-muted', size: 8.8 }));
+        for (let i = 0; i < 4; i += 1) {
+          const sx = mx + i * 44 + 38;
+          const sy = my + 32;
+          svg.appendChild(line(sx, sy, panel.x + 184, panel.y + 133, { stroke: panel.color, width: 1.35, marker: 'arrow-pressure', opacity: 0.58 }));
+        }
+        svg.appendChild(text(panel.x + 29, panel.y + 186, '压力点：每层反复发生，尾时延进关键路径', { anchor: 'start', class: 'svg-muted', size: 9.7 }));
+      }
+
+      function drawPpPressure(svg, panel) {
+        const stages = [
+          [panel.x + 22, panel.y + 104, 'Stage k'],
+          [panel.x + 104, panel.y + 104, 'Stage k+1'],
+          [panel.x + 188, panel.y + 104, 'Stage k+2']
+        ];
+        stages.forEach(([x, y, label], index) => {
+          drawDeviceCell(svg, x, y, 66, 58, label, index === 1 ? 'rank_299' : 'layers', panel.color, index === 1);
+        });
+        svg.appendChild(path(`M${panel.x + 88},${panel.y + 116} C${panel.x + 102},${panel.y + 92} ${panel.x + 116},${panel.y + 92} ${panel.x + 132},${panel.y + 116}`, {
+          stroke: panel.color,
+          width: 2.2,
+          marker: 'arrow-pressure'
+        }));
+        svg.appendChild(text(panel.x + 110, panel.y + 91, 'activation A', { size: 9.7, weight: 700, fill: panel.color }));
+        svg.appendChild(path(`M${panel.x + 170},${panel.y + 150} C${panel.x + 152},${panel.y + 176} ${panel.x + 118},${panel.y + 176} ${panel.x + 88},${panel.y + 150}`, {
+          stroke: COLORS.dp,
+          width: 2.0,
+          marker: 'arrow-pressure'
+        }));
+        svg.appendChild(text(panel.x + 132, panel.y + 181, 'gradient dA', { size: 9.7, weight: 700, fill: COLORS.dp }));
+        svg.appendChild(line(panel.x + 170, panel.y + 116, panel.x + 188, panel.y + 116, { stroke: panel.color, width: 1.5, marker: 'arrow-pressure', opacity: 0.68 }));
+        svg.appendChild(line(panel.x + 188, panel.y + 150, panel.x + 170, panel.y + 150, { stroke: COLORS.dp, width: 1.5, marker: 'arrow-pressure', opacity: 0.68 }));
+        svg.appendChild(text(panel.x + 25, panel.y + 194, 'A 是前向 hidden_states；dA 是反向传回来的激活梯度', { anchor: 'start', class: 'svg-muted', size: 9.4 }));
+      }
+
+      function drawEpPressure(svg, panel) {
+        const rx = panel.x + 28;
+        const ry = panel.y + 96;
+        svg.appendChild(rect(rx, ry, 72, 54, { rx: 12, fill: alpha(panel.color, 0.14), stroke: alpha(panel.color, 0.46) }));
+        svg.appendChild(text(rx + 36, ry + 20, 'Router', { size: 10.5, weight: 700, fill: panel.color }));
+        svg.appendChild(text(rx + 36, ry + 38, 'top-8', { class: 'svg-muted', size: 9 }));
+        for (let i = 0; i < 12; i += 1) {
+          svg.appendChild(svgEl('circle', { cx: rx + 11 + (i % 6) * 10, cy: ry + 68 + Math.floor(i / 6) * 10, r: 3.2, fill: alpha(panel.color, 0.55 + (i % 3) * 0.10) }));
+        }
+        const experts = [
+          [panel.x + 142, panel.y + 88, 'E0-7'],
+          [panel.x + 205, panel.y + 112, 'E152-159'],
+          [panel.x + 142, panel.y + 152, 'E248-255']
+        ];
+        experts.forEach(([x, y, label], index) => {
+          drawDeviceCell(svg, x, y, 54, 34, label, `EP${index === 1 ? 19 : index}`, panel.color, index === 1);
+          svg.appendChild(path(`M${rx + 72},${ry + 26} C${rx + 112},${ry + 20 + index * 18} ${x - 20},${y + 17} ${x},${y + 17}`, {
+            stroke: panel.color,
+            width: index === 1 ? 2.1 : 1.3,
+            marker: 'arrow-pressure',
+            opacity: 0.72
+          }));
+        });
+        svg.appendChild(text(panel.x + 28, panel.y + 194, 'dispatch 送 token；combine 把 expert output 收回', { anchor: 'start', class: 'svg-muted', size: 9.6 }));
+      }
+
+      function drawCpPressure(svg, panel) {
+        const sx = panel.x + 24;
+        const sy = panel.y + 96;
+        for (let i = 0; i < 4; i += 1) {
+          svg.appendChild(rect(sx + i * 55, sy, 48, 36, { rx: 8, fill: alpha(panel.color, 0.12 + i * 0.04), stroke: alpha(panel.color, 0.42) }));
+          svg.appendChild(text(sx + i * 55 + 24, sy + 15, `seq${i}`, { size: 9.5, weight: 700, fill: panel.color }));
+          svg.appendChild(text(sx + i * 55 + 24, sy + 29, i === 0 ? 'CP0' : `CP${i}`, { class: 'svg-muted', size: 8.5 }));
+        }
+        for (let i = 0; i < 3; i += 1) {
+          svg.appendChild(line(sx + i * 55 + 48, sy + 18, sx + (i + 1) * 55, sy + 18, { stroke: panel.color, width: 1.6, marker: 'arrow-pressure' }));
+        }
+        svg.appendChild(rect(panel.x + 70, panel.y + 162, 136, 34, { rx: 10, fill: alpha(panel.color, 0.16), stroke: alpha(panel.color, 0.50) }));
+        svg.appendChild(text(panel.x + 138, panel.y + 176, 'KV / Attention State', { size: 10, weight: 700, fill: panel.color }));
+        svg.appendChild(text(panel.x + 138, panel.y + 190, 'ring / gather / p2p', { class: 'svg-muted', size: 8.8 }));
+        svg.appendChild(path(`M${panel.x + 138},${panel.y + 162} C${panel.x + 92},${panel.y + 146} ${panel.x + 54},${panel.y + 142} ${sx + 24},${sy + 36}`, {
+          stroke: panel.color,
+          width: 1.4,
+          marker: 'arrow-pressure',
+          opacity: 0.68
+        }));
+        svg.appendChild(path(`M${panel.x + 138},${panel.y + 162} C${panel.x + 190},${panel.y + 146} ${panel.x + 232},${panel.y + 142} ${sx + 189},${sy + 36}`, {
+          stroke: panel.color,
+          width: 1.4,
+          marker: 'arrow-pressure',
+          opacity: 0.68
+        }));
+      }
+
+      const DRAWERS = {
+        dp: drawDP,
+        tp: drawTP,
+        pp: drawPP,
+        ep: drawEP,
+        cp: drawCP,
+        zero: drawZERO,
+        vpp: drawVPP,
+        network: drawNetwork
+      };
+
+      function drawOverview() {
+        const svg = document.getElementById('overview-map');
+        if (!svg) return;
+        drawUnifiedArchitecture(svg, {
+          id: 'overview',
+          nav: 'Overview',
+          color: COLORS.network,
+          ops: ARCH_STACK.map((item) => item.id),
+          network: 'TP/EP/P2P → Scale-Up；DP/cross-node → Scale-Out；Frontend only controls'
+        });
+      }
+
+      function drawAllMaps() {
+        drawPressureMap();
+        drawOverview();
+        document.querySelectorAll('svg[data-map]').forEach((svg) => {
+          const strategy = STRATEGIES.find((item) => item.id === svg.dataset.map);
+          if (!strategy) return;
+          DRAWERS[strategy.id](svg, strategy);
+        });
+      }
+
+      function setupSvgInteractions() {
+        if (window.__panguVizInteractionsReady) return;
+        window.__panguVizInteractionsReady = true;
+        const tooltip = document.createElement('div');
+        tooltip.className = 'viz-tooltip';
+        tooltip.setAttribute('role', 'tooltip');
+        document.body.appendChild(tooltip);
+
+        let activeSvgTarget = null;
+        let activeTimelineCanvas = null;
+
+        const keySet = (node) => new Set(String(node?.dataset?.linkKey || '').split(/\s+/).filter(Boolean));
+        const intersects = (lhs, rhs) => {
+          for (const key of lhs) {
+            if (rhs.has(key)) return true;
+          }
+          return false;
+        };
+
+        const clearSvg = () => {
+          if (!activeSvgTarget) return;
+          const svg = activeSvgTarget.ownerSVGElement;
+          if (svg) {
+            svg.classList.remove('is-hovering');
+            svg.querySelectorAll('.hover-target').forEach((item) => item.classList.remove('is-linked'));
+          }
+          activeSvgTarget = null;
+        };
+
+        const clearTimeline = () => {
+          if (!activeTimelineCanvas) return;
+          activeTimelineCanvas.__activeTimelineHitId = '';
+          drawTimelineCanvas(activeTimelineCanvas);
+          activeTimelineCanvas = null;
+        };
+
+        const clearAll = () => {
+          clearSvg();
+          clearTimeline();
+          tooltip.classList.remove('is-visible');
+        };
+
+        const positionTip = (event) => {
+          const pad = 14;
+          const rectBox = tooltip.getBoundingClientRect();
+          let x = event.clientX + pad;
+          let y = event.clientY + pad;
+          if (x + rectBox.width + pad > window.innerWidth) x = event.clientX - rectBox.width - pad;
+          if (y + rectBox.height + pad > window.innerHeight) y = event.clientY - rectBox.height - pad;
+          tooltip.style.left = `${Math.max(pad, x)}px`;
+          tooltip.style.top = `${Math.max(pad, y)}px`;
+        };
+
+        const showTip = (title, body, event) => {
+          tooltip.textContent = '';
+          const titleValue = document.createElement('strong');
+          titleValue.textContent = title || '说明';
+          const bodyValue = document.createElement('span');
+          bodyValue.textContent = body || '';
+          tooltip.append(titleValue, bodyValue);
+          tooltip.classList.add('is-visible');
+          positionTip(event);
+        };
+
+        const setSvgHighlight = (target) => {
+          const svg = target.ownerSVGElement;
+          if (!svg) return false;
+          if (activeSvgTarget && activeSvgTarget.ownerSVGElement !== svg) clearSvg();
+          const activeKeys = keySet(target);
+          svg.classList.add('is-hovering');
+          svg.querySelectorAll('.hover-target').forEach((item) => {
+            item.classList.toggle('is-linked', intersects(activeKeys, keySet(item)));
+          });
+          activeSvgTarget = target;
+          return true;
+        };
+
+        const activateSvg = (target, event) => {
+          clearTimeline();
+          if (!setSvgHighlight(target)) return;
+          showTip(target.dataset.tipTitle, target.dataset.tip, event);
+        };
+
+        const canvasPoint = (canvas, event) => {
+          const box = canvas.getBoundingClientRect();
+          return {
+            x: event.clientX - box.left,
+            y: event.clientY - box.top
+          };
+        };
+
+        const hitTimeline = (canvas, event) => {
+          const point = canvasPoint(canvas, event);
+          const hits = canvas.__timelineHitboxes || [];
+          for (let index = hits.length - 1; index >= 0; index -= 1) {
+            const hit = hits[index];
+            if (
+              point.x >= hit.x &&
+              point.x <= hit.x + hit.w &&
+              point.y >= hit.y &&
+              point.y <= hit.y + hit.h
+            ) {
+              return hit;
+            }
+          }
+          return null;
+        };
+
+        const activateTimeline = (canvas, hit, event) => {
+          clearSvg();
+          if (activeTimelineCanvas && activeTimelineCanvas !== canvas) {
+            activeTimelineCanvas.__activeTimelineHitId = '';
+            drawTimelineCanvas(activeTimelineCanvas);
+          }
+          canvas.__activeTimelineHitId = hit.id;
+          activeTimelineCanvas = canvas;
+          drawTimelineCanvas(canvas);
+          showTip(hit.title, hit.tip, event);
+        };
+
+        document.addEventListener('click', (event) => {
+          const target = event.target?.closest?.('.hover-target[data-tip]');
+          if (target && target.ownerSVGElement?.classList?.contains('viz-svg')) {
+            activateSvg(target, event);
+            return;
+          }
+          const canvas = event.target?.closest?.('canvas[data-timeline]');
+          if (canvas) {
+            const hit = hitTimeline(canvas, event);
+            if (hit) {
+              activateTimeline(canvas, hit, event);
+              return;
+            }
+            clearAll();
+            return;
+          }
+          clearAll();
+        });
+
+        document.addEventListener('pointermove', (event) => {
+          const target = event.target?.closest?.('.hover-target[data-tip]');
+          if (target && target.ownerSVGElement?.classList?.contains('viz-svg')) {
+            setSvgHighlight(target);
+            return;
+          }
+          clearSvg();
+        });
+
+        document.addEventListener('scroll', clearAll, true);
+        window.addEventListener('blur', clearAll);
+        window.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') clearAll();
+        });
+      }
+
+      function getTimeline(id) {
+        if (id === 'overview') return { color: COLORS.network, rows: TIMELINES.overview };
+        const strategy = STRATEGIES.find((item) => item.id === id);
+        return strategy ? { color: strategy.color, rows: strategy.timeline } : { color: COLORS.muted, rows: [] };
+      }
+
+      function timelineTaskCopy(label, kind) {
+        const value = String(label || '');
+        const lower = value.toLowerCase();
+        if (/^f\d/.test(lower) || lower.includes('forward')) {
+          return {
+            role: '前向 micro-batch',
+            meaning: `${value} 表示某个 micro-batch 在当前 stage 上做前向计算，主要产生下一段 stage 需要的 activation。`,
+            reason: '它排在这里，是因为该 stage 要等上游 activation 到达；多个 F 段错开后形成 pipeline 预热。'
+          };
+        }
+        if (/^b\d/.test(lower) || lower.includes('backward')) {
+          return {
+            role: '反向 micro-batch',
+            meaning: `${value} 表示对应 micro-batch 的反向计算，产生 dA 和 dW。`,
+            reason: '它晚于前向窗口出现，是因为 loss 和下游梯度回来后，当前 stage 才能进入反向。'
+          };
+        }
+        if (lower.includes('bubble')) {
+          return {
+            role: '流水线空泡',
+            meaning: `${value} 表示设备暂时没有可执行的 micro-batch。`,
+            reason: '它出现在这里，说明前后 stage 依赖没有接上，当前 lane 在等待 activation、梯度或调度窗口。'
+          };
+        }
+        if (lower.includes('qkv') || lower.includes('o-proj')) {
+          return {
+            role: 'Attention 投影计算',
+            meaning: `${value} 是 Attention 内的 QKV / O-Proj 矩阵计算，TP 场景下每个 rank 只算自己的张量分片。`,
+            reason: '它放在层开始附近，因为 Attention 投影先于层内集合通信和后续 MLP。'
+          };
+        }
+        if (lower === 'mlp' || lower.includes('mlp shard') || lower.includes('o/mlp')) {
+          return {
+            role: 'MLP / Expert 局部计算',
+            meaning: `${value} 表示本 rank 上的 MLP 或 Expert FFN 计算窗口。`,
+            reason: '它通常跟在 Attention 或路由通信之后，依赖前面的激活、集合通信或 token dispatch 完成。'
+          };
+        }
+        if (lower === 'ar' || lower.includes('all-reduce') || lower.includes('ring/tree ar')) {
+          return {
+            role: 'All-Reduce 同步',
+            meaning: `${value} 表示多个 rank 把局部结果或梯度合成一致结果的集合通信。`,
+            reason: '它出现在计算片段之后，因为本地 shard 先产出 partial tensor，随后才需要跨 rank 合并。'
+          };
+        }
+        if (lower.includes('rs') || lower.includes('reduce-scatter')) {
+          return {
+            role: 'Reduce-Scatter',
+            meaning: `${value} 表示先规约再把结果分散回各 rank，常用于 ZeRO / 分布式优化器的梯度阶段。`,
+            reason: '它靠近反向后段，是因为梯度准备好后才进入分片规约和后续本地更新。'
+          };
+        }
+        if (lower.includes('ag') || lower.includes('all-gather')) {
+          return {
+            role: 'All-Gather',
+            meaning: `${value} 表示各 rank 汇集彼此持有的分片，形成当前计算需要的参数或激活视图。`,
+            reason: '它通常排在计算前，因为缺少完整可见数据时，后面的矩阵计算不能开始。'
+          };
+        }
+        if (lower.includes('router') || lower.includes('top-8')) {
+          return {
+            role: 'Router / Top-8 选择',
+            meaning: `${value} 表示 MoE gate 为 token 选择专家集合。`,
+            reason: '它放在 dispatch 之前，因为 token 必须先知道目标专家，才能进入 All-to-All 分发。'
+          };
+        }
+        if (lower.includes('dispatch') || lower.includes('token shuffle')) {
+          return {
+            role: 'Token Dispatch',
+            meaning: `${value} 表示把 token 按专家目标发送到对应 rank，是 MoE 里的主要 All-to-All 窗口。`,
+            reason: '它跟在 Router 后面，因为路由结果确定后，runtime 才能排列 token 并发起专家侧通信。'
+          };
+        }
+        if (lower.includes('combine')) {
+          return {
+            role: 'Token Combine',
+            meaning: `${value} 表示专家输出按原 token 顺序汇聚回来。`,
+            reason: '它出现在 Expert 计算之后，因为 token 要等专家 FFN 结果返回，才能继续残差和后续层。'
+          };
+        }
+        if (lower.includes('expert') || lower.includes('e152')) {
+          return {
+            role: 'Expert FFN',
+            meaning: `${value} 表示选中的专家在本 rank 上执行 FFN。`,
+            reason: '它夹在 dispatch 和 combine 之间，因为 token 先被送到专家位置，算完后再汇回原顺序。'
+          };
+        }
+        if (lower.includes('recv') || lower.includes('send')) {
+          return {
+            role: 'Stage 边界通信',
+            meaning: `${value} 表示 pipeline stage 间传 activation 或 dActivation。`,
+            reason: '它只在 stage 边界出现，因为相邻 stage 之间不能直接共享中间 tensor。'
+          };
+        }
+        if (lower.includes('kv') || lower.includes('context') || lower.includes('seq ring')) {
+          return {
+            role: '序列 / KV 状态交换',
+            meaning: `${value} 表示长序列切分后需要交换 KV、attention state 或上下文片段。`,
+            reason: '它靠近 Attention，是因为注意力需要跨 token 范围的信息才能完成全局上下文计算。'
+          };
+        }
+        if (lower.includes('grad') || lower.includes('bucket')) {
+          return {
+            role: '梯度 bucket 同步',
+            meaning: `${value} 表示反向产生的梯度被收进 bucket 后进入同步。`,
+            reason: '它排在反向后段，因为梯度必须先由本地 backward 产出；bucket overlap 会决定它是否暴露在关键路径上。'
+          };
+        }
+        if (lower.includes('step') || lower.includes('optimizer')) {
+          return {
+            role: '参数更新',
+            meaning: `${value} 表示 optimizer 根据同步后的梯度更新参数或分片状态。`,
+            reason: '它靠后出现，因为参数更新必须等当前 step 的梯度通信完成。'
+          };
+        }
+        if (lower.includes('collective') || lower.includes('sync') || lower.includes('a2a')) {
+          return {
+            role: kind === 'comm' ? '通信关键窗口' : '关键路径窗口',
+            meaning: `${value} 汇总了该策略在当前 lane 上最容易压住 step 的通信窗口。`,
+            reason: '它覆盖更长时间，是为了表达通信与计算重叠或跨多个算子持续占用链路。'
+          };
+        }
+        if (lower.includes('launch') || lower.includes('checkpoint')) {
+          return {
+            role: '控制面事件',
+            meaning: `${value} 表示训练启动、保存或管理动作。`,
+            reason: '它不代表高频训练数据通信，放在这里用于和 Scale-Up / Scale-Out 数据面区分。'
+          };
+        }
+        return {
+          role: kind === 'comm' ? '通信窗口' : '计算窗口',
+          meaning: `${value} 表示 ${kind === 'comm' ? '通信' : '计算'} 在当前 lane 上占用的相对时间段。`,
+          reason: '它的位置用于表达依赖和重叠关系，不是绝对毫秒。'
+        };
+      }
+
+      function timelineTaskTip(timelineId, row, task) {
+        const [xPct, wPct, label, kind, emph] = task;
+        const copy = timelineTaskCopy(label, kind);
+        const start = Math.round(xPct);
+        const end = Math.round(xPct + wPct);
+        const windowText = `横轴是归一化 pipeline clock；这个块覆盖 ${start}-${end}，表示相对先后和重叠窗口。`;
+        const laneText = `lane「${row.lane}」表示该策略下的 stage、rank 组或通信域。`;
+        const focusText = emph ? '这段被强调，表示它更可能进入关键路径，或者代表跨多个 rank / stage 的合并窗口。' : '';
+        return `${copy.meaning} ${copy.reason} ${laneText} ${windowText} ${focusText}`.trim();
+      }
+
+      function drawRoundedStroke(ctx, x, y, w, h, radius) {
+        const r = Math.min(radius, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+      }
+
+      function currentTheme() {
+        return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+      }
+
+      function setTheme(theme, persist) {
+        const nextTheme = theme === 'light' ? 'light' : 'dark';
+        const button = document.getElementById('themeToggle');
+        document.documentElement.dataset.theme = nextTheme;
+        if (button) {
+          const label = nextTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式';
+          button.setAttribute('aria-label', label);
+          button.title = label;
+        }
+        if (persist) {
+          try {
+            localStorage.setItem('pangu-moe-whitepaper-theme', nextTheme);
+          } catch (error) {
+            /* localStorage can be unavailable in private or restricted contexts. */
+          }
+        }
+        drawAllTimelines();
+      }
+
+      function setupThemeToggle() {
+        const button = document.getElementById('themeToggle');
+        if (!button) return;
+        setTheme(currentTheme(), false);
+        button.addEventListener('click', () => {
+          setTheme(currentTheme() === 'dark' ? 'light' : 'dark', true);
+        });
+      }
+
+      function timelinePalette() {
+        const isLight = currentTheme() === 'light';
+        return {
+          bg: isLight ? 'rgba(0,0,0,0.018)' : 'rgba(255,255,255,0.025)',
+          grid: isLight ? 'rgba(0,0,0,0.085)' : 'rgba(255,255,255,0.09)',
+          tick: isLight ? 'rgba(0,0,0,0.48)' : 'rgba(220,227,238,0.42)',
+          rowA: isLight ? 'rgba(0,0,0,0.024)' : 'rgba(255,255,255,0.008)',
+          rowB: isLight ? 'rgba(0,0,0,0.036)' : 'rgba(255,255,255,0.018)',
+          label: isLight ? 'rgba(0,0,0,0.64)' : 'rgba(220,227,238,0.68)'
+        };
+      }
+
+      function drawTimelineCanvas(canvas) {
+        const id = canvas.dataset.timeline;
+        const { color, rows } = getTimeline(id);
+        const palette = timelinePalette();
+        const rectBox = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(640, Math.floor(rectBox.width || canvas.clientWidth || 900));
+        const height = Math.max(180, Math.floor(rectBox.height || canvas.clientHeight || 210));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const left = 112;
+        const right = 18;
+        const top = 22;
+        const rowH = Math.max(32, (height - top - 18) / Math.max(1, rows.length));
+        const chartW = width - left - right;
+        const hits = [];
+        const activeHitId = canvas.__activeTimelineHitId || '';
+
+        ctx.fillStyle = palette.bg;
+        ctx.fillRect(0, 0, width, height);
+        ctx.strokeStyle = palette.grid;
+        ctx.lineWidth = 1;
+        for (let tick = 0; tick <= 100; tick += 10) {
+          const x = left + chartW * (tick / 100);
+          ctx.beginPath();
+          ctx.moveTo(x, 10);
+          ctx.lineTo(x, height - 12);
+          ctx.stroke();
+          if (tick % 20 === 0) {
+            ctx.fillStyle = palette.tick;
+            ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(String(tick), x, 13);
+          }
+        }
+
+        const pattern = window.PtoSwimlaneTaskPattern;
+        rows.forEach((row, index) => {
+          const y = top + index * rowH + 6;
+          ctx.fillStyle = index % 2 ? palette.rowB : palette.rowA;
+          ctx.fillRect(0, y - 5, width, rowH);
+          ctx.fillStyle = palette.label;
+          ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(row.lane, left - 12, y + 11);
+          row.tasks.forEach((task, taskIndex) => {
+            const [xPct, wPct, label, kind, emph] = task;
+            const x = left + chartW * (xPct / 100);
+            const w = Math.max(20, chartW * (wPct / 100));
+            const taskColor = kind === 'comm' ? color : task[5] || COLORS.muted;
+            const copy = timelineTaskCopy(label, kind);
+            const hitId = `${id}:${index}:${taskIndex}:${label}`;
+            hits.push({
+              id: hitId,
+              x,
+              y,
+              w,
+              h: 22,
+              title: `${copy.role} · ${label}`,
+              tip: timelineTaskTip(id, row, task)
+            });
+            if (pattern && typeof pattern.drawTaskBar === 'function') {
+              pattern.drawTaskBar(ctx, {
+                x,
+                y,
+                width: w,
+                height: 22,
+                radius: 5,
+                baseColor: taskColor,
+                isEmphasized: !!emph,
+                isSelected: !!emph,
+                task: {
+                  label,
+                  displayName: label,
+                  laneKind: kind || 'compute',
+                  totalCycle: Math.round(wPct * 100)
+                },
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace'
+              });
+            } else {
+              ctx.fillStyle = taskColor;
+              ctx.fillRect(x, y, w, 22);
+            }
+            if (activeHitId === hitId) {
+              ctx.save();
+              ctx.strokeStyle = alpha(taskColor, 0.98);
+              ctx.lineWidth = 2;
+              drawRoundedStroke(ctx, x - 2, y - 2, w + 4, 26, 7);
+              ctx.stroke();
+              ctx.restore();
+            }
+          });
+        });
+        canvas.__timelineHitboxes = hits;
+
+        ctx.fillStyle = alpha(color, 0.95);
+        ctx.font = '700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('pipeline clock →', left, height - 7);
+      }
+
+      function drawAllTimelines() {
+        document.querySelectorAll('canvas[data-timeline]').forEach(drawTimelineCanvas);
+      }
+
+      function observeTimelines() {
+        if (!('ResizeObserver' in window)) {
+          window.addEventListener('resize', drawAllTimelines);
+          return;
+        }
+        const observer = new ResizeObserver((entries) => {
+          entries.forEach((entry) => {
+            const canvas = entry.target.querySelector('canvas[data-timeline]') || entry.target;
+            if (canvas && canvas.matches && canvas.matches('canvas[data-timeline]')) {
+              drawTimelineCanvas(canvas);
+            }
+          });
+        });
+        document.querySelectorAll('canvas[data-timeline]').forEach((canvas) => observer.observe(canvas));
+      }
+
+      function applyFocusParam() {
+        const focus = new URLSearchParams(window.location.search).get('focus');
+        if (!focus) return;
+        const target = document.getElementById(focus);
+        if (!target) return;
+        requestAnimationFrame(() => {
+          const previousBehavior = document.documentElement.style.scrollBehavior;
+          document.documentElement.style.scrollBehavior = 'auto';
+          window.scrollTo(0, target.getBoundingClientRect().top + window.scrollY);
+          document.documentElement.style.scrollBehavior = previousBehavior;
+        });
+      }
+
+      mountSections();
+      setupThemeToggle();
+      drawAllMaps();
+      setupSvgInteractions();
+      drawAllTimelines();
+      observeTimelines();
+      applyFocusParam();
+      window.addEventListener('resize', drawAllTimelines);
+    })();
+  </script>
+</body>
+</html>
