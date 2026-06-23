@@ -39,6 +39,11 @@
       word-break: break-all;
     }
 
+    .evidence-list code {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
     .parallel-matrix td:first-child,
     .parallel-matrix th:first-child,
     .terms-table td:first-child,
@@ -273,6 +278,8 @@
       <a href="#cover">封面</a>
       <a href="#index">目录</a>
       <a href="#official-structure">官方结构</a>
+      <a href="#network-communication">通信映射</a>
+      <a href="#strategy-layering">层次/边界</a>
       <a href="#scope">基本对象</a>
       <a href="#dp">DP</a>
       <a href="#fsdp">FSDP</a>
@@ -319,16 +326,16 @@
   </svg>
 
   <section class="floor" id="cover">
-    <div class="kicker">Whitepaper · 2026 · Parallel Placement</div>
+    <div class="kicker">Whitepaper · 2026 · Parallel Placement & Communication</div>
     <h1>大模型训练并行放置白皮书<br>Rank / Device Placement 的语义边界与产品表达</h1>
-    <p class="lead">本文面向 TrainScope 的并行放置建模，系统区分 <code>device</code>、<code>rank</code>、<code>worker</code>、<code>stage</code>、<code>expert</code> 等对象，并说明 DP（Data Parallel，数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、PP（Pipeline Parallel，流水线并行）、TP（Tensor Parallel，张量并行）、SP/CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）与 EP（Expert Parallel，专家并行）分别对应的数据、模型状态、层段、张量、序列和专家维度。报告结论是：产品界面应表达“多维运行时放置”，而不是把所有并行语义压缩为“每张卡承载哪些层/算子”。</p>
+    <p class="lead">本文面向 TrainScope 的并行放置建模，区分 <code>device</code>、<code>rank</code>、<code>stage</code>、<code>expert</code> 等对象，并说明 DP、FSDP / ZeRO、PP、TP、SP/CP、EP、VPP、micro-batch 与重计算各自作用在哪一层。核心结论是：产品界面应表达“多维运行时放置 + 通信后果”，而不是把所有语义压成“每张卡承载哪些层/算子”。</p>
     <div class="grid cols-4">
-      <div class="card metric"><strong>6</strong><span>需要区分的并行方式：DP、FSDP、PP、TP、SP/CP、EP</span></div>
-      <div class="card metric"><strong>5</strong><span>产品字段：device、rank、PP、TP、DP、CP/SP、EP</span></div>
+      <div class="card metric"><strong>7+</strong><span>需要区分的策略：DP、TP、PP、EP、SP/CP、FSDP/ZeRO、VPP 等</span></div>
+      <div class="card metric"><strong>8</strong><span>核心字段：device、rank、PP、TP、DP、CP/SP、EP、state shard</span></div>
       <div class="card metric"><strong>1</strong><span>核心判断：训练放置是多维 placement，而非单一层归属</span></div>
-      <div class="card metric"><strong>2</strong><span>工程落点：复用 ParallelDemo 计算逻辑，重构 TrainScope 视图模型</span></div>
+      <div class="card metric"><strong>3</strong><span>网络层：Scale-Up / Scale-Out / Frontend 各自承载不同通信流</span></div>
     </div>
-    <div class="callout"><b>核心结论：</b>“每张卡承载哪些层/算子”仅能覆盖 PP（Pipeline Parallel，流水线并行）中的层段放置语义；对于 TP（Tensor Parallel，张量并行）、DP（Data Parallel，数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、SP/CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）和 EP（Expert Parallel，专家并行），更准确的产品表达应为“该 rank/device 在多个并行维度上的运行时放置关系”。</div>
+    <div class="callout"><b>核心结论：</b>PP 才适合说“哪段层在哪个 stage”。TP、DP、FSDP / ZeRO、SP/CP、EP 应表达为 rank/device 的多维坐标，并在 runtime 面板展示 All-Reduce、All-to-All、P2P、All-Gather / Reduce-Scatter、KV / activation exchange 等通信事件。</div>
   </section>
 
   <section class="floor" id="index">
@@ -355,62 +362,76 @@
         </tr>
         <tr>
           <td><span class="pill blue">02</span></td>
+          <td><a class="index-link" href="#network-communication">通信映射</a></td>
+          <td>把 DP、TP、PP、EP、CP/SP 映射到通信原语和网络层。</td>
+          <td>解释“放置关系”在训练 step 里真正导致哪些数据移动。</td>
+          <td>形成通信原语、关键指标、Scale-Up / Scale-Out 放置建议。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">03</span></td>
+          <td><a class="index-link" href="#strategy-layering">策略层次</a></td>
+          <td>把 TP、PP、EP、DP、ZeRO、SP/CP 放到不同作用层次上。</td>
+          <td>明确 Kernel、图编译器、分布式规划器和运行时各自不需要“全管”。</td>
+          <td>形成端到端自动优化需要的 IR、reshard、通信、训练/推理语义与代价模型清单。</td>
+        </tr>
+        <tr>
+          <td><span class="pill blue">04</span></td>
           <td><a class="index-link" href="#scope">基本对象</a></td>
           <td>区分 card、device、rank、worker、stage、expert。</td>
           <td>对象层级决定后续图表、tooltip 和数据模型是否准确。</td>
           <td>明确标题、tooltip 和 placementMap 应该落在哪些字段上。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">03</span></td>
+          <td><span class="pill blue">05</span></td>
           <td><a class="index-link" href="#dp">DP（Data Parallel，数据并行）</a></td>
           <td>说明完整模型副本如何处理不同数据 shard。</td>
           <td>明确 DP（Data Parallel，数据并行）不表达层段归属。</td>
           <td>区分数据 shard、样本、mini-batch tensor 与模型参数副本。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">04</span></td>
-          <td><a class="index-link" href="#fsdp">FSDP（Fully Sharded Data Parallel，全分片数据并行）</a></td>
+          <td><span class="pill blue">06</span></td>
+          <td><a class="index-link" href="#fsdp">FSDP / ZeRO（状态分片）</a></td>
           <td>说明参数、梯度、优化器状态如何分片与重建。</td>
-          <td>FSDP（Fully Sharded Data Parallel，全分片数据并行）表达训练状态管理，而非层归属。</td>
+          <td>FSDP / ZeRO 表达训练状态管理，而非层归属。</td>
           <td>明确 state shard、all-gather、reshard 的展示位置。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">05</span></td>
+          <td><span class="pill blue">07</span></td>
           <td><a class="index-link" href="#pp">PP（Pipeline Parallel，流水线并行）</a></td>
           <td>说明模型如何按连续层段切分为多个 stage。</td>
           <td>PP（Pipeline Parallel，流水线并行）是层段归属表达的主要适用场景。</td>
           <td>给出可用于 inspector 的层段范围文案。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">06</span></td>
+          <td><span class="pill blue">08</span></td>
           <td><a class="index-link" href="#tp">TP（Tensor Parallel，张量并行）</a></td>
           <td>说明同一层内部的算子和矩阵如何分片。</td>
           <td>TP（Tensor Parallel，张量并行）表达 shard 关系，而非整层归属。</td>
           <td>明确应展示 <code>QKV shard 2/8</code>，而非“负责 Attention 层”。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">07</span></td>
+          <td><span class="pill blue">09</span></td>
           <td><a class="index-link" href="#spcp">SP / CP（Sequence / Context Parallel，序列 / 上下文并行）</a></td>
           <td>说明长序列和上下文窗口如何分片。</td>
           <td>SP/CP（Sequence / Context Parallel，序列 / 上下文并行）解决 token 维度负载，而非层切分。</td>
           <td>给出 sequence shard / context shard 的页面表达。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">08</span></td>
+          <td><span class="pill blue">10</span></td>
           <td><a class="index-link" href="#ep">EP（Expert Parallel，专家并行）</a></td>
           <td>说明 Gate 如何将 token 路由到不同 expert 与 rank。</td>
           <td>MoE 场景中需要避免把 <code>expert ↔ rank ↔ card</code> 固定为 1:1 关系。</td>
           <td>明确产品应展示 expert placement，而非 MoE 层归属。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">09</span></td>
+          <td><span class="pill blue">11</span></td>
           <td><a class="index-link" href="#combined">多维叠加</a></td>
           <td>说明 ParallelDemo 的 <code>dp × pp × cp × tp</code> 网格公式如何映射到 rank 坐标。</td>
           <td>避免把“多维语义标签”误解成五张卡或单一卡片归属。</td>
           <td>形成“公开模型配置 → 派生训练策略 → rank mesh → 单卡计算切片”的主图。</td>
         </tr>
         <tr>
-          <td><span class="pill blue">10</span></td>
+          <td><span class="pill blue">12</span></td>
           <td><a class="index-link" href="#product-guidance">产品表达</a></td>
           <td>说明并行数量是否可由开发者配置，以及盘古 MoE 单卡内部会呈现哪些计算。</td>
           <td>这决定 TrainScope 的数据接口、聚合层级和单卡详情是否可扩展到真实卡数。</td>
@@ -430,6 +451,7 @@
           <th>并行方式</th>
           <th>核心切分对象</th>
           <th>最接近的官方语义</th>
+          <th>典型通信 / 网络敏感点</th>
           <th>适合的页面表达</th>
           <th>不推荐的误导表达</th>
         </tr>
@@ -439,13 +461,15 @@
           <td>DP（Data Parallel，数据并行）</td>
           <td>数据 batch shard</td>
           <td>同一模型副本跑不同数据，再同步梯度</td>
+          <td>梯度 All-Reduce；关注 bucket、重叠、跨 HBD 带宽和分层归约</td>
           <td><code>DP7 replica</code></td>
           <td>“这张卡负责第 12-24 层”</td>
         </tr>
         <tr>
-          <td>FSDP（Fully Sharded Data Parallel，全分片数据并行）</td>
+          <td>FSDP / ZeRO（状态分片）</td>
           <td>参数 / 梯度 / 优化器状态</td>
           <td>训练状态分片，前后向按需 all-gather / reshard</td>
+          <td>All-Gather / Reduce-Scatter；关注显存窗口、状态重建和通信计算重叠</td>
           <td><code>state shard 3/8</code></td>
           <td>“卡 12 负责 MLP 层”</td>
         </tr>
@@ -453,6 +477,7 @@
           <td>PP（Pipeline Parallel，流水线并行）</td>
           <td>连续层段 / stage 子模块</td>
           <td>每个 stage 运行模型的一部分</td>
+          <td>activation / gradient P2P send-recv；关注相邻 stage 路径和 pipeline bubble</td>
           <td><code>PP5 · layers 36-42</code></td>
           <td>“TP2 负责第 36-42 层”</td>
         </tr>
@@ -460,6 +485,7 @@
           <td>TP（Tensor Parallel，张量并行）</td>
           <td>同一层内部的张量 / 算子分片</td>
           <td>列切 / 行切的线性层并行</td>
+          <td>层内 All-Reduce / All-Gather / Reduce-Scatter / P2P；低时延和拓扑跳数敏感</td>
           <td><code>QKV shard 2/8</code></td>
           <td>“卡 7 独自承载 Attention 层”</td>
         </tr>
@@ -467,6 +493,7 @@
           <td>SP / CP（Sequence / Context Parallel，序列 / 上下文并行）</td>
           <td>sequence / context shard</td>
           <td>参数复制但输入序列被切开</td>
+          <td>attention 相关 KV / activation exchange；同时受网络、缓存和内存层级影响</td>
           <td><code>sequence shard 1/4</code></td>
           <td>“CP3 承载第 20 层”</td>
         </tr>
@@ -474,12 +501,203 @@
           <td>EP（Expert Parallel，专家并行）</td>
           <td>experts / expert shards</td>
           <td>每个 worker 持有一个或多个专家</td>
+          <td>MoE dispatch / combine All-to-All；关注热点专家、尾时延和拓扑感知路由</td>
           <td><code>experts 152-159</code></td>
           <td>“卡 19 负责整个 MoE 层”</td>
         </tr>
       </tbody>
     </table>
     <div class="callout"><b>章节组织原则：</b>后续章节均按照“实现目标 / 设计理由 / 代码或配置落点 / 验证方法”展开，目标是将并行语义落实为 TrainScope 的界面字段、数据模型和 tooltip，而非仅给出概念定义。</div>
+  </section>
+
+  <section class="floor" id="network-communication">
+    <div class="kicker">Communication · 网络里发生了什么</div>
+    <h2>并行 placement 最终会变成训练 step 里的数据移动</h2>
+    <p class="lead">把这一节读成三件事：谁组成通信组、什么时候移动 tensor、落在哪个网络域。页面不需要把所有细节铺开，只要把通信事件挂回对应的并行坐标。</p>
+    <div class="callout"><b>修正口径：</b>PP / TP / DP / CP / EP 不是时间轴上的阶段。timeline 里真正出现的是 compute、P2P、All-Reduce、All-to-All、All-Gather、Reduce-Scatter、KV / activation exchange 等事件；事件再携带 <code>pp/tp/dp/cp/ep</code> 标签。</div>
+    <table class="section-table">
+      <thead><tr><th>并行方式</th><th>主要通信</th><th>最敏感</th><th>页面指标</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>DP</td>
+          <td>梯度 All-Reduce</td>
+          <td>带宽、bucket、overlap</td>
+          <td><code>dp_group</code>、bytes、overlap、跨域链路</td>
+        </tr>
+        <tr>
+          <td>FSDP / ZeRO</td>
+          <td>参数 All-Gather、梯度 Reduce-Scatter</td>
+          <td>显存窗口、预取、reshard</td>
+          <td><code>state_shard</code>、gather window、reshard point</td>
+        </tr>
+        <tr>
+          <td>TP</td>
+          <td>层内 All-Reduce / All-Gather / Reduce-Scatter</td>
+          <td>低时延、p99、拓扑跳数</td>
+          <td><code>tp_group</code>、op shard、collective、wait</td>
+        </tr>
+        <tr>
+          <td>PP</td>
+          <td>activation / gradient P2P send-recv</td>
+          <td>相邻 stage 距离、bubble</td>
+          <td><code>pp_stage</code>、send/recv bytes、idle time</td>
+        </tr>
+        <tr>
+          <td>EP / MoE</td>
+          <td>dispatch / combine All-to-All</td>
+          <td>专家倾斜、热点链路、尾时延</td>
+          <td><code>expert_bucket</code>、load、hotspot、drop</td>
+        </tr>
+        <tr>
+          <td>CP / SP</td>
+          <td>KV / activation exchange</td>
+          <td>上下文长度、缓存、内存层级</td>
+          <td><code>token range</code>、KV bytes、cache hit、wait</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="section-table detail-table">
+      <thead><tr><th>网络放置判断</th><th>结论</th><th>TrainScope 要回答的问题</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>TP / EP / 高频 CP</td>
+          <td>优先放在 Scale-Up / HBD 或低跳数拓扑内。</td>
+          <td>是否跨域拉长 step time？热点链路在哪里？</td>
+        </tr>
+        <tr>
+          <td>DP / FSDP / ZeRO</td>
+          <td>可跨 Scale-Out，但要看分层归约、bucket 和 overlap。</td>
+          <td>跨域带宽是否被占满？通信是否与计算重叠？</td>
+        </tr>
+        <tr>
+          <td>PP 相邻 stage</td>
+          <td>不要求全组同域，但相邻 stage 不应走高时延路径。</td>
+          <td>bubble 来自算力不均，还是链路等待？</td>
+        </tr>
+        <tr>
+          <td>Frontend</td>
+          <td>只承载管理、存储、日志和控制面流量。</td>
+          <td>训练关键路径是否误走前端网络？</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="quote-box"><b>保留重点：</b>placement 决定“谁在同一组”，communication events 解释“网络里实际发生了什么”。调度器应输入并行组、拓扑域和通信算法，而不是只按空闲卡数做 bin packing。</div>
+  </section>
+
+  <section class="floor" id="strategy-layering">
+    <div class="kicker">Strategy Layering · 策略层次与组件边界</div>
+    <h2>不同并行策略作用于不同层次，不是每个组件都要处理全部策略</h2>
+    <p class="lead">Megatron Core 官方并行指南把 DP、TP、PP、CP、EP、FSDP 分别定义到 batch、individual layers、model depth、sequence length、MoE experts 和 model state 等对象上；MindSpeed / MindSpeed-LLM 官方特性列表也同时覆盖 DP、TP、PP、VPP、SP、长序列并行、EP、分布式优化器、重计算、融合算子和通信重叠。因此“训推级主动能力”不能只写成照顾 TP、PP、EP，而应先区分策略作用层次和组件职责边界。</p>
+    <table class="section-table">
+      <thead><tr><th>策略</th><th>主要作用范围</th><th>主要责任</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>TP</td>
+          <td>层内、Tensor 维度</td>
+          <td>张量切分、局部计算、集合通信；典型对象是同一层内的 Column / Row Parallel Linear、词表分片和 logits 分片。</td>
+        </tr>
+        <tr>
+          <td>PP</td>
+          <td>层间、子图或 Stage</td>
+          <td>Stage 划分、micro-batch 调度、相邻 stage 的 activation / gradient P2P 传递。</td>
+        </tr>
+        <tr>
+          <td>EP</td>
+          <td>MoE 专家层</td>
+          <td>Expert 放置、Token 路由、dispatch / combine All-to-All，以及专家负载均衡。</td>
+        </tr>
+        <tr>
+          <td>DP</td>
+          <td>数据批次</td>
+          <td>模型副本、样本切分、梯度同步和梯度通信重叠。</td>
+        </tr>
+        <tr>
+          <td>ZeRO / FSDP</td>
+          <td>参数、梯度、优化器状态</td>
+          <td>状态分片、按需 All-Gather / Reduce-Scatter、reshard、优化器状态显存压缩。</td>
+        </tr>
+        <tr>
+          <td>SP / CP</td>
+          <td>序列或上下文维度</td>
+          <td>序列切分、上下文通信、KV / activation exchange；SP 常与 TP 配套。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>MindSpeed 口径修正：</b>MindSpeed 官方的并行策略和自动调优范围不只包含 TP、PP、EP，还包含 DP、SP、CP、ZeRO / 分布式优化器、VPP、重计算、micro-batch、通信重叠和融合算子等因素；这些配置会共同影响算子 shape、显存峰值、通信事件和调度顺序。</div>
+    <table class="section-table detail-table">
+      <thead><tr><th>组件</th><th>通常需要处理的范围</th><th>不应强行承担的责任</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>普通 Kernel</td>
+          <td>处理当前 rank 上的局部 Tensor、局部 shape、dtype、stride、tiling 和访存流水。</td>
+          <td>不决定全局 rank mesh、stage 划分或跨 rank 通信组。</td>
+        </tr>
+        <tr>
+          <td>图编译器</td>
+          <td>处理 layout、融合、依赖关系、buffer 生命周期和必要的重切分 / reshard。</td>
+          <td>不独自决定训练集群的全局并行策略组合。</td>
+        </tr>
+        <tr>
+          <td>分布式规划器</td>
+          <td>处理设备放置、rank mesh、并行策略组合、通信组和拓扑约束。</td>
+          <td>不替代单个 kernel 的 tiling，也不替代 MoE runtime 的 token 路由。</td>
+        </tr>
+        <tr>
+          <td>PP 调度器</td>
+          <td>处理 micro-batch、stage 执行顺序、bubble、VPP interleaving 和 P2P send/recv。</td>
+          <td>不决定同一线性层的列切 / 行切方式。</td>
+        </tr>
+        <tr>
+          <td>MoE 运行时</td>
+          <td>处理 EP 路由、token bucket、专家负载、dispatch / combine All-to-All。</td>
+          <td>不负责普通 Dense 层的 TP 切分传播。</td>
+        </tr>
+        <tr>
+          <td>训练运行时</td>
+          <td>处理 Autograd、Saved Tensor、重计算、梯度累积、优化器状态和分布式优化器通信。</td>
+          <td>不把推理请求调度或 KV Cache 生命周期混入训练 step 语义。</td>
+        </tr>
+        <tr>
+          <td>推理运行时</td>
+          <td>处理 KV Cache、Prefill / Decode、连续批处理、请求调度和动态 batch。</td>
+          <td>不等同于训练中的 micro-batch 流水线调度。</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="section-table detail-table">
+      <thead><tr><th>端到端主动优化能力</th><th>必要条件</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>统一 IR</td>
+          <td>需要同时表示算子、计算图、设备放置、Tensor Layout、通信组和状态生命周期。</td>
+        </tr>
+        <tr>
+          <td>切分传播与 Reshard</td>
+          <td>需要描述一个并行布局如何在层间、算子间或训练阶段转换到另一个布局，并明确重切分成本。</td>
+        </tr>
+        <tr>
+          <td>通信建模</td>
+          <td>需要显式表示 collective、P2P、All-to-All、通信计算重叠、拓扑域和通信库算法选择。</td>
+        </tr>
+        <tr>
+          <td>训练语义</td>
+          <td>需要覆盖 Autograd、Saved Tensor、重计算、梯度累积、参数 / 梯度 / 优化器状态分片。</td>
+        </tr>
+        <tr>
+          <td>推理语义</td>
+          <td>需要覆盖 KV Cache、Prefill / Decode、连续批处理、请求队列、动态 shape 和 cache eviction。</td>
+        </tr>
+        <tr>
+          <td>代价模型</td>
+          <td>需要同时估计计算、通信、显存、流水空泡、动态负载、专家热点和长上下文缓存成本。</td>
+        </tr>
+        <tr>
+          <td>合法性与回退机制</td>
+          <td>需要校验数值正确性、shape 约束、资源约束、拓扑限制和不支持场景的 fallback。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="quote-box"><b>产品含义：</b>TrainScope 可以在一个视图里关联这些策略，但数据模型应保留组件边界。普通 kernel 面板看局部 tensor 和 tiling；图编译面板看 layout / fusion / reshard；分布式面板看 rank mesh 与通信组；PP / MoE / 训练 / 推理运行时分别呈现自己的调度语义。</div>
   </section>
 
   <section class="floor" id="scope">
@@ -576,7 +794,7 @@
       </div>
       <div class="evidence-caption">读图顺序：左侧表示物理设备，中间表示运行时身份，右侧表示混合并行配置下的多维放置标签；这些标签是否全部出现，取决于实际训练配置。</div>
     </div>
-    <div class="callout"><b>Ascend / MindSpore 官方依据与边界：</b>MindSpore Transformers 文档明确说明并行模式包括数据并行、模型并行、流水线并行、序列并行等，且这些模式“可以单独使用，也可以结合在一起，形成复杂的混合并行策略”；配置项中也分别给出 <code>data_parallel</code>、<code>model_parallel</code>、<code>context_parallel</code>、<code>pipeline_stage</code> / <code>layers_per_stage</code> 等维度。MoE 配置还单独定义专家数量、token 选择专家数、专家计算通信并行，并提到“专家并行数”与节点 NPU 数的约束。因此，右侧“并行坐标层”是 TrainScope 为混合并行 placement 做的产品抽象，不是 Ascend 官方术语；图中的 PP / TP / DP / CP / EP 五层表示盘古 MoE 训练可能关心的五类标签，实际页面应按配置有则展示、无则隐藏。参考：<a href="https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/parallel_training.html">MindSpore Transformers 分布式并行训练</a>、<a href="https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/configuration.html">MindSpore Transformers 配置文件说明</a>。</div>
+    <div class="callout"><b>Ascend / MindSpore 依据与边界：</b>官方文档支持多种并行模式组合，配置项覆盖 <code>data_parallel</code>、<code>model_parallel</code>、<code>context_parallel</code>、<code>pipeline_stage</code> 和 MoE 专家相关字段。右侧“并行坐标层”是 TrainScope 的产品抽象；实际页面应按配置有则展示、无则隐藏。参考：<a href="https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/parallel_training.html">分布式并行训练</a>、<a href="https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/configuration.html">配置文件说明</a>。</div>
     <div class="quote-box"><b>命名原则：</b>产品总标题建议使用 <code>Runtime Placement</code>、<code>Rank / Device Placement</code> 或“rank/device 并行放置关系”，避免使用“每张卡承载哪些层/算子”作为总括表达。后文涉及缩写时，统一按“缩写（英文全称，中文全称）”理解。</div>
   </section>
 
@@ -674,12 +892,13 @@
       </thead>
       <tbody>
         <tr><td>实现目标</td><td>提升吞吐，让多个 rank 同时处理不同数据 shard。</td></tr>
-        <tr><td>设计理由</td><td>DP（Data Parallel，数据并行）不切分模型结构；训练正确性的关键在于梯度同步，而非层归属。这里的数据 shard 指样本或 mini-batch 的切分，不表示模型 tensor 被切分。</td></tr>
-        <tr><td>代码或配置落点</td><td>页面上应显示 <code>DP replica id</code>、<code>sample range / batch shard</code>、<code>input tensor slice for this replica</code>、<code>gradient sync group</code>，而不是显示层段范围。</td></tr>
+        <tr><td>设计理由</td><td>DP 不切模型结构；数据 shard 指样本或 mini-batch 切分，关键是梯度同步。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>反向后做梯度 All-Reduce。重点看 bucket、backward overlap、跨 HBD 链路和 Scale-Out 拥塞。</td></tr>
+        <tr><td>代码或配置落点</td><td>显示 <code>DP replica id</code>、sample range、batch shard、gradient sync group，而不是层段范围。</td></tr>
         <tr><td>验证方法</td><td>检查多个 DP rank 是否展示同样的模型结构描述，但数据 shard 不同；通信面板应反映梯度同步。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b><code>DP7 replica</code> 或“完整模型副本之一，处理当前 step 的样本 / mini-batch shard”是准确表达；“这张卡负责第几层”不属于 DP（Data Parallel，数据并行）语义。</div>
+    <div class="callout"><b>页面口径：</b><code>DP7 replica</code> 或“完整模型副本之一，处理当前 step 的样本 / mini-batch shard”是准确表达；“这张卡负责第几层”不属于 DP（Data Parallel，数据并行）语义。runtime 面板则应把 <code>DP all-reduce</code> 画成梯度同步事件，而不是画成样本数据回传。</div>
   </section>
 
   <section class="floor" id="fsdp">
@@ -746,11 +965,12 @@
       <tbody>
         <tr><td>实现目标</td><td>降低显存占用，让更大的模型可训练。</td></tr>
         <tr><td>设计理由</td><td>FSDP（Fully Sharded Data Parallel，全分片数据并行）切分的是参数、梯度与优化器状态，这与“哪张卡负责哪一段层”属于不同问题。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>前后向窗口做参数 All-Gather，反向后做 Reduce-Scatter / reshard。重点看预取、显存窗口、带宽和 overlap。</td></tr>
         <tr><td>代码或配置落点</td><td>页面应展示 <code>state shard</code>、<code>all-gather window</code>、<code>reshard point</code> 等语义，而不是层标签。</td></tr>
         <tr><td>验证方法</td><td>检查同一模块在不同 rank 上是否展示成状态切片；前后向关键阶段是否存在 gather / reshard 事件说明。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b>可以写“该 rank 持有模型参数/梯度/优化器状态的一部分分片；前后向期间按需 all-gather”，不要写“卡 12 负责 MLP 层”。</div>
+    <div class="callout"><b>页面口径：</b>可以写“该 rank 持有模型参数/梯度/优化器状态的一部分分片；前后向期间按需 all-gather”，不要写“卡 12 负责 MLP 层”。通信视图应显示 <code>all-gather window</code>、<code>reduce-scatter</code> 和 <code>reshard point</code>，用于解释显存峰值与等待时间。</div>
   </section>
 
   <section class="floor" id="pp">
@@ -818,11 +1038,37 @@
       <tbody>
         <tr><td>实现目标</td><td>把深模型按层段切开，让不同 stage 并行工作。</td></tr>
         <tr><td>设计理由</td><td>只有 PP 在官方语义上直接对应“这个 stage 运行模型的哪一部分”。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>相邻 stage 之间传 activation / gradient。重点看 send/recv bytes、相邻链路、micro-batch 数量和 bubble。</td></tr>
         <tr><td>代码或配置落点</td><td>适合在 <code>placementMap</code> 中直接保存 <code>layerStart</code>、<code>layerEnd</code>、<code>stageId</code>，并在 inspector 中显示层段范围。</td></tr>
         <tr><td>验证方法</td><td>切换 stage 时，界面必须显示连续层段；micro-batch 流转顺序应与 stage 顺序一致。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b><code>PP5 · layers 36-42</code>、“该 stage 执行第 36-42 层的前后向”这类说法是可靠的。</div>
+    <div class="callout"><b>页面口径：</b><code>PP5 · layers 36-42</code>、“该 stage 执行第 36-42 层的前后向”这类说法是可靠的。通信面板还应显示该 stage 与前后相邻 stage 的 <code>recv activation</code>、<code>send activation</code>、<code>recv grad</code>、<code>send grad</code> 和 bubble time。</div>
+    <table class="section-table detail-table">
+      <thead><tr><th>PP 与融合算子</th><th>正确关系</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>PP 的边界</td>
+          <td>PP 划分 stage 并调度 micro-batch；它不是算子融合 pass。</td>
+        </tr>
+        <tr>
+          <td>融合算子的边界</td>
+          <td>融合发生在 stage 内，目标是减少访存和 kernel launch。</td>
+        </tr>
+        <tr>
+          <td>不能跨越的边界</td>
+          <td>跨 stage 要 send/recv activation / gradient，通常不能合成一个本地 fused kernel。</td>
+        </tr>
+        <tr>
+          <td>调度影响</td>
+          <td>Stage 切分要避开关键 fusion pattern，并同时考虑 activation 边界和 bubble。</td>
+        </tr>
+        <tr>
+          <td>VPP 影响</td>
+          <td>VPP 改变虚拟 stage 的交错顺序，不改变融合算子的 stage 内属性。</td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 
   <section class="floor" id="tp">
@@ -897,11 +1143,88 @@
       <tbody>
         <tr><td>实现目标</td><td>把单层内部的大矩阵与大算子切开，扩展单层可并行规模。</td></tr>
         <tr><td>设计理由</td><td>TP（Tensor Parallel，张量并行）的官方语义是行切 / 列切，体现的是同层协同计算，而非整层归属。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>TP 通信在层内关键路径上。重点看 collective 类型、等待时间、HBD 内低时延和拓扑跳数。</td></tr>
         <tr><td>代码或配置落点</td><td>适合显示 <code>op name</code>、<code>tensor shard id</code>、<code>group size</code>，如 <code>Attention QKV shard 2/8</code>。</td></tr>
         <tr><td>验证方法</td><td>切换到 TP（Tensor Parallel，张量并行）视图时，同一层应同时出现在多个 rank 上；说明文字必须强调 shard，而非层归属。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b><code>卡 7 / rank_7 持有 Attention QKV 的 TP shard 2/8</code> 是准确的；“卡 7 负责 Attention 层”会误导。</div>
+    <div class="callout"><b>页面口径：</b><code>卡 7 / rank_7 持有 Attention QKV 的 TP shard 2/8</code> 是准确的；“卡 7 负责 Attention 层”会误导。runtime 视图应把 TP collective 标成同层事件，并显示 <code>tp_group</code>、collective 类型、等待时间和所在拓扑域。</div>
+    <table class="section-table detail-table">
+      <thead><tr><th>对比项</th><th>TP</th><th>算子 tiling</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>所属层次</td>
+          <td>分布式并行策略，作用在同一层的全局张量、权重和 rank group 上。</td>
+          <td>单个 kernel 的本地实现策略，作用在当前 rank / device 上的局部 tensor 上。</td>
+        </tr>
+        <tr>
+          <td>切分对象</td>
+          <td>把权重、embedding、logits 或激活按列、行、词表或序列维分到多个 rank。</td>
+          <td>把本 rank 的局部 tensor 再切成 tile / block，用于访存和核内流水。</td>
+        </tr>
+        <tr>
+          <td>通信责任</td>
+          <td>需要插入 All-Reduce、All-Gather、Reduce-Scatter 等跨 rank 通信。</td>
+          <td>通常不创建跨 rank 通信，只决定本地数据搬运和计算循环形态。</td>
+        </tr>
+        <tr>
+          <td>先后关系</td>
+          <td>TP 先决定每个 rank 看到的局部 shape 和 layout。</td>
+          <td>tiling 再基于这个局部 shape 选择 tile 大小、访存路径和 kernel 内调度。</td>
+        </tr>
+        <tr>
+          <td>产品表达</td>
+          <td>应展示 <code>tp_group</code>、<code>shard id</code>、分片维度和 collective event。</td>
+          <td>应展示 local shape、tile shape、kernel 名称和本地耗时。</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout"><b>关键边界：</b>TP 和 tiling 都在“切”，但前者是跨 rank 的张量所有权与通信语义，后者是单 rank 内 kernel 如何高效计算局部分片。图编译器可以在两者之间处理 layout、fusion、依赖和 reshard，但不能把 kernel tiling 误写成 TP 策略本身。</div>
+    <table class="section-table detail-table">
+      <thead><tr><th>与 TP 强相关的算子 / 层</th><th>典型 TP 关系</th><th>页面表达建议</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ColumnParallelLinear</code></td>
+          <td>按输出维切分；常见于 QKV、MLP up / gate projection。</td>
+          <td><code>QKV column shard 2/8</code>、<code>MLP gate shard</code>、output all-gather。</td>
+        </tr>
+        <tr>
+          <td><code>RowParallelLinear</code></td>
+          <td>按输入维切分；常见于 Attention output 和 MLP down projection。</td>
+          <td><code>O-proj row shard</code>、<code>MLP down shard</code>、output all-reduce。</td>
+        </tr>
+        <tr>
+          <td><code>VocabParallelEmbedding</code></td>
+          <td>词表维分片，每个 rank 持有一段 vocab embedding。</td>
+          <td><code>vocab range 64k-96k</code>、embedding shard。</td>
+        </tr>
+        <tr>
+          <td>LM Head / <code>VocabParallelCrossEntropy</code></td>
+          <td>logits 按 vocab 维切分，loss 在 shard 间规约。</td>
+          <td><code>logits vocab shard</code>、vocab-parallel CE、loss collective。</td>
+        </tr>
+        <tr>
+          <td>TP mapping / communication ops</td>
+          <td>负责 TP 区域边界上的 split / gather / reduce。</td>
+          <td>把它们标为 <code>TP boundary collective</code>，而不是普通 compute op。</td>
+        </tr>
+        <tr>
+          <td>LayerNorm / Dropout 的 Sequence Parallel 形态</td>
+          <td>TP 常配合 SP；LayerNorm、Dropout 可能触发 all-gather / reduce-scatter。</td>
+          <td>标成 <code>TP+SP adjacent</code>，避免说成单纯 PP 层归属。</td>
+        </tr>
+        <tr>
+          <td>MoE expert MLP / Grouped GEMM</td>
+          <td>EP 是主语，但当 expert 内部 MLP 继续做 TP 时，expert linear 也会出现列切 / 行切和对应 TP 通信。</td>
+          <td><code>expert E17 · TP shard 1/4</code>，同时保留 EP routing 和 TP shard 两组标签。</td>
+        </tr>
+        <tr>
+          <td>fused softmax / fused swiglu / fused layer norm / fused bias-gelu</td>
+          <td>这些是局部融合算子，本身不定义 TP 组；它们的输入 shape 和 layout 会被 TP / SP 分片影响。</td>
+          <td>在 kernel 面板展示 fused op，在 placement 面板展示 TP shard，二者通过 local shape 关联。</td>
+        </tr>
+      </tbody>
+    </table>
   </section>
 
   <section class="floor" id="spcp">
@@ -966,12 +1289,13 @@
       <thead><tr><th>项</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td>实现目标</td><td>在长上下文场景下把 sequence 维切开，降低单 rank 的序列负载。</td></tr>
-        <tr><td>设计理由</td><td>SP / CP（Sequence Parallel / Context Parallel，序列并行 / 上下文并行）回答的是“哪段 token 由哪个 rank 处理”，而非“哪层由哪个 rank 处理”。</td></tr>
+        <tr><td>设计理由</td><td>SP / CP 回答“哪段 token 由哪个 rank 处理”，不是层段归属。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>Attention 相关 shard 会交换 KV、activation 或中间状态。重点看 token range、KV bytes、cache hit 和 attention wait。</td></tr>
         <tr><td>代码或配置落点</td><td>适合展示 <code>sequence shard id</code>、<code>token range</code>、<code>context window</code>。</td></tr>
         <tr><td>验证方法</td><td>同一层或模块在多个 SP/CP rank 上仍然存在，但 token range 不同；说明文字必须明确是序列切分。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b><code>CP1 · sequence shard 1/4</code>、“负责当前上下文窗口的一段 token”是准确的；“CP3 承载第 20 层”不准确。</div>
+    <div class="callout"><b>页面口径：</b><code>CP1 · sequence shard 1/4</code>、“负责当前上下文窗口的一段 token”是准确的；“CP3 承载第 20 层”不准确。通信视图应额外标出 KV / activation exchange、cache 命中和 attention wait，否则长上下文瓶颈会被误解成普通层放置问题。</div>
   </section>
 
   <section class="floor" id="ep">
@@ -1039,19 +1363,21 @@
       <thead><tr><th>项</th><th>说明</th></tr></thead>
       <tbody>
         <tr><td>实现目标</td><td>在 MoE 层内部把 experts 分布到多个 rank 上，提升专家总容量与并发。</td></tr>
-        <tr><td>设计理由</td><td>EP（Expert Parallel，专家并行）的主体对象是 experts；它描述“某个 rank 持有哪些 experts 或 expert shards”，而非“某张卡负责整个 MoE 层”。</td></tr>
+        <tr><td>设计理由</td><td>EP 的主体对象是 experts；rank 持有 experts / expert shards，不是负责整个 MoE 层。</td></tr>
+        <tr><td>通信 / 网络落点</td><td>核心是 MoE dispatch / combine All-to-All。重点看专家负载、热点链路、token bucket 和尾时延。</td></tr>
         <tr><td>代码或配置落点</td><td>适合在 <code>placementMap</code> 中展示 <code>expertIds</code>、<code>expertShardRange</code>、<code>gate route target</code>。</td></tr>
         <tr><td>验证方法</td><td>从任意 token 或 expert bucket 出发，页面能追到它被路由到哪个 rank/device；并且不假设 1:1 固定映射。</td></tr>
       </tbody>
     </table>
-    <div class="callout"><b>页面口径：</b><code>EP19 · experts 152-159</code>、“该 rank 持有当前 MoE 层的一部分 experts / expert shards”是准确的；“卡 19 负责 MoE 层”不准确。</div>
+    <div class="callout"><b>页面口径：</b><code>EP19 · experts 152-159</code>、“该 rank 持有当前 MoE 层的一部分 experts / expert shards”是准确的；“卡 19 负责 MoE 层”不准确。runtime 面板应显示 dispatch / combine All-to-All、expert load、hotspot link 和 token bucket，而不是只显示专家列表。</div>
   </section>
 
   <section class="floor" id="combined">
     <div class="kicker">Framework · 多维并行叠加</div>
     <h2>真实训练不是单选题，而是多维坐标叠加</h2>
     <p class="lead">在混合并行训练中，同一个 rank 往往同时拥有 PP（Pipeline Parallel，流水线并行）、TP（Tensor Parallel，张量并行）、DP（Data Parallel，数据并行）、CP（Context Parallel，上下文并行）和 EP（Expert Parallel，专家并行）等坐标。这里的“叠加”不是把一张卡拆成多张卡，而是同一个 rank 在多个通信组、切分维度和专家路由维度中各有一个坐标。</p>
-    <div class="callout"><b>与 ParallelDemo 的匹配关系：</b>两者逻辑匹配，但准确表达应是“配置的并行度生成多维 rank 网格，再把同一 rank 投影到不同并行坐标上”。ParallelDemo 当前实现中 <code>world = dp × pp × cp × tp</code>，并用 <code>grid = arange(world).view(dp, pp, cp, tp)</code> 推导 rank、TP（Tensor Parallel，张量并行）组、PP（Pipeline Parallel，流水线并行）组、CP（Context Parallel，上下文并行）组和 DP（Data Parallel，数据并行）组；EP（Expert Parallel，专家并行）/ MoE 在该 Demo 中作为专家放置与 token 路由语义叠加显示，不参与这条 <code>world</code> 乘法。</div>
+    <div class="callout"><b>与 ParallelDemo 的匹配关系：</b>配置的并行度先生成 rank 网格，再把同一 rank 投影到不同并行坐标上。当前 Demo 用 <code>world = dp × pp × cp × tp</code> 推导 rank 和通信组；EP / MoE 作为专家放置与 token 路由语义叠加显示。</div>
+    <div class="quote-box"><b>通信推导关系：</b>rank mesh 只给出通信组成员关系，真正的网络事件由训练 step 触发。同一个 <code>rank_299 / PP5 / TP3 / DP2 / CP0 / EP19</code> 在一次 step 里可能先接收 PP activation，再执行 TP shard 计算，MoE 区域触发 EP All-to-All，反向传播后进入 DP All-Reduce；这些是 runtime event 的时间顺序，不是把 PP / TP / EP 画成互斥模式。</div>
     <div class="screenshot">
       <div class="shotbar"><span class="dots"></span>组合主图 · 一个 rank 的多维身份</div>
       <div class="shotbody flush">
@@ -1128,17 +1454,17 @@
       <tbody>
         <tr>
           <td>官方公开模型配置</td>
-          <td>openPangu-Ultra-MoE-718B：61 层、hidden 7680、256 路由专家、1 共享专家、top-8、MLA / MTP / sandwich norm 等结构。</td>
+          <td>openPangu-Ultra-MoE-718B：61 层、hidden 7680、256 路由专家、top-8 等。</td>
           <td><span class="pill good">official config</span> 可作为确定训练场景的静态模型底座。</td>
         </tr>
         <tr>
           <td>派生训练 placement</td>
-          <td>用 <code>DP=32 / PP=16 / CP=1 / TP=8</code> 落成 <code>world=4096</code> 的 rank mesh；MoE 侧用 <code>EP=32</code> 把 256 experts 聚合为 32 个 expert bucket。</td>
+          <td><code>DP=32 / PP=16 / CP=1 / TP=8</code> 得到 <code>world=4096</code>；<code>EP=32</code> 作为 MoE 专家 bucket 示例。</td>
           <td><span class="pill blue">derived</span> 这是产品可解释样例，不声称 openPangu 官方真实训练切分已经公开。</td>
         </tr>
         <tr>
           <td>动态训练遥测</td>
-          <td>loss、grad norm、router z-loss、专家负载、All-to-All 字节数、rank util 等信号需要来自一次自有 Ascend run，或用 OLMoE/BLOOM 逻辑信号重投影。</td>
+          <td>loss、grad norm、专家负载、All-to-All bytes、rank util 等需要自有 run 或合成数据。</td>
           <td><span class="pill hot">synthetic / self-collected</span> 未公开的逐 step 数据不能伪装成官方真实遥测。</td>
         </tr>
       </tbody>
@@ -1294,7 +1620,7 @@
           <text x="680" y="758" text-anchor="middle" font-size="15" font-weight="850" fill="#0f172a">结论：ParallelDemo 的网格公式可落成盘古训练诊断样例；每个 rank/card 都要携带自己的切片标签。</text>
         </svg>
       </div>
-      <div class="evidence-caption">证据边界：模型结构来自公开 <a href="https://huggingface.co/FreedomIntelligence/openPangu-Ultra-MoE-718B/blob/main/config.json">openPangu-Ultra-MoE-718B config</a> 与 <a href="https://huggingface.co/FreedomIntelligence/openPangu-Ultra-MoE-718B/blob/main/inference/model.py">inference/model.py</a>；<code>DP=32 / PP=16 / CP=1 / TP=8 / EP=32</code> 是用于把 ParallelDemo 公式落实到大规模训练的派生 placement，不是官方公开的真实训练切分。模型架构只定义 forward 主干；训练 step 还包含 loss、backward、通信同步与 optimizer update，可参考 <a href="https://docs.pytorch.org/tutorials/recipes/recipes/zeroing_out_gradients.html">PyTorch 训练循环示例</a>。Hugging Face Transformers 配置文档说明 <code>num_hidden_layers</code> 是模型的 block 数量，Model Outputs 文档说明 <code>hidden_states</code> 是 embedding 输出加每层输出的张量序列，形状为 <code>(batch_size, sequence_length, hidden_size)</code>。PyTorch Pipeline 文档说明 stage 是模型分段，Profiler 文档说明时间轴记录的是 operator/runtime event。MindSpore Transformers 配置说明提供 <code>data_parallel</code>、<code>model_parallel</code>、<code>context_parallel</code>、<code>pipeline_stage</code>、<code>expert_num</code>、<code>num_experts_chosen</code> 等字段依据，通信 API 提供通信组与 rank 映射依据。与 ParallelDemo 的差异边界：截图中的 H100_0 是 <code>Stage 0</code>，所以显示 Embedding；本图的 <code>rank_299 / PP5</code> 不应显示 Embedding，只显示该 stage 覆盖的 decoder blocks。<code>E152-E159</code> 是盘古产品场景中的 EP bucket，不是直接照搬 ParallelDemo 当前 demo 里按 TP shard 展示专家片的简化逻辑。</div>
+      <div class="evidence-caption">证据边界：模型结构来自公开 <a href="https://huggingface.co/FreedomIntelligence/openPangu-Ultra-MoE-718B/blob/main/config.json">config</a> 与 <a href="https://huggingface.co/FreedomIntelligence/openPangu-Ultra-MoE-718B/blob/main/inference/model.py">model.py</a>；<code>DP=32 / PP=16 / CP=1 / TP=8 / EP=32</code> 是派生 placement 示例，不是官方真实训练切分。差异边界：Stage 0 才显示 Embedding；<code>rank_299 / PP5</code> 只显示该 stage 的 decoder blocks；<code>E152-E159</code> 是产品场景中的 expert bucket。</div>
     </div>
     <table class="section-table detail-table">
       <thead><tr><th>概念</th><th>在训练中的含义</th><th>在图表中的表达边界</th></tr></thead>
@@ -1331,18 +1657,18 @@
       <tbody>
         <tr>
           <td>一张卡按时间看，是不是在跑乱序任务</td>
-          <td>不是乱序。Profiler timeline 里 forward、backward、send/recv、all-reduce、all-to-all 等事件可能交错出现，但它们受训练 step、pipeline schedule、autograd 依赖和通信依赖约束。</td>
-          <td>时间轴画 runtime event；PP / TP / DP / CP / EP 画成 event 上的标签，不要画成“先跑 PP 再跑 TP 再跑 EP”的时间顺序。</td>
+          <td>不是。事件可交错，但受 step、pipeline schedule、autograd 和通信依赖约束。</td>
+          <td>时间轴画 runtime event；PP / TP / DP / CP / EP 只是 event 标签。</td>
         </tr>
         <tr>
           <td>1F1B 这类流水线为什么看起来交错</td>
-          <td>同一张卡可能先执行某个 micro-batch 的 forward，再执行另一个 micro-batch 的 backward。交错是流水线调度为了提高设备利用率，不是任务随机打乱。</td>
-          <td>可在时间轴中标 <code>Fwd mb7</code>、<code>Bwd mb3</code>、<code>Fwd mb8</code>、<code>Bwd mb4</code>，旁边附同一组 placement 标签。</td>
+          <td>同一 rank 会交错执行不同 micro-batch 的 forward / backward，以提高利用率。</td>
+          <td>标 <code>Fwd mb7</code>、<code>Bwd mb3</code>，并附 placement 标签。</td>
         </tr>
         <tr>
           <td><code>rank_299 / PP5</code> 为什么不应显示 Embedding</td>
-          <td>Embedding 只属于模型入口 stage。<code>rank_299 / PP5</code> 是中间流水线 stage，只覆盖该 stage 的 decoder blocks，例如 <code>Blocks 20-23</code>。</td>
-          <td>卡内显示 <code>Decoder blocks 20-23</code>、Attention shard、MoE FFN、expert bucket、通信事件；不要照搬 ParallelDemo 中 <code>H100_0 / Stage 0</code> 的 Embedding。</td>
+          <td>Embedding 属于入口 stage；<code>rank_299 / PP5</code> 只覆盖中间 decoder blocks。</td>
+          <td>显示 blocks、Attention shard、MoE FFN、expert bucket 和通信事件。</td>
         </tr>
       </tbody>
     </table>
@@ -1456,15 +1782,40 @@
       <tbody>
         <tr>
           <td>这些并行度能否由开发者配置</td>
-          <td>可以配置，但不是任意配置。MindSpore Transformers 暴露 <code>parallel_config.data_parallel</code>、<code>model_parallel</code>、<code>context_parallel</code>、<code>pipeline_stage</code> 等字段；这些值必须满足设备数量、模型层数、attention head 数、序列长度、global batch、拓扑和通信开销等约束。ParallelDemo 的滑块表达的是这个配置空间。</td>
+          <td>可以配置，但受设备数、层数、head 数、序列长度、batch、拓扑和通信成本约束。ParallelDemo 的滑块表达配置空间，不表示任意组合都合法。</td>
         </tr>
         <tr>
           <td>与 ParallelDemo 的公式关系</td>
-          <td>当前 ParallelDemo 使用 <code>world = dp × pp × cp × tp</code>，并将 rank reshape 为 <code>grid[d][p][c][t]</code>。因此 TrainScope 应复用这套 rank 坐标与通信组推导逻辑；如果真实盘古训练引入独立 EP（Expert Parallel，专家并行）维度，需要在数据层显式建模，而不是默认把 EP 固定绑定到 TP 或卡号。</td>
+          <td>ParallelDemo 按 <code>world = dp × pp × cp × tp</code> 推 rank mesh。TrainScope 应复用坐标和通信组推导；若有独立 EP，需新增 EP 维度。</td>
         </tr>
         <tr>
           <td>图表应该怎么展示</td>
-          <td>主视图建议按三层组织：先展示物理层 <code>host/device</code>，再展示运行时层 <code>globalRank/localRank</code>，最后展示并行坐标层 <code>pp/tp/dp/cp/ep</code>。单卡详情面板再展开“本 rank 的卡内计算切片”，避免在总览里平铺真实训练的全部卡。</td>
+          <td>按三层展示：<code>host/device</code> → <code>globalRank/localRank</code> → <code>pp/tp/dp/cp/ep</code>。单卡面板再展开本 rank 的计算切片。</td>
+        </tr>
+        <tr>
+          <td>通信视图应该怎么展示</td>
+          <td>派生 <code>communicationEvents</code>：记录 type、group、bytes、latency、overlap、topology、source / target。</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="section-table detail-table">
+      <thead><tr><th>MindSpeed / Megatron 官方范围</th><th>对 TrainScope 配置与调优视图的影响</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>并行策略不只 TP / PP / EP</td>
+          <td>配置面板应覆盖 DP、TP、PP、VPP、SP、CP、EP、ZeRO、micro-batch，并校验 world size、head、层数、序列和 expert。</td>
+        </tr>
+        <tr>
+          <td>重计算与显存优化会改变调度</td>
+          <td>重计算、checkpointing、参数预取和状态分片会改变 saved tensor、显存峰值和通信窗口。</td>
+        </tr>
+        <tr>
+          <td>融合算子与通信重叠会改变观测事件</td>
+          <td>fused ops、overlap、MC2 / CoC 会改变 kernel 粒度和瓶颈归因。</td>
+        </tr>
+        <tr>
+          <td>自动调优需要多目标代价模型</td>
+          <td>调优结果要解释 shape、显存、通信、bubble、专家负载和请求调度，不只给 TP/PP/EP 三个数。</td>
         </tr>
       </tbody>
     </table>
@@ -1474,27 +1825,27 @@
         <tr>
           <td>PP（Pipeline Parallel，流水线并行）</td>
           <td>决定这个 rank 处在第几个流水线 stage，以及该 stage 覆盖哪些连续层段。</td>
-          <td>Stage 0 可显示 Embedding + early Transformer blocks；Stage N 可显示后续 blocks 或 LM Head。这里才适合写 <code>layers 36-42</code> 这类层段范围。</td>
+          <td>显示 <code>PP5 · layers 36-42</code>、stage idle、send/recv 和 bubble。</td>
         </tr>
         <tr>
           <td>TP（Tensor Parallel，张量并行）</td>
           <td>决定同一层内部的张量 / 权重 / 算子切片，通常需要同组 all-reduce、all-gather 或 reduce-scatter。</td>
-          <td>Embedding 词表分片、Attention QKV column shard、Attention output row shard、MLP up/down projection shard、LM Head vocab shard；卡片上应标 <code>第 3/4 片</code>，而不是“独占 Attention 层”。</td>
+          <td>显示 QKV、O-proj、MLP、Embedding、LM Head 的 shard id 和 collective。</td>
         </tr>
         <tr>
           <td>CP（Context Parallel，上下文并行）</td>
           <td>决定 attention 看到的 token / context 分片，以及 KV、QKV 或 attention 中间结果在组内如何交换。</td>
-          <td>同一个 Block 的 Self-Attention 区域显示 <code>CP1 · token shard</code>、KV exchange、Ring / Ulysses / hybrid CP 等算法标签；它不改变该 rank 属于哪个 PP stage。</td>
+          <td>显示 <code>CP1 · token shard</code>、KV exchange、cache hit 和 attention wait。</td>
         </tr>
         <tr>
           <td>DP（Data Parallel，数据并行）</td>
           <td>决定这个 rank 处理哪份样本 / mini-batch shard，并决定 backward 后的梯度同步组。</td>
-          <td>卡片或顶部 batch 条显示 <code>samples 512-1023</code> 之类的数据 shard；反向传播后显示 gradient all-reduce，同步的是梯度 / 参数更新，不是把样本数据拼回去。</td>
+          <td>显示 sample range、batch shard、gradient all-reduce 和 overlap。</td>
         </tr>
         <tr>
           <td>EP（Expert Parallel，专家并行） / MoE</td>
           <td>决定当前 rank 持有哪些专家、token 经 gate 路由到哪些专家，以及 dispatch / combine 的通信路径。</td>
-          <td>MoE FFN 区域显示 router / gate 复制、experts E4-E5、本 rank 的 top-k token bucket、all-to-all dispatch/combine。不要把 <code>EP组</code> 简化成“这张卡负责整个 MoE 层”。</td>
+          <td>显示 experts、token bucket、expert load、dispatch / combine All-to-All。</td>
         </tr>
       </tbody>
     </table>
@@ -1518,32 +1869,37 @@
         <h3>数据与视图</h3>
         <div class="rec-item">
           <div class="rec-num">04</div>
-          <div><b>数据层</b><span>把 ParallelDemo 的坐标推导抽成共享 `parallel-placement.js`，输出纯 placement 数据。</span></div>
+          <div><b>数据层</b><span>把 ParallelDemo 的坐标推导抽成共享 <code>parallel-placement.js</code>，输出纯 placement 数据；再基于 trace / profiler / simulation 派生 <code>communicationEvents</code>。</span></div>
         </div>
         <div class="rec-item">
           <div class="rec-num">05</div>
-          <div><b>视图层</b><span>真实规模采用聚合视图：cluster / host / group / rank window，多级钻取，不试图平铺 1k+ 卡。</span></div>
+          <div><b>视图层</b><span>真实规模采用聚合视图：cluster / host / group / rank window，多级钻取，不试图平铺 1k+ 卡；通信热力图按 group / link / topology domain 聚合。</span></div>
         </div>
         <div class="rec-item">
           <div class="rec-num">06</div>
           <div><b>MoE 特别注意</b><span>不要默认 <code>expert_group ↔ rank ↔ card</code> 一一对应；应展示“当前 projection 到哪些 rank / device”。</span></div>
         </div>
+        <div class="rec-item">
+          <div class="rec-num">07</div>
+          <div><b>网络分层</b><span>TP / EP / 高频 CP 尽量落在 Scale-Up / HBD；DP / 分层归约可跨 Scale-Out；Frontend 只承载管理、存储和控制面流量。</span></div>
+        </div>
       </div>
     </div>
-    <div class="callout"><b>一句话建议：</b>复用 ParallelDemo 的并行分配计算逻辑，重做 TrainScope 的数据模型和聚合视图；逻辑复用，视图重做。</div>
+    <div class="callout"><b>一句话建议：</b>复用 ParallelDemo 的并行分配计算逻辑，重做 TrainScope 的数据模型、聚合视图和通信事件层；placement 决定“谁在组里”，communication events 解释“网络里发生了什么”。</div>
   </section>
 
   <section class="floor" id="findings">
     <div class="kicker">Findings · 总结</div>
-    <h2>把这件事记成三条判断</h2>
-    <p class="lead">如果只保留最重要的结论，应该是下面三条。</p>
+    <h2>把这件事记成四条判断</h2>
+    <p class="lead">如果只保留最重要的结论，应该是下面四条。</p>
     <div class="tension">
       <div><b>核心判断</b><span>真实大模型训练不是“卡按层和算子分配”一句话能说完，而是多个并行维度共同定义 placement。</span></div>
-      <div><b>准确边界</b><span>“哪张卡负责哪几层”只适用于 PP（Pipeline Parallel，流水线并行）；TP、DP、FSDP、SP/CP、EP 都需要更精确的语义字段。</span></div>
+      <div><b>准确边界</b><span>“哪张卡负责哪几层”只适用于 PP（Pipeline Parallel，流水线并行）；TP、DP、FSDP/ZeRO、SP/CP、EP 都需要更精确的语义字段。</span></div>
       <div><b>产品方向</b><span>TrainScope 的正确标题是 placement，不是 layer ownership；ParallelDemo 提供的是计算引擎，不是最终 UI 结构。</span></div>
+      <div><b>网络方向</b><span>placement 必须继续推导 communication events：TP / EP 偏 Scale-Up，DP / 分层归约偏 Scale-Out，PP 关注相邻 stage，CP/SP 还要联动 KV cache 和内存层级。</span></div>
     </div>
     <div class="quote-box">
-      <b>最终结论：</b>对 `PP（Pipeline Parallel，流水线并行）` 来说，“每张卡承载哪些层”基本准确；对 `TP（Tensor Parallel，张量并行）` 来说，这句话只说对一半；对 `DP（Data Parallel，数据并行）/ FSDP（Fully Sharded Data Parallel，全分片数据并行）/ CP（Context Parallel，上下文并行）` 来说基本不准确；对 `EP（Expert Parallel，专家并行）` 来说，应改成“该 rank/device 持有哪些 experts 或 expert shards”。
+      <b>最终结论：</b>对 <code>PP（Pipeline Parallel，流水线并行）</code> 来说，“每张卡承载哪些层”基本准确，但还要补充 activation / gradient P2P、bubble 和 stage 内融合边界；对 <code>TP（Tensor Parallel，张量并行）</code> 来说，这句话只说对一半，真正要看同层 shard、高频同步，以及 TP 与本地算子 tiling 的边界；对 <code>DP（Data Parallel，数据并行）/ FSDP / ZeRO / CP（Context Parallel，上下文并行）</code> 来说基本不准确；对 <code>EP（Expert Parallel，专家并行）</code> 来说，应改成“该 rank/device 持有哪些 experts 或 expert shards，并在 runtime 里发生了哪些 dispatch / combine All-to-All”。
     </div>
   </section>
 
@@ -1560,30 +1916,90 @@
         <tr><td>rank</td><td>global rank / local rank（全局 / 本地运行时编号）</td><td><code>global_rank_237</code></td><td>运行时通信成员编号</td><td>把 rank 与 card 当同义词</td></tr>
         <tr><td>DP</td><td>Data Parallel（数据并行）</td><td><code>DP7 replica</code></td><td>完整模型副本所属数据并行组</td><td>“负责第 12-24 层”</td></tr>
         <tr><td>FSDP</td><td>Fully Sharded Data Parallel（全分片数据并行）</td><td><code>state shard 3/8</code></td><td>参数、梯度、优化器状态分片</td><td>“卡 12 负责 MLP 层”</td></tr>
+        <tr><td>ZeRO</td><td>Zero Redundancy Optimizer（零冗余优化器）</td><td><code>zero stage 2 · grad shard</code></td><td>优化器状态、梯度和参数按阶段分片，减少状态冗余</td><td>“ZeRO 决定层放置”</td></tr>
         <tr><td>PP</td><td>Pipeline Parallel（流水线并行）</td><td><code>PP5 · layers 36-42</code></td><td>该 stage 承担的层段</td><td>省略层段范围</td></tr>
+        <tr><td>VPP</td><td>Virtual Pipeline Parallelism（虚拟流水线并行）</td><td><code>PP2 / VPP1</code></td><td>同一物理 rank 上多个虚拟 stage 的交错调度</td><td>当成新的张量切分维度</td></tr>
+        <tr><td>micro-batch</td><td>pipeline micro-batch（流水线微批）</td><td><code>mb7 on PP3</code></td><td>PP 调度中的小批次单位，用于填充流水线并减少 bubble</td><td>与 DP 的数据副本混用</td></tr>
         <tr><td>block</td><td>Transformer block / decoder block（Transformer / 解码器块）</td><td><code>Decoder blocks 20-23</code></td><td>Attention、FFN/MoE、Norm、Residual 组成的重复计算单元</td><td>把 block 说成样本块或数据块</td></tr>
         <tr><td>layer</td><td>layer（层，需标明粒度）</td><td><code>decoder layer</code> / <code>linear layer</code></td><td>语境依赖词，可指完整 block，也可指子层</td><td>裸写“隐藏层”但不说明指什么</td></tr>
         <tr><td>num_hidden_layers</td><td>number of hidden layers（隐藏层数量配置字段）</td><td><code>num_hidden_layers=61 → 61 blocks</code></td><td>Hugging Face 配置中表示模型 block 数量</td><td>解释成 hidden state 形状</td></tr>
         <tr><td>hidden state</td><td>hidden state（隐藏状态 / 中间表示）</td><td><code>[batch, seq, hidden_size]</code></td><td>每个 token 在模型内部的中间向量表示</td><td>当成 Attention 或 MLP 这类模块</td></tr>
         <tr><td>hidden_size</td><td>hidden size（隐藏状态向量宽度）</td><td><code>hidden_size=7680</code></td><td>hidden state 最后一维宽度</td><td>当成层数</td></tr>
         <tr><td>TP</td><td>Tensor Parallel（张量并行）</td><td><code>Attention QKV shard 2/8</code></td><td>同一层内部的张量分片</td><td>“负责 Attention 层”</td></tr>
+        <tr><td>operator tiling</td><td>算子 tiling / kernel blocking（算子分块）</td><td><code>local tile 128×64</code></td><td>单个 kernel 内对当前 rank 局部 tensor 的计算与访存分块</td><td>当成跨 rank 的 TP 切分</td></tr>
+        <tr><td>fused op</td><td>fused operator（融合算子）</td><td><code>fused swiglu</code></td><td>把多个局部算子合并以减少访存和调度开销</td><td>跨 PP stage 做本地融合</td></tr>
         <tr><td>SP</td><td>Sequence Parallel（序列并行）</td><td><code>sequence shard 1/4</code></td><td>当前处理的序列片段</td><td>“承载第 20 层”</td></tr>
         <tr><td>CP</td><td>Context Parallel（上下文并行）</td><td><code>context shard 1/4</code></td><td>当前处理的上下文窗口分片</td><td>“承载第 20 层”</td></tr>
         <tr><td>EP</td><td>Expert Parallel（专家并行）</td><td><code>experts 152-159</code></td><td>该 rank 持有的专家或专家分片</td><td>“负责整个 MoE 层”</td></tr>
+        <tr><td>All-Reduce</td><td>collective all-reduce（集合归约并分发）</td><td><code>DP all-reduce · bucket 12</code></td><td>多 rank 先归约再让所有成员拿到结果，常用于梯度同步</td><td>当成普通点对点传输</td></tr>
+        <tr><td>All-Gather</td><td>collective all-gather（集合收集）</td><td><code>FSDP all-gather window</code></td><td>把各 rank 的分片收集成可计算的完整参数或激活片段</td><td>说成模型常驻完整副本</td></tr>
+        <tr><td>Reduce-Scatter</td><td>collective reduce-scatter（归约后分片散发）</td><td><code>grad reduce-scatter</code></td><td>归约结果按 shard 分回各 rank，常见于状态 / 梯度分片训练</td><td>说成一次完整广播</td></tr>
+        <tr><td>reshard</td><td>resharding（重切分 / 重分片）</td><td><code>tp layout → sp layout</code></td><td>把 tensor 从一种并行布局转换为另一种布局</td><td>忽略布局转换成本</td></tr>
+        <tr><td>All-to-All</td><td>collective all-to-all（多对多交换）</td><td><code>MoE dispatch all-to-all</code></td><td>各 rank 互相发送不同 token bucket，常见于 EP / MoE dispatch 和 combine</td><td>当成稳定均匀流量</td></tr>
+        <tr><td>Scale-Up / HBD</td><td>Scale-Up network / High-Bandwidth Domain（高带宽域）</td><td><code>tp_group in HBD-0</code></td><td>适合承载 TP、EP、P2P、高频低时延通信</td><td>把所有训练流量都塞进同一层网络</td></tr>
+        <tr><td>Scale-Out</td><td>Scale-Out network（跨高带宽域扩展网络）</td><td><code>dp_group cross HBD</code></td><td>适合 DP、跨 HBD 扩展、分层归约后的大流量同步</td><td>直接承载每层 TP 关键路径</td></tr>
+        <tr><td>Frontend</td><td>frontend / management network（前端 / 管理网络）</td><td><code>control / storage traffic</code></td><td>承载管理、存储、业务访问和控制面流量</td><td>承载训练关键路径 collective</td></tr>
+        <tr><td>communicationEvents</td><td>runtime communication events（运行时通信事件）</td><td><code>{type, group, bytes, latency, overlap, topologyDomain}</code></td><td>TrainScope 用于连接 placement、trace 和网络瓶颈的事件层</td><td>只保存静态 rank 坐标</td></tr>
+        <tr><td>unified IR</td><td>unified intermediate representation（统一中间表示）</td><td><code>{graph, layout, placement, state}</code></td><td>端到端优化需要的公共表示，用于连接算子、图、设备放置、layout 和状态生命周期</td><td>只用 UI 字段替代编译 / 运行时语义</td></tr>
         <tr><td>placementMap</td><td>runtime placement map（运行时放置映射）</td><td><code>{host, device, rank, pp, tp, dp, cp, ep}</code></td><td>TrainScope 的核心数据对象</td><td>只留 <code>rank ↔ node</code> 的 1:1 简化表</td></tr>
       </tbody>
     </table>
   </section>
 
   <section class="floor" id="evidence">
-    <div class="kicker">Evidence · 官方依据</div>
-    <h2>这份白皮书直接参考的官方文档</h2>
-    <p class="lead">以下资料分别定义了 DDP（DistributedDataParallel，分布式数据并行）、FSDP（Fully Sharded Data Parallel，全分片数据并行）、Pipeline Parallel（流水线并行）、Tensor Parallel（张量并行）、Sequence Parallel（序列并行）和 MoE Expert Parallel（专家并行）的官方或主流实现语义。</p>
+    <div class="kicker">Evidence · 依据边界</div>
+    <h2>这份白皮书直接参考的官方文档与补充资料</h2>
+    <p class="lead">以下资料分别定义了 DDP（DistributedDataParallel，分布式数据并行）、FSDP / ZeRO（状态分片）、Pipeline Parallel（流水线并行）、Tensor Parallel（张量并行）、Sequence Parallel（序列并行）、MoE Expert Parallel（专家并行）、fusion、communication overlap 和 MindSpeed 特性范围的官方或主流实现语义；用户提供的下载文章用于补充“这些并行方式在网络里发生什么”的工程归纳。</p>
     <table class="evidence-list">
       <thead>
         <tr><th>来源</th><th>对应章节</th><th>链接</th></tr>
       </thead>
       <tbody>
+        <tr>
+          <td>超节点技术深度篇三：大模型并行通信拆解</td>
+          <td>补充通信原语、网络分层、拓扑调度和仿真口径；作为工程归纳参考。</td>
+          <td><code>/Users/yin/Downloads/超节点技术深度篇三：大模型并行通信拆解：DP、TP、PP、EP、CP 到底在网络里发生了什么.html</code></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Parallelism Strategies Guide</td>
+          <td>定义 DP、TP、PP、CP、EP、FSDP 的作用对象和总设备数关系。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/parallelism-guide.html">https://docs.nvidia.com/megatron-core/developer-guide/latest/user-guide/parallelism-guide.html</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Tensor Parallel Layers</td>
+          <td>定义 TP 相关层：VocabParallelEmbedding、ColumnParallelLinear、RowParallelLinear 等。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/apidocs/core/core.tensor_parallel.layers.html">Megatron Core TP Layers</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Tensor Parallel Mappings</td>
+          <td>定义 TP 区域边界上的 split、gather、reduce 和集合通信映射。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/apidocs/core/core.tensor_parallel.mappings.html">Megatron Core TP Mappings</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Vocab Parallel Cross Entropy</td>
+          <td>说明 vocab-parallel cross entropy 处理按 TP 切分的 logits。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/apidocs/core/core.tensor_parallel.cross_entropy.html">Megatron Core TP Cross Entropy</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Pipeline Parallel API</td>
+          <td>定义 PP schedule、interleaving 和 stage 间 P2P 通信。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/pipeline_parallel.html">https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/pipeline_parallel.html</a></td>
+        </tr>
+        <tr>
+          <td>Megatron Core Fusions API</td>
+          <td>列出 fused softmax、cross entropy、layer norm、swiglu、bias-gelu 等局部融合算子。</td>
+          <td><a href="https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/core/fusions.html">https://docs.nvidia.com/megatron-core/developer-guide/latest/api-guide/core/fusions.html</a></td>
+        </tr>
+        <tr>
+          <td>Ascend MindSpeed README</td>
+          <td>说明 MindSpeed 覆盖 DP、TP、PP、VPP、SP、重计算、分布式优化器和通信重叠。</td>
+          <td><a href="https://github.com/Ascend/MindSpeed">https://github.com/Ascend/MindSpeed</a></td>
+        </tr>
+        <tr>
+          <td>Ascend MindSpeed-LLM Features</td>
+          <td>列出 SPTD、长序列、MoE EP、显存、融合算子和通信优化特性。</td>
+          <td><a href="https://github.com/Ascend/MindSpeed-LLM/blob/master/docs/zh/pytorch/features/README.md">https://github.com/Ascend/MindSpeed-LLM/blob/master/docs/zh/pytorch/features/README.md</a></td>
+        </tr>
         <tr>
           <td>openPangu-Ultra-MoE-718B config</td>
           <td>盘古公开结构参数：<code>num_hidden_layers=61</code>、<code>hidden_size=7680</code>、<code>n_routed_experts=256</code>、<code>num_experts_per_tok=8</code></td>
@@ -1596,7 +2012,7 @@
         </tr>
         <tr>
           <td>Hugging Face Transformers Model Outputs</td>
-          <td><code>hidden_states</code> 是 embedding 输出和每层输出组成的 runtime tensor 序列，形状为 <code>(batch_size, sequence_length, hidden_size)</code></td>
+          <td><code>hidden_states</code> 是 embedding 输出和每层输出组成的 runtime tensor 序列。</td>
           <td><a href="https://huggingface.co/docs/transformers/main_classes/output">https://huggingface.co/docs/transformers/main_classes/output</a></td>
         </tr>
         <tr>
@@ -1621,7 +2037,7 @@
         </tr>
         <tr>
           <td>PyTorch Tensor Parallelism</td>
-          <td>TP / SP（Tensor Parallel / Sequence Parallel，张量并行 / 序列并行）：ColwiseParallel、RowwiseParallel、SequenceParallel</td>
+          <td>TP / SP：ColwiseParallel、RowwiseParallel、SequenceParallel</td>
           <td><a href="https://docs.pytorch.org/docs/2.12/distributed.tensor.parallel.html">https://docs.pytorch.org/docs/2.12/distributed.tensor.parallel.html</a></td>
         </tr>
         <tr>
@@ -1636,7 +2052,7 @@
         </tr>
         <tr>
           <td>MindSpore Transformers 分布式并行训练</td>
-          <td>官方说明多种并行模式可以组合成混合并行策略，并分别描述 DP（Data Parallel，数据并行）、模型/TP、长序列/CP 和 PP（Pipeline Parallel，流水线并行）的语义</td>
+          <td>说明 DP、模型/TP、长序列/CP、PP 可组合为混合并行策略</td>
           <td><a href="https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/parallel_training.html">https://www.mindspore.cn/mindformers/docs/zh-CN/master/feature/parallel_training.html</a></td>
         </tr>
         <tr>
