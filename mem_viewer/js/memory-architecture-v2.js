@@ -16,12 +16,8 @@ let helper = null;
 let stageEl = null;
 let overlay = null;
 let hover = null;
-let resizeObserver = null;
+let zoomController = null;
 let currentStep = 0;
-let fitFrame = 0;
-let lastResizeWidth = 0;
-let lastFitWidth = 0;
-let lastAppliedScale = 0;
 
 function hexToRgba(hex, alpha) {
   if (!hex || hex.startsWith('rgb')) return hex || `rgba(255,255,255,${alpha})`;
@@ -271,63 +267,6 @@ function initTensorTooltip() {
   });
 }
 
-function getArchitectureAvailableWidth() {
-  const panel = document.getElementById('bottom-panel');
-  const shell = document.getElementById('arch-diagram');
-  const target = panel || shell;
-  if (!target) return 360;
-  const rect = target.getBoundingClientRect();
-  const styles = window.getComputedStyle(target);
-  const paddingX = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
-  return Math.max(360, Math.round(rect.width - paddingX - 24));
-}
-
-function fitArchitecture(force = false) {
-  const archRoot = root();
-  const shell = document.getElementById('arch-diagram');
-  if (!helper || !stageEl || !archRoot || !shell) return;
-  const availableWidth = getArchitectureAvailableWidth();
-  const naturalWidth = Math.max(1, archRoot.offsetWidth || archRoot.getBoundingClientRect().width);
-  const scale = Math.max(0.42, Math.min(0.84, availableWidth / naturalWidth));
-  const widthChanged = Math.abs(availableWidth - lastFitWidth) >= 2;
-  const scaleChanged = Math.abs(scale - lastAppliedScale) >= 0.005;
-
-  if (force || widthChanged || scaleChanged) {
-    helper.applyCanvasScale(stageEl, scale);
-    lastFitWidth = availableWidth;
-    lastAppliedScale = scale;
-    overlay?.update?.();
-  }
-
-  const readout = document.getElementById('arch-fit-readout');
-  if (readout) readout.textContent = `fit ${Math.round(scale * 100)}%`;
-}
-
-function scheduleFit(force = false) {
-  window.cancelAnimationFrame(fitFrame);
-  fitFrame = window.requestAnimationFrame(() => {
-    fitArchitecture(force);
-  });
-}
-
-function scheduleFitForResize(entries) {
-  const entry = entries?.[0];
-  const inlineSize = entry?.borderBoxSize?.[0]?.inlineSize
-    ?? entry?.borderBoxSize?.inlineSize
-    ?? entry?.target?.getBoundingClientRect?.().width
-    ?? entry?.contentRect?.width
-    ?? document.getElementById('bottom-panel')?.clientWidth
-    ?? 0;
-  const nextWidth = Math.round(inlineSize);
-  if (!nextWidth) {
-    scheduleFit();
-    return;
-  }
-  if (lastResizeWidth && Math.abs(nextWidth - lastResizeWidth) < 2) return;
-  lastResizeWidth = nextWidth;
-  scheduleFit(true);
-}
-
 function showMissingRenderer() {
   if (!stageEl) return;
   stageEl.innerHTML = '<div class="mv-v2-arch-error">Memory architecture renderer unavailable.</div>';
@@ -343,10 +282,7 @@ export function initMemoryArchitectureV2() {
 
   hover?.destroy?.();
   overlay?.destroy?.();
-  resizeObserver?.disconnect?.();
-  lastResizeWidth = 0;
-  lastFitWidth = 0;
-  lastAppliedScale = 0;
+  zoomController?.destroy?.();
 
   helper.renderArchitecture(stageEl, ARCH_PRESET);
   stageEl.classList.add('mv-v2-memory-arch');
@@ -356,15 +292,31 @@ export function initMemoryArchitectureV2() {
   ensureBufferChrome();
   initTensorTooltip();
 
-  const resizeTarget = document.getElementById('bottom-panel');
-  resizeObserver = typeof ResizeObserver === 'function'
-    ? new ResizeObserver(scheduleFitForResize)
-    : null;
-  if (resizeObserver && resizeTarget) resizeObserver.observe(resizeTarget);
+  const shell = document.getElementById('arch-diagram');
+  zoomController = helper.createZoomController?.({
+    root: shell,
+    viewport: shell?.querySelector('[data-pto-mem-arch-viewport]'),
+    sizer: shell?.querySelector('[data-pto-mem-arch-sizer]'),
+    canvas: shell?.querySelector('[data-pto-mem-arch-canvas]'),
+    defaultZoom: 0.6,
+    min: 0.35,
+    max: 1.6,
+    step: 0.1,
+    pan: true,
+    wheelZoom: true,
+    centerOnReset: true,
+    centerTarget: '.pto-mem950__rails, .pto-mem950__engine-stack, .pto-mem950__stack',
+    onZoom: ({ zoom }) => {
+      hover?.setViewportScale?.(zoom);
+      overlay?.render?.();
+    },
+    onPan: () => overlay?.render?.(),
+  });
 
   window.requestAnimationFrame(() => {
     overlay?.render?.();
-    fitArchitecture(true);
+    zoomController?.render?.();
+    zoomController?.center?.();
     renderMemoryArchitectureV2(currentStep);
   });
 }
