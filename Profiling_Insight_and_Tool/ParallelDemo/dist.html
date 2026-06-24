@@ -93,12 +93,23 @@
   .row{display:flex;align-items:center;justify-content:space-between;margin:7px 0;font-size:var(--font-size-body-sm)}
   .row label{display:flex;align-items:center;gap:var(--space-2);cursor:pointer}
   input[type=checkbox]{width:15px;height:15px;accent-color:var(--primary)}
+  input[type=radio]{width:14px;height:14px;accent-color:var(--primary);flex-shrink:0}
+
+  /* ── ResNet variant radio group ── */
+  .cnn-variant-group{display:flex;gap:var(--space-1);margin-top:var(--space-1)}
+  .cnn-variant-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:var(--font-size-body-sm);color:var(--foreground-secondary);background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:5px var(--space-2);cursor:pointer;user-select:none;white-space:nowrap;transition:border-color var(--duration-base),color var(--duration-base),background var(--duration-base)}
+  .cnn-variant-opt:hover{border-color:var(--border-strong)}
+  .cnn-variant-opt:has(input:checked){border-color:var(--primary);color:var(--primary);background:var(--tone-info-bg)}
 
   /* ── Inputs ── */
   .deg{width:54px;background:var(--surface-1);border:1px solid var(--border-default);color:var(--foreground);border-radius:var(--radius-sm);padding:3px var(--space-2);font-size:var(--font-size-body-sm);text-align:center}
   .deg:disabled{opacity:.35}
   select{width:100%;background:var(--surface-1);border:1px solid var(--border-default);color:var(--foreground);border-radius:var(--radius-sm);padding:5px var(--space-2);font-size:var(--font-size-body-sm)}
-  #libSelect{width:auto;cursor:pointer;font-weight:var(--font-weight-semibold);padding:3px var(--space-3);border-color:var(--border-strong)}
+  /* ── Header repo switch: pill tabs (Transformer / CNN) ── */
+  .lib-tabs{display:inline-flex;gap:3px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--radius-pill);padding:3px}
+  .lib-tab{font-size:var(--font-size-body-sm);font-weight:var(--font-weight-semibold);padding:3px var(--space-3);border:none;border-radius:var(--radius-pill);background:transparent;color:var(--foreground-muted);cursor:pointer;transition:color var(--duration-base),background var(--duration-base)}
+  .lib-tab:hover{color:var(--foreground)}
+  .lib-tab.on{background:var(--primary);color:#fff}
   input[type=range]{width:100%;accent-color:var(--primary)}
   .slabel{display:flex;justify-content:space-between;font-size:var(--font-size-body-sm);color:var(--foreground-secondary);margin-top:var(--space-2)}
   .slabel b{color:var(--foreground)}
@@ -146,6 +157,11 @@
   .wdiag-lb-moe{border-color:rgba(255,75,123,.55);color:rgba(255,75,123,.9)}
   .wdiag-lb-norm{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.5)}
   .wdiag-lb-head{border-color:rgba(155,123,255,.6);color:rgba(155,123,255,.9)}
+  /* DATA-VIZ: CNN layer type color encoding (stem/res/pool/fc) */
+  .wdiag-lb-stem{border-color:rgba(232,201,90,.6);color:rgba(232,201,90,.9)}
+  .wdiag-lb-res{border-color:rgba(67,105,239,.55);color:rgba(67,105,239,.9)}
+  .wdiag-lb-pool{border-color:rgba(4,215,147,.55);color:rgba(4,215,147,.9)}
+  .wdiag-lb-fc{border-color:rgba(155,123,255,.6);color:rgba(155,123,255,.9)}
   .wdiag-card.af{border-color:rgba(4,215,147,.0)}
   @keyframes ppArrow{0%{opacity:.25}100%{opacity:.85}}
   .wdiag-pp-arr.af{animation:ppArrow .3s ease forwards;color:var(--success)!important;opacity:.85!important}
@@ -297,6 +313,12 @@
   .tip-desc{color:var(--foreground-secondary);margin-bottom:7px;font-size:var(--font-size-label-xs);line-height:1.65}
   .tip-ops-hdr{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--foreground-muted);margin-bottom:3px;font-weight:700}
   .tip-op{font-size:var(--font-size-label-xs);padding:1px 0;color:var(--foreground-muted);display:flex;align-items:baseline;gap:var(--space-1);flex-wrap:wrap}
+  /* ── 整网算子图 节点科普气泡：分类徽标（颜色对应 dag-n 四类节点）── */
+  .tip-cat{display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:var(--radius-pill);margin-bottom:6px;letter-spacing:.02em}
+  .tip-cat.op{background:rgba(67,105,239,.16);color:#8aabf7}
+  .tip-cat.w{background:rgba(255,170,59,.14);color:var(--warning)}
+  .tip-cat.comm{background:rgba(4,215,147,.14);color:var(--success)}
+  .tip-cat.act{background:rgba(155,123,255,.14);color:var(--dv-purple)}
 
   /* ── Operator DAG (layer tooltip hover) ── */
   #wdiagTip{width:auto;min-width:272px;max-width:305px}
@@ -365,7 +387,7 @@
 
   /* ── Model structure mini-diagram (横向流程卡片) ── */
   .mdiag{margin:var(--space-3) 0 var(--space-1);display:flex;flex-wrap:wrap;align-items:stretch;gap:5px}
-  .mdiag-card{border:1px solid var(--border-default);border-radius:var(--radius-sm);padding:5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;background:var(--surface-1)}
+  .mdiag-card{border:1px solid var(--border-default);border-radius:var(--radius-sm);padding:5px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;background:var(--surface-1);cursor:help}
   .mdiag-card-lab{font-size:9px;font-weight:700;letter-spacing:.03em;line-height:1.2;text-align:center;white-space:nowrap}
   /* DATA-VIZ: layer type color encoding (matches topology diagram) */
   .mdiag-emb{border-color:rgba(232,201,90,.55)}  .mdiag-emb  .mdiag-card-lab{color:var(--dv-yellow)}
@@ -375,10 +397,16 @@
   .mdiag-blk{border-color:var(--border-strong);padding:4px;gap:3px;cursor:help}
   .mdiag-blk-lab{font-size:8px;color:var(--foreground-muted);font-weight:700;line-height:1;letter-spacing:.04em}
   .mdiag-blk-cells{display:flex;flex-direction:column;gap:2px;width:100%}
-  .mdiag-cell{font-size:8px;font-weight:700;text-align:center;border-radius:3px;padding:2px 6px;line-height:1.3;white-space:nowrap}
+  .mdiag-cell{font-size:8px;font-weight:700;text-align:center;border-radius:3px;padding:2px 6px;line-height:1.3;white-space:nowrap;cursor:help}
   .mdiag-cell-attn{background:rgba(67,105,239,.16);color:#8aabf7;border:1px solid rgba(67,105,239,.4)}
   .mdiag-cell-mlp{background:rgba(4,215,147,.14);color:var(--success);border:1px solid rgba(4,215,147,.4)}
   .mdiag-cell-moe{background:rgba(255,75,123,.14);color:var(--danger);border:1px solid rgba(255,75,123,.4)}
+  /* CNN mini-diagram cells */
+  .mdiag-stem{border-color:rgba(232,201,90,.55)} .mdiag-stem .mdiag-card-lab{color:var(--dv-yellow)}
+  .mdiag-pool{border-color:rgba(4,215,147,.5)}   .mdiag-pool .mdiag-card-lab{color:var(--success)}
+  .mdiag-fc{border-color:rgba(155,123,255,.55)}  .mdiag-fc .mdiag-card-lab{color:var(--dv-purple)}
+  .mdiag-cell-res{background:rgba(67,105,239,.16);color:#8aabf7;border:1px solid rgba(67,105,239,.4)}
+  .mdiag-cell-btnk{background:rgba(255,170,59,.14);color:var(--warning);border:1px solid rgba(255,170,59,.4)}
 </style>
 </head>
 <body>
@@ -390,10 +418,10 @@
     </svg>
   </a>
   <h1>🧩 并行训练可视化 Demo</h1>
-  <select id="libSelect">
-    <option value="picotron">picotron</option>
-    <option value="torchtitan">torchtitan</option>
-  </select>
+  <div class="lib-tabs" id="libTabs">
+    <button class="lib-tab on" data-lib="picotron">Transformer</button>
+    <button class="lib-tab" data-lib="pytorch-cifar">CNN</button>
+  </div>
   <span class="sub" id="headerSub">基于 huggingface/picotron 真实逻辑</span>
 </header>
 <div class="app">
@@ -401,35 +429,47 @@
   <div class="col" id="ctrl">
     <div class="h2row"><h2>控制器</h2><button class="reset" id="resetBtn">↺ 复原</button></div>
     <div class="group">
-      <div class="gh">并行模式 <span class="pill">(picotron 网格 dp×pp×cp×tp)</span></div>
+      <div class="gh">并行模式 <span class="pill" id="parallelPill">(picotron 网格 dp×pp×cp×tp)</span></div>
       <div class="row"><label><input type="checkbox" id="enDP" data-tab="launch" checked> 数据并行 DP</label><input class="deg" type="number" id="dp" data-tab="launch" min="1" max="8" value="1"></div>
       <input type="range" class="par-slider" id="dpSlider" min="1" max="8" value="1">
       <div class="para-hint" id="hintDP"></div>
       <div class="row"><label><input type="checkbox" id="enPP" data-tab="launch" checked> 流水线并行 PP</label><input class="deg" type="number" id="pp" data-tab="launch" min="1" max="8" value="2"></div>
       <input type="range" class="par-slider" id="ppSlider" min="1" max="8" value="2">
       <div class="para-hint" id="hintPP"></div>
-      <div class="row"><label><input type="checkbox" id="enCP" data-tab="launch"> 上下文并行 CP</label><input class="deg" type="number" id="cp" data-tab="launch" min="1" max="8" value="2" disabled></div>
-      <input type="range" class="par-slider" id="cpSlider" min="1" max="8" value="2" disabled>
-      <div class="para-hint" id="hintCP"></div>
-      <div class="row"><label><input type="checkbox" id="enTP" data-tab="launch" checked> 张量并行 TP</label><input class="deg" type="number" id="tp" data-tab="launch" min="1" max="8" value="2"></div>
-      <input type="range" class="par-slider" id="tpSlider" min="1" max="8" value="2">
-      <div class="para-hint" id="hintTP"></div>
-      <div class="row"><label><input type="checkbox" id="enMoE" data-tab="launch"> MoE / 专家并行 EP</label><input class="deg" type="number" id="ep" data-tab="launch" min="1" max="8" value="2" disabled></div>
-      <input type="range" class="par-slider" id="epSlider" min="1" max="8" value="2" disabled>
-      <div class="para-hint" id="hintEP"></div>
-      <div class="slabel" id="expRow" style="display:none"><span>专家数 (每 MoE 层)</span><b id="vExperts">8</b></div>
-      <input type="range" id="experts" min="2" max="16" step="2" value="8" style="display:none">
-      <div class="para-hint" id="hintExperts"></div>
+      <div id="ctrlCP">
+        <div class="row"><label><input type="checkbox" id="enCP" data-tab="launch"> 上下文并行 CP</label><input class="deg" type="number" id="cp" data-tab="launch" min="1" max="8" value="2" disabled></div>
+        <input type="range" class="par-slider" id="cpSlider" min="1" max="8" value="2" disabled>
+        <div class="para-hint" id="hintCP"></div>
+      </div>
+      <div id="ctrlTP">
+        <div class="row"><label><input type="checkbox" id="enTP" data-tab="launch" checked> 张量并行 TP</label><input class="deg" type="number" id="tp" data-tab="launch" min="1" max="8" value="2"></div>
+        <input type="range" class="par-slider" id="tpSlider" min="1" max="8" value="2">
+        <div class="para-hint" id="hintTP"></div>
+      </div>
+      <div id="ctrlMoE">
+        <div class="row"><label><input type="checkbox" id="enMoE" data-tab="launch"> MoE / 专家并行 EP</label><input class="deg" type="number" id="ep" data-tab="launch" min="1" max="8" value="2" disabled></div>
+        <input type="range" class="par-slider" id="epSlider" min="1" max="8" value="2" disabled>
+        <div class="para-hint" id="hintEP"></div>
+        <div class="slabel" id="expRow" style="display:none"><span>专家数 (每 MoE 层)</span><b id="vExperts">8</b></div>
+        <input type="range" id="experts" min="2" max="16" step="2" value="8" style="display:none">
+        <div class="para-hint" id="hintExperts"></div>
+      </div>
       <div class="conclusion-box" id="parallelConclusion"></div>
     </div>
 
     <div class="group">
       <div class="gh">模型结构</div>
-      <div class="slabel"><span>Transformer 层数</span><b id="vBlocks">4</b></div>
+      <div class="slabel" id="cnnVariantRow" style="display:none"><span>ResNet 型号</span></div>
+      <div id="cnnVariant" class="cnn-variant-group" style="display:none">
+        <label class="cnn-variant-opt"><input type="radio" name="cnnVariant" value="ResNet-18" checked> ResNet-18</label>
+        <label class="cnn-variant-opt"><input type="radio" name="cnnVariant" value="ResNet-34"> ResNet-34</label>
+        <label class="cnn-variant-opt"><input type="radio" name="cnnVariant" value="ResNet-50"> ResNet-50</label>
+      </div>
+      <div class="slabel" id="txBlocksRow"><span>Transformer 层数</span><b id="vBlocks">4</b></div>
       <input type="range" id="blocks" data-tab="launch" min="1" max="12" value="4">
       <div id="modelDiagram"></div>
       <div class="para-hint" id="hintBlocks"></div>
-      <div class="slabel"><span>hidden size</span><b id="vHidden">4096</b></div>
+      <div class="slabel" id="txHiddenRow"><span>hidden size</span><b id="vHidden">4096</b></div>
       <input type="range" id="hidden" min="1024" max="8192" step="512" value="4096">
       <div class="para-hint" id="hintHidden"></div>
     </div>
@@ -535,10 +575,17 @@
 </div>
 
 <div id="wdiagTip"></div>
+<script src="cnn_model.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const state = {};
 let currentLib = 'picotron';
+
+// =================== CNN helpers ===================
+// CNN(pytorch-cifar)模式:只用 DP + PP,不适用 TP/CP/MoE。层数据来自 cnn_model.js。
+function isCNN(){ return currentLib==='pytorch-cifar'; }
+function cnnVariant(){ const el=document.querySelector('input[name="cnnVariant"]:checked'); return el && el.value ? el.value : (typeof CNN_DEFAULT!=='undefined'?CNN_DEFAULT:'ResNet-18'); }
+function cnnAllLayers(){ return buildCnnLayers(cnnVariant()); }
 
 // =================== STATE ===================
 function readState(){
@@ -551,6 +598,13 @@ function readState(){
   const tile=document.querySelector('.card-tile.selected'); state.cardType=tile?tile.dataset.name:'NVIDIA H100 80GB'; state.cardGB=tile?+tile.dataset.gb:80;
   state.batch=+$('batch').value; state.steps=+$('steps').value;
   state.lr=Math.pow(10,-6+(+$('lr').value/100)*4);
+  // CNN:强制关闭 TP/CP/MoE,层数取 ResNet 总层段数,供 PP 分段与 hint 使用
+  if(isCNN()){
+    state.enCP=false; state.enTP=false; state.enMoE=false;
+    state.cp=1; state.tp=1; state.ep=1;
+    state.cnnVariant=cnnVariant();
+    state.blocks=cnnAllLayers().length;
+  }
   state.world=state.dp*state.pp*state.cp*state.tp;
 }
 
@@ -571,6 +625,12 @@ const TENSOR_ICON=`<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" w
 
 function cardLayerHTML(p, t){
   const layers=stageLayers(p), tp=state.tp;
+  // CNN:每个 block 一格,无 TP 列/行切,直接显示层名 + kind 配色。
+  if(isCNN()){
+    return layers.map(l=>
+      `<div class="wdiag-layer-box wdiag-lb-${l.kind}" data-kind="${l.kind}" data-bi="" data-p="${p}" data-t="${t}">${TENSOR_ICON}${l.name}</div>`
+    ).join('');
+  }
   return layers.map(l=>{
     const m=l.name.match(/Block (\d+)/), bi=m?m[1]:'';
     let label;
@@ -670,13 +730,16 @@ function renderWorldDiagram(){
 
 // picotron distribute_layers: 连续块均分，前面的 rank 多拿余数
 function distributeLayers(){
-  const pp=state.pp,N=state.blocks;
+  const pp=state.pp;
+  const N=isCNN()?cnnAllLayers().length:state.blocks;
   const per=[]; for(let i=0;i<pp;i++) per.push(Math.floor(N/pp)+(i<N%pp?1:0));
   const ranges=[]; let start=0;
   for(let i=0;i<pp;i++){ranges.push([start,start+per[i]]); start+=per[i];}
   return ranges; // ranges[pp_rank] = [startLayer, endLayer)
 }
 function stageLayers(p){
+  // CNN:层数据来自 cnn_model.js（块级 {kind,name,ops}），按 PP 连续切段。
+  if(isCNN()) return cnnStageLayers(cnnAllLayers(), p, state.pp);
   const [s,e]=distributeLayers()[p]; const layers=[];
   if(p===0) layers.push({kind:'emb',name:'Embedding'});
   for(let i=s;i<e;i++){
@@ -724,6 +787,7 @@ function opsForLayer(layer,t){
 
 // 每卡显存估算（权重+Adam优化器态，混合精度约 16 B/param）
 function cardMemGB(p,t){
+  if(isCNN()) return cnnCardMemGB(stageLayers(p)); // CNN:按卷积/bn 参数量估算
   const H=state.hidden, V=32000, B=16; // bytes/param
   let params=0;
   for(const l of stageLayers(p)){
@@ -740,6 +804,19 @@ function cardMemGB(p,t){
 
 // =================== MEM TOOLTIP CONTENT ===================
 function memTooltipHTML(p,t){
+  // CNN:逐 block 列出卷积/bn 参数量(无 TP 切分)
+  if(isCNN()){
+    const layers=stageLayers(p);
+    const rows=layers.map(l=>{
+      const gb=cnnCardMemGB([l]);
+      return `<div style="display:flex;justify-content:space-between;gap:10px"><span>${l.name}</span><span style="opacity:.7">${(gb*1e3).toFixed(1)} MB</span></div>`;
+    }).join('');
+    const total=cnnCardMemGB(layers);
+    return `<div style="font-weight:600;margin-bottom:6px">Stage ${p} · ${cnnVariant()}（本段 ${layers.length} 个 block）</div>`+
+      rows+
+      `<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px;display:flex;justify-content:space-between"><b>合计权重</b><b>${total.toFixed(3)} GB</b></div>`+
+      `<div style="opacity:.55;margin-top:4px">仅卷积+BN 权重(混合精度≈16 B/param);DP 下每卡完整复制,PP 下只持有本 stage。</div>`;
+  }
   const H=state.hidden,V=32000,B=16,tp=state.tp;
   const rows=[];let total=0;
   for(const l of stageLayers(p)){
@@ -1023,261 +1100,141 @@ torchrun --nproc_per_node=${world} train.py --config ./tmp/my_run/config.json
     } },
 };
 
-// =================== 真实源码（来自 torchtitan 仓库） ===================
-const SOURCES_TORCHTITAN={
-  pgm:{ label:'device_mesh.py', file:'torchtitan/parallelisms/parallelize_llama.py',
-    code(s){
-      return `# torchtitan: init_device_mesh = picotron ProcessGroupManager.grid 的 PyTorch 原生写法
-# 同样把 world_size 张卡 reshape 成 dp×pp×cp×tp 多维网格，每个维度是一个 process group
-from torch.distributed.device_mesh import init_device_mesh
-
-# 建立 ${s.dp}×${s.pp}×${s.cp}×${s.tp} = ${s.world} 卡网格（等价于 picotron grid.view）
-device_mesh = init_device_mesh(
-    "cuda",
-    mesh_shape=(${s.dp}, ${s.pp}, ${s.cp}, ${s.tp}),
-    mesh_dim_names=("dp", "pp", "cp", "tp"),
-)
-
-# 沿各维取出子网格（等价于 picotron new_subgroups_by_enumeration）
-tp_mesh = device_mesh["tp"]   # 张量并行子组（${s.tp} 卡）
-pp_mesh = device_mesh["pp"]   # 流水线并行子组（${s.pp} 卡）
-cp_mesh = device_mesh["cp"]   # 上下文并行子组（${s.cp} 卡）
-dp_mesh = device_mesh["dp"]   # 数据并行子组（${s.dp} 卡，供 FSDP2 使用）
-
-# 本卡在各维度的坐标（等价于 picotron dp_rank / pp_rank / cp_rank / tp_rank）
-tp_rank = tp_mesh.get_local_rank()
-pp_rank = pp_mesh.get_local_rank()
-cp_rank = cp_mesh.get_local_rank()
-dp_rank = dp_mesh.get_local_rank()
-
-# 流水线相邻 rank（P2P 通信对象；等价于 picotron pp_next_rank / pp_prev_rank）
-pp_next = pp_rank + 1 if pp_rank < ${s.pp} - 1 else None
-pp_prev = pp_rank - 1 if pp_rank > 0 else None`;
-    },
-    hl(s){
-      const m=['init_device_mesh','device_mesh','mesh_shape'];
-      if(s.tp>1)m.push('tp_mesh');
-      if(s.pp>1)m.push('pp_mesh','pp_next','pp_prev');
-      if(s.dp>1)m.push('dp_mesh');
-      if(s.cp>1)m.push('cp_mesh');
-      return m;
-    }
-  },
-
-  tp:{ label:'parallelize_llama.py', file:'torchtitan/parallelisms/parallelize_llama.py',
+// =================== 真实源码（来自 kuangliu/pytorch-cifar 等，CNN 视图） ===================
+const CNN_SOURCES={
+  resnet:{ label:'models/resnet.py', file:'models/resnet.py',
     code:
-`# torchtitan: apply_tp() — DTensor placement 替代 picotron ColumnParallelLinear/RowParallelLinear
-# ColwiseParallel ≡ ColumnParallel（Shard 输出维）
-# RowwiseParallel  ≡ RowParallel  （Shard 输入维 → all-reduce 汇总）
-from torch.distributed.tensor.parallel import (
-    ColwiseParallel, RowwiseParallel, SequenceParallel, parallelize_module,
-)
-from torch.distributed.tensor import Replicate, Shard
+`import torch.nn as nn
+import torch.nn.functional as F
 
-parallelize_module(model, tp_mesh, {
-    # Embedding：词表按行切（VocabParallel），输出按序列维切片
-    "tok_embeddings": RowwiseParallel(
-        input_layouts=Replicate(), output_layouts=Shard(1)
-    ),
-    # Attention QKV：列切（Column → Shard 输出维）
-    "layers.{i}.attention.wq": ColwiseParallel(),
-    "layers.{i}.attention.wk": ColwiseParallel(),
-    "layers.{i}.attention.wv": ColwiseParallel(),
-    # Attention Out：行切（Row → Shard 输入维 → all-reduce 汇总输出）
-    "layers.{i}.attention.wo": RowwiseParallel(),
-    # FFN：up/gate 列切，down 行切（等价于 picotron up_proj 列 / down_proj 行）
-    "layers.{i}.feed_forward.w1": ColwiseParallel(),
-    "layers.{i}.feed_forward.w3": ColwiseParallel(),
-    "layers.{i}.feed_forward.w2": RowwiseParallel(),
-    # LM Head：列切，输出全量复制（等价于 picotron VocabParallelLinear）
-    "output": ColwiseParallel(output_layouts=Replicate()),
-})`,
-    hl(s){
-      if(s.tp>1) return ['ColwiseParallel','RowwiseParallel','parallelize_module','Shard','Replicate','all-reduce'];
-      return ['parallelize_module','ColwiseParallel','RowwiseParallel'];
-    }
-  },
+class BasicBlock(nn.Module):          # ResNet-18/34 用
+    expansion = 1
+    def __init__(self, in_planes, planes, stride=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, 3, stride, padding=1, bias=False)
+        self.bn1   = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, 3, 1, padding=1, bias=False)
+        self.bn2   = nn.BatchNorm2d(planes)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != planes:      # 下采样/通道变化 → 1x1 投影
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, planes, 1, stride, bias=False),
+                nn.BatchNorm2d(planes))
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += self.shortcut(x)                     # 残差相加
+        return F.relu(out)
 
-  pp:{ label:'pipeline_llama.py', file:'torchtitan/parallelisms/pipeline_llama.py',
-    code(s){
-      const pp=s.pp,N=s.blocks;
-      const per=[]; for(let i=0;i<pp;i++) per.push(Math.floor(N/pp)+(i<N%pp?1:0));
-      const exStages=per.map((n,i)=>{const st=per.slice(0,i).reduce((a,b)=>a+b,0);return `#   stage ${i}: layers ${st}..${n>0?st+n-1:st}  (${n} 层)`;}).join('\n');
-      return `# torchtitan: pipeline_llama_manual_split() — PipelineStage + Schedule
-# 用 torch.distributed.pipelining 替代 picotron 的手写 1F1B P2P 通信
-from torch.distributed.pipelining import PipelineStage, ScheduleGPipe
-# from torch.distributed.pipelining import Schedule1F1B  # 更低 bubble rate
+class Bottleneck(nn.Module):          # ResNet-50 用
+    expansion = 4
+    def __init__(self, in_planes, planes, stride=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_planes, planes, 1, bias=False)
+        self.bn1   = nn.BatchNorm2d(planes)
+        self.conv2 = nn.Conv2d(planes, planes, 3, stride, padding=1, bias=False)
+        self.bn2   = nn.BatchNorm2d(planes)
+        self.conv3 = nn.Conv2d(planes, self.expansion*planes, 1, bias=False)
+        self.bn3   = nn.BatchNorm2d(self.expansion*planes)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion*planes:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_planes, self.expansion*planes, 1, stride, bias=False),
+                nn.BatchNorm2d(self.expansion*planes))
 
-# ── 层分配（与 picotron distribute_layers 相同的均分逻辑）──
-# layers_per_stage = [${per.join(', ')}]  (num_layers=${N}, pp_degree=${pp})
-${exStages}
-stage_idx   = pp_mesh.get_local_rank()
-stage_start = sum(layers_per_stage[:stage_idx])
-stage_module = nn.Sequential(
-    *model.layers[stage_start : stage_start + layers_per_stage[stage_idx]]
-)
+class ResNet(nn.Module):
+    def __init__(self, block, num_blocks, num_classes=10):
+        super().__init__()
+        self.in_planes = 64
+        self.conv1 = nn.Conv2d(3, 64, 3, 1, padding=1, bias=False)   # CIFAR: 3x3 stem
+        self.bn1   = nn.BatchNorm2d(64)
+        self.layer1 = self._make_layer(block, 64,  num_blocks[0], 1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], 2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], 2)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], 2)
+        self.linear = nn.Linear(512*block.expansion, num_classes)
+    def _make_layer(self, block, planes, n, stride):
+        strides = [stride] + [1]*(n-1)              # 仅首块可能下采样
+        layers = []
+        for s in strides:
+            layers.append(block(self.in_planes, planes, s))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.layer1(out); out = self.layer2(out)
+        out = self.layer3(out); out = self.layer4(out)
+        out = F.avg_pool2d(out, 4).flatten(1)
+        return self.linear(out)
 
-stage = PipelineStage(
-    submodule=stage_module,
-    stage_index=stage_idx,
-    num_stages=${pp},
-    device=device,
-    input_args=(sample_input,),  # 用于 tracing 推断 tensor shape
-)
-
-# GPipe：先做所有前向再做反向（简单实现）
-schedule = ScheduleGPipe(stage, n_microbatches=n_microbatches)
-# schedule = Schedule1F1B(stage, n_microbatches=n_microbatches)  # 更省 bubble
-
-# 每步只需一行（schedule 内部处理 P2P send/recv）
-schedule.step(data)`;
-    },
-    hl(s){
-      const base=['PipelineStage','layers_per_stage','stage_idx',`num_stages=${s.pp}`];
-      if(s.pp>1) return [...base,'ScheduleGPipe','Schedule1F1B','schedule.step'];
-      return base;
-    }
-  },
-
-  dp:{ label:'train.py (FSDP2)', file:'torchtitan/train.py',
+def ResNet18(): return ResNet(BasicBlock,  [2,2,2,2])
+def ResNet34(): return ResNet(BasicBlock,  [3,4,6,3])
+def ResNet50(): return ResNet(Bottleneck,  [3,4,6,3])`,
+    hl:(s)=>{
+      const v=s.cnnVariant||'ResNet-18';
+      if(v==='ResNet-50') return ['class Bottleneck','def ResNet50'];
+      if(v==='ResNet-34') return ['class BasicBlock','def ResNet34'];
+      return ['class BasicBlock','def ResNet18'];
+    } },
+  train:{ label:'main.py (DDP 数据并行)', file:'main.py',
     code:
-`# torchtitan: FSDP2 数据并行
-# fully_shard 替代 picotron 的 DataParallelNaive + register_post_accumulate_grad_hook
-from torch.distributed._composable.fsdp import fully_shard, MixedPrecisionPolicy
+`import torch, torchvision
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
 
-mp_policy = MixedPrecisionPolicy(
-    param_dtype=torch.bfloat16,
-    reduce_dtype=torch.float32,  # 梯度 all-reduce 用 fp32，防精度溢出
+# CIFAR-10：torchvision 自动下载，无需自备数据
+train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True,
+                                         transform=transform_train)
+
+# 数据并行：按 DP rank 把数据集切片，每卡只看自己那份
+sampler = DistributedSampler(train_set, num_replicas=world_size, rank=rank)
+loader  = torch.utils.data.DataLoader(train_set, batch_size=mbs, sampler=sampler)
+
+model = ResNet18().cuda(rank)
+model = DDP(model, device_ids=[rank])        # 整模型在每卡复制
+
+for epoch in range(epochs):
+    sampler.set_epoch(epoch)                 # 每个 epoch 重新 shuffle 分片
+    for x, y in loader:
+        loss = F.cross_entropy(model(x.cuda(rank)), y.cuda(rank))
+        loss.backward()                      # 反向后梯度自动 all-reduce 平均
+        optimizer.step(); optimizer.zero_grad()`,
+    hl:(s)=>{
+      const m=['ResNet'+ (s.cnnVariant||'').replace('ResNet-','')];
+      if(s.dp>1) return ['DistributedSampler','DDP(model','all-reduce','num_replicas=world_size'];
+      return ['train_set','model = ResNet'];
+    } },
+  pipe:{ label:'pipeline (torchgpipe)', file:'(torchgpipe / torch.distributed.pipeline)',
+    code:
+`from torchgpipe import GPipe
+import torch.nn as nn
+
+# 把 ResNet 摊平成 nn.Sequential，便于按层段切分
+model = nn.Sequential(
+    stem,            # conv1 + bn1 + relu
+    layer1, layer2,  # 残差块段
+    layer3, layer4,
+    pool_flatten, fc # avgpool + linear
 )
 
-# 逐 TransformerBlock wrap（逐层分片比整体 wrap 更省峰值显存）
-for layer in model.layers:
-    fully_shard(layer,
-        mesh=dp_mesh,
-        mp_policy=mp_policy,
-        reshard_after_forward=True,  # 前向后立即 free 参数分片，节省激活显存
-    )
-# wrap 整个模型外壳（optimizer state 也随之分片到 dp_mesh 各卡）
-fully_shard(model, mesh=dp_mesh, mp_policy=mp_policy)
-# FSDP2 在 backward 时自动对 dp_mesh 做 all-reduce，无需手动 hook
+# 流水线并行：balance 指定每段放几个子模块，devices 指定段→卡
+model = GPipe(model,
+              balance=[2, 2, 2, 1],   # 4 段 → 4 张卡（按 PP 度切分）
+              devices=[0, 1, 2, 3],
+              chunks=8)               # micro-batch 数（1F1B 流水）
 
-# 数据集切分（与 picotron 相同的 DistributedSampler 思路）
-sampler = DistributedSampler(dataset,
-    num_replicas=dp_mesh.size(),
-    rank=dp_mesh.get_local_rank())
-loader = DataLoader(dataset, batch_size=micro_batch, sampler=sampler)`,
-    hl(s){
-      const base=['DistributedSampler','DataLoader','dp_mesh'];
-      if(s.dp>1) return [...base,'fully_shard','all-reduce','reshard_after_forward','MixedPrecisionPolicy','num_replicas=dp_mesh.size()'];
-      return base;
-    }
-  },
-
-  launch:{ label:'llama3_8b.toml', file:'train_configs/llama3_8b.toml',
-    code(s){
-      const world=s.dp*s.pp*s.cp*s.tp;
-      const micro=Math.max(1,Math.floor(s.batch/(s.dp*s.cp)));
-      const lrStr=s.lr.toExponential(1);
-      return `# torchtitan 通过 TOML config 驱动训练（区别于 picotron 的 CLI flags）
-
-# 启动命令（nproc_per_node = dp×pp×cp×tp = ${world}）
-torchrun --nproc_per_node=${world} train.py \\
-    --job.config_file ./train_configs/llama3_8b.toml
-
-# ── train_configs/llama3_8b.toml ──
-[parallelism]
-tensor_parallel_degree   = ${s.tp}
-pipeline_parallel_degree = ${s.pp}
-context_parallel_degree  = ${s.cp}
-data_parallel_degree     = ${s.dp}
-data_parallel_type       = "fsdp2"
-
-[model]
-name       = "llama3"
-num_layers = ${s.blocks}
-dim        = ${s.hidden}${s.enMoE?`
-num_experts         = ${s.experts}
-num_experts_per_tok = 2`:''}
-
-[training]
-batch_size        = ${micro}
-global_batch_size = ${s.batch}
-learning_rate     = ${lrStr}
-steps             = ${s.steps}
-mixed_precision_param = "bfloat16"
-max_norm          = 1.0`;
-    },
-    hl(s){
-      const micro=Math.max(1,Math.floor(s.batch/(s.dp*s.cp)));
-      const lrStr=s.lr.toExponential(1);
-      const m=[
-        `tensor_parallel_degree   = ${s.tp}`,
-        `pipeline_parallel_degree = ${s.pp}`,
-        `context_parallel_degree  = ${s.cp}`,
-        `data_parallel_degree     = ${s.dp}`,
-        `num_layers = ${s.blocks}`,
-        `dim        = ${s.hidden}`,
-        `batch_size        = ${micro}`,
-        `global_batch_size = ${s.batch}`,
-        `learning_rate     = ${lrStr}`,
-        `steps             = ${s.steps}`,
-      ];
-      if(s.enMoE) m.push(`num_experts         = ${s.experts}`);
-      return m;
-    }
-  },
-
-  moe:{ label:'moe_layer.py', file:'torchtitan/models/llama4/model.py',
-    code(s){
-      const E=s.experts,ep=s.ep,localE=ep>1?Math.ceil(E/ep):E;
-      return `# torchtitan: MoE + Expert Parallel（Llama4 / DeepSeek-V3 风格）
-# router → topk → all-to-all dispatch → 本地专家 FFN → all-to-all combine
-
-class MoEFeedForward(nn.Module):
-    def __init__(self, dim, n_experts=${E}, top_k=2, ep_mesh=None):
-        self.router  = nn.Linear(dim, n_experts, bias=False)  # 可学习门控权重矩阵
-        # Expert Parallel: 每卡仅存 ${localE} 个专家（${E} ÷ ep=${ep}）
-        local_n = n_experts // ep_mesh.size()   # = ${localE}
-        self.experts = nn.ModuleList(
-            [Expert(dim) for _ in range(local_n)]
-        )
-        self.ep_mesh = ep_mesh  # ep=${ep} 卡的 expert-parallel 子网格
-
-    def forward(self, x):  # x: (B×S, dim)
-        logits = self.router(x)                                 # (B×S, ${E})
-        scores, expert_ids = logits.topk(self.top_k, dim=-1)   # top-2
-        scores = F.softmax(scores, dim=-1)${ep>1?`
-
-        # all-to-all 分发：把 token 路由到持有对应专家的卡
-        x_disp, counts = all_to_all_dispatch(
-            x, expert_ids, self.ep_mesh
-        )   # 本卡接收需要自己 ${localE} 个专家处理的 token
-
-        # 本地专家计算（只跑 ${localE} 个专家的前向）
-        expert_out = torch.stack([
-            e(x_disp[i]) for i, e in enumerate(self.experts)
-        ])
-
-        # all-to-all 合并：结果按 token 原序回收
-        return all_to_all_combine(expert_out, counts, scores, self.ep_mesh)`:`
-
-        # ep=1：${E} 个专家全量复制在每张卡，无 all-to-all 路由
-        expert_out = torch.stack([
-            e(x) for e in self.experts
-        ])  # (${E}, B×S, dim)
-        # 用 scores 加权组合 top-2 专家的输出
-        idx = expert_ids.unsqueeze(-1).expand(-1, -1, x.size(-1))
-        return (expert_out.gather(0, idx) * scores.unsqueeze(-1)).sum(1)`}`;
-    },
-    hl(s){
-      const m=['MoEFeedForward','router','top_k','n_experts','Expert'];
-      if(s.ep>1) m.push(...['all_to_all_dispatch','all_to_all_combine','ep_mesh','local_n']);
-      if(s.enMoE) m.push('F.softmax','logits.topk');
-      return m;
-    }
-  },
+# 前向：激活值在相邻卡间 P2P 传递
+output = model(input)`,
+    hl:(s)=>{
+      if(s.pp>1) return ['GPipe(model','balance=','devices=','chunks=8'];
+      return ['nn.Sequential','model = nn.Sequential'];
+    } },
 };
-function currentSources(){ return currentLib==='torchtitan'?SOURCES_TORCHTITAN:SOURCES; }
+
+function currentSources(){
+  if(currentLib==='pytorch-cifar') return CNN_SOURCES;
+  return SOURCES;
+}
 
 let activeTab='pgm';
 
@@ -1315,12 +1272,12 @@ const SCROLL_HINT={
 };
 function renderCode(scrollToHl, scrollCtrlId){
   let src=currentSources()[activeTab];
-  if(!src){src=currentSources()['pgm'];activeTab='pgm';renderTabs();}
+  if(!src){const keys=Object.keys(currentSources());activeTab=keys[0];src=currentSources()[activeTab];renderTabs();}
   const marks=src.hl(state);
   const codeStr=typeof src.code==='function'?src.code(state):src.code;
   const lines=codeStr.split('\n');
-  const repoBase=currentLib==='torchtitan'
-    ?'https://github.com/pytorch/torchtitan/blob/main/'
+  const repoBase=currentLib==='pytorch-cifar'
+    ?'https://github.com/kuangliu/pytorch-cifar/blob/master/'
     :'https://github.com/huggingface/picotron/blob/main/';
   $('srcMeta').innerHTML=`<a href="${repoBase}${src.file}" target="_blank">${src.file}</a> · 高亮＝当前配置激活的代码`;
   const isBash=activeTab==='launch';
@@ -1463,7 +1420,7 @@ function renderHints(){
   hiddenEl.className='para-hint on';
   const H=s.hidden;
   const tpSuffix=s.tp>1?`，TP 后每卡各切 <b>1/${s.tp}</b>`:'';
-  hiddenEl.innerHTML=`Hidden size 是 Transformer 每层隐状态的向量维度（即模型宽度），每个 token 在模型内部始终以该维度的向量表示；当前 = <b>${H}</b>；`+
+  hiddenEl.innerHTML=`Hidden size 是 Transformer 每层隐状态的向量维度（即模型宽度），每个 token 在模型内部始终以该维度的向量表示；当前 = <b>${H}</b>，即每个 token 用 ${H} 个浮点数表示；维度越高，模型的<b>表示容量</b>越大、潜在能编码的语义差别越多（但能否真正用上取决于数据量与训练是否充分，且参数量、算力随之按约平方增长）；`+
     `Attention QKV Linear：<b>${H}×${H}</b>（每 Q/K/V）${tpSuffix}；`+
     `MLP up_proj：<b>${H}×${H*4}</b>${tpSuffix}`;
 
@@ -1787,6 +1744,11 @@ function layerDagHTML(kind, t, noHeader) {
   const cn   = () => `<span class="dag-conn">→</span>`;
   const erow = (...items) => `<div class="dag-erow">${items.join('')}</div>`;
   let h = noHeader ? '' : `<div class="dag-hdr">算子图</div>`;
+  // CNN block 算子图(无 TP 切分)
+  if(kind==='stem'){ h+=sh('img [B,3,32,32]');h+=arr();h+=erow(wN('conv1','3→64 3×3'),cn(),opN('BN'),cn(),actN('ReLU'));h+=arr();h+=sh('act [B,64,32,32]'); return h; }
+  if(kind==='res'){ h+=sh('x');h+=arr();h+=erow(wN('conv','3×3'),cn(),opN('BN'),cn(),actN('ReLU'));h+=arr();h+=erow(wN('conv','3×3'),cn(),opN('BN'));h+=arr();h+=opN('+ shortcut');h+=arr();h+=actN('ReLU');h+=arr();h+=sh('out'); return h; }
+  if(kind==='pool'){ h+=sh('[B,C,4,4]');h+=arr();h+=opN('avg_pool2d(4) → flatten');h+=arr();h+=sh('[B,C]'); return h; }
+  if(kind==='fc'){ h+=sh('[B,C]');h+=arr();h+=erow(wN('W_fc','C×10'),cn(),opN('Linear'));h+=arr();h+=sh('logits [B,10]'); return h; }
   switch(kind) {
     case 'emb':
       // picotron VocabParallelEmbedding：按词表维切 (V/tp × H)，各卡查自己词表区间、其余置零，再 all-reduce 求和
@@ -1882,6 +1844,76 @@ function layerDagNoteHTML(kind){
     `</div>`;
 }
 
+// =================== 整网算子图：节点级悬浮科普 ===================
+// Block 内的小卡片不全是「算子」，而是计算图的 4 类节点：算子 / 权重 / 通信 / 激活。
+// 悬浮任一小卡片 → 复用 #wdiagTip 浮层，先点明它属于哪一类，再解释这个节点本身。
+const FNET_CAT={
+  op  :{label:'算子 · 计算节点',   cls:'op',   desc:'对张量做数学运算的真正算子（矩阵乘 / 归一化 / 注意力打分等）。'},
+  w   :{label:'权重 · 可学习参数', cls:'w',    desc:'算子用到的权重矩阵，训练中被优化器更新；卡片角标是它的形状与切分方式。'},
+  comm:{label:'通信 · 集合原语',   cls:'comm', desc:'多卡并行时跨卡同步数据的通信原语（all-reduce / all-to-all / all-gather），本身不做数学运算。'},
+  act :{label:'激活 · 逐元素运算', cls:'act',  desc:'逐元素非线性或位置编码类运算（SiLU / RoPE / ReLU 等）。'},
+};
+function _fnetCat(el){
+  if(el.classList.contains('dag-n-op'))   return 'op';
+  if(el.classList.contains('dag-n-w'))    return 'w';
+  if(el.classList.contains('dag-n-comm')) return 'comm';
+  if(el.classList.contains('dag-n-act'))  return 'act';
+  return null;
+}
+// 按关键字匹配，避免被动态形状后缀（H/tp、×N 等）干扰
+function _fnetNodeBody(cat,label){
+  const has=s=>label.indexOf(s)>=0;
+  if(cat==='comm'){
+    if(has('CrossEntropy')) return '词表并行交叉熵：每卡用自己那片 logits 算局部 loss，只 all-reduce 标量 loss，无需聚合完整 logits，省显存与带宽。';
+    if(has('all-gather'))   return '环形 all-gather：上下文并行(CP)把序列切到各卡，注意力前需把其它卡的 K/V 收集齐。';
+    if(has('dispatch'))     return 'all-to-all 派发：按路由结果，把每个 token 发送到持有其目标专家的卡上。';
+    if(has('combine'))      return 'all-to-all 回收：专家算完后，把结果按原顺序送回各 token 所在的卡。';
+    return 'all-reduce 全规约：张量并行下每卡只算出部分和，相加得到完整结果并同步回每张卡。';
+  }
+  if(cat==='act'){
+    if(has('RoPE')) return 'RoPE 旋转位置编码 + 缩放点积注意力：先给 Q/K 注入位置信息，再用 Q·Kᵀ/√d 算注意力分数并加权求和 V。';
+    if(has('SiLU')) return 'SwiGLU 激活：SiLU(gate) 与 up 逐元素相乘。SiLU(x)=x·sigmoid(x)，提供非线性。';
+    if(has('ReLU')) return 'ReLU 激活：负值清零、正值保留，最常用的非线性。';
+    return '逐元素激活运算，给网络引入非线性。';
+  }
+  if(cat==='w'){
+    if(has('γ'))        return '可学习缩放增益向量（每个隐藏维一个），RMSNorm 归一化后逐元素相乘。';
+    if(has('W_emb'))    return '词嵌入表：每个 token 对应一行向量，按词表维(V/tp)切到各卡。';
+    if(has('W_Q/K/V'))  return '生成 Query / Key / Value 的权重，列并行(col-∥)按输出维切分。';
+    if(has('W_O'))      return '注意力输出投影权重，行并行(row-∥)按输入维切分。';
+    if(has('W_gate'))   return 'SwiGLU 升维的两路权重(gate 门控 / up 主路)，列并行切分。';
+    if(has('W_dn'))     return '降维(down_proj)权重，行并行 + all-reduce。';
+    if(has('W_router')) return '路由器权重：把每个 token 映射成各专家的打分。';
+    if(has('W_exp'))    return '各专家 FFN 的权重，按专家并行(EP)分散到不同卡。';
+    if(has('W_head'))   return '输出头权重，列并行切到 V/tp，常与词嵌入共享同一份参数。';
+    if(has('conv'))     return '卷积核权重：在图像上滑动做局部加权求和，提取空间特征。';
+    if(has('W_fc'))     return '分类头权重矩阵：特征向量 → 各类别得分。';
+    return '可学习权重参数，训练中被优化器更新。';
+  }
+  // cat==='op'
+  if(has('Embedding'))  return '查表算子：把 token 编号换成向量。picotron 按词表维切到各卡，查不到的置零后 all-reduce 求和。';
+  if(has('RMSNorm'))    return '均方根归一化：除以本行的均方根再乘增益 γ，稳定数值；比 LayerNorm 省去求均值。pre-norm 放在子层之前。';
+  if(has('QKV'))        return '线性算子：一次算出 Query / Key / Value 三组向量供注意力使用。列并行切分。';
+  if(has('Out Proj'))   return '线性算子：把多头注意力结果投影回隐藏维。行并行 + all-reduce。';
+  if(has('gate & up'))  return 'SwiGLU 的两路升维线性投影(gate 门控 / up 主路)，列并行。';
+  if(has('down_proj'))  return '降维线性算子：把中间表示降回隐藏维。行并行 + all-reduce。';
+  if(has('router'))     return 'MoE 路由：给每个 token 打分并选出 top-2 专家，决定它走哪几个专家网络。';
+  if(has('Expert FFN')) return '专家前馈网络：一个独立的小 MLP。每卡只放 E/ep 个专家，token 经 all-to-all 派发到对应卡计算。';
+  if(has('lm_head'))    return '输出头线性算子：把隐状态投影到词表维得到 logits。列并行切到 V/tp。';
+  if(has('BN'))         return 'BatchNorm：按通道把激活规整到稳定分布，加速并稳定训练。';
+  if(has('shortcut'))   return '残差相加：把块输入直接加到输出(跳连)，让梯度直达浅层，支撑深层网络。';
+  if(has('avg_pool'))   return '全局平均池化：把每张特征图在空间维求平均(C×H×W→C)，再展平成向量。';
+  if(has('Linear'))     return '全连接线性算子：把特征向量映射到类别得分。';
+  return '计算算子：对张量做数学运算。';
+}
+function _fnetNodeInfo(el){
+  const cat=_fnetCat(el); if(!cat) return null;
+  // 取首个文本节点作为标签（权重节点第二行 <br><span> 是形状，需排除）
+  const raw=(el.firstChild&&el.firstChild.nodeType===3)?el.firstChild.textContent:el.textContent;
+  const label=(raw||'').replace(/\s+/g,' ').trim();
+  return {cat, label, body:_fnetNodeBody(cat,label)};
+}
+
 // =================== 整网算子计算图（拼接所有层片段）===================
 // 每个 layerDagHTML 片段都遵循同一激活契约：输入/输出都是 [B, S, H]
 // （emb 产出该张量，head 消费它），因此可按 stageLayers 顺序首尾相接，
@@ -1908,8 +1940,15 @@ function fullNetDagHTML(){
 let panelMode='code';  // 'code' | 'fnet'
 function renderFnet(){
   if(!$('fnetBody')) return;
+  // CNN 模式:整网算子图(基于 Transformer 层契约)不适用,引导回拓扑图查看
+  if(isCNN()){
+    _clearOpSweep();
+    $('fnetBody').innerHTML=`<div class="fnet-hint">CNN(${cnnVariant()})模式下,逐层算子请在左侧"真实源码"的 <b>models/resnet.py</b> 查看,或在中间拓扑图悬停各 block 看其卷积/BN/shortcut 算子图。<br>整网算子图(emb→blocks→head 契约)仅用于 Transformer。</div>`;
+    if($('fnetSub')) $('fnetSub').textContent=`${cnnVariant()} · dp=${state.dp} pp=${state.pp}`;
+    return;
+  }
   _clearOpSweep();
-  const hint=`<div class="fnet-hint">🖱 点击<b>算子节点</b>（如 RMSNorm、W_Q/K/V）→ 选中该最小节点；点击<b>分组标题</b>（如 Block 0 · MLP）→ 选中整层。两者都会在拓扑图高亮承载它的权重格子与所在卡（硬件分布）。<br>▶️ 拓扑<b>计算流动</b>时，当前层在此图同步点亮，并逐<b>算子</b>扫过（绿色）。</div>`;
+  const hint=`<div class="fnet-hint">🛈 Block 内的小卡片<b>并非都是算子</b>，分四类：<b style="color:#8aabf7">算子</b>(蓝) / <b style="color:var(--warning)">权重</b>(橙) / <b style="color:var(--success)">通信</b>(绿) / <b style="color:var(--dv-purple)">激活</b>(紫)——<b>悬浮任一卡片</b>看它属于哪类及作用。<br>🖱 点击<b>算子节点</b>（如 RMSNorm、W_Q/K/V）→ 选中该最小节点；点击<b>分组标题</b>（如 Block 0 · MLP）→ 选中整层。两者都会在拓扑图高亮承载它的权重格子与所在卡（硬件分布）。<br>▶️ 拓扑<b>计算流动</b>时，当前层在此图同步点亮，并逐<b>算子</b>扫过（绿色）。</div>`;
   $('fnetBody').innerHTML=hint+fullNetDagHTML();
   // 为每层内的最小算子节点编号，作为节点级选中的稳定键
   $('fnetBody').querySelectorAll('.fnet-layer').forEach(fl=>{
@@ -2024,8 +2063,52 @@ const LAYER_DESC={
   moe: '<b>混合专家 FFN 权重矩阵</b>：可学习 router 为每个 token 选 top-2 专家，以稀疏激活换取更大参数量。Expert Parallel 时不同卡持有不同专家子集（各自的权重矩阵），token 经 all-to-all 路由到对应卡计算。',
   norm:'<b>Final LayerNorm 权重（scale / bias）</b>：在输出 logits 之前对隐状态做归一化，稳定数值分布。权重体积极小，全量复制在每张卡上，无需切分。',
   head:'<b>LM Head 输出权重矩阵（hidden → vocab）</b>：将最终隐状态线性投影到词表维度，输出每个位置的下一 token logits。按 Column Parallel 切分，通常与 Embedding 共享同一权重矩阵。',
+  // CNN kinds（来自 cnn_model.js 的 CNN_KIND_DESC）
+  stem:'<b>Stem(conv1 + bn1 + relu)</b>：3×3 卷积把 3 通道输入提到 64 通道（CIFAR 版 stride1，不下采样），是网络的<b>输入门户</b>。CNN 用 DP/PP，不切权重。',
+  res: '<b>残差块(ResBlock)</b>：两/三个卷积的主路 + 一条 shortcut 跳连，输出 = relu(主路 + shortcut)。stride≠1 或通道改变时 shortcut 用 1×1 卷积投影，否则恒等直连。',
+  pool:'<b>全局平均池化(AvgPool)</b>：把 (C×4×4) 特征图在空间维平均成 (C×1×1)，无可学习参数，为分类头压平特征。',
+  fc:  '<b>线性分类头(FC)</b>：把池化后的 C 维向量线性投影到 10 类（CIFAR-10）logits。',
 };
-const LAYER_KIND_LABEL={emb:'Embedding',attn:'Attention',mlp:'MLP',moe:'MoE-FFN',norm:'LayerNorm',head:'LM Head'};
+
+// 迷你结构图(左栏 modelDiagram)的科普级悬浮说明：业务通用、讲“是什么/做什么/为什么”，不涉及并行切分细节
+const MINI_DESC={
+  // ── Transformer ──
+  emb:{title:'Embedding 词嵌入', body:'把每个离散的 <b>token（词 / 子词编号）</b>映射成一串连续数字组成的向量，让模型能用数学方式处理语言。<br><br><b>为什么是第一层：</b>神经网络只会做数值运算，不认识文字。Embedding 就是“文字 → 向量”的翻译入口，必须先把输入翻译成向量，后面的层才有东西可算。'},
+  attn:{title:'Self-Attention 自注意力', body:'让序列里<b>每个位置都去“看”其他所有位置</b>，按相关程度加权汇总信息，从而捕捉上下文与长程依赖（如代词指代、跨句呼应）。<br><br>这是 Transformer 区别于 RNN / CNN 的核心：一步到位地建立全局联系，而不是逐步传递。'},
+  mlp:{title:'MLP 前馈网络', body:'注意力把不同位置的信息“混合”之后，对<b>每个位置单独</b>做一次“升维 → 非线性激活 → 降维”的变换，增强模型的表达与记忆能力。<br><br>一句话：注意力负责<b>交流信息</b>，MLP 负责<b>加工信息</b>，两者交替组成一个 Transformer 块。'},
+  moe:{title:'MoE 混合专家', body:'把单个大 MLP 换成<b>多个并列的“专家”小网络</b>，由一个可学习的 router 给每个 token 只挑 1~2 个专家计算（稀疏激活）。<br><br><b>好处：</b>总参数量可以做得很大，但每个 token 实际只过一小部分，算力开销几乎不变。'},
+  block:{title:'Transformer Block 基本块', body:'一个标准块 = <b>Self-Attention + 前馈网络（MLP / MoE）</b>，外加残差连接和归一化。<br><br>整个模型就是把这种块<b>堆叠 N 层</b>（这里的 L0、L1… 就是第几层）。层数越多，模型越深、表达力越强，显存与算力开销也越大。'},
+  norm:{title:'Final Norm 最终归一化', body:'在输出之前对隐状态做一次<b>归一化</b>（把数值缩放到稳定范围），避免深层网络数值漂移、让训练更稳定。<br><br>参数极少，几乎不占显存。'},
+  head:{title:'LM Head 输出头', body:'把最后的隐状态<b>线性投影到词表大小</b>，得到“下一个 token 是词表里每个词的可能性（logits）”。<br><br>这是模型的“出口”，与 Embedding 入口相对，二者常共享同一份权重。'},
+  // ── CNN / ResNet ──
+  stem:{title:'Stem 输入茎（干路）', body:'网络最前端的一小段固定结构：<b>一个卷积 + BatchNorm + ReLU</b>，把原始 3 通道图像快速提取成 64 通道的低级特征（边缘、颜色、纹理）。<br><br><b>为什么 ResNet 第一层是 Stem：</b>后面的残差块都假设输入已经是“有一定通道数的特征图”。Stem 的职责就是把<b>原始像素一次性转换成残差块能接手的特征</b>，相当于 CNN 版的“输入门户”。（CIFAR 版用 3×3、stride 1，不下采样以保留小图细节。）'},
+  reslayer:{title:'Stage 残差阶段（layer1~4）', body:'ResNet 把主体分成 <b>4 个 stage</b>，每个 stage 由若干个<b>残差块</b>堆叠而成。<br><br>每进入下一个 stage，通常<b>特征图尺寸减半、通道数翻倍</b>——用空间分辨率换语义深度。不同 ResNet 型号的主要差别，就在每个 stage 放几个块、用哪种块。'},
+  'res-basic':{title:'BasicBlock 基础残差块', body:'结构：<b>3×3 卷积 → 3×3 卷积</b>，再加一条 shortcut 跳连，输出 = relu(主路 + 输入)。<br><br>用于较浅的 <b>ResNet-18 / 34</b>。<br><br><b>残差跳连的意义：</b>让网络去学“变化量”而不是“整体映射”，梯度能沿 shortcut 直达浅层，因此能把网络堆得很深也不退化。'},
+  'res-bottleneck':{title:'Bottleneck 瓶颈残差块', body:'结构：<b>1×1（降维）→ 3×3 → 1×1（升维）</b>三层，再加 shortcut。<br><br>用于较深的 <b>ResNet-50 / 101 / 152</b>。<br><br><b>为什么叫瓶颈：</b>先用 1×1 把通道压窄、在窄通道上做昂贵的 3×3、再用 1×1 还原，<b>用更少计算量换取更深的网络</b>。这正是 ResNet-50 与 ResNet-34 的关键区别——两者每个 stage 的块数相同（3/4/6/3），但 50 用的是瓶颈块。'},
+  pool:{title:'Global AvgPool 全局平均池化', body:'把最后的特征图（C×H×W）在空间维度上<b>整体求平均</b>，压成 C 个数（C×1×1）。<br><br>无可学习参数，作用是把“一张特征图”浓缩成“一个特征向量”，交给分类头。'},
+  fc:{title:'FC 全连接分类头', body:'一层<b>线性变换</b>，把池化得到的 C 维特征向量映射到<b>类别数</b>（CIFAR-10 是 10 类）的 logits，即每一类的得分。<br><br>这是 CNN 的“出口”。'},
+};
+
+let _mdiagTipBound=false;
+function bindMdiagTooltips(){
+  const md=$('modelDiagram'); if(!md||_mdiagTipBound) return;
+  _mdiagTipBound=true;            // #modelDiagram 元素长存，只需绑定一次（innerHTML 重渲不影响容器监听）
+  const tip=$('wdiagTip');
+  md.addEventListener('mousemove',e=>{
+    const el=e.target.closest('[data-mini]');
+    const key=el&&el.dataset.mini;
+    const d=key&&MINI_DESC[key];
+    if(!d){ tip.classList.remove('vis'); tip.dataset.mini=''; return; }
+    if(tip.dataset.mini!==key){
+      tip.dataset.mini=key;
+      tip.innerHTML=`<div class="tip-title">${d.title}</div><div class="tip-desc">${d.body}</div>`;
+    }
+    _moveTip(e); tip.classList.add('vis');
+  });
+  md.addEventListener('mouseleave',()=>{ tip.classList.remove('vis'); tip.dataset.mini=''; });
+}
+const LAYER_KIND_LABEL={emb:'Embedding',attn:'Attention',mlp:'MLP',moe:'MoE-FFN',norm:'LayerNorm',head:'LM Head',
+  stem:'Stem',res:'ResBlock',pool:'AvgPool',fc:'FC'};
 
 function bindWdiagTooltips(){
   const wd=$('worldDiagram'); if(!wd) return;
@@ -2071,23 +2154,46 @@ function _moveTip(e){
 function renderModelDiagram(){
   const el=$('modelDiagram'); if(!el) return;
   const s=state;
+  // CNN:Stem → layer1~4(各含若干 ResBlock)→ Pool → FC
+  if(isCNN()){
+    const v=CNN_VARIANTS[cnnVariant()]||CNN_VARIANTS[CNN_DEFAULT];
+    // ResNet-18/34 用 basic 块（3×3·3×3）；ResNet-50 用 bottleneck 块（1×1·3×3·1×1）→ 视觉与悬浮说明区分
+    const isB=v.block==='bottleneck';
+    const cellCls=isB?'mdiag-cell-btnk':'mdiag-cell-res';
+    const cellLab=isB?'btnk':'basic';
+    const cellKey=isB?'res-bottleneck':'res-basic';
+    let h='<div class="mdiag">';
+    h+='<div class="mdiag-card mdiag-stem" data-mini="stem"><span class="mdiag-card-lab">Stem</span></div>';
+    for(let li=0;li<4;li++){
+      h+=`<div class="mdiag-card mdiag-blk" data-mini="reslayer">`+
+           `<span class="mdiag-blk-lab">layer${li+1}</span>`+
+           '<div class="mdiag-blk-cells">';
+      for(let j=0;j<v.num[li];j++) h+=`<span class="mdiag-cell ${cellCls}" data-mini="${cellKey}">${cellLab}${j}</span>`;
+      h+='</div></div>';
+    }
+    h+='<div class="mdiag-card mdiag-pool" data-mini="pool"><span class="mdiag-card-lab">AvgPool</span></div>';
+    h+='<div class="mdiag-card mdiag-fc" data-mini="fc"><span class="mdiag-card-lab">FC</span></div>';
+    h+='</div>';
+    el.innerHTML=h; bindMdiagTooltips(); return;
+  }
   const mlpType=s.enMoE?'MoE':'MLP';
   const mlpCls =s.enMoE?'mdiag-cell-moe':'mdiag-cell-mlp';
+  const mlpKey =s.enMoE?'moe':'mlp';
   let h='<div class="mdiag">';
-  h+='<div class="mdiag-card mdiag-emb" title="词嵌入 Embedding"><span class="mdiag-card-lab">Embed</span></div>';
+  h+='<div class="mdiag-card mdiag-emb" data-mini="emb"><span class="mdiag-card-lab">Embed</span></div>';
   for(let i=0;i<s.blocks;i++){
-    h+=`<div class="mdiag-card mdiag-blk" title="Transformer Block ${i}：Attention + ${mlpType}">`+
+    h+=`<div class="mdiag-card mdiag-blk" data-mini="block">`+
          `<span class="mdiag-blk-lab">L${i}</span>`+
          '<div class="mdiag-blk-cells">'+
-           '<span class="mdiag-cell mdiag-cell-attn">Attn</span>'+
-           `<span class="mdiag-cell ${mlpCls}">${mlpType}</span>`+
+           '<span class="mdiag-cell mdiag-cell-attn" data-mini="attn">Attn</span>'+
+           `<span class="mdiag-cell ${mlpCls}" data-mini="${mlpKey}">${mlpType}</span>`+
          '</div>'+
        '</div>';
   }
-  h+='<div class="mdiag-card mdiag-norm" title="最终归一化 Final Norm"><span class="mdiag-card-lab">Norm</span></div>';
-  h+='<div class="mdiag-card mdiag-head" title="输出头 LM Head"><span class="mdiag-card-lab">Head</span></div>';
+  h+='<div class="mdiag-card mdiag-norm" data-mini="norm"><span class="mdiag-card-lab">Norm</span></div>';
+  h+='<div class="mdiag-card mdiag-head" data-mini="head"><span class="mdiag-card-lab">Head</span></div>';
   h+='</div>';
-  el.innerHTML=h;
+  el.innerHTML=h; bindMdiagTooltips();
 }
 
 // =================== WIRE UP ===================
@@ -2136,21 +2242,36 @@ const DEFAULTS=[...document.querySelectorAll('#ctrl input,#ctrl select')].map(el
 $('resetBtn').onclick=()=>{
   DEFAULTS.forEach(d=>{ if(d.el.type==='checkbox') d.el.checked=d.v; else d.el.value=d.v; });
   document.querySelectorAll('.card-tile').forEach((t,i)=>t.classList.toggle('selected',i===0));
-  currentLib='picotron'; $('libSelect').value='picotron';
+  currentLib='picotron';
   activeTab='pgm'; renderTabs(); update(false); updateLibUI();
 };
 
-// ── 库切换下拉框 ──
+// ── 库切换胶囊 Tab ──
 function updateLibUI(){
-  const isPico=currentLib==='picotron';
-  if($('headerSub')) $('headerSub').textContent=isPico
-    ?'基于 huggingface/picotron 真实逻辑'
-    :'基于 pytorch/torchtitan 真实逻辑';
+  const cnn=isCNN();
+  document.querySelectorAll('.lib-tab').forEach(t=>t.classList.toggle('on',t.dataset.lib===currentLib));
+  if($('headerSub')) $('headerSub').textContent=
+    currentLib==='picotron' ? '基于 huggingface/picotron 真实逻辑'
+    : '基于 kuangliu/pytorch-cifar 真实逻辑（CNN：DP + PP）';
+  // CNN 模式:隐藏 TP/CP/MoE 与 Transformer 专属控件,显示 ResNet 型号下拉
+  const show=(id,on)=>{ const el=$(id); if(el) el.style.display=on?'':'none'; };
+  show('ctrlCP',!cnn); show('ctrlTP',!cnn); show('ctrlMoE',!cnn);
+  show('txBlocksRow',!cnn); show('blocks',!cnn); show('hintBlocks',!cnn);
+  show('txHiddenRow',!cnn); show('hidden',!cnn); show('hintHidden',!cnn);
+  show('cnnVariantRow',cnn); show('cnnVariant',cnn);
+  if($('parallelPill')) $('parallelPill').textContent=cnn
+    ? '(CNN：数据并行 DP + 流水线并行 PP)'
+    : '(picotron 网格 dp×pp×cp×tp)';
 }
-$('libSelect').addEventListener('change',e=>{
-  currentLib=e.target.value;
+$('libTabs').addEventListener('click',e=>{
+  const btn=e.target.closest('.lib-tab'); if(!btn) return;
+  const lib=btn.dataset.lib; if(lib===currentLib) return;
+  const prevCNN=isCNN();
+  currentLib=lib;
   if(currentLib==='picotron'&&activeTab==='moe') activeTab='pgm';
-  updateLibUI(); renderTabs(); renderCode(false);
+  // 进出 CNN 时切换默认 Tab(CNN 用 resnet/train/pipe,其余用 pgm)
+  if(isCNN()!==prevCNN) activeTab=isCNN()?'resnet':'pgm';
+  updateLibUI(); update(false); renderTabs();
 });
 
 // =================== MEM TOOLTIP BUBBLE ===================
@@ -2201,6 +2322,27 @@ $('pmodeCode').onclick=()=>setPanelMode('code');
 $('pmodeFnet').onclick=()=>setPanelMode('fnet');
 // 反向联动：点击整网图节点 → 高亮拓扑图硬件分布（事件委托，#fnetBody 元素稳定）
 $('fnetBody').addEventListener('click',e=>onFnetClick(e.target));
+// 悬浮整网图小卡片 → 科普气泡：先点明它是 算子/权重/通信/激活，再解释该节点（复用 #wdiagTip）
+(function(){
+  const fb=$('fnetBody'); if(!fb) return;
+  const tip=$('wdiagTip');
+  fb.addEventListener('mousemove',e=>{
+    const el=e.target.closest('.dag-n');
+    const info=el&&_fnetNodeInfo(el);
+    if(!info){ if(tip.dataset.fnode){tip.classList.remove('vis');tip.dataset.fnode='';} return; }
+    const key=info.cat+'|'+info.label;
+    if(tip.dataset.fnode!==key){
+      tip.dataset.fnode=key; tip.dataset.mini='';      // 与 mini/世界图浮层互斥
+      const c=FNET_CAT[info.cat];
+      tip.innerHTML=`<div class="tip-cat ${c.cls}">${c.label}</div>`+
+        `<div class="tip-title">${info.label}</div>`+
+        `<div class="tip-desc">${info.body}</div>`+
+        `<div class="tip-desc" style="margin:0;opacity:.7">${c.desc}</div>`;
+    }
+    _moveTip(e); tip.classList.add('vis');
+  });
+  fb.addEventListener('mouseleave',()=>{ tip.classList.remove('vis'); tip.dataset.fnode=''; });
+})();
 
 renderTabs(); update(false);
 setPanelMode('fnet');
