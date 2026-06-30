@@ -130,13 +130,126 @@ export function createAnalysisDock({ tabsRoot, titleEl, metaEl, views, initialVi
   return { setActiveView, refresh, resize, get activeView() { return activeView; } };
 }
 
-export function createMoeLoadView({ panel, viewModel, onSelect }) {
+export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) {
   let metricId = viewModel.metricOptions[0]?.id || 'loadRatio';
   let canvas;
   let detail;
   let tooltip;
   let hoverCell = null;
   let selectedCell = null;
+  let mode = 'heatmap';   // 'heatmap' | 'distribution'（distribution 仅在传入 distribution 时可用）
+  let distCanvas, distTip, distTipEl;
+  let distCursor = null;  // distribution 图当前游标 step（跟随鼠标的竖线）
+  // 自定义气泡定位：用气泡真实尺寸钳制在容器内，避免溢出屏幕
+  function showDistTip(event, html) {
+    if (!distTipEl) return;
+    distTipEl.innerHTML = html;
+    distTipEl.hidden = false;
+    const parent = distTipEl.parentElement;
+    const pb = parent.getBoundingClientRect();
+    const tw = distTipEl.offsetWidth, th = distTipEl.offsetHeight;
+    let x = event.clientX - pb.left + 14;
+    let y = event.clientY - pb.top + 14;
+    if (x + tw > pb.width - 4) x = event.clientX - pb.left - tw - 14;  // 翻到鼠标左侧
+    if (x < 4) x = 4;
+    if (y + th > pb.height - 4) y = pb.height - th - 4;
+    if (y < 4) y = 4;
+    distTipEl.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  function distColor(e, hot, dead) {
+    const theme = document.documentElement.dataset.theme || 'dark';
+    if (hot && hot.length) {
+      if (e === hot[0]) return '#ef4444';
+      if (e === hot[1]) return '#f97316';
+    }
+    if (dead && dead.includes(e)) return theme === 'light' ? '#b6bcc6' : '#5b6473';  // 死专家：灰色
+    const hue = (e * 47) % 360;
+    return `hsl(${hue}, ${theme === 'light' ? 40 : 34}%, ${theme === 'light' ? 62 : 46}%)`;
+  }
+  function drawDistribution() {
+    if (!distribution || !distCanvas || panel.hidden) return;
+    const wrap = panel.querySelector('[data-moe-dist-wrap]');
+    if (!wrap || wrap.hidden) return;
+    const bounds = wrap.getBoundingClientRect();
+    const width = Math.max(460, bounds.width - 4);
+    const height = Math.max(200, bounds.height - 4);
+    const ctx = resizeCanvas(distCanvas, width, height);
+    const { steps, experts, series, hot = [], dead = [], collapseStep } = distribution;
+    const n = steps.length;
+    const padL = 44, padR = 12, padT = 14, padB = 26;
+    const plotW = width - padL - padR, plotH = height - padT - padB;
+    const x0 = steps[0], x1 = steps[n - 1];
+    const mapX = s => padL + (s - x0) / (x1 - x0 || 1) * plotW;
+    const mapY = v => padT + (1 - v) * plotH;   // v: 累计占比 0..1
+    ctx.clearRect(0, 0, width, height);
+    const cum = new Array(n).fill(0);
+    for (let e = 0; e < experts; e++) {
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) { const x = mapX(steps[i]), y = mapY(cum[i] + series[e][i]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      for (let i = n - 1; i >= 0; i--) ctx.lineTo(mapX(steps[i]), mapY(cum[i]));
+      ctx.closePath();
+      ctx.fillStyle = distColor(e, hot, dead);
+      ctx.fill();
+      for (let i = 0; i < n; i++) cum[i] += series[e][i];
+    }
+    if (collapseStep != null) {
+      const cx = mapX(collapseStep);
+      ctx.strokeStyle = readCssVar('--danger', '#ef4444');
+      ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, padT + plotH); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = readCssVar('--danger', '#ef4444');
+      ctx.font = '700 10px PingFang SC, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('路由坍缩', cx + 4, padT + 2);
+    }
+    ctx.fillStyle = readCssVar('--foreground-muted', 'rgba(255,255,255,0.45)');
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+    [0, 0.5, 1].forEach(p => ctx.fillText(Math.round(p * 100) + '%', padL - 6, mapY(p)));
+    ctx.textBaseline = 'top';
+    [x0, Math.round((x0 + x1) / 2), x1].forEach((s, idx) => { ctx.textAlign = idx === 0 ? 'left' : idx === 2 ? 'right' : 'center'; ctx.fillText(String(s), mapX(s), padT + plotH + 6); });
+    // 跟随鼠标的游标竖线 + step 标签
+    if (distCursor != null) {
+      const cx = mapX(distCursor);
+      ctx.strokeStyle = readCssVar('--foreground-secondary', 'rgba(255,255,255,0.6)');
+      ctx.setLineDash([]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, padT); ctx.lineTo(cx, padT + plotH); ctx.stroke();
+      const label = 'Step ' + distCursor;
+      ctx.font = '10px JetBrains Mono, monospace';
+      const tw = ctx.measureText(label).width + 10;
+      const chipX = Math.min(Math.max(cx - tw / 2, padL), padL + plotW - tw);
+      ctx.fillStyle = readCssVar('--surface-4', '#2a2c33');
+      ctx.strokeStyle = readCssVar('--border-strong', 'rgba(255,255,255,0.3)');
+      ctx.fillRect(chipX, padT - 1, tw, 14); ctx.strokeRect(chipX, padT - 1, tw, 14);
+      ctx.fillStyle = readCssVar('--foreground', '#fff');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, chipX + tw / 2, padT + 6);
+    }
+  }
+  function onDistMove(event) {
+    if (!distribution) return;
+    const rect = distCanvas.getBoundingClientRect();
+    const { steps, experts, series, hot = [], dead = [] } = distribution;
+    const n = steps.length;
+    const padL = 44, padR = 12, padT = 14, padB = 26;
+    const plotW = rect.width - padL - padR, plotH = rect.height - padT - padB;
+    const x = event.clientX - rect.left, y = event.clientY - rect.top;
+    if (x < padL || x > rect.width - padR || y < padT || y > padT + plotH) { distCursor = null; drawDistribution(); if (distTipEl) distTipEl.hidden = true; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - padL) / plotW * (n - 1))));
+    distCursor = steps[i];
+    drawDistribution();   // 重绘以更新游标竖线
+    // 当前 y 命中的专家（高亮显示），气泡列出全部专家占比
+    const shareAtY = 1 - (y - padT) / plotH;
+    let cum = 0, hitE = -1;
+    for (let e = 0; e < experts; e++) { if (shareAtY >= cum && shareAtY < cum + series[e][i]) { hitE = e; break; } cum += series[e][i]; }
+    const order = Array.from({ length: experts }, (_, e) => e).sort((a, b) => series[b][i] - series[a][i]);
+    const rows = order.map(e => {
+      const hl = e === hitE ? ' style="font-weight:800;color:var(--foreground)"' : '';
+      return `<span${hl}><i style="background:${distColor(e, hot, dead)}"></i>E${e} ${(series[e][i] * 100).toFixed(1)}%</span>`;
+    }).join('');
+    showDistTip(event, `<b>Step ${steps[i]} · ${experts} 专家 token 占比</b><div class="opv-dist-tip-grid">${rows}</div>`);
+  }
 
   function metric() {
     return viewModel.metricOptions.find(item => item.id === metricId) || viewModel.metricOptions[0];
@@ -247,28 +360,57 @@ export function createMoeLoadView({ panel, viewModel, onSelect }) {
       <div class="opv-analysis-view">
         ${makeStatGrid(viewModel.stats)}
         <div class="opv-analysis-controls" data-metric-tabs></div>
-        <div class="opv-analysis-grid-wrap">
+        <div class="opv-analysis-grid-wrap" data-moe-heat-wrap>
           <canvas class="opv-moe-heatmap" aria-label="MoE expert load heatmap"></canvas>
           <aside class="opv-analysis-detail"></aside>
         </div>
+        ${distribution ? '<div class="opv-moe-dist-wrap" data-moe-dist-wrap hidden><canvas class="opv-moe-dist" aria-label="专家 token 占比面积堆叠图"></canvas></div>' : ''}
       </div>`;
-    canvas = panel.querySelector('canvas');
+    canvas = panel.querySelector('.opv-moe-heatmap');
     detail = panel.querySelector('.opv-analysis-detail');
     tooltip = makeTooltip(panel);
+    const heatWrap = panel.querySelector('[data-moe-heat-wrap]');
+    const distWrap = panel.querySelector('[data-moe-dist-wrap]');
     const metricTabs = panel.querySelector('[data-metric-tabs]');
+    const chips = [];
     viewModel.metricOptions.forEach(item => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'opv-analysis-chip';
       btn.textContent = item.label;
       btn.addEventListener('click', () => {
-        metricId = item.id;
-        metricTabs.querySelectorAll('button').forEach(tab => tab.classList.toggle('is-active', tab === btn));
+        metricId = item.id; mode = 'heatmap';
+        chips.forEach(c => c.classList.toggle('is-active', c === btn));
+        if (heatWrap) heatWrap.hidden = false;
+        if (distWrap) distWrap.hidden = true;
         draw();
       });
-      if (item.id === metricId) btn.classList.add('is-active');
-      metricTabs.appendChild(btn);
+      if (item.id === metricId && mode === 'heatmap') btn.classList.add('is-active');
+      metricTabs.appendChild(btn); chips.push(btn);
     });
+    if (distribution) {
+      const dbtn = document.createElement('button');
+      dbtn.type = 'button';
+      dbtn.className = 'opv-analysis-chip';
+      dbtn.textContent = 'Distribution';
+      dbtn.addEventListener('click', () => {
+        mode = 'distribution';
+        chips.forEach(c => c.classList.toggle('is-active', c === dbtn));
+        if (heatWrap) heatWrap.hidden = true;
+        if (distWrap) distWrap.hidden = false;
+        drawDistribution();
+      });
+      if (mode === 'distribution') dbtn.classList.add('is-active');
+      metricTabs.appendChild(dbtn); chips.push(dbtn);
+      distCanvas = panel.querySelector('.opv-moe-dist');
+      distTip = makeTooltip(distWrap);
+      distTipEl = distWrap.querySelector('.opv-analysis-tooltip');
+      if (distTipEl) distTipEl.classList.add('opv-dist-tip');
+      distCanvas.addEventListener('pointermove', onDistMove);
+      distCanvas.addEventListener('pointerleave', () => { distCursor = null; drawDistribution(); if (distTipEl) distTipEl.hidden = true; });
+      // 还原当前模式可见性（setViewModel 重挂载后保持在 Distribution）
+      if (mode === 'distribution') { if (heatWrap) heatWrap.hidden = true; distWrap.hidden = false; }
+    }
     canvas.addEventListener('pointermove', event => {
       hoverCell = cellAt(event);
       if (!hoverCell) {
@@ -299,9 +441,10 @@ export function createMoeLoadView({ panel, viewModel, onSelect }) {
     });
   }
 
-  function setViewModel(next) { viewModel = next; selectedCell = null; hoverCell = null; mount(); draw(); }
+  function renderByMode() { mode === 'distribution' ? drawDistribution() : draw(); }
+  function setViewModel(next) { viewModel = next; selectedCell = null; hoverCell = null; mount(); renderByMode(); }
 
-  return { panel, mount, render: draw, resize: draw, setViewModel };
+  return { panel, mount, render: renderByMode, resize: renderByMode, setViewModel };
 }
 
 const CARDLOAD_STATE_LABEL = { ok: '正常', warn: '过载', alert: '饥饿' };

@@ -86,6 +86,10 @@
   /* ── Reset button → ghost style ── */
   .reset{font-size:var(--font-size-label-xs);padding:var(--space-1) var(--space-3);border:1px solid var(--border-default);border-radius:var(--radius-sm);background:transparent;color:var(--foreground-muted);cursor:pointer;transition:color var(--duration-base),border-color var(--duration-base)}
   .reset:hover{color:var(--primary);border-color:var(--primary)}
+  .flow-toggle{flex-shrink:0;white-space:nowrap;font-size:var(--font-size-label-xs);font-weight:600;color:var(--success);background:rgba(4,215,147,.08);border:1px solid var(--success);border-radius:var(--radius-pill);padding:3px 12px;cursor:pointer;transition:color var(--duration-base),background var(--duration-base),border-color var(--duration-base)}
+  .flow-toggle:hover{background:rgba(4,215,147,.16)}
+  .flow-toggle.paused{color:var(--foreground-muted);background:transparent;border-color:var(--border-default)}
+  .flow-toggle.paused:hover{color:var(--foreground);border-color:var(--border-strong)}
 
   /* ── Group / panel containers ── */
   .group{background:var(--surface-2);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--space-3);margin-bottom:var(--space-3)}
@@ -104,6 +108,12 @@
   /* ── Inputs ── */
   .deg{width:54px;background:var(--surface-1);border:1px solid var(--border-default);color:var(--foreground);border-radius:var(--radius-sm);padding:3px var(--space-2);font-size:var(--font-size-body-sm);text-align:center}
   .deg:disabled{opacity:.35}
+  /* EP 专家并行：合法取值有限(整除 DP×CP 且整除专家数)，用卡片单选而非滑块 */
+  .ep-chips{display:flex;gap:var(--space-1);flex-wrap:wrap;margin:var(--space-1) 0 2px}
+  .ep-chip{min-width:30px;display:flex;align-items:center;justify-content:center;font-size:var(--font-size-body-sm);color:var(--foreground-secondary);background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:4px var(--space-2);cursor:pointer;user-select:none;transition:border-color var(--duration-base),color var(--duration-base),background var(--duration-base)}
+  .ep-chip:hover{border-color:var(--border-strong)}
+  .ep-chip.on{border-color:var(--danger);color:var(--danger);background:rgba(255,75,123,.12);font-weight:var(--font-weight-semibold)}
+  .ep-chips.disabled{opacity:.4;pointer-events:none}
   select{width:100%;background:var(--surface-1);border:1px solid var(--border-default);color:var(--foreground);border-radius:var(--radius-sm);padding:5px var(--space-2);font-size:var(--font-size-body-sm)}
   /* ── Header repo switch: pill tabs (Transformer / CNN) ── */
   .lib-tabs{display:inline-flex;gap:3px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--radius-pill);padding:3px}
@@ -175,6 +185,8 @@
   .wdiag-group-head{display:flex;align-items:center;gap:4px;font-size:var(--font-size-label-xs);color:var(--foreground-muted);opacity:.7;margin:4px 0 1px;cursor:pointer;user-select:none;line-height:1.3;white-space:nowrap}
   .wdiag-group-head:hover{opacity:1}
   .wdiag-group-caret{font-size:9px;width:9px;display:inline-block;text-align:center;flex-shrink:0}
+  /* Transformer 卡内 transformer 层分组标题(灰字,不可折叠) */
+  .wdiag-lgroup{font-size:var(--font-size-label-xs);color:var(--foreground-muted);opacity:.7;margin:4px 0 1px;line-height:1.3;white-space:nowrap}
   /* DATA-VIZ: CNN layer type color encoding (stem/res/pool/fc) */
   .wdiag-lb-stem{border-color:rgba(232,201,90,.6);color:rgba(232,201,90,.9)}
   .wdiag-lb-res{border-color:rgba(67,105,239,.55);color:rgba(67,105,239,.9)}
@@ -472,8 +484,9 @@
         <div class="para-hint" id="hintTP"></div>
       </div>
       <div id="ctrlMoE">
-        <div class="row"><label><input type="checkbox" id="enMoE" data-tab="launch"> MoE / 专家并行 EP</label><input class="deg" type="number" id="ep" data-tab="launch" min="1" max="8" value="2" disabled></div>
-        <input type="range" class="par-slider" id="epSlider" min="1" max="8" value="2" disabled>
+        <div class="row"><label><input type="checkbox" id="enMoE" data-tab="launch"> MoE / 专家并行 EP</label></div>
+        <input type="hidden" id="ep" data-tab="launch" value="1">
+        <div class="ep-chips disabled" id="epChips"></div>
         <div class="para-hint" id="hintEP"></div>
         <div class="slabel" id="expRow" style="display:none"><span>专家数 (每 MoE 层)</span><b id="vExperts">8</b></div>
         <input type="range" id="experts" min="2" max="16" step="2" value="8" style="display:none">
@@ -573,7 +586,10 @@
 
   <!-- ============ MIDDLE: VISUALIZATION ============ -->
   <div class="col col-mid">
-    <h2 id="midTitle" style="margin:0 14px;padding:14px 0 6px;position:static;flex-shrink:0">训练拓扑及计算流动可视化</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:0 14px;flex-shrink:0">
+      <h2 id="midTitle" style="margin:0;padding:14px 0 6px;position:static">训练拓扑及计算流动可视化</h2>
+      <button class="flow-toggle" id="flowToggleBtn" title="停止计算流动动画">⏸ 停止播放</button>
+    </div>
     <div class="worldbox">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span id="worldHdrText">总卡数 World Size = <b id="world">4</b></span>
@@ -884,7 +900,7 @@ function panguAllLayers(){
 // 点击左侧(锁定的)表单 → 右侧定位到对应文件与关键字行。
 const PANGU_SCROLL={
   enTP:{tab:'tp',hint:'attn_tp_size'},  tp:{tab:'tp',hint:'attn_tp_size'},  tpSlider:{tab:'tp',hint:'attn_tp_size'},
-  enMoE:{tab:'tp',hint:'moe_tp_size'},  ep:{tab:'tp',hint:'moe_tp_size'},   epSlider:{tab:'tp',hint:'moe_tp_size'},
+  enMoE:{tab:'tp',hint:'moe_tp_size'},  ep:{tab:'tp',hint:'moe_tp_size'},
   enCP:{tab:'tp',hint:'embed_tp_size'}, cp:{tab:'tp',hint:'embed_tp_size'},  cpSlider:{tab:'tp',hint:'embed_tp_size'},
   enDP:{tab:'tp',hint:'parallel_config'}, dp:{tab:'tp',hint:'parallel_config'}, dpSlider:{tab:'tp',hint:'parallel_config'},
   enPP:{tab:'tp',hint:'parallel_config'}, pp:{tab:'tp',hint:'parallel_config'}, ppSlider:{tab:'tp',hint:'parallel_config'},
@@ -902,8 +918,9 @@ function readState(){
   state.enTP=$('enTP').checked; state.enMoE=$('enMoE').checked;
   state.dp=state.enDP?+$('dp').value:1; state.pp=state.enPP?+$('pp').value:1;
   state.cp=state.enCP?+$('cp').value:1; state.tp=state.enTP?+$('tp').value:1;
-  state.ep=state.enMoE?+$('ep').value:1;
   state.blocks=+$('blocks').value; state.hidden=+$('hidden').value; state.experts=+$('experts').value;
+  // EP 从 DP×CP 借卡：吸附到「整除 DP×CP 且整除专家数」的最近合法值（dp×cp=1 时强制为 1）
+  state.ep=state.enMoE?snapEP(+$('ep').value):1;
   const tile=document.querySelector('.card-tile.selected'); state.cardType=tile?tile.dataset.name:'NVIDIA H100 80GB'; state.cardGB=tile?+tile.dataset.gb:80;
   state.batch=+$('batch').value; state.steps=+$('steps').value;
   state.lr=Math.pow(10,-6+(+$('lr').value/100)*4);
@@ -937,9 +954,31 @@ function cpGroup(d,p,t){ const a=[]; for(let c=0;c<state.cp;c++)a.push(rankOf(d,
 function ppGroup(d,c,t){ const a=[]; for(let p=0;p<state.pp;p++)a.push(rankOf(d,p,c,t)); return a; }
 function dpGroup(p,c,t){ const a=[]; for(let d=0;d<state.dp;d++)a.push(rankOf(d,p,c,t)); return a; }
 
+// =================== 专家并行 EP（Megatron 式：从 DP×CP 借卡）===================
+// EP 不增加总卡数（world 仍 = DP×PP×CP×TP）；它把 MoE 层里本来互为副本的
+// DP×CP 张卡，改成「各持一部分专家」。约束：EP 必须整除 DP×CP，且整除专家数。
+function epCap(){ return state.dp*state.cp; }                       // 可借用的副本卡上限
+function epDivisors(){ const cap=epCap(),E=state.experts,ds=[]; for(let k=1;k<=cap;k++) if(cap%k===0 && E%k===0) ds.push(k); return ds; }
+function snapEP(req){ let best=1; for(const k of epDivisors()) if(k<=req) best=k; return best; }  // 向下吸附到最近合法值
+// 卡 (d,c) 在 MoE 层持有哪些专家：EP 切「专家个数」，TP 再切每个专家的矩阵
+function expertAssign(d,c){
+  const idx=d*state.cp+c, epr=idx%state.ep, perEP=state.experts/state.ep;
+  return { epr, edp:Math.floor(idx/state.ep), lo:epr*perEP, hi:epr*perEP+perEP-1, perEP };
+}
+// EP 卡片单选：只列出合法取值（整除 DP×CP 且整除专家数）。隐藏 #ep 为真值源。
+function renderEpChips(){
+  const box=$('epChips'); if(!box) return;
+  $('ep').value=state.ep;                                  // 回写真值（已吸附为合法值）
+  box.style.display=state.enMoE?'flex':'none';
+  if(!state.enMoE) return;
+  const vals=epDivisors();
+  box.classList.toggle('disabled', isPangu());             // Pangu 锁定为只读
+  box.innerHTML=vals.map(v=>`<div class="ep-chip${v===state.ep?' on':''}" data-ep="${v}" title="EP=${v}：每卡持有 ${state.experts/v} 个专家">${v}</div>`).join('');
+}
+
 const TENSOR_ICON=`<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" style="display:inline-block;vertical-align:-3px;margin-right:2px;flex-shrink:0"><rect width="3" height="3" x="2" y="5" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="5" y="5" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="8" y="5" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="11" y="5" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="2" y="8" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="5" y="8" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="8" y="8" stroke="currentColor" stroke-width="1"/><rect width="3" height="3" x="11" y="8" stroke="currentColor" stroke-width="1"/></svg>`;
 
-function cardLayerHTML(p, t){
+function cardLayerHTML(p, t, d=0, c=0){
   const layers=stageLayers(p), tp=state.tp;
   // Pangu:复用格子/贴图/流动。TP=32 → 每张卡持有各层的 1/32 分片(注意力按头、FFN/MoE 按中间维、emb/head 按词表)。
   if(isPangu()){
@@ -956,22 +995,33 @@ function cardLayerHTML(p, t){
     const dense=layers.slice(1, 1+PANGU.dense*2);
     const moe=layers.slice(1+PANGU.dense*2, layers.length-2);
     const moeN=PANGU.layers-PANGU.dense;
-    let out=box(emb);
+    let out='<div class="wdiag-lgroup">Embed</div>'+box(emb);
     out+=head('dense',`Dense × ${PANGU.dense}`,PANGU.dense);
     out+=panguGroupCollapsed.dense ? box(dense[0])+box(dense[1]) : dense.map(box).join('');
     out+=head('moe',`MoE × ${moeN}`,moeN);
     out+=panguGroupCollapsed.moe ? box(moe[0])+box(moe[1]) : moe.map(box).join('');
-    out+=tail.map(box).join('');
+    out+='<div class="wdiag-lgroup">Output</div>'+tail.map(box).join('');
     return out;
   }
-  // CNN:每个 block 一格,无 TP 列/行切,直接显示层名 + kind 配色。
+  // CNN:每个 block 一格,无 TP 列/行切,直接显示层名 + kind 配色;按 stage 加灰字分组标题。
   if(isCNN()){
-    return layers.map(l=>
-      `<div class="wdiag-layer-box wdiag-lb-${l.kind}" data-kind="${l.kind}" data-bi="" data-p="${p}" data-t="${t}">${TENSOR_ICON}${l.name}</div>`
-    ).join('');
+    let curSec=null, out='';
+    layers.forEach(l=>{
+      // stage: 0=Stem,1~4=layer{n},5=Pool+FC(输出头)
+      const sec = l.stage===0 ? 'Stem' : l.stage>=1&&l.stage<=4 ? `Layer ${l.stage}` : 'Pool + FC';
+      if(sec!==curSec){ curSec=sec; out+=`<div class="wdiag-lgroup">${sec}</div>`; }
+      out+=`<div class="wdiag-layer-box wdiag-lb-${l.kind}" data-kind="${l.kind}" data-bi="" data-p="${p}" data-t="${t}">${TENSOR_ICON}${l.name}</div>`;
+    });
+    return out;
   }
-  return layers.map(l=>{
+  // 参考 Pangu「Dense × 3」分组:每个 transformer 层(attn+mlp/moe)上方加灰字标题 L{i};
+  // emb / norm+head 也各自分组,避免误以为 norm、head 属于最后一层 L{n-1}。
+  let curSec=null, out='';
+  layers.forEach(l=>{
     const m=l.name.match(/Block (\d+)/), bi=m?m[1]:'';
+    // 分组键:transformer 层用 L{i};emb 独立;norm+head 合并为「输出头」
+    const sec = bi!=='' ? `Layer ${bi}` : (l.kind==='emb' ? 'Embed' : 'Output');
+    if(sec!==curSec){ curSec=sec; out+=`<div class="wdiag-lgroup">${sec}</div>`; }
     let label;
     switch(l.kind){
       case 'emb':  label=tp>1?`Emb (第${t+1}/${tp}片)`:'Embedding'; break;
@@ -979,9 +1029,9 @@ function cardLayerHTML(p, t){
       case 'mlp':  label=tp>1?`MLP-${bi} (第${t+1}/${tp}片)`:`MLP-${bi}`; break;
       case 'moe':{
         if(state.enMoE && state.ep>1){
-          const per=Math.ceil(state.experts/tp);
-          const lo=t*per, hi=Math.min(state.experts-1,lo+per-1);
-          label=`MoE-${bi} [E${lo}${lo<hi?'~E'+hi:''}]`;
+          const {lo,hi}=expertAssign(d,c);
+          const er=lo===hi?`E${lo}`:`E${lo}~E${hi}`;
+          label=tp>1?`MoE-${bi} [${er}·第${t+1}/${tp}片]`:`MoE-${bi} [${er}]`;
         } else {
           label=tp>1?`MoE-${bi} (第${t+1}/${tp}片)`:`MoE-${bi}`;
         }
@@ -991,8 +1041,9 @@ function cardLayerHTML(p, t){
       case 'head': label=tp>1?`Head (第${t+1}/${tp}片)`:'Head'; break;
       default:     label=l.name;
     }
-    return `<div class="wdiag-layer-box wdiag-lb-${l.kind}" data-kind="${l.kind}" data-bi="${bi}" data-p="${p}" data-t="${t}">${TENSOR_ICON}${label}</div>`;
-  }).join('');
+    out+=`<div class="wdiag-layer-box wdiag-lb-${l.kind}" data-kind="${l.kind}" data-bi="${bi}" data-p="${p}" data-t="${t}">${TENSOR_ICON}${label}</div>`;
+  });
+  return out;
 }
 
 function applyNpuBg(){
@@ -1044,12 +1095,12 @@ function renderWorldDiagram(){
       if(pp>1) h+=`<div class="wdiag-stage-label"><span class="wdiag-stage-icon"></span>Stage ${p}</div>`;
       for(let c=0;c<cp;c++){
         if(cp>1) h+=`<div class="wdiag-cp"><div class="wdiag-cp-label">CP ${c}</div>`;
-        if(state.enMoE && state.ep>1 && dp*pp*cp>1) h+=`<div class="wdiag-ep-label">EP组${p*dp*cp+d*cp+c}</div>`;
+        if(state.enMoE && state.ep>1){ const idx=d*cp+c, per=state.experts/state.ep, lo=(idx%state.ep)*per, hi=lo+per-1; h+=`<div class="wdiag-ep-label">EP组${Math.floor(idx/state.ep)} · EP位${idx%state.ep} · 专家 E${lo}${per>1?'~E'+hi:''}（${state.tp>1?state.tp+' 张 TP 卡共持':'本卡持有'}）</div>`; }
         h+=`<div class="wdiag-tp-row">`;
         for(let t=0;t<tpN;t++){
           if(t>0) h+=`<span class="wdiag-tp-arr">↔</span>`;
           const _r=rankOf(d,p,c,t),_gb=cardMemGB(p,t),_pct=Math.min(100,_gb/state.cardGB*100),_mc=_pct>100?'over':_pct>80?'warn':'';
-          h+=`<div class="wdiag-card-outer"><div class="wdiag-g-label" title="rank ${_r}">${cardShortName()}_${_r}</div><div class="wdiag-card" data-d="${d}" data-p="${p}">${cardLayerHTML(p,t)}</div><div class="wdiag-mem mem-wrap" data-p="${p}" data-t="${t}">显存 ≈ <b>${_gb.toFixed(1)}</b> / ${state.cardGB} GB<div class="membar"><i class="${_mc}" style="width:${Math.min(100,_pct)}%"></i></div></div></div>`;
+          h+=`<div class="wdiag-card-outer"><div class="wdiag-g-label" title="rank ${_r}">${cardShortName()}_${_r}</div><div class="wdiag-card" data-d="${d}" data-p="${p}">${cardLayerHTML(p,t,d,c)}</div><div class="wdiag-mem mem-wrap" data-p="${p}" data-t="${t}">显存 ≈ <b>${_gb.toFixed(1)}</b> / ${state.cardGB} GB<div class="membar"><i class="${_mc}" style="width:${Math.min(100,_pct)}%"></i></div></div></div>`;
         }
         if(tpCollapsed) h+=`<span class="wdiag-tp-arr">↔</span><div class="wdiag-tp-more">⋯<br>其余<br>${tp-2} 卡</div>`;
         h+=`</div>`;
@@ -1104,7 +1155,7 @@ function stageLayers(p){
 }
 
 // 算子分片描述
-function opsForLayer(layer,t){
+function opsForLayer(layer,t,d=0,c=0){
   const tp=state.tp,ep=state.ep,cp=state.cp;
   const colShard=tp>1?{shard:`第 ${t+1}/${tp} 片`,cls:''}:{shard:'整块',cls:'rep'};
   switch(layer.kind){
@@ -1125,11 +1176,11 @@ function opsForLayer(layer,t){
       const ops=[{op:'router / gate',shard:'复制',cls:'rep'}];
       const E=state.experts;
       if(ep>1){
-        const per=Math.ceil(E/tp), s=t*per, e=Math.min(E,s+per), ids=[];
-        for(let x=s;x<e;x++)ids.push(x);
-        ops.push({op:'Experts (本卡持有)',shard:`专家 ${ids.join(',')||'—'}`,cls:'exp'});
+        const {lo,hi}=expertAssign(d,c), ids=[];
+        for(let x=lo;x<=hi;x++)ids.push(x);
+        ops.push({op:'Experts (本卡持有)',shard:`专家 ${ids.join(',')||'—'}${tp>1?` · 各第${t+1}/${tp}片`:''}`,cls:'exp'});
         ops.push({op:'all-to-all dispatch/combine',shard:'token 路由',cls:'exp'});
-      }else ops.push({op:`Experts ×${E}`,shard:'全部复制',cls:'rep'});
+      }else ops.push({op:`Experts ×${E}`,shard:tp>1?`各第${t+1}/${tp}片`:'全部复制',cls:tp>1?'':'rep'});
       return ops;
     }
     case 'norm': return [{op:'LayerNorm',shard:'复制',cls:'rep'}];
@@ -1147,8 +1198,8 @@ function cardMemGB(p,t){
     if(l.kind==='attn') params += 4*H*H/state.tp;
     else if(l.kind==='mlp') params += 8*H*H/state.tp;
     else if(l.kind==='moe'){
-      const per=state.ep>1?Math.ceil(state.experts/state.tp):state.experts;
-      params += per*8*H*H + H*state.experts; // experts + router
+      const perEP=state.experts/state.ep;          // EP 切专家数（ep=1 时即全部专家）
+      params += perEP*8*H*H/state.tp + H*state.experts; // 每专家矩阵再按 TP 切；router 复制
     }
     else if(l.kind==='emb'||l.kind==='head') params += V*H/state.tp;
   }
@@ -1185,9 +1236,9 @@ function memTooltipHTML(p,t){
         ?`8 × H² ÷ TP<br><span style="opacity:.55">up/down 权重矩阵，= 8 × ${H}² ÷ ${tp}</span>`
         :`8 × H²<br><span style="opacity:.55">up 权重矩阵(4H²) + down 权重矩阵(4H²)</span>`;
     } else if(l.kind==='moe'){
-      const per=state.ep>1?Math.ceil(state.experts/tp):state.experts;
-      cnt=per*8*H*H+H*state.experts;
-      formula=`${per} 专家权重矩阵 × 8H²<br><span style="opacity:.55">+ router 权重矩阵 H×E</span>`;
+      const perEP=state.experts/state.ep;
+      cnt=perEP*8*H*H/tp+H*state.experts;
+      formula=`${perEP} 专家 × 8H²${tp>1?' ÷ TP':''}<br><span style="opacity:.55">EP 切专家数 E/ep=${state.experts}/${state.ep}=${perEP}${tp>1?'，每专家矩阵再 ÷ TP':''} + router H×E</span>`;
     } else if(l.kind==='emb'||l.kind==='head'){
       cnt=V*H/tp;
       formula=tp>1
@@ -1259,7 +1310,7 @@ function renderViz(){
           if(state.cp>1) grp.push(`CP组[${cpGroup(d,p,t).join(',')}]`);
           if(grp.length) h+=`<div class="grpline">${grp.join(' · ')}</div>`;
           for(const layer of stageLayers(p)){
-            let ops=''; opsForLayer(layer,t).forEach(o=>ops+=`<div class="op">• ${o.op}<span class="shard ${o.cls}">${o.shard}</span></div>`);
+            let ops=''; opsForLayer(layer,t,d,c).forEach(o=>ops+=`<div class="op">• ${o.op}<span class="shard ${o.cls}">${o.shard}</span></div>`);
             h+=`<div class="layer L-${layer.kind}"><div class="ln">${layer.name}</div>${ops}</div>`;
           }
           if(state.tp>1) h+=`<div class="commtag">↔ TP all-reduce / all-gather（组内 ${state.tp} 卡）</div>`;
@@ -1874,26 +1925,27 @@ function renderHints(){
   // MoE / EP
   const epEl=$('hintEP');
   if(s.enMoE){
+    const cap=s.dp*s.cp;
     if(s.ep>1){
-      const perCard=Math.ceil(s.experts/s.tp);
-      const minPerCard=Math.floor(s.experts/s.tp);
-      const perCardDesc=minPerCard===perCard?`${perCard}`:`${minPerCard}~${perCard}`;
-      const cardTags=Array.from({length:s.tp},(_,t)=>{
-        const lo=t*perCard, hi=Math.min(s.experts-1,lo+perCard-1);
-        const label=lo===hi?`E${lo}`:`E${lo}~E${hi}`;
-        return `<span style="display:inline-block;margin:1px 2px;padding:0 5px;border-radius:3px;background:rgba(255,75,123,.13);color:var(--danger);font-size:10px;white-space:nowrap">卡${t}:${label}</span>`;
+      const perEP=s.experts/s.ep;
+      const cardTags=Array.from({length:s.ep},(_,r)=>{
+        const lo=r*perEP, hi=lo+perEP-1, label=lo===hi?`E${lo}`:`E${lo}~E${hi}`;
+        return `<span style="display:inline-block;margin:1px 2px;padding:0 5px;border-radius:3px;background:rgba(255,75,123,.13);color:var(--danger);font-size:10px;white-space:nowrap">EP位${r}:${label}</span>`;
       }).join('');
-      const epGroups=s.dp*s.pp*s.cp;
-      const groupsDesc=epGroups>1
-        ?`<br>DP×PP×CP = ${s.dp}×${s.pp}×${s.cp} = <b>${epGroups}</b>，这三个维度彼此隔离、不能共享专家，因此产生 <b>${epGroups}</b> 个独立 EP 组，每组专家分布相同。`
-        :``;
+      const edp=cap/s.ep;
       epEl.className='para-hint on';
-      epEl.innerHTML=`<b>切分专家到不同卡。</b>EP 启用，TP=<b>${s.tp}</b>：即每组 <b>${s.tp}</b> 张卡（TP 维度）协同持有全部 <b>${s.experts}</b> 个专家，每卡 <b>${perCardDesc}</b> 个专家：`+
-        cardTags+groupsDesc+
-        `<br>每个 token 被 router 选出 top-k 专家，通过 all-to-all 路由到持有对应专家的卡上计算`;
+      epEl.innerHTML=`<b>从 DP×CP 借卡切专家。</b>EP=<b>${s.ep}</b>：一个 EP 组内 <b>${s.ep}</b> 个 EP 位（专家位）各持 <b>${perEP}</b> 个专家，合起来覆盖全部 <b>${s.experts}</b> 个：`+
+        cardTags+
+        `<br>这些位<b>不是新增的卡</b>——来自 DP×CP = ${s.dp}×${s.cp} = <b>${cap}</b> 的副本卡（约束：EP 必须整除 DP×CP 且整除专家数，故 world size 不变）。`+
+        (edp>1?`其中 ${s.ep} 个 EP 位组成 1 个 EP 组，剩下 <b>${edp}</b> 份为 EDP（专家数据并行）副本，互相复制相同的专家划分。`:`此处 DP×CP 恰好全部用作 1 个 EP 组，无额外 EDP 副本。`)+
+        (s.tp>1?`<br>又因 TP=${s.tp}，每个 EP 位再被切成 <b>${s.tp}</b> 张物理卡（每卡持该位的 ${perEP} 个专家 × 1/${s.tp} 矩阵），故 1 个 EP 组实占 <b>${s.ep}×${s.tp}=${s.ep*s.tp}</b> 张物理卡。`:`<br>TP=1，此处 1 个 EP 位 = 1 张物理卡。`)+
+        `<br>token 经 router 选 top-k，再 all-to-all 路由到持有目标专家的卡。`;
     } else {
       epEl.className='para-hint on';
-      epEl.innerHTML=`<b>稀疏激活专家。</b>MoE 已启用，专家并行度为 1：<b>${s.experts}</b> 个专家完整复制在每张卡上，无需 all-to-all 路由`;
+      epEl.innerHTML=`<b>MoE 已启用，专家并行度 EP=1。</b><b>${s.experts}</b> 个专家在每个 DP×CP 副本上完整保有${s.tp>1?`（每个专家矩阵仍按 TP=${s.tp} 切片）`:''}，无 all-to-all 路由。`+
+        (cap<=1
+          ?`<br><b style="color:var(--danger)">当前 DP×CP=${cap}，没有可借用的副本卡，EP 只能为 1</b>——要开专家并行，得先把 DP 或 CP 提到 ≥2。`
+          :`<br>当前 DP×CP=${cap}，可把 EP 调到「整除 ${cap} 且整除 ${s.experts}」的值（如 ${epDivisors().filter(k=>k>1).join('、')||'—'}）来真正切分专家。`);
     }
   } else {
     epEl.className='para-hint';
@@ -1942,8 +1994,8 @@ function renderHints(){
     expertsEl.className='para-hint on';
     const activeRatio=Math.round(2/s.experts*100);
     const epDesc=s.ep>1
-      ?`EP 启用（TP=${s.tp}），每卡持有 <b>${(()=>{const mx=Math.ceil(s.experts/s.tp),mn=Math.floor(s.experts/s.tp);return mn===mx?mx:mn+'~'+mx;})()} 个专家</b>，token 经 all-to-all 路由`
-      :`专家完整复制在每张卡，无需 all-to-all`;
+      ?`EP=${s.ep}，每卡持有 <b>${s.experts/s.ep} 个专家</b>${s.tp>1?`（每专家矩阵再 ÷ TP=${s.tp}）`:''}，token 经 all-to-all 路由`
+      :`专家在每个 DP×CP 副本完整保有${s.tp>1?`（矩阵按 TP 切）`:''}，无需 all-to-all`;
     expertsEl.innerHTML=`<b>${s.experts}</b> 个专家，每个专家为独立 FFN（${H}→${H*4}→${H}）；`+
       `router 为每个 token 选 top-2，每次激活 ≈ <b>${activeRatio}%</b> 的参数；${epDesc}`;
   } else {
@@ -2038,9 +2090,9 @@ function renderConclusion(){
     const pct=Math.round(2/s.experts*100);
     tags.push('<span class="ctag">稀疏MoE</span>');
     if(s.ep>1){
-      clauses.push(`<b>MoE + EP</b>（TP=${s.tp}）：${s.experts} 专家分 ${s.tp} 张 TP 卡，每 token 仅激活 top-2（≈${pct}%）——适用于<b>想大幅扩大参数量但不增加 FLOPs</b>、同时分摊专家显存的场景`);
+      clauses.push(`<b>MoE + EP=${s.ep}</b>：${s.experts} 专家从 DP×CP=${s.dp}×${s.cp} 借 ${s.ep} 个 EP 位分担（每位 ${s.experts/s.ep} 个专家${s.tp>1?`，每位再 ×TP=${s.tp} 张物理卡`:''}），top-2 稀疏激活（≈${pct}%）——适用于<b>专家数多、单卡放不下全部专家</b>、需跨卡分摊专家显存的场景`);
     } else {
-      clauses.push(`<b>MoE</b>：${s.experts} 专家全量复制，top-2 稀疏激活（≈${pct}%）——适用于<b>以稀疏方式扩大模型容量</b>而每步计算量保持不变的场景`);
+      clauses.push(`<b>MoE</b>：${s.experts} 专家在每个副本完整保有，top-2 稀疏激活（≈${pct}%）——适用于<b>以稀疏方式扩大模型容量</b>而每步计算量保持不变的场景`);
     }
   }
 
@@ -2066,6 +2118,7 @@ function renderConclusion(){
 // All DP replicas advance in sync (each gets its own color).
 // TP/CP cards within a stage light up simultaneously.
 let _waTmr=null, _waStage=0, _waOnDone=null;
+let _flowPlaying=true;   // 计算流动动画开关（绿色高亮流动）：默认播放，由拓扑栏右上角按钮控制
 
 function _waClear(){
   const wd=$('worldDiagram'); if(!wd) return;
@@ -2148,6 +2201,25 @@ function _makeSvgArrow(svg,rootRect,x1,y1,x2,y2,spread){
   return {path,len};
 }
 
+// 计算流动动画开关：on=播放（重启循环），off=停止并清除所有绿色高亮/流动
+function setFlowPlaying(on){
+  _flowPlaying=on;
+  const btn=$('flowToggleBtn');
+  if(btn){
+    btn.classList.toggle('paused',!on);
+    btn.textContent=on?'⏸ 停止播放':'▶ 播放';
+    btn.title=on?'停止计算流动动画':'播放计算流动动画';
+  }
+  if(on){ initSplitArrows(); return; }
+  if(_splitTmr){clearTimeout(_splitTmr);_splitTmr=null;}
+  if(_waTmr){clearTimeout(_waTmr);_waTmr=null;}
+  _waOnDone=null; _splitCycleId++;
+  _waClear();                                  // 熄灭卡片/图层/算子的绿色高亮
+  const svg=$('wSplitSvg'); if(svg) svg.innerHTML='';
+  document.querySelectorAll('.wdiag-split-piece').forEach(p=>p.classList.remove('vis'));
+  const batchFull=document.querySelector('.wdiag-batch-full'); if(batchFull) batchFull.classList.remove('faded');
+}
+
 function initSplitArrows(){
   if(_splitTmr){clearTimeout(_splitTmr);_splitTmr=null;}
   if(_waTmr){clearTimeout(_waTmr);_waTmr=null;}
@@ -2155,6 +2227,7 @@ function initSplitArrows(){
   _splitPaths=null; _splitCycleId++;
   const svg=$('wSplitSvg'),root=$('wdiagRoot');
   if(!svg||!root) return;
+  if(!_flowPlaying){ svg.innerHTML=''; return; }   // 暂停：清空残留的绿色流动，不启动循环
   const rootRect=root.getBoundingClientRect();
   svg.innerHTML='';
   _splitPaths=[];
@@ -2757,18 +2830,17 @@ function syncDisabled(){
 }
 function update(scrollToHl, scrollCtrlId){
   syncDisabled(); readState();
-  // EP 上限：每卡至少 1 个专家，且不能超过 world size（无法超出物理卡数）
-  if(state.enMoE && !isPangu()){
-    const maxEP=Math.min(state.experts, state.world);
-    const epNum=$('ep'), epSl=$('epSlider');
-    epNum.max=maxEP; epSl.max=maxEP;
-    if(state.ep>maxEP){ state.ep=maxEP; epNum.value=maxEP; epSl.value=maxEP; }
-  }
+  renderEpChips();   // EP 合法取值有限，渲染成卡片单选（state.ep 已在 readState 吸附为合法值）
   // 中间区域头部:World Size。Pangu 即 32(纯推理张量并行 TP=32)。
   if($('world')) $('world').textContent=state.world;
   $('worldFormula').textContent=isPangu()
     ? `推理张量并行 attn/moe/embed_tp = ${state.tp}（无 DP/PP/CP）`
-    : `dp=${state.dp}、pp=${state.pp}、cp=${state.cp}、tp=${state.tp}`;
+    : `dp=${state.dp}、pp=${state.pp}、cp=${state.cp}、tp=${state.tp}`
+      + (state.enMoE
+          ? (state.ep>1
+              ? ` ｜ ep=${state.ep}（${state.dp*state.cp/state.ep} 个EP组，借自DP×CP不计入总卡）`
+              : ` ｜ ep=1`)
+          : ``);
   $('vBlocks').textContent=state.blocks; $('vHidden').textContent=state.hidden;
   $('vExperts').textContent=state.experts;
   // 超参数行:训练态显示训练超参;Pangu 推理态改用 tp32.yaml 的推理参数 + 改标签
@@ -2807,10 +2879,17 @@ $('ctrl').addEventListener('click',e=>{
   if(map && currentSources()[map.tab]){ activeTab=map.tab; renderTabs(); renderCode(true,id); }
 });
 // 滑动条 → 更新数字输入并转发 input 事件；数字输入 → 回写滑动条位置
-[['dp','dpSlider'],['pp','ppSlider'],['cp','cpSlider'],['tp','tpSlider'],['ep','epSlider']].forEach(([nid,sid])=>{
+[['dp','dpSlider'],['pp','ppSlider'],['cp','cpSlider'],['tp','tpSlider']].forEach(([nid,sid])=>{
   const num=$(nid),sl=$(sid); if(!num||!sl) return;
   sl.addEventListener('input',()=>{num.value=sl.value; num.dispatchEvent(new Event('input',{bubbles:true}));});
   num.addEventListener('input',()=>{sl.value=num.value;});
+});
+// EP 卡片单选 → 写入隐藏 #ep 并转发 input 事件（→ onControlChange → update）
+$('epChips').addEventListener('click',e=>{
+  const chip=e.target.closest('.ep-chip'); if(!chip) return;
+  if($('epChips').classList.contains('disabled')) return;
+  $('ep').value=chip.dataset.ep;
+  $('ep').dispatchEvent(new Event('input',{bubbles:true}));
 });
 document.querySelectorAll('.card-tile').forEach(tile=>{tile.onclick=()=>{document.querySelectorAll('.card-tile').forEach(t=>t.classList.remove('selected'));tile.classList.add('selected');update(false);};});
 
@@ -2826,7 +2905,7 @@ $('resetBtn').onclick=()=>{
 };
 
 // ── Pangu:把现有滑块锁定为只读发布配置（保留 Transformer 控件形态，仅禁用 + 改值）──
-const _SYNC=[['dp','dpSlider'],['pp','ppSlider'],['cp','cpSlider'],['tp','tpSlider'],['ep','epSlider']];
+const _SYNC=[['dp','dpSlider'],['pp','ppSlider'],['cp','cpSlider'],['tp','tpSlider']];
 let _prePangu=null;
 function _syncSliders(){ _SYNC.forEach(([n,s])=>{const sl=$(s),nu=$(n); if(sl&&nu){sl.max=nu.max; sl.value=nu.value; sl.disabled=nu.disabled;}}); }
 function lockPangu(){
@@ -2894,6 +2973,9 @@ $('libTabs').addEventListener('click',e=>{
   if(!currentSources()[activeTab]) activeTab=Object.keys(currentSources())[0];
   updateLibUI(); update(false); renderTabs();
 });
+
+// 拓扑栏右上角：播放/停止 计算流动动画（绿色高亮流动）
+$('flowToggleBtn').onclick=()=>setFlowPlaying(!_flowPlaying);
 
 // =================== MEM TOOLTIP BUBBLE ===================
 (()=>{
