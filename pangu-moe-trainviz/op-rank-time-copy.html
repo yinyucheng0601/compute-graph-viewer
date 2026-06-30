@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>openPangu-R-72B-MoE · 算子 × 硬件 × 时间</title>
+<title>openPangu-Ultra-MoE-718B-V1.1 · 算子 × 硬件 × 时间</title>
 <link rel="icon" href="data:," />
 
 <!-- PTO 设计系统：tokens + 共享 patterns（ide-frame / swimlane-task / floating-playback / workbench-shell） -->
@@ -21,17 +21,15 @@
   canvas{display:block}
 
   /* 框架铺满视口（页面级取舍：覆盖 ide-frame 默认 4:3 框中窗，让 3D 舞台更大） */
-  .pto-ide-frame{
-    width:100vw;height:100vh;aspect-ratio:auto;border-radius:0;box-shadow:none;--floating-playback-expanded-width:880px;
-    --ide-gradient-left-alpha:.30;--ide-gradient-right-alpha:.28;--ide-gradient-center-alpha:.18;--ide-gradient-lower-alpha:.15;
-    --ide-aura-left-alpha:.38;--ide-aura-right-alpha:.34;--ide-aura-center-alpha:.22;--ide-aura-lower-alpha:.18;--ide-aura-bottom-alpha:.18;
-  }
-  :root[data-theme='light'] .pto-ide-frame{
-    --ide-gradient-left-alpha:.26;--ide-gradient-right-alpha:.22;--ide-gradient-center-alpha:.14;--ide-gradient-lower-alpha:.12;
-    --ide-aura-left-alpha:.32;--ide-aura-right-alpha:.28;--ide-aura-center-alpha:.17;--ide-aura-lower-alpha:.14;--ide-aura-bottom-alpha:.13;
-  }
+  .pto-ide-frame{width:100vw;height:100vh;aspect-ratio:auto;border-radius:0;box-shadow:none;--floating-playback-expanded-width:880px}
   /* 播放条：加宽（见上 expanded-width）+ 整体下移 20px（默认 bottom:38px → 18px） */
   .pto-ide-frame__floating-playback-mount{bottom:18px}
+  :root[data-theme='light']{
+    --ide-frame-page-bg:#f8f8f8;
+    --ide-frame-bg:#f8f8f8;
+    --ide-frame-pane-bg:#fff;
+  }
+
   /* 顶栏 */
   .pto-ide-frame__host-chip span{font:var(--ide-frame-title-font);color:var(--foreground)}
   .pto-ide-frame__host-chip b{color:var(--accent)}
@@ -43,35 +41,9 @@
   .opv-icon-btn:hover{background:var(--state-hover);color:var(--foreground-secondary)}
   .opv-icon-btn.is-active{background:var(--ide-frame-control-bg);border-color:var(--ide-frame-control-border);color:var(--foreground)}
   .opv-icon-btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .ide-status{min-width:0;width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--foreground-muted);font:600 12px/1 var(--font-sans)}
-  .ide-status__group{min-width:0;display:flex;align-items:center;gap:14px}
-  .ide-status__group--left{flex:1 1 auto;overflow:hidden}
-  .ide-status__group--right{flex:0 1 auto;justify-content:flex-end;overflow:hidden}
-  .ide-status__item{min-width:0;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--foreground-muted)}
-  .ide-status__item--dynamic{overflow:hidden;text-overflow:ellipsis}
-  .ide-status__icon{width:16px;height:16px;flex:0 0 16px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-  .ide-status__icon--solid{fill:currentColor;stroke:none}
-  .ide-status__item--disabled{opacity:.55;text-decoration:line-through;text-decoration-thickness:1px}
-  .opv-explorer{padding:10px 8px 12px;display:flex;flex-direction:column;gap:8px;overflow:auto;font:600 12px/1.2 var(--font-sans)}
-  .opv-explorer-root{height:24px;display:flex;align-items:center;padding:0 7px;border-radius:var(--radius-sm);color:var(--foreground);font:800 11px/1 var(--font-sans);letter-spacing:.04em}
-  .opv-tree{display:flex;flex-direction:column;gap:1px}
-  .opv-tree-row{--depth:0;min-width:0;min-height:24px;display:grid;grid-template-columns:12px 16px minmax(0,1fr) auto;align-items:center;gap:6px;
-    padding:0 7px 0 calc(7px + (var(--depth) * 14px));border-radius:var(--radius-sm);color:var(--foreground-secondary)}
-  .opv-tree-row.is-active{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--foreground)}
-  .opv-tree-row.is-muted{color:var(--foreground-muted)}
-  .opv-tree-caret{width:0;height:0;border-top:4px solid transparent;border-bottom:4px solid transparent;border-left:5px solid currentColor;opacity:.72}
-  .opv-tree-row.is-open>.opv-tree-caret{transform:rotate(90deg)}
-  .opv-tree-spacer{width:12px}
-  .opv-tree-icon{position:relative;width:16px;height:16px;color:var(--foreground-muted)}
-  .opv-tree-icon--folder::before{content:"";position:absolute;left:1px;top:5px;width:14px;height:9px;border:1.5px solid currentColor;border-radius:2px;background:color-mix(in srgb,var(--foreground) 5%,transparent)}
-  .opv-tree-icon--folder::after{content:"";position:absolute;left:2px;top:3px;width:6px;height:4px;border:1.5px solid currentColor;border-bottom:0;border-radius:2px 2px 0 0}
-  .opv-tree-icon--file::before{content:"";position:absolute;left:3px;top:2px;width:10px;height:13px;border:1.5px solid currentColor;border-radius:2px}
-  .opv-tree-icon--file::after{content:"";position:absolute;right:3px;top:2px;width:4px;height:4px;border-left:1.5px solid currentColor;border-bottom:1.5px solid currentColor;background:var(--ide-frame-pane-bg)}
-  .opv-tree-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .opv-tree-badge{font:700 10px/1 var(--font-mono);color:var(--foreground-muted)}
   .pto-ide-frame[data-inspector-open="false"] [data-ide-pane="inspector"]{display:none}
-  .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"]>[data-ide-pane="editor-preview"]{flex:1 1 0%!important;width:auto!important}
-  .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"]>.pto-workbench-shell__split-gutter:has(+ [data-ide-pane="inspector"]){display:none}
+  .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"]>[data-ide-pane="editor-preview"]{flex:1 1 100%!important;width:100%!important}
+  .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"]>[data-split-direction="horizontal"].pto-workbench-shell__split-gutter{display:none}
   .pto-ide-frame[data-analysis-open="false"] [data-ide-pane="analysis-dock"]{display:none}
   .pto-ide-frame[data-analysis-open="false"] [data-ide-split="op-rank-vertical"]>[data-ide-pane="stage-row"]{flex:1 1 100%!important;height:100%!important}
   .pto-ide-frame[data-analysis-open="false"] [data-ide-split="op-rank-vertical"]>[data-split-direction="vertical"].pto-workbench-shell__split-gutter{display:none}
@@ -79,8 +51,8 @@
   /* 说明/图例/坐标系 弹窗（右上角 info icon 打开） */
   .opv-popup{position:fixed;top:52px;right:14px;z-index:150;width:340px;max-height:calc(100vh - 96px);overflow:auto;
     padding:14px;display:flex;flex-direction:column;gap:16px;
-    background:var(--ide-frame-pane-fill);border:1px solid var(--ide-frame-pane-border);border-radius:var(--radius-md);
-    box-shadow:var(--ide-frame-pane-shadow);backdrop-filter:var(--ide-frame-pane-backdrop-filter);-webkit-backdrop-filter:var(--ide-frame-pane-backdrop-filter)}
+    background:var(--ide-frame-pane-bg);border:1px solid var(--ide-frame-pane-border);border-radius:var(--radius-md);
+    box-shadow:0 18px 54px rgba(0,0,0,.34);backdrop-filter:var(--surface-backdrop-filter-soft)}
   .opv-popup[hidden]{display:none}
   .opv-popup__head{display:flex;align-items:center;justify-content:space-between}
   .opv-popup__title{font:var(--ide-frame-title-font);color:var(--foreground)}
@@ -119,6 +91,7 @@
 
   /* 3D 舞台（中间面板） */
   [data-ide-pane="editor-preview"]>.pto-ide-frame__pane-header{background:transparent;border-bottom-color:transparent;box-shadow:none}
+  :root[data-theme='light'] [data-ide-pane="editor-preview"]>.pto-ide-frame__pane-header{background:#fff}
   :root[data-theme='light'] [data-ide-pane="editor-preview"]>.pto-ide-frame__pane-header .pto-ide-frame__pane-title,
   :root[data-theme='light'] [data-ide-pane="editor-preview"]>.pto-ide-frame__pane-header .pto-ide-frame__pane-meta,
   :root[data-theme='light'] .opv-focus .meta,
@@ -226,6 +199,14 @@
   .opv-analysis-grid-wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:8px;min-height:0;flex:1}
   .opv-moe-heatmap,.opv-load-bars{display:block;width:100%;height:100%;border:1px solid var(--border-subtle);
     border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 2.5%,transparent)}
+  /* MoE Load · Distribution 面积堆叠图 */
+  .opv-analysis-tooltip.opv-dist-tip{width:auto;max-width:340px}
+  .opv-dist-tip-grid{display:grid;grid-template-columns:repeat(4,auto);gap:2px 10px;margin-top:5px}
+  .opv-dist-tip-grid span{display:inline-flex;align-items:center;gap:4px;font:10px/1.35 var(--font-mono);color:var(--foreground-secondary);white-space:nowrap}
+  .opv-dist-tip-grid i{width:8px;height:8px;border-radius:2px;flex:none}
+  .opv-moe-dist-wrap{position:relative;flex:1;min-height:0}
+  .opv-moe-dist{display:block;width:100%;height:100%;border:1px solid var(--border-subtle);
+    border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 2.5%,transparent)}
   .opv-analysis-detail{border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 3.5%,transparent);padding:10px;overflow:auto}
   .opv-analysis-detail-title{font:var(--text-title-2);font-size:13px;color:var(--foreground);margin-bottom:8px}
   .opv-analysis-detail-grid{display:grid;grid-template-columns:86px minmax(0,1fr);gap:6px 8px;font:var(--text-label)}
@@ -300,32 +281,6 @@
   .opv-anomaly-badge:hover{filter:brightness(1.1)}
   .opv-anomaly-badge.is-selected{outline:2px solid #fff;outline-offset:1px;filter:brightness(1.12)}
   .opv-anomaly-badge.is-dimmed{opacity:.32}
-  .opv-ep-label-layer{position:absolute;inset:0;z-index:36;pointer-events:none;overflow:hidden}
-  .opv-ep-label{position:absolute;display:none;transform:translate(10px,-50%);min-width:104px;
-    padding:6px 8px;border-radius:var(--radius-md);border:1px solid color-mix(in srgb,#8b5cf6 64%,transparent);
-    background:color-mix(in srgb,var(--ide-frame-pane-bg) 82%,#8b5cf6 18%);
-    box-shadow:0 10px 26px rgba(109,40,217,.18);font:700 12px/1.1 var(--font-mono);color:#5b21b6}
-  .opv-ep-label span{display:block;margin-top:3px;font:600 10px/1 var(--font-sans);color:color-mix(in srgb,#5b21b6 64%,var(--foreground-muted))}
-  :root[data-theme='dark'] .opv-ep-label{color:#ede9fe;background:rgba(76,29,149,.76);border-color:rgba(196,181,253,.62)}
-  :root[data-theme='dark'] .opv-ep-label span{color:#ddd6fe}
-  .opv-ep-label.opv-tp-label{border-color:color-mix(in srgb,#2563eb 64%,transparent);
-    background:color-mix(in srgb,var(--ide-frame-pane-bg) 82%,#2563eb 18%);color:#1d4ed8}
-  .opv-ep-label.opv-tp-label span{color:color-mix(in srgb,#1d4ed8 64%,var(--foreground-muted))}
-  :root[data-theme='dark'] .opv-ep-label.opv-tp-label{color:#dbeafe;background:rgba(30,64,175,.76);border-color:rgba(147,197,253,.62)}
-  :root[data-theme='dark'] .opv-ep-label.opv-tp-label span{color:#bfdbfe}
-  .opv-ep-label.opv-pp-label{border-color:color-mix(in srgb,#16a34a 64%,transparent);
-    background:color-mix(in srgb,var(--ide-frame-pane-bg) 82%,#16a34a 18%);color:#166534;
-    transform:translate(-50%,-50%);pointer-events:auto;cursor:help}
-  .opv-ep-label.opv-pp-label span{color:color-mix(in srgb,#166534 64%,var(--foreground-muted))}
-  .opv-ep-label.opv-pp-label:hover,
-  .opv-ep-label.opv-pp-label.is-hovered{border-color:#16a34a;box-shadow:0 12px 30px rgba(22,163,74,.28);filter:saturate(1.08)}
-  :root[data-theme='dark'] .opv-ep-label.opv-pp-label{color:#dcfce7;background:rgba(22,101,52,.76);border-color:rgba(134,239,172,.62)}
-  :root[data-theme='dark'] .opv-ep-label.opv-pp-label span{color:#bbf7d0}
-  .opv-ep-label.opv-dp-label{border-color:color-mix(in srgb,#6366f1 64%,transparent);
-    background:color-mix(in srgb,var(--ide-frame-pane-bg) 82%,#6366f1 18%);color:#4338ca}
-  .opv-ep-label.opv-dp-label span{color:color-mix(in srgb,#4338ca 64%,var(--foreground-muted))}
-  :root[data-theme='dark'] .opv-ep-label.opv-dp-label{color:#e0e7ff;background:rgba(49,46,129,.76);border-color:rgba(165,180,252,.62)}
-  :root[data-theme='dark'] .opv-ep-label.opv-dp-label span{color:#c7d2fe}
   @keyframes opvBadgePulse{0%,100%{box-shadow:0 4px 14px rgba(0,0,0,.34)}50%{box-shadow:0 0 16px 3px var(--danger)}}
   .opv-loss-readout .regime.is-clickable{cursor:pointer}
   .opv-loss-readout .regime.is-clickable:hover{filter:brightness(1.1)}
@@ -375,8 +330,7 @@
   .opv-diag-list__item{width:100%;text-align:left;border:1px solid var(--border-subtle);border-radius:var(--radius-md);
     background:color-mix(in srgb,var(--foreground) 3%,transparent);padding:9px;cursor:pointer;color:var(--foreground)}
   .opv-diag-list__item:hover{border-color:var(--border-strong);background:color-mix(in srgb,var(--foreground) 5%,transparent)}
-  .opv-diag-list__item.is-previewing{border-color:color-mix(in srgb,#4f6df6 70%,var(--border-strong));background:color-mix(in srgb,#4f6df6 10%,transparent)}
-  .opv-diag-list__item.is-selected{border-color:#4f6df6;box-shadow:0 0 0 1px rgba(79,109,246,.18)}
+  .opv-diag-list__item.is-selected{border-color:var(--border-subtle);box-shadow:none}
   .opv-diag-list__head{display:flex;align-items:center;gap:7px}
   .opv-diag-list__sev{width:7px;height:7px;border-radius:50%;flex:none;background:#c47d18}
   .opv-diag-list__item[data-sev="2"] .opv-diag-list__sev{background:#dd6a1c}
@@ -394,7 +348,7 @@
   #tip .t-desc{color:var(--foreground);margin-top:6px}
 
   /* Loss 趋势 tab：复用 training-metrics-chart pattern（scope .pto-tmchart*） */
-  .opv-loss-view{height:100%;display:flex;flex-direction:column;gap:10px;padding:var(--space-5) var(--space-6) var(--space-4);min-height:0;overflow:auto}
+  .opv-loss-view{height:100%;display:flex;flex-direction:column;gap:10px;padding:16px var(--space-6) var(--space-4);min-height:0;overflow:auto}
   .opv-loss-readout{flex:none;display:flex;align-items:center;gap:10px;font:var(--text-body-sm);color:var(--foreground-secondary)}
   .opv-loss-readout b{color:var(--foreground);font-family:var(--font-mono)}
   .opv-loss-readout .regime{height:20px;padding:0 9px;display:inline-flex;align-items:center;border-radius:var(--radius-pill);
@@ -403,22 +357,29 @@
   .opv-loss-readout .regime[data-regime="fault"]{background:#d08312}
   .opv-loss-readout .regime[data-regime="collapse"]{background:var(--danger)}
   .opv-loss-chart-wrap{flex:1;min-height:0;width:100%}
-  /* Monitor 视图：左 1/4 train/val loss 图 + 右侧观测指标卡片 */
-  :root{--monitor-valacc:#ec4899}
+  /* Monitor 视图：左 1/4 train/val loss 图 + 右 3 个指标卡片 */
+  :root{--monitor-valacc:#ec4899}  /* val acc 专用色（玫红），与 train acc 的绿色及其它指标都不同 */
   .opv-monitor-row{display:flex;gap:10px;flex:1;min-height:0}
   .opv-monitor-chart{flex:0 0 25%;max-width:25%;min-width:0;min-height:0;display:flex;flex-direction:column}
   .opv-monitor-cards{flex:1;min-width:0;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .opv-monitor-card{display:flex;flex-direction:column;gap:6px;min-width:0;min-height:0;padding:10px;overflow:hidden;
     border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 3%,transparent)}
+  /* 卡片内自绘图例（loss / acc）：紧凑一行，固定在卡片头部下方 */
   .opv-monitor-legend{flex:none;display:flex;flex-wrap:wrap;gap:3px 10px}
   .opv-monitor-legend span{display:inline-flex;align-items:center;gap:5px;font:var(--text-label);color:var(--foreground-secondary);white-space:nowrap}
   .opv-monitor-legend i{width:12px;height:3px;border-radius:2px;flex:none}
   .opv-monitor-card__head{display:flex;align-items:baseline;gap:6px}
   .opv-monitor-card__name{font:var(--text-label);color:var(--foreground-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 标题下方一行：左=结果值，右=图例 */
   .opv-monitor-card__sub{flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
   .opv-monitor-card__val{font:var(--text-mono);font-size:13px;font-weight:700;color:var(--foreground);flex:none}
   .opv-monitor-card__note{font:var(--text-label);font-size:9px;color:var(--foreground-muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .opv-monitor-card__chart{flex:1;min-height:78px;width:100%}
+  .opv-monitor-card__chart{flex:1;min-height:0;width:100%}
+  @media (max-width:920px){
+    .opv-monitor-row{flex-direction:column}
+    .opv-monitor-chart{flex:0 0 auto;max-width:100%;height:160px}
+    .opv-monitor-cards{grid-template-columns:1fr}
+  }
   .pto-tmchart{position:relative;width:100%;font-family:var(--font-sans);user-select:none}
   .pto-tmchart__svg{display:block;width:100%;height:auto;overflow:visible}
   .pto-tmchart__grid line{stroke:var(--border-subtle);stroke-width:1}
@@ -444,9 +405,6 @@
   .pto-tmchart__legend-swatch{width:14px;height:3px;border-radius:2px}
 
   @media (max-width:920px){
-    .opv-monitor-row{flex-direction:column}
-    .opv-monitor-chart{flex:0 0 auto;max-width:100%;height:160px}
-    .opv-monitor-cards{grid-template-columns:1fr}
     .pto-ide-frame__pane-meta{display:none}
   }
   @media (max-width:640px){
@@ -478,12 +436,12 @@
 </head>
 <body>
 
-<section class="pto-ide-frame" id="opRankIdeFrame" data-ide-frame data-host="standalone" data-cursor-dots="true" data-inspector-open="true" data-analysis-open="true" data-explorer-collapsed="false" aria-label="Pangu MoE TrainViz IDE frame">
+<section class="pto-ide-frame" data-ide-frame data-host="standalone" data-hide-activity-rail="true" data-inspector-open="true" data-analysis-open="true" aria-label="openPangu MoE 训练透视">
   <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
     <div class="pto-ide-frame__topbar-left">
       <div class="pto-ide-frame__host-chip">
         <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
-        <span>openPangu-R-72B-MoE · <b>算子 × 硬件 × 时间</b></span>
+        <span>openPangu-Ultra-MoE-718B-V1.1 · <b>算子 × 硬件 × 时间</b></span>
       </div>
     </div>
     <div class="pto-ide-frame__topbar-center">
@@ -508,54 +466,16 @@
   </header>
 
   <div class="pto-ide-frame__body">
-    <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
-      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle file explorer" aria-controls="pangu-explorer-pane" aria-expanded="true" aria-pressed="true" title="Explorer">
-        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
-      </button>
-      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
-        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
-      </button>
-      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Source control" title="Source control">
-        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path><path d="M6 9v12"></path></svg>
-      </button>
-      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Terminal" title="Terminal">
-        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
-      </button>
-    </nav>
     <div class="pto-ide-frame__workarea">
-      <div class="pto-ide-frame__split" data-ide-split="op-rank-vertical" data-storage-key="pangu-moe-trainviz-vertical-v1" data-split-direction="vertical" data-sizes="60,40" data-min-size="280,200">
+      <div class="pto-ide-frame__split" data-ide-split="op-rank-vertical" data-split-direction="vertical" data-sizes="60,40" data-min-size="280,200">
 
         <section class="pto-ide-frame__pane pto-ide-frame__pane--stack" data-ide-pane="stage-row">
-          <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-storage-key="pangu-moe-trainviz-main-v1" data-split-direction="horizontal" data-sizes="18,56,26" data-pixel-sizes="280" data-min-size="220,380,260">
-
-            <aside id="pangu-explorer-pane" class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" aria-hidden="false">
-              <header class="pto-ide-frame__pane-header">
-                <span class="pto-ide-frame__pane-title">Explorer</span>
-                <span class="pto-ide-frame__pane-meta">PANGU</span>
-              </header>
-              <div class="pto-ide-frame__pane-body opv-explorer">
-                <div class="opv-explorer-root">PANGU-MOE-TRAINVIZ</div>
-                <div class="opv-tree" aria-label="Pangu model files">
-                  <div class="opv-tree-row is-open" style="--depth:0"><span class="opv-tree-caret"></span><span class="opv-tree-icon opv-tree-icon--folder"></span><span class="opv-tree-name">data</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">graph-ultramoe-718b.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">strict-1f1b-trace-sim.json</span><span class="opv-tree-badge">JSON</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">timeseries.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row is-open" style="--depth:0"><span class="opv-tree-caret"></span><span class="opv-tree-icon opv-tree-icon--folder"></span><span class="opv-tree-name">js</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">analysis-data.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">analysis-dock.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row" style="--depth:1"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">training-metrics-chart.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row is-active" style="--depth:0"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">op-rank-time.html</span><span class="opv-tree-badge">HTML</span></div>
-                  <div class="opv-tree-row" style="--depth:0"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">pangu-palette.js</span><span class="opv-tree-badge">JS</span></div>
-                  <div class="opv-tree-row is-muted" style="--depth:0"><span class="opv-tree-spacer"></span><span class="opv-tree-icon opv-tree-icon--file"></span><span class="opv-tree-name">SPEC-op-rank-time-A.md</span><span class="opv-tree-badge">MD</span></div>
-                </div>
-              </div>
-            </aside>
+          <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="72,28" data-min-size="380,260">
 
             <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
               <div class="pto-ide-frame__pane-body opv-stage">
                 <div id="app"></div>
                 <div class="opv-anomaly-layer" id="anomalyLayer" aria-label="异常徽标"></div>
-                <div class="opv-ep-label-layer" id="epLabelLayer" aria-label="EP bucket 标注"></div>
                 <div class="opv-object-panel" id="objectPanel" aria-label="对象筛选与高亮" hidden>
                   <div class="opv-object-panel__head">
                     <span class="opv-object-panel__title">对象聚焦</span>
@@ -589,10 +509,9 @@
                   <div class="opv-object-panel__group">
                     <div class="opv-object-panel__label">Communication</div>
                     <div class="opv-object-panel__items">
-                      <button class="opv-object-btn" type="button" data-focus-object="comm:tp">TP=2 All-Reduce</button>
-                      <button class="opv-object-btn" type="button" data-focus-object="comm:ep">EP=2 All-to-All</button>
-                      <button class="opv-object-btn" type="button" data-focus-object="comm:pp">PP=4 Send/Recv</button>
-                      <button class="opv-object-btn" type="button" data-focus-object="comm:dp">DP=2 Grad Sync</button>
+                      <button class="opv-object-btn" type="button" data-focus-object="comm:tp">TP All-Reduce</button>
+                      <button class="opv-object-btn" type="button" data-focus-object="comm:ep">EP All-to-All</button>
+                      <button class="opv-object-btn" type="button" data-focus-object="comm:pp">PP Send/Recv</button>
                       <button class="opv-object-btn" type="button" data-focus-object="comm:logits">Logits Gather</button>
                     </div>
                   </div>
@@ -681,7 +600,7 @@
           <header class="pto-ide-frame__pane-header">
             <div class="opv-analysis-tabs" id="analysisTabs" role="group" aria-label="Analysis views"></div>
             <span class="pto-ide-frame__pane-title" id="analysisTitle">Timeline / Swimlane</span>
-            <span class="pto-ide-frame__pane-meta" id="analysisMeta">DP2 × PP4 × TP2 × EP2 · chunk-level schedule</span>
+            <span class="pto-ide-frame__pane-meta" id="analysisMeta">DP2 × PP2 × TP8 · chunk-level schedule</span>
             <button id="commModeToggle" class="opv-object-btn opv-comm-toggle" type="button" aria-pressed="false"
               title="通信展示：细条子轨 ⇄ 与计算同款双轨（行高×2）">通信双轨</button>
           </header>
@@ -698,32 +617,9 @@
         </section>
 
       </div>
-      <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" data-ide-slot="status" aria-label="IDE status">
-        <div class="ide-status">
-          <div class="ide-status__group ide-status__group--left">
-            <span class="ide-status__item" title="Errors">
-              <svg class="ide-status__icon ide-status__icon--solid" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m15 9-6 6" stroke="var(--ide-frame-bg)" stroke-width="2.4" stroke-linecap="round"></path><path d="m9 9 6 6" stroke="var(--ide-frame-bg)" stroke-width="2.4" stroke-linecap="round"></path></svg>
-              <span>0</span>
-            </span>
-            <span class="ide-status__item" title="Warnings">
-              <svg class="ide-status__icon ide-status__icon--solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2L12 3Z"></path><path d="M12 8v6" stroke="var(--ide-frame-bg)" stroke-width="2.2" stroke-linecap="round"></path><path d="M12 17.2h.01" stroke="var(--ide-frame-bg)" stroke-width="3" stroke-linecap="round"></path></svg>
-              <span>0</span>
-            </span>
-            <span class="ide-status__item" title="IDE Panel">
-              <svg class="ide-status__icon ide-status__icon--solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v13H4z"></path><path d="M8 8v5" stroke="var(--ide-frame-bg)" stroke-width="2" stroke-linecap="round"></path><path d="M12 10v3" stroke="var(--ide-frame-bg)" stroke-width="2" stroke-linecap="round"></path><path d="M16 6v7" stroke="var(--ide-frame-bg)" stroke-width="2" stroke-linecap="round"></path><path d="M8 21h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-            </span>
-            <span class="ide-status__item ide-status__item--dynamic" id="statusLeft">—</span>
-          </div>
-          <div class="ide-status__group ide-status__group--right">
-            <span class="ide-status__item ide-status__item--dynamic" id="statusRight">—</span>
-            <span class="ide-status__item">UTF-8</span>
-            <span class="ide-status__item">LF</span>
-            <span class="ide-status__item" title="Language tools">{ }</span>
-            <span class="ide-status__item">Markdown</span>
-            <span class="ide-status__item ide-status__item--disabled">CUE</span>
-            <span class="ide-status__item" title="Notifications"><svg class="ide-status__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
-          </div>
-        </div>
+      <footer class="pto-ide-frame__status-strip">
+        <span id="statusLeft">—</span>
+        <span id="statusRight">—</span>
       </footer>
     </div>
   </div>
@@ -736,8 +632,8 @@
   </div>
   <div>
     <div class="opv-section-label">说明</div>
-    <p class="opv-note">上方是<b>openPangu-R-72B MoE 架构图</b>：local XY 图立成竖板；Embedding 与 Final/Head 只出现一次；中间 <b>L0–L49 全部 decoder layers</b> 沿世界 Y 展开，<b>L0–L3 是 Dense</b>（mlp_only_layers=[0,1,2,3]），<b>L4–L49 是 MoE</b>；config 声明 num_mtp_layers=1，但当前主图仍聚焦 causal LM forward，不画 MTP head。下方 32 卡按 1F1B 流水播放，竖线连到当前算子的卡。</p>
-    <p class="opv-note" style="margin-top:6px">代表配置 <em>DP2 × PP4 × TP2 × EP2 = 32 ranks</em>；这是 72B 训练通信 demo 的缩小切片，DP 为 demo 显式维度，官方论文披露 TP/EP/PP/VPP/CP，完整 DP 只可推导。</p>
+    <p class="opv-note">上方是<b>真实完整架构图</b>：local XY 图立成竖板；Embedding 与 Final/Head 只出现一次；中间 <b>L0–L60 全部 decode layers</b> 沿世界 Y 展开，<b>L0–L2 是 Dense</b>（num_dense_layers=3），<b>L3–L60 是 MoE</b>；config 声明 num_mtp_layers=1，但当前 forward 未构建 MTP head，所以主图不画 MTP。下方 32 卡按 1F1B 流水满载，竖线连到当前算子的卡。</p>
+    <p class="opv-note" style="margin-top:6px">代表配置 <em>DP2 × PP2 × TP8 = 32 卡</em>（真实 DP32/PP16/TP8/EP32·4096 卡的缩放示意）。</p>
   </div>
   <div>
     <div class="opv-section-label">算子语义色</div>
@@ -758,7 +654,6 @@
       <div class="row"><span class="ln" data-line="tp"></span>All-Reduce (TP)</div>
       <div class="row"><span class="ln" data-line="ep"></span>All-to-All (EP)</div>
       <div class="row"><span class="ln" data-line="pp"></span>send/recv (PP)</div>
-      <div class="row"><span class="ln" data-line="dp"></span>gradient sync (DP)</div>
     </div>
   </div>
   <div>
@@ -816,7 +711,7 @@ import {
 
 /* ===== 粗连线（Line2，真实像素宽度，浏览器不会忽略） ===== */
 const LINE_RES=new THREE.Vector2(1,1), fatMats=new Set();
-const LW={arch:1.65, dyn:1.35, arc:1.45, halo:1.45};
+const LW={arch:1.2, dyn:1.2, arc:1.2, halo:1.2};
 function fatLine(points,color,opacity,linewidth){
   const pos=[]; points.forEach(p=>pos.push(p.x,p.y,p.z));
   const g=new LineGeometry(); g.setPositions(pos);
@@ -843,16 +738,12 @@ try{
   });
 }catch(err){
   console.error('Failed to load simulated 1F1B trace',err);
-  TRACE={schema:'fallback',fidelity:'fallback',defaultTick:0,config:{dp:2,pp:4,tp:2,ep:2,microbatches:1,stageRanges:{0:[0,12],1:[13,25],2:[26,37],3:[38,49]}},lanes:[
-    {id:'d0p0',dp:0,stage:0,label:'D0 · PP0',rankRange:'0-3'},
-    {id:'d0p1',dp:0,stage:1,label:'D0 · PP1',rankRange:'4-7'},
-    {id:'d0p2',dp:0,stage:2,label:'D0 · PP2',rankRange:'8-11'},
-    {id:'d0p3',dp:0,stage:3,label:'D0 · PP3',rankRange:'12-15'},
-    {id:'d1p0',dp:1,stage:0,label:'D1 · PP0',rankRange:'16-19'},
-    {id:'d1p1',dp:1,stage:1,label:'D1 · PP1',rankRange:'20-23'},
-    {id:'d1p2',dp:1,stage:2,label:'D1 · PP2',rankRange:'24-27'},
-    {id:'d1p3',dp:1,stage:3,label:'D1 · PP3',rankRange:'28-31'}
-  ],ticks:[{tick:0,region:'steady',stages:{0:{phase:'F',micro:0,layerRange:[0,12],opFocus:{layer:4,step:'mla'},stepIndex:1,stepTotal:13,label:'F m0 · L0-L12',dependsOn:['input'],produces:['hidden'],explain:'Fallback simulated frame.'},1:{phase:'F',micro:0,layerRange:[13,25],opFocus:{layer:13,step:'gate'},stepIndex:1,stepTotal:13,label:'F m0 · L13-L25',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback simulated frame.'},2:{phase:'F',micro:0,layerRange:[26,37],opFocus:{layer:26,step:'experts'},stepIndex:1,stepTotal:12,label:'F m0 · L26-L37',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback simulated frame.'},3:{phase:'B',micro:0,layerRange:[38,49],opFocus:{layer:49,step:'lm_head'},stepIndex:12,stepTotal:12,label:'B m0 · L49-L38',dependsOn:['loss'],produces:['grad'],explain:'Fallback simulated frame.'}}}]};
+  TRACE={schema:'fallback',fidelity:'fallback',defaultTick:0,config:{dp:2,pp:2,tp:8,microbatches:1,stageRanges:{0:[0,30],1:[31,60]}},lanes:[
+    {id:'d0p0',dp:0,stage:0,label:'D0 · PP0',rankRange:'0-7'},
+    {id:'d0p1',dp:0,stage:1,label:'D0 · PP1',rankRange:'8-15'},
+    {id:'d1p0',dp:1,stage:0,label:'D1 · PP0',rankRange:'16-23'},
+    {id:'d1p1',dp:1,stage:1,label:'D1 · PP1',rankRange:'24-31'}
+  ],ticks:[{tick:0,region:'steady',stages:{0:{phase:'F',micro:0,layerRange:[0,30],opFocus:{layer:30,step:'moe_residual'},stepIndex:1,stepTotal:1,label:'F m0 · L0-L30',dependsOn:['input'],produces:['hidden'],explain:'Fallback simulated frame.'},1:{phase:'F',micro:0,layerRange:[31,60],opFocus:{layer:31,step:'mla'},stepIndex:1,stepTotal:1,label:'F m0 · L31-L60',dependsOn:['hidden'],produces:['loss'],explain:'Fallback simulated frame.'}}}]};
 }
 document.getElementById('traceMeta').textContent=`${TRACE.fidelity} · ${TRACE.config.schedule||'simulated schedule'} · ${TRACE.ticks.length} ticks`;
 
@@ -861,7 +752,6 @@ let pbOpname=null,pbCounter=null,pbScrubber=null,statusLeft=null,statusRight=nul
 let analysisDockController=null;
 let activeAnalysisView='timeline';
 let threeSceneReady=false;
-let swimHost=null, swimTip=null, axisCanvas=null, bodyCanvas=null, scrollEl=null, swimBuilt=false;
 
 /* ===== UI 主题 ===== */
 const themeBtn=document.getElementById('themeToggle');
@@ -884,9 +774,9 @@ function refreshAfterInspectorToggle(){
   requestAnimationFrame(()=>{
     if(threeSceneReady&&typeof sizeRenderer==='function')sizeRenderer();
     if(threeSceneReady&&typeof resizeAxisRenderer==='function')resizeAxisRenderer();
-    if(threeSceneReady&&typeof renderSwimlane==='function')renderSwimlane();
+    if(typeof renderSwimlane==='function')renderSwimlane();
     analysisDockController?.resize?.();
-    if(threeSceneReady&&typeof redraw==='function')redraw();
+    if(typeof redraw==='function')redraw();
   });
 }
 function setAnalysisDockOpen(open){
@@ -972,35 +862,6 @@ addEventListener('keydown',e=>{if(e.key==='Escape')setInfo(false);});
 
 /* ===== 真实图(全展开,只读) ===== */
 const G = window.buildUltraMoE718BGraph({moeExpanded:true, expertExpanded:true});
-const MODEL_CONFIG={
-  name:'openPangu-R-72B-2512',
-  displayName:'openPangu-R-72B MoE',
-  source:'config.json + OmniInfer PanguProMoEV2 source',
-  hiddenLayers:50,
-  denseLayers:[0,1,2,3],
-  firstMoeLayer:4,
-  lastMoeLayer:49,
-  routedExperts:80,
-  expertsPerTok:8,
-  sharedExpertLabel:'shared expert intermediate 2560',
-  demoParallel:{dp:2,pp:4,tp:2,ep:2,cp:1,vpp:1},
-};
-const DEMO=MODEL_CONFIG.demoParallel;
-const DEMO_STAGE_RANGES=Array.from(
-  {length:DEMO.pp},
-  (_,stage)=>TRACE.config.stageRanges?.[stage]||TRACE.config.stageRanges?.[String(stage)]||[0,0]
-);
-const rankOf=(dp,stage,tp,ep=0)=>(((dp*DEMO.pp+stage)*DEMO.tp+tp)*DEMO.ep+ep);
-const localRankOf=(tp,ep=0)=>tp*DEMO.ep+ep;
-const epLabel=ep=>`EP${ep} (${ep+1}/${DEMO.ep})`;
-const tpLabel=tp=>`TP${tp} (${tp+1}/${DEMO.tp})`;
-const ppLabel=stage=>`PP${stage} (${stage+1}/${DEMO.pp})`;
-const dpLabel=dp=>`DP${dp} (${dp+1}/${DEMO.dp})`;
-const rankRangeForNode=node=>{
-  const first=rankOf(node.dp,node.stage,0,0);
-  const last=rankOf(node.dp,node.stage,DEMO.tp-1,DEMO.ep-1);
-  return `${first}-${last}`;
-};
 const byId = new Map(G.nodes.map(n=>[n.id,n]));
 const EXPERT_IDS = G.nodes.filter(n=>/^expert_group_/.test(n.id)).map(n=>n.id);
 
@@ -1009,14 +870,14 @@ const RANK_COLOR_KEYS=Array.from({length:32},(_,rank)=>Array.from({length:7},(_,
 const SEMANTIC_KEYS=[
   'sem:embedding','module:decoder','sem:attention','sem:norm','sem:gate','sem:comm',
   'sem:moe','sem:mlp','sem:residual','sem:head','module:moe','module:model','module:mlp',
-  'io:input','io:parameter','io:output','pipeline:bubble','sem:dp',
+  'io:input','io:parameter','io:output','pipeline:bubble',
   ...RANK_COLOR_KEYS
 ];
 const ROLE_LABEL={
   'sem:embedding':'Embedding','module:decoder':'Dense','sem:attention':'MLA','sem:norm':'Norm',
   'sem:gate':'Router','sem:comm':'All-to-All','sem:moe':'Experts','sem:mlp':'Shared Expert',
   'sem:residual':'Post-MLP Norm','sem:head':'Head','io:input':'Input','io:parameter':'Parameter',
-  'io:output':'Output','pipeline:bubble':'Bubble','sem:dp':'DP Sync'
+  'io:output':'Output','pipeline:bubble':'Bubble'
 };
 // 正式页固定使用方案一，避免 palette-lab 的旧 localStorage 选择污染当前视觉。
 const SELECTED_PALETTE_ID='balanced';
@@ -1039,7 +900,7 @@ function applySemanticPalette(){
     :baseDsMap(SEMANTIC_KEYS);
   SEM_COLOR=Object.fromEntries(SEMANTIC_KEYS.map(key=>[key,hexInt(palette[key]||'#8b929e')]));
   GRAY=hexInt(theme==='light'?'#64748b':'#8b929e');
-  LINE={tp:SEM_COLOR['sem:attention'],ep:SEM_COLOR['sem:comm'],pp:SEM_COLOR['sem:mlp'],dp:SEM_COLOR['sem:dp']??0x9aa7ff};
+  LINE={tp:SEM_COLOR['sem:attention'],ep:SEM_COLOR['sem:comm'],pp:SEM_COLOR['sem:mlp']};
 }
 function colorForNode(n){
   if(isWeightNode(n))return weightFillColor();
@@ -1097,18 +958,18 @@ const STEP_META={
   moe_prenorm:{label:'Pre-RMSNorm', sem:'sem:norm', comm:null, nodes:['moe_prenorm']},
   gate:{label:'Router · Top-8', sem:'sem:gate', comm:null, nodes:['gate','w_gate']},
   a2a_dispatch:{label:'All-to-All 分发', sem:'sem:comm', comm:'ep', nodes:['a2a_dispatch']},
-  experts:{label:`当前 MoE 层专家池:${MODEL_CONFIG.routedExperts} routed experts + shared expert`, sem:'sem:moe', comm:null, nodes:EXPERT_IDS.concat(['shared_expert','w_expert'])},
+  experts:{label:'当前 MoE 层专家池:256 路由专家 + 共享专家', sem:'sem:moe', comm:null, nodes:EXPERT_IDS.concat(['shared_expert','w_expert'])},
   a2a_combine:{label:'All-to-All 汇聚', sem:'sem:comm', comm:'ep', nodes:['a2a_combine']},
   moe_residual:{label:'Post-MLP RMSNorm', sem:'sem:norm', comm:null, nodes:['moe_residual']},
   final_norm:{label:'Final RMSNorm', sem:'sem:norm', comm:null, nodes:['final_norm']},
   lm_head:{label:'LM Head', sem:'sem:head', comm:'tp', nodes:['lm_head','lm_head_weight']},
 };
 const STEP_DESC={
-  experts:`当前 MoE layer 内的一个 Expert Pool block:${MODEL_CONFIG.routedExperts} 个 routed experts 按 EP${DEMO.ep} 切分执行;它和 Router、All-to-All 分发/汇聚、Shared Expert、Post-MLP RMSNorm 共同构成这一层 MoE。`
+  experts:'当前 MoE layer 内的一个 Expert Pool block:256 个 routed experts 按 EP 切分执行;它和 Router、All-to-All 分发/汇聚、Shared Expert、Post-MLP RMSNorm 共同构成这一层 MoE。'
 };
 const descOf=step=>STEP_DESC[step]??(()=>{const id=STEP_META[step].nodes[0];return byId.get(id)?.desc||'';})();
 const semColor=step=>SEM_COLOR[STEP_META[step].sem]??GRAY;
-const TOTAL_LAYERS=MODEL_CONFIG.hiddenLayers, FIRST_MOE_LAYER=MODEL_CONFIG.firstMoeLayer, LAST_MOE_LAYER=MODEL_CONFIG.lastMoeLayer;
+const TOTAL_LAYERS=61, FIRST_MOE_LAYER=3, LAST_MOE_LAYER=60;
 const LAYER_STEPS=['mla','moe_prenorm','gate','a2a_dispatch','experts','a2a_combine','moe_residual'];
 
 /* ===== 场景 ===== */
@@ -1185,14 +1046,6 @@ function setObjectPanelOpen(open){
 function setObjectFocus(id){
   objectFocus=id||'all';
   syncObjectFocusControls();
-  const activeTip=document.getElementById('tip');
-  if(activeTip){
-    activeTip.style.display='none';
-    activeTip.querySelector('.t-id').textContent='';
-    activeTip.querySelector('.t-body').textContent='';
-  }
-  if(typeof setHoverStaticObject==='function')setHoverStaticObject(null);
-  if(typeof setHoverArch==='function')setHoverArch(null);
   if(typeof applyViewPresentation==='function')applyViewPresentation();
   if(typeof redraw==='function')redraw();
 }
@@ -1273,7 +1126,7 @@ function setCameraView(view,theta,phi,opts={}){
   };
   viewTween=requestAnimationFrame(step);
 }
-const sideViewTarget=()=>new THREE.Vector3(0,ARCH_HEIGHT_CENTER-0.9,(archDepth('input')+archDepth('output'))*0.5);
+const sideViewTarget=()=>new THREE.Vector3(0,ARCH_HEIGHT_CENTER-0.55,(archDepth('input')+archDepth('output'))*0.5);
 const frontViewTarget=()=>new THREE.Vector3(0,ARCH_HEIGHT_CENTER-0.35,(archDepth('input')+archDepth('output'))*0.5);
 viewIso?.addEventListener('click',()=>setCameraView('iso',DEFAULT_CAM.theta,DEFAULT_CAM.phi,{target:DEFAULT_TARGET.clone()}));
 viewFront?.addEventListener('click',()=>setCameraView('front',0,Math.PI/2,{target:frontViewTarget(),zoomRatio:1.4}));
@@ -1319,43 +1172,6 @@ function makeSprite(text,colorHex=sceneLabelColor(),scale){
   }
   g.fillText(text,cv.width/2,cv.height/2+4);
   return makeFixedTextMesh(cv,scale,scale*144/768,7);
-}
-function makeBadgeSprite(text,colorHex=sceneLabelColor(),scale=1,bgHex=0xffffff,borderHex=0xcbd5e1){
-  const cv=document.createElement('canvas'); cv.width=768;cv.height=168;
-  const g=cv.getContext('2d');
-  const bg='#'+((bgHex>>>0)&0xffffff).toString(16).padStart(6,'0');
-  const border='#'+((borderHex>>>0)&0xffffff).toString(16).padStart(6,'0');
-  const fg='#'+((colorHex>>>0)&0xffffff).toString(16).padStart(6,'0');
-  const x=18,y=22,w=cv.width-36,h=cv.height-44,r=26;
-  g.beginPath();
-  g.moveTo(x+r,y);
-  g.lineTo(x+w-r,y);
-  g.quadraticCurveTo(x+w,y,x+w,y+r);
-  g.lineTo(x+w,y+h-r);
-  g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  g.lineTo(x+r,y+h);
-  g.quadraticCurveTo(x,y+h,x,y+h-r);
-  g.lineTo(x,y+r);
-  g.quadraticCurveTo(x,y,x+r,y);
-  g.closePath();
-  g.globalAlpha=0.86;
-  g.fillStyle=bg;
-  g.fill();
-  g.globalAlpha=0.92;
-  g.lineWidth=5;
-  g.strokeStyle=border;
-  g.stroke();
-  g.globalAlpha=1;
-  g.font='800 54px "JetBrains Mono",monospace';
-  g.textAlign='center'; g.textBaseline='middle';
-  let fs=54;
-  while(g.measureText(text).width>cv.width*0.82&&fs>28){
-    fs-=2;
-    g.font=`800 ${fs}px "JetBrains Mono",monospace`;
-  }
-  g.fillStyle=fg;
-  g.fillText(text,cv.width/2,cv.height/2+4);
-  return makeFixedTextMesh(cv,scale,scale*168/768,7);
 }
 
 /* ===== 右上角:真实 3D 坐标轴小视图 ===== */
@@ -1411,11 +1227,11 @@ function syncAxisCamera(){
 resizeAxisRenderer();
 requestAnimationFrame(resizeAxisRenderer);  // 常驻浮层：布局就绪后兜底定尺寸
 
-/* ===== 上方:真实架构 local XY 竖板 + L0-L49 decode layers 沿世界 Y 全展开 ===== */
+/* ===== 上方:真实架构 local XY 竖板 + L0-L60 decode layers 沿世界 Y 全展开 ===== */
 const clusterById=new Map(G.clusters.map(c=>[c.id,c]));
-const ARCH_PS=0.0056, ARCH_HEIGHT_CENTER=5.15, ARCH_LAYER_FRONT=2.2, ARCH_LAYER_GAP=0.18, ARCH_IO_GAP=0.56, ARCH_THICK=0.055, ARCH_FRONT=0.055, DENSE_MOE_GAP=0.7;
+const ARCH_PS=0.0056, ARCH_HEIGHT_CENTER=5.15, ARCH_LAYER_FRONT=2.2, ARCH_LAYER_GAP=0.13, ARCH_IO_GAP=0.56, ARCH_THICK=0.055, ARCH_FRONT=0.055, DENSE_MOE_GAP=0.7;
 const EDGE_COL={activation:0x4369ef,communication:0x10b981,parameter:0xf59e0b,gradient:0xef4444};
-const DENSE_LAYER_IDS=[...MODEL_CONFIG.denseLayers];
+const DENSE_LAYER_IDS=[0,1,2];
 const MOE_LAYER_IDS=Array.from({length:LAST_MOE_LAYER-FIRST_MOE_LAYER+1},(_,i)=>FIRST_MOE_LAYER+i);
 const MOE_NODE_IDS=new Set([
   'mla','moe_prenorm','gate','w_gate','a2a_dispatch','shared_expert','w_expert','a2a_combine','moe_residual',
@@ -1427,34 +1243,16 @@ const DENSE_LAYER_BOX={x:340,y:120,width:560,height:180};
 const archPickables=[], archRecords=[], archByKey=new Map(), archRecordByMesh=new Map();
 const archKey=(layer,id)=>`${layer}:${id}`;
 let hoverArch=null, hoverNeighbors=[], hoverStage=null;
-let selectedArch=null, selectedArchNeighbors=[];
 // 架构连线：所有线统一的默认透明度（flat，不跟各自 base 走，避免有的实有的隐），只有 hover 节点接到的那几条变 solid。
-const archLineRecords=[], ARCH_LINE_DIM=0.20, ARCH_LINE_SOLID=0.92;
-const archSelectionActive=()=>!!selectedArch;
-const archSelectionRelated=mesh=>!!selectedArch&&(mesh===selectedArch||selectedArchNeighbors.includes(mesh));
-function archLabelSelectionRelated(label){
-  const id=label?.userData?.archId, layer=label?.userData?.archLayer;
-  if(id==null||layer==null)return false;
-  return archSelectionRelated(archByKey.get(archKey(layer,id)));
-}
+const archLineRecords=[], ARCH_LINE_DIM=0.14, ARCH_LINE_SOLID=0.92;
 function updateArchLineHover(){
   archLineRecords.forEach(rec=>{
     const lit=hoverArch&&(rec.aMesh===hoverArch||rec.bMesh===hoverArch);
-    const selectedLit=selectedArch&&(rec.aMesh===selectedArch||rec.bMesh===selectedArch);
-    const selectedRelated=archSelectionActive()&&(archSelectionRelated(rec.aMesh)||archSelectionRelated(rec.bMesh));
     const focusLit=focusActive()&&tagMatchesFocus(rec.tags);
-    rec.mat.uniforms.opacity.value=lit
-      ? ARCH_LINE_SOLID
-      : selectedLit
-        ? ARCH_LINE_SOLID
-        : (archSelectionActive()
-          ? (selectedRelated?0.36:0.018)
-          : (focusActive()
-            ? (focusLit?Math.max(ARCH_LINE_SOLID,rec.base):(ppFocusActive()?Math.max(rec.base,ARCH_LINE_DIM):0.035))
-            : ARCH_LINE_DIM));
+    rec.mat.uniforms.opacity.value=lit?ARCH_LINE_SOLID:(focusActive()?(focusLit?Math.max(ARCH_LINE_SOLID,rec.base):0.035):ARCH_LINE_DIM);
   });
 }
-// 深度沿数据流：input/Embedding 最前 → L0-L3(Dense) →（明显间隔）→ L4-L49(MoE) → Final/Head 最后。
+// 深度沿数据流：input/Embedding 最前 → L0-L2(Dense) →（明显间隔）→ L3-L60(MoE) → Final/Head 最后。
 // 关键：solid 层用 transparent:false + depthWrite:true 写深度缓冲，才能真正遮挡后面的绿色专家池；
 // 否则（depthWrite:false）遮挡只靠 renderOrder=20+layer，靠后的大 MoE 池会画在靠前的 Dense 上面（旧 bug）。
 const archDepth=layer=>{
@@ -1470,12 +1268,11 @@ const nodePos=(id,layer=0)=>{
 };
 const isMoeNode=id=>MOE_NODE_IDS.has(id);
 const isMajorLayer=layer=>layer%10===0||layer===LAST_MOE_LAYER;  // 详细 MoE 层每 10 层一张（前排 MoE 不再抢镜）
-const SOLID_LAYERS=new Set([0,LAST_MOE_LAYER]);  // 第一层(L0 Dense)+最后一层 MoE 完全 solid：写深度、正确遮挡、完整架构可读
+const SOLID_LAYERS=new Set([0,LAST_MOE_LAYER]);  // 第一层(L0 Dense)+最后一层(L60 MoE)完全 solid：写深度、正确遮挡、完整架构可读
 const isSolidLayer=layer=>typeof layer==='number'&&SOLID_LAYERS.has(layer);
 const layerRenderOrder=layer=>typeof layer==='number'?20+layer:(layer==='output'?90:10);
 const ARCH_LABEL_MIN_SCALE=0.72;
 const ARCH_LAYER_LABEL=()=>curTheme()==='light'?0x111111:0xf8fafc;
-const PP_BOUNDARY_LABEL=()=>curTheme()==='light'?0x111111:0xf8fafc;
 const lineMat=(color,opacity)=>new THREE.LineBasicMaterial({color,transparent:true,opacity});
 const expertPoolGridRecords=[];
 function archTagsFor(id,layer){
@@ -1503,11 +1300,9 @@ function archTagsFor(id,layer){
   return [...tags];
 }
 const focusActive=()=>objectFocus&&objectFocus!=='all';
-const ppFocusActive=()=>objectFocus==='comm:pp';
 const tagMatchesFocus=tags=>!focusActive()||(tags||[]).includes(objectFocus);
 function archRecordMatchesFocus(rec){
   if(!focusActive())return true;
-  if(ppFocusActive()&&typeof rec.layer==='number')return true;
   return tagMatchesFocus(archTagsFor(rec.id,rec.layer));
 }
 function lineTagsFor(a,b,layerA,layerB){
@@ -1525,9 +1320,7 @@ function rememberArch(mesh,id,layer,base,labelOverride,descOverride){
     activeHighlight:false,
     trailHighlight:false,
     hoverHighlight:false,
-    neighborHighlight:false,
-    selectedHighlight:false,
-    selectedNeighborHighlight:false
+    neighborHighlight:false
   };
   mesh.renderOrder=layerRenderOrder(layer);
   const rec={mesh,id,layer,base,tags:archTagsFor(id,layer)};
@@ -1537,42 +1330,26 @@ function refreshArchMesh(mesh){
   const rec=archRecordByMesh.get(mesh);
   if(!rec||!mesh.material)return;
   const node=byId.get(rec.id)||clusterById.get(rec.id)||(rec.id==='dense_layer_shell'?{colorKey:'module:decoder'}:null);
-  const baseCol=node?colorForNode(node):GRAY;
-  let col=baseCol;
+  const col=node?colorForNode(node):GRAY;
   const lightMode=curTheme()==='light';
+  if(mesh.material.color)mesh.material.color.setHex(lightMode&&mesh.material.emissive?0x000000:col);
+  if(mesh.material.emissive)mesh.material.emissive.setHex(col);
   let ei=rec.base.ei, op=rec.base.op, sc=1;
-  const selectionActive=archSelectionActive();
-  const selectedDirect=!!mesh.userData.selectedHighlight;
-  const selectedNeighbor=!!mesh.userData.selectedNeighborHighlight;
   if(mesh.userData.trailHighlight){ei=Math.max(ei,0.32);op=Math.max(op,0.38);sc=1.02;}
   if(mesh.userData.neighborHighlight){ei=Math.max(ei,0.62);op=Math.max(op,0.88);sc=Math.max(sc,1.05);}  // hover 节点的上下游：变 solid
-  if(selectedNeighbor){ei=Math.max(ei,0.52);op=Math.max(op,0.62);sc=Math.max(sc,1.035);}
   if(mesh.userData.activeHighlight){ei=Math.max(ei,0.78);op=Math.max(op,0.82);sc=Math.max(sc,1.04);}
-  if(selectedDirect){ei=Math.max(ei,1.05);op=1;sc=Math.max(sc,1.13);}
   if(mesh.userData.hoverHighlight){ei=1;op=1;sc=1.09;}
-  if(rec.base.hiCap!=null&&!mesh.userData.hoverHighlight&&!selectedDirect)op=Math.min(op,rec.base.hiCap);  // 淡化的专家池：自动高亮也不许冲成大绿块
+  if(rec.base.hiCap!=null&&!mesh.userData.hoverHighlight)op=Math.min(op,rec.base.hiCap);  // 淡化的专家池：自动高亮也不许冲成大绿块
   if(focusActive()){
     if(archRecordMatchesFocus(rec)){ei=Math.max(ei,0.92);op=Math.max(op,0.86);sc=Math.max(sc,1.055);}
     else {ei=Math.min(ei,0.04);op=Math.min(op,0.08);sc=Math.min(sc,0.98);}
   }
-  if(selectionActive&&!selectedDirect&&!selectedNeighbor){
-    col=lightMode?0x94a3b8:0x475569;
-    ei=Math.min(ei,0.025);
-    op=Math.min(op,0.07);
-    sc=Math.min(sc,0.96);
-  }else if(selectedDirect){
-    col=mixHex(baseCol,0xffffff,lightMode?0.12:0.22);
-  }else if(selectedNeighbor){
-    col=mixHex(baseCol,lightMode?0x111827:0xffffff,lightMode?0.08:0.12);
-  }
-  if(mesh.material.color)mesh.material.color.setHex(lightMode&&mesh.material.emissive&&!selectionActive?0x000000:col);
-  if(mesh.material.emissive)mesh.material.emissive.setHex(col);
   const frontDense=activeView==='front'&&rec.id==='dense_block'&&typeof rec.layer==='number';
   if(frontDense){
     op=focusActive()&&archRecordMatchesFocus(rec)?Math.max(op,0.78):Math.min(op,0.38);
     ei=Math.max(ei,0.36);
   }
-  if(lightMode&&mesh.material.emissive&&!(selectionActive&&!selectedDirect&&!selectedNeighbor)){
+  if(lightMode&&mesh.material.emissive){
     ei=Math.max(ei,1);
     mesh.material.toneMapped=false;
   }
@@ -1596,10 +1373,6 @@ function mapExpertAliases(mesh,layer){
 const archLabels=[];
 const staticFocusObjects=[];
 const staticFocusPickables=[];
-const epOverlayAnchors=[];
-const tpOverlayAnchors=[];
-const ppOverlayAnchors=[];
-const dpOverlayAnchors=[];
 let hiddenRailTip=null;
 function applyStaticFocusObject(obj){
   const only=obj.userData?.viewOnly||null;
@@ -1615,29 +1388,16 @@ function applyStaticFocusObject(obj){
   const tags=obj.userData?.tags||[];
   const match=tagMatchesFocus(tags);
   const base=obj.userData?.baseOpacity??0.8;
-  const hover=!!obj.userData?.hoverHighlight;
-  const focusLit=focusActive()&&match;
-  const opacity=hover
-    ? Math.max(obj.userData?.hoverOpacity??0.9,base)
-    : (focusActive()?(match?(obj.userData?.focusOpacity??Math.max(base,0.92)):(obj.userData?.dimOpacity??0.045)):base);
-  if(obj.userData?.baseColor!=null&&obj.material.color){
-    const tint=(hover||focusLit)&&obj.userData?.focusColor!=null;
-    obj.material.color.setHex(tint?obj.userData.focusColor:obj.userData.baseColor);
-  }
+  const opacity=focusActive()?(match?Math.max(base,0.92):0.045):base;
   if(obj.material.uniforms?.opacity)obj.material.uniforms.opacity.value=opacity;
   else {obj.material.transparent=true; obj.material.opacity=opacity; obj.material.needsUpdate=true;}
-  if(obj.material.uniforms?.linewidth&&obj.userData?.baseLinewidth){
-    obj.material.uniforms.linewidth.value=hover
-      ? (obj.userData.hoverLinewidth??obj.userData.baseLinewidth*1.65)
-      : obj.userData.baseLinewidth;
-  }
 }
 function applyViewPresentation(){
   if(typeof archLabels==='undefined')return;
   archLabels.forEach(label=>{
     const only=label.userData?.viewOnly||null;
     const builtInNode=!only&&label.userData?.labelKind==='node';
-    const builtInFlat=(activeView==='front'&&builtInNode)||(activeView==='right'&&builtInNode&&label.userData?.keepInSide);
+    const builtInFlat=(activeView==='front'||activeView==='right')&&builtInNode;
     const hideGenericFlat=(
       (activeView==='right'&&!only&&!label.userData?.keepInFront&&!builtInFlat)||
       (activeView==='front'&&!only&&!label.userData?.keepInFront&&!builtInFlat)
@@ -1654,13 +1414,7 @@ function applyViewPresentation(){
     }
     if(label.material){
       const tags=label.userData?.tags||[];
-      if(label.userData?.focusOnly&&(!focusActive()||!tagMatchesFocus(tags))){
-        label.visible=false;
-      }
-      let opacity=focusActive()?(tagMatchesFocus(tags)||ppFocusActive()?1:0.14):1;
-      if(archSelectionActive()&&!only){
-        opacity=archLabelSelectionRelated(label)?1:Math.min(opacity,0.12);
-      }
+      const opacity=focusActive()?(tagMatchesFocus(tags)?1:0.14):1;
       label.material.transparent=true;
       label.material.opacity=opacity;
       label.material.needsUpdate=true;
@@ -1685,9 +1439,6 @@ function addArchLabel(text,p,colorHex,scale,renderOrder=7,opts={}){
     tags:opts.tags||[],
     keepInFront:!!opts.keepInFront,
     labelKind:opts.labelKind||null,
-    archId:opts.archId??null,
-    archLayer:opts.archLayer??null,
-    focusOnly:!!opts.focusOnly,
     frontBoost:opts.frontBoost??1,
     sideBoost:opts.sideBoost??opts.frontBoost??1
   };
@@ -1698,85 +1449,22 @@ function addArchLabel(text,p,colorHex,scale,renderOrder=7,opts={}){
 }
 function addStaticFocusLine(points,color,opacity,linewidth,tags,opts={}){
   const line=fatLine(points,color,opacity,linewidth);
-  if(opts.depthTest!=null)line.material.depthTest=opts.depthTest;
-  if(opts.renderOrder!=null)line.renderOrder=opts.renderOrder;
-  line.userData={
-    viewOnly:opts.viewOnly||null,
-    tags,
-    baseOpacity:opacity,
-    baseLinewidth:linewidth,
-    baseColor:color,
-    focusColor:opts.focusColor,
-    focusOpacity:opts.focusOpacity,
-    hoverOpacity:opts.hoverOpacity,
-    hoverLinewidth:opts.hoverLinewidth,
-    dimOpacity:opts.dimOpacity
-  };
+  line.userData={viewOnly:opts.viewOnly||null,tags,baseOpacity:opacity};
   staticFocusObjects.push(line);
   scene.add(line);
   applyStaticFocusObject(line);
   return line;
 }
-function addStaticFocusPlane(center,size,color,opacity,tags,opts={}){
-  const mat=new THREE.MeshBasicMaterial({
-    color,transparent:true,opacity,depthWrite:false,depthTest:false,side:THREE.DoubleSide,toneMapped:false
-  });
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(size.z,size.y),mat);
-  mesh.rotation.y=Math.PI/2;
-  mesh.position.copy(center);
-  mesh.renderOrder=opts.renderOrder??58;
-  mesh.userData={
-    viewOnly:opts.viewOnly||null,
-    tags,
-    baseOpacity:opacity,
-    baseColor:color,
-    focusColor:opts.focusColor,
-    focusOpacity:opts.focusOpacity,
-    hoverOpacity:opts.hoverOpacity??Math.max(0.16,opacity*2.8),
-    dimOpacity:opts.dimOpacity
-  };
-  staticFocusObjects.push(mesh);
-  scene.add(mesh);
-  applyStaticFocusObject(mesh);
-  return mesh;
-}
-function addStaticFocusHitBox(center,size,tags,{viewOnly=null,title='',body='',stage=null,hoverTargets=[],pickOnlyWhenFocus=false,pickPriority=0}={}){
+function addStaticFocusHitBox(center,size,tags,{viewOnly=null,title='',body=''}={}){
   const mat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0,depthWrite:false});
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(size.x,size.y,size.z),mat);
   mesh.position.copy(center);
-  mesh.userData={viewOnly,tags,title,body,stage,hoverTargets,pickOnlyWhenFocus,pickPriority,baseOpacity:0,staticTip:true};
+  mesh.userData={viewOnly,tags,title,body,baseOpacity:0,staticTip:true};
   staticFocusObjects.push(mesh);
   staticFocusPickables.push(mesh);
   scene.add(mesh);
   applyStaticFocusObject(mesh);
   return mesh;
-}
-let hoverStaticObject=null;
-function setHoverStaticObject(obj){
-  if(hoverStaticObject===obj)return;
-  const clearTargets=hoverStaticObject?.userData?.hoverTargets||[];
-  clearTargets.forEach(target=>{
-    if(!target?.userData)return;
-    target.userData.hoverHighlight=false;
-    applyStaticFocusObject(target);
-  });
-  hoverStaticObject=obj||null;
-  const nextTargets=hoverStaticObject?.userData?.hoverTargets||[];
-  nextTargets.forEach(target=>{
-    if(!target?.userData)return;
-    target.userData.hoverHighlight=true;
-    applyStaticFocusObject(target);
-  });
-  const nextStage=hoverStaticObject?.userData?.stage??null;
-  if(nextStage!==hoverStage){
-    hoverStage=nextStage;
-    if(typeof redraw==='function')redraw();
-  }
-  if(typeof ppLabelEls!=='undefined'){
-    ppLabelEls.forEach(({el,anchor})=>{
-      el.classList.toggle('is-hovered',nextStage!=null&&anchor.stage===nextStage&&objectFocus==='comm:pp');
-    });
-  }
 }
 function addNodeNote(id,layer,text,colorHex,dx=0,dy=0,scale=1.0){
   const p=nodePos(id,layer); if(!p)return null;
@@ -1798,7 +1486,7 @@ function addCluster(c,layer,opacity,{showLabel=true,labelText=null,labelScale=nu
   if(showLabel&&c.id!=='expert_pool'){
     const label=labelText??c.label;
     const labelColor=c.id==='moe_layer'?ARCH_LAYER_LABEL():colorForNode(c);
-    addArchLabel(label,p.clone().add(new THREE.Vector3(0,c.height*ARCH_PS/2-0.12,0)),labelColor,labelScale??Math.min(1.25,c.width*ARCH_PS*0.22),layerRenderOrder(layer)+0.1,{tags:archTagsFor(c.id,layer),labelKind:'node',frontBoost:2.2,archId:c.id,archLayer:layer});
+    addArchLabel(label,p.clone().add(new THREE.Vector3(0,c.height*ARCH_PS/2-0.12,0)),labelColor,labelScale??Math.min(1.25,c.width*ARCH_PS*0.22),layerRenderOrder(layer)+0.1,{tags:archTagsFor(c.id,layer),labelKind:'node',frontBoost:2.2});
   }
 }
 function addExpertPoolPanel(c,layer,{showLabel=true,labelText=null,solid=false}={}){
@@ -1814,10 +1502,10 @@ function addExpertPoolPanel(c,layer,{showLabel=true,labelText=null,solid=false}=
   if(solid)panel.position.z-=ARCH_THICK*0.6;  // solid 池退到本层算子之后，避免 z-fight、读作“专家在路由算子背后”
   scene.add(panel);
   rememberArch(panel,'expert_pool',layer,base,'Expert Pool',
-    `当前 MoE 层的专家池：EP${DEMO.ep} bucket × 每桶 ${MODEL_CONFIG.routedExperts/DEMO.ep} 个 routed experts = ${MODEL_CONFIG.routedExperts} routed experts。它是一层内部结构，不是 ${DEMO.ep} 层，也不是 ${DEMO.ep} 张卡。`);
+    '当前 MoE 层的专家池：32 个 EP bucket × 每桶 8 个 routed experts = 256 routed experts。它是一层内部结构，不是 32 层。');
   addExpertPoolGrid(panel,c,layer);
   mapExpertAliases(panel,layer);
-  if(showLabel)addArchLabel(labelText??`Expert Pool · L${layer}`,p.clone().add(new THREE.Vector3(0,h*0.36,0)),ARCH_LAYER_LABEL(),0.72,layerRenderOrder(layer)+0.2,{tags:archTagsFor('expert_pool',layer),labelKind:'node',frontBoost:2.5,archId:'expert_pool',archLayer:layer});
+  if(showLabel)addArchLabel(labelText??`Expert Pool · L${layer}`,p.clone().add(new THREE.Vector3(0,h*0.36,0)),ARCH_LAYER_LABEL(),0.72,layerRenderOrder(layer)+0.2,{tags:archTagsFor('expert_pool',layer),labelKind:'node',frontBoost:2.5});
 }
 function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null,descOverride=null,box=null}={}){
   if(!n){
@@ -1836,7 +1524,7 @@ function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,ARCH_THICK),mat);
   mesh.position.copy(p); scene.add(mesh); rememberArch(mesh,n.id,layer,base,labelText,descOverride);
   const expert=/^expert_group_/.test(n.id);
-  if(showLabel&&!expert)addArchLabel(labelText??n.label,p,nodeLabelColor(),Math.min(expert?0.28:0.76,w*0.92),layerRenderOrder(layer)+0.2,{tags:archTagsFor(n.id,layer),labelKind:'node',frontBoost:2.55,archId:n.id,archLayer:layer});
+  if(showLabel&&!expert)addArchLabel(labelText??n.label,p,nodeLabelColor(),Math.min(expert?0.28:0.76,w*0.92),layerRenderOrder(layer)+0.2,{tags:archTagsFor(n.id,layer),labelKind:'node',frontBoost:2.55});
   return mesh;
 }
 function addArchLine(a,b,color,opacity,layerA=0,layerB=layerA,tags=null){
@@ -1899,43 +1587,15 @@ function addExpertPoolGrid(panel,c,layer){
   group.position.z+=ARCH_THICK*0.42;
   group.renderOrder=layerRenderOrder(layer)+0.36;
   group.visible=false;
-  const expertCols=10, expertRows=8;
   const fineMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,toneMapped:false});
   const bucketMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,toneMapped:false});
-  const bucketCols=DEMO.ep, bucketRows=1;
-  const tileGeo=new THREE.PlaneGeometry(1,1);
-  const tileMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,depthTest:false,side:THREE.DoubleSide,toneMapped:false});
-  const tiles=new THREE.InstancedMesh(tileGeo,tileMat,MODEL_CONFIG.routedExperts);
-  const fine=new THREE.LineSegments(expertGridLineGeometry(w,h,{cols:expertCols,rows:expertRows}),fineMat);
-  const buckets=new THREE.LineSegments(expertGridLineGeometry(w,h,{bucketOnly:true,bucketCols,bucketRows}),bucketMat);
-  tiles.renderOrder=group.renderOrder-0.01;
+  const fine=new THREE.LineSegments(expertGridLineGeometry(w,h),fineMat);
+  const buckets=new THREE.LineSegments(expertGridLineGeometry(w,h,{bucketOnly:true}),bucketMat);
   fine.renderOrder=group.renderOrder;
   buckets.renderOrder=group.renderOrder+0.01;
-  const pad=Math.min(w,h)*0.055;
-  const left=-w/2+pad,right=w/2-pad,bottom=-h/2+pad,top=h/2-pad;
-  const cellW=(right-left)/expertCols, cellH=(top-bottom)/expertRows;
-  const tileMatrix=new THREE.Matrix4();
-  for(let expert=0;expert<MODEL_CONFIG.routedExperts;expert++){
-    const col=expert%expertCols;
-    const row=Math.floor(expert/expertCols);
-    tileMatrix.makeScale(cellW*0.72,cellH*0.62,1);
-    tileMatrix.setPosition(left+cellW*(col+0.5),top-cellH*(row+0.5),ARCH_THICK*0.055);
-    tiles.setMatrixAt(expert,tileMatrix);
-  }
-  tiles.instanceMatrix.needsUpdate=true;
-  group.add(tiles,fine,buckets);
-  const epLabelColor=curTheme()==='light'?0x111827:0xf8fafc;
-  const expertsPerBucket=MODEL_CONFIG.routedExperts/DEMO.ep;
-  const bucketLabels=Array.from({length:DEMO.ep},(_,ep)=>{
-    const x=left+(right-left)*(ep+0.5)/DEMO.ep;
-    const lab=makeSprite(`${epLabel(ep)} · ${expertsPerBucket} experts`,epLabelColor,Math.min(0.66,Math.max(0.36,(right-left)/DEMO.ep*0.52)));
-    lab.position.set(x,bottom+(top-bottom)*0.11,ARCH_THICK*0.09);
-    lab.renderOrder=group.renderOrder+0.04;
-    group.add(lab);
-    return lab;
-  });
+  group.add(fine,buckets);
   scene.add(group);
-  const grid={panel,group,tiles,tileMat,fineMat,bucketMat,bucketLabels,layer,tags:archTagsFor('expert_pool',layer)};
+  const grid={panel,group,fineMat,bucketMat,layer,tags:archTagsFor('expert_pool',layer)};
   panel.userData.expertGrid=grid;
   expertPoolGridRecords.push(grid);
   syncExpertPoolGrid(panel,archRecordByMesh.get(panel));
@@ -1945,44 +1605,29 @@ function syncExpertPoolGrid(mesh,rec){
   if(!grid||!rec)return;
   const layer=rec.layer;
   const focusMatch=focusActive()&&archRecordMatchesFocus(rec);
-  const directHighlight=!!(mesh.userData.hoverHighlight||mesh.userData.activeHighlight||mesh.userData.neighborHighlight||mesh.userData.trailHighlight||mesh.userData.selectedHighlight||mesh.userData.selectedNeighborHighlight);
+  const directHighlight=!!(mesh.userData.hoverHighlight||mesh.userData.activeHighlight||mesh.userData.neighborHighlight||mesh.userData.trailHighlight);
   const contextualFocus=focusMatch&&(objectFocus==='layer:moe'||objectFocus==='op:experts'||objectFocus==='data:dispatch'||objectFocus==='comm:ep');
   const representative=typeof layer==='number'&&(isMajorLayer(layer)||isSolidLayer(layer));
   const visible=directHighlight||(contextualFocus&&representative);
-  const high=mesh.userData.selectedHighlight?1:(mesh.userData.hoverHighlight?1:(mesh.userData.activeHighlight?0.82:(mesh.userData.selectedNeighborHighlight?0.62:(mesh.userData.neighborHighlight?0.58:(mesh.userData.trailHighlight?0.42:(contextualFocus?0.5:0))))));
+  const high=mesh.userData.hoverHighlight?1:(mesh.userData.activeHighlight?0.82:(mesh.userData.neighborHighlight?0.58:(mesh.userData.trailHighlight?0.42:(contextualFocus?0.5:0))));
   grid.group.visible=visible;
   grid.group.position.copy(mesh.position);
   grid.group.position.z+=ARCH_THICK*0.42;
   grid.group.scale.copy(mesh.scale);
   const lineColor=curTheme()==='light'?0x0f172a:0xffffff;
   const bucketColor=curTheme()==='light'?0x111827:0xf8fafc;
-  const tileColor=curTheme()==='light'?0x5b8def:0x8ab4ff;
-  grid.tileMat.color.setHex(tileColor);
   grid.fineMat.color.setHex(lineColor);
   grid.bucketMat.color.setHex(bucketColor);
-  grid.tileMat.opacity=visible?Math.min(0.42,0.10+high*0.22):0;
   grid.fineMat.opacity=visible?Math.min(0.46,0.16+high*0.24):0;
   grid.bucketMat.opacity=visible?Math.min(0.78,0.32+high*0.32):0;
-  grid.tileMat.needsUpdate=true;
   grid.fineMat.needsUpdate=true;
   grid.bucketMat.needsUpdate=true;
-  grid.bucketLabels.forEach(lab=>{if(lab.material){lab.material.opacity=visible?Math.min(1,0.40+high*0.55):0;lab.material.transparent=true;lab.material.needsUpdate=true;}});
 }
 function addExpertFan(layer,opacity=0.18){
   const c=G.clusters.find(cl=>cl.id==='expert_pool');
   const pool=c?graphPos(c.x+c.width/2,c.y+c.height/2,layer):null;
-  const dispatch=addArchLinePoints(nodePos('a2a_dispatch',layer),pool,EDGE_COL.communication,opacity,['comm:ep','data:dispatch','layer:moe','op:experts']);
-  if(dispatch){
-    dispatch.aMesh=archByKey.get(archKey(layer,'a2a_dispatch'))||null;
-    dispatch.bMesh=archByKey.get(archKey(layer,'expert_pool'))||null;
-    dispatch.source='a2a_dispatch'; dispatch.target='expert_pool';
-  }
-  const combine=addArchLinePoints(pool,nodePos('a2a_combine',layer),EDGE_COL.communication,opacity,['comm:ep','data:dispatch','layer:moe','op:experts']);
-  if(combine){
-    combine.aMesh=archByKey.get(archKey(layer,'expert_pool'))||null;
-    combine.bMesh=archByKey.get(archKey(layer,'a2a_combine'))||null;
-    combine.source='expert_pool'; combine.target='a2a_combine';
-  }
+  addArchLinePoints(nodePos('a2a_dispatch',layer),pool,EDGE_COL.communication,opacity,['comm:ep','data:dispatch','layer:moe','op:experts']);
+  addArchLinePoints(pool,nodePos('a2a_combine',layer),EDGE_COL.communication,opacity,['comm:ep','data:dispatch','layer:moe','op:experts']);
 }
 function addLayerMarker(layer,text,colorHex,major=false){
   if(!(major||layer<5||layer%5===0||layer===LAST_MOE_LAYER))return;
@@ -1992,7 +1637,7 @@ function addLayerMarker(layer,text,colorHex,major=false){
 }
 function addDenseLayer(layer){
   const n=byId.get('dense_block');
-  const desc=`Dense decoder layer L${layer}：openPangu-R-72B config 的 mlp_only_layers=[0,1,2,3] 之一，没有 Router、All-to-All、Expert Pool 或 Shared Expert；hidden state 直接传给下一层。`;
+  const desc=`Dense decoder layer L${layer}：前 3 个解码层之一（num_dense_layers=3），没有 Router、All-to-All、Expert Pool 或 Shared Expert；hidden state 直接传给下一层。`;
   // 单个实心块：宽度和 MoE 保持同一层级，但在 local-Z 上低于 MoE 专家区，正视图不会互相遮挡。
   addNode(n,layer,{opaque:true,labelText:`Dense L${layer}`,descOverride:desc,showLabel:true,
     box:DENSE_LAYER_BOX});
@@ -2000,7 +1645,7 @@ function addDenseLayer(layer){
 }
 function addMoeLayer(layer){
   const major=isMajorLayer(layer);
-  const solid=isSolidLayer(layer);  // 最后一层 MoE 架构全 solid、可读
+  const solid=isSolidLayer(layer);  // L60：完整 MoE 架构全 solid、可读
   const moeCluster=clusterById.get('moe_layer');
   const expertCluster=clusterById.get('expert_pool');
   if(moeCluster)addCluster(moeCluster,layer,solid?0.85:(major?0.16:0.014),{showLabel:major||solid,labelText:`MoE L${layer}`});
@@ -2039,8 +1684,8 @@ function drawHiddenStateChain(){
     addArchLine('moe_residual','mla',0x93c5fd,layer%10===0?0.34:0.15,layer,layer+1);
   }
   addArchLine('moe_residual','final_norm',0x93c5fd,0.7,LAST_MOE_LAYER,'output');
-  addArchLabel(`hidden state flows L0 → L${LAST_MOE_LAYER} along world Y toward the back`,
-    graphPos(G.width-210,420,28),0x93c5fd,0.78,layerRenderOrder(28)+0.3,{tags:['data:hidden']});
+  addArchLabel('hidden state flows L0 → L60 along world Y toward the back',
+    graphPos(G.width-210,420,34),0x93c5fd,0.78,layerRenderOrder(34)+0.3,{tags:['data:hidden']});
 }
 function addSideViewAnnotations(){
   const zDense=(archDepth(0)+archDepth(2))*0.5;
@@ -2065,7 +1710,7 @@ function addSideViewAnnotations(){
   hiddenRailTip={
     points:railPts,
     title:'Hidden state main path',
-    body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L3 -> MoE L${FIRST_MOE_LAYER}-L${LAST_MOE_LAYER} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`
+    body:'这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L2 -> MoE L3-L60 -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。'
   };
   addStaticFocusLine(railPts,0x2563eb,0.78,5.5,['data:hidden'],{viewOnly:'right'});
   const railMinY=Math.min(...railPts.map(p=>p.y)), railMaxY=Math.max(...railPts.map(p=>p.y));
@@ -2076,8 +1721,7 @@ function addSideViewAnnotations(){
     {
       viewOnly:'right',
       title:'Hidden state main path',
-      body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L3 -> MoE L${FIRST_MOE_LAYER}-L${LAST_MOE_LAYER} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`,
-      pickOnlyWhenFocus:true
+      body:'这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L2 -> MoE L3-L60 -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。'
     }
   );
   railPts.forEach(p=>{
@@ -2086,252 +1730,31 @@ function addSideViewAnnotations(){
       new THREE.Vector3(railX,p.y+0.26,p.z)
     ],0x2563eb,0.72,3.2,['data:hidden'],{viewOnly:'right'});
   });
-  // Right-side flat view uses one row label per operator family. Repeated per-layer
-  // node labels are hidden by applyViewPresentation to keep this view readable.
+  // Side/front flat views use labels attached to actual 3D nodes.
+  // These guides remain as non-text helpers for reading repeated layer rows.
   const rowGuide=(y,z0,z1,tags,lineColor=0x94a3b8)=>{
-    return addStaticFocusLine([
+    addStaticFocusLine([
       new THREE.Vector3(railX+0.02,y,z0),
       new THREE.Vector3(railX+0.02,y,z1)
-    ],lineColor,0.22,2.2,tags,{viewOnly:'right',hoverOpacity:0.72,hoverLinewidth:4.2});
-  };
-  const sideRowLabel=(text,y,z,tags,colorHex)=>{
-    addArchLabel(text,new THREE.Vector3(railX+0.2,y,z),ARCH_LAYER_LABEL(),0.68,96,{
-      viewOnly:'right',
-      orientation:'right',
-      tags,
-      labelKind:'side-row',
-      sideBoost:2.2
-    });
-    const guide=rowGuide(y,z-0.34,z+0.34,tags,colorHex);
-    addStaticFocusHitBox(
-      new THREE.Vector3(railX+0.04,y,z),
-      new THREE.Vector3(0.9,0.34,0.96),
-      tags,
-      {
-        viewOnly:'right',
-        title:text,
-        body:`侧视图行标注：${text}。hover 时高亮这一条算子横线；点击或 hover 具体算子块时会继续高亮它的上下游连线。`,
-        hoverTargets:[guide]
-      }
-    );
+    ],lineColor,0.22,2.2,tags,{viewOnly:'right'});
   };
   const yOf=(id,layer=34,fallbackY=ARCH_HEIGHT_CENTER)=>nodePos(id,layer)?.y??fallbackY;
   const moeRows=[
-    {id:'mla',label:'MLA 注意力',tags:['op:mla','layer:moe','data:hidden'],color:0x0891b2},
-    {id:'moe_prenorm',label:'Pre-RMSNorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14},
-    {id:'gate',label:'Router · Top-8',tags:['op:router','layer:moe','data:dispatch'],color:0x9333ea},
-    {id:'a2a_dispatch',label:`EP=${DEMO.ep} Dispatch`,tags:['comm:ep','layer:moe','data:dispatch'],color:0xa855f7},
-    {id:'expert_pool',label:`Expert Pool · ${MODEL_CONFIG.routedExperts}`,tags:['op:experts','layer:moe','data:dispatch','comm:ep'],color:0xc026d3},
-    {id:'a2a_combine',label:`EP=${DEMO.ep} Combine`,tags:['comm:ep','layer:moe','data:dispatch'],color:0xa855f7},
-    {id:'moe_residual',label:'Post-MLP RMSNorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14}
+    {id:'mla',tags:['op:mla','layer:moe','data:hidden'],color:0x0891b2},
+    {id:'moe_prenorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14},
+    {id:'gate',tags:['op:router','layer:moe','data:dispatch'],color:0x9333ea},
+    {id:'a2a_dispatch',tags:['comm:ep','layer:moe','data:dispatch'],color:0xa855f7},
+    {id:'expert_pool',tags:['op:experts','layer:moe','data:dispatch','comm:ep'],color:0xc026d3},
+    {id:'a2a_combine',tags:['comm:ep','layer:moe','data:dispatch'],color:0xa855f7},
+    {id:'moe_residual',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14}
   ];
   rowGuide(denseY,archDepth(0),archDepth(2),['layer:dense','data:hidden'],0x60a5fa);
-  sideRowLabel('Dense MLP · L0-L3',denseY,(archDepth(0)+archDepth(2))*0.5,['layer:dense','data:hidden'],0x60a5fa);
-  const moeRowYById=new Map();
   moeRows.forEach(row=>{
     const y=row.id==='expert_pool'
       ? (clusterCenterPos('expert_pool',34)?.y??yOf('shared_expert',34,moeY))
       : yOf(row.id,34,moeY);
-    moeRowYById.set(row.id,y);
     rowGuide(y,zMoeStart,zMoeEnd,row.tags,row.color);
-    sideRowLabel(row.label,y,(zMoeStart+zMoeEnd)*0.5,row.tags,row.color);
   });
-  const dispatchY=moeRowYById.get('a2a_dispatch');
-  const expertY=moeRowYById.get('expert_pool');
-  const combineY=moeRowYById.get('a2a_combine');
-  if(dispatchY!=null&&expertY!=null&&combineY!=null){
-    const tags=['comm:ep','data:dispatch','layer:moe'];
-    const span=zMoeEnd-zMoeStart;
-    const bandX=railX+0.118;
-    const bandY0=Math.min(dispatchY,combineY)-0.08;
-    const bandY1=Math.max(dispatchY,combineY)+0.08;
-    const bandPad=Math.abs(span)*0.014;
-    for(let ep=0;ep<DEMO.ep;ep++){
-      const rawZ0=zMoeStart+span*ep/DEMO.ep;
-      const rawZ1=zMoeStart+span*(ep+1)/DEMO.ep;
-      const z0=Math.min(rawZ0,rawZ1)+bandPad;
-      const z1=Math.max(rawZ0,rawZ1)-bandPad;
-      const zc=(z0+z1)/2;
-      const fill=addStaticFocusPlane(
-        new THREE.Vector3(bandX-0.006,(bandY0+bandY1)/2,zc),
-        new THREE.Vector3(0,bandY1-bandY0,Math.max(0.04,z1-z0)),
-        LINE.ep,
-        0.018,
-        tags,
-        {viewOnly:'right',focusColor:LINE.ep,focusOpacity:0.14,hoverOpacity:0.18,dimOpacity:0.008,renderOrder:98+ep}
-      );
-      const outline=addStaticFocusLine([
-        new THREE.Vector3(bandX,bandY0,z0),
-        new THREE.Vector3(bandX,bandY1,z0),
-        new THREE.Vector3(bandX,bandY1,z1),
-        new THREE.Vector3(bandX,bandY0,z1),
-        new THREE.Vector3(bandX,bandY0,z0)
-      ],LINE.ep,0.18,2.2,tags,{
-        viewOnly:'right',
-        focusColor:LINE.ep,
-        focusOpacity:0.9,
-        hoverOpacity:1,
-        hoverLinewidth:5.2,
-        dimOpacity:0.012,
-        depthTest:false,
-        renderOrder:102+ep
-      });
-      addArchLabel(
-        `${epLabel(ep)} bucket`,
-        new THREE.Vector3(railX+0.34,expertY,zc),
-        LINE.ep,
-        0.58,
-        106+ep,
-        {
-          viewOnly:'right',
-          orientation:'right',
-          tags,
-          labelKind:'ep-bucket',
-          sideBoost:2.05,
-          focusOnly:true,
-          minScale:0.5
-        }
-      );
-      epOverlayAnchors.push({
-        ep,
-        pos:new THREE.Vector3(railX+0.34,expertY,zc),
-        dx:12,
-        dy:0
-      });
-      addStaticFocusHitBox(
-        new THREE.Vector3(bandX+0.018,(bandY0+bandY1)/2,zc),
-        new THREE.Vector3(0.58,bandY1-bandY0+0.12,Math.max(0.18,z1-z0+0.08)),
-        tags,
-        {
-          viewOnly:'right',
-          title:`${epLabel(ep)} Expert bucket`,
-          body:`${epLabel(ep)} 是 EP=2 中的一个 expert shard，约持有 ${MODEL_CONFIG.routedExperts/DEMO.ep} 个 routed experts。Router 之后 token 先 dispatch 到目标 expert 所在的 EP bucket，计算后再 combine 回主链路。`,
-          hoverTargets:[fill,outline],
-          pickPriority:70
-        }
-      );
-    }
-    [0.18,0.38,0.62,0.82].forEach((ratio,i)=>{
-      const z=zMoeStart+span*ratio;
-      const xLine=railX+0.075+0.012*(i%2);
-      const line=addStaticFocusLine([
-        new THREE.Vector3(xLine,dispatchY,z),
-        new THREE.Vector3(xLine,expertY,z),
-        new THREE.Vector3(xLine,combineY,z)
-      ],LINE.ep,0.16,3.4,tags,{
-        viewOnly:'right',
-        focusColor:LINE.ep,
-        focusOpacity:1,
-        hoverOpacity:1,
-        hoverLinewidth:7.2,
-        dimOpacity:0.018,
-        depthTest:false,
-        renderOrder:101+i
-      });
-      addStaticFocusHitBox(
-        new THREE.Vector3(xLine,(dispatchY+combineY)*0.5,z),
-        new THREE.Vector3(0.74,Math.abs(combineY-dispatchY)+0.24,0.34),
-        tags,
-        {
-          viewOnly:'right',
-          title:'EP=2 token All-to-All flow',
-          body:`这条紫色竖线表示 MoE 层内 token 在 EP=${DEMO.ep} 之间的 All-to-All 流动：Router 之后先 Dispatch 到持有目标 expert 的 EP rank，Expert Pool 计算后再 Combine 回主链路。它不是 layer 边界通信，而是同一 MoE layer 内部的专家并行通信。`,
-          hoverTargets:[line],
-          pickPriority:80
-        }
-      );
-    });
-  }
-  const stageBoxX=railX+0.18;
-  const stageYMin=graphPos(0,70,0).y;
-  const stageYMax=graphPos(0,G.height-124,0).y;
-  const layerPad=Math.abs(archDepth(0)-archDepth(1))*0.38;
-  const localRanks=Array.from({length:DEMO.tp},(_,tpIndex)=>
-    Array.from({length:DEMO.ep},(_,epIndex)=>`T${tpIndex}E${epIndex}`).join(' ')
-  ).join(' · ');
-  DEMO_STAGE_RANGES.forEach(([lo,hi],stage)=>{
-    const zA=archDepth(lo), zB=archDepth(hi);
-    const zMin=Math.min(zA,zB)-layerPad, zMax=Math.max(zA,zB)+layerPad;
-    const ppGray=curTheme()==='light'?0xd7ded7:0x4b5563;
-    const ppGreen=0x79c96b;
-    const tags=['comm:pp','data:hidden'];
-    const fill=addStaticFocusPlane(
-      new THREE.Vector3(stageBoxX-0.005,(stageYMin+stageYMax)/2,(zMin+zMax)/2),
-      new THREE.Vector3(0,(stageYMax-stageYMin),(zMax-zMin)),
-      ppGray,
-      0.04,
-      tags,
-      {viewOnly:'right',focusColor:ppGreen,focusOpacity:0.14,hoverOpacity:0.16,renderOrder:54}
-    );
-    const outline=addStaticFocusLine([
-      new THREE.Vector3(stageBoxX,stageYMin,zMin),
-      new THREE.Vector3(stageBoxX,stageYMax,zMin),
-      new THREE.Vector3(stageBoxX,stageYMax,zMax),
-      new THREE.Vector3(stageBoxX,stageYMin,zMax),
-      new THREE.Vector3(stageBoxX,stageYMin,zMin)
-    ],ppGray,0.2,2.2,tags,{viewOnly:'right',focusColor:ppGreen,focusOpacity:0.82,hoverOpacity:0.92,hoverLinewidth:5.4});
-    const d0=`D0 R${rankOf(0,stage,0,0)}-R${rankOf(0,stage,DEMO.tp-1,DEMO.ep-1)}`;
-    const d1=`D1 R${rankOf(1,stage,0,0)}-R${rankOf(1,stage,DEMO.tp-1,DEMO.ep-1)}`;
-    const hoverTargets=[fill,outline];
-    const ppAnchor={
-      stage,
-      range:[lo,hi],
-      pos:new THREE.Vector3(stageBoxX+0.32,stageYMax-0.24,(zMin+zMax)/2),
-      dx:0,
-      dy:84
-    };
-    ppOverlayAnchors.push(ppAnchor);
-    ppAnchor.hitBox=addStaticFocusHitBox(
-      new THREE.Vector3(stageBoxX+0.18,(stageYMin+stageYMax)/2,(zMin+zMax)/2),
-      new THREE.Vector3(0.8,stageYMax-stageYMin+0.16,Math.max(0.55,zMax-zMin+0.08)),
-      tags,
-      {
-        viewOnly:'right',
-        title:`PP${stage} stage · L${lo}-L${hi}`,
-        body:`PP${stage} 对应 layer 切片 L${lo}-L${hi}。${d0}，${d1}；每个 stage 内部是 TP${DEMO.tp} x EP${DEMO.ep}，local 坐标为 ${localRanks}。选中 PP filter 时，四个 PP stage 框会统一高亮。`,
-        stage,
-        hoverTargets,
-        pickOnlyWhenFocus:true,
-        pickPriority:60
-      }
-    );
-  });
-  for(let stage=0;stage<DEMO.pp-1;stage++){
-    const [loA,hiA]=DEMO_STAGE_RANGES[stage]||[0,0];
-    const [loB,hiB]=DEMO_STAGE_RANGES[stage+1]||[0,0];
-    const zA=archDepth(hiA), zB=archDepth(loB);
-    const z0=Math.min(zA,zB)-layerPad*0.35, z1=Math.max(zA,zB)+layerPad*0.35;
-    const y=stageYMax-0.54;
-    const tags=['comm:pp','data:hidden'];
-    const line=addStaticFocusLine([
-      new THREE.Vector3(stageBoxX+0.30,y,z0),
-      new THREE.Vector3(stageBoxX+0.30,y,z1)
-    ],LINE.pp,0.24,3.2,tags,{viewOnly:'right',focusColor:LINE.pp,focusOpacity:0.95,hoverOpacity:1,hoverLinewidth:6.0,depthTest:false,renderOrder:108+stage});
-    addArchLabel(`PP${stage}->PP${stage+1}`,
-      new THREE.Vector3(stageBoxX+0.48,y+0.06,(z0+z1)/2),
-      PP_BOUNDARY_LABEL(),0.48,110+stage,{
-        viewOnly:'right',
-        orientation:'right',
-        tags,
-        labelKind:'pp-boundary',
-        sideBoost:1.75,
-        focusOnly:true,
-        minScale:0.42
-      });
-    addStaticFocusHitBox(
-      new THREE.Vector3(stageBoxX+0.30,y,(z0+z1)/2),
-      new THREE.Vector3(0.72,0.30,Math.max(0.18,z1-z0+0.18)),
-      tags,
-      {
-        viewOnly:'right',
-        title:`PP boundary ${stage} -> ${stage+1}`,
-        body:`PP${stage} 的最后一层 L${hiA} 与 PP${stage+1} 的第一层 L${loB} 之间需要跨 stage send/recv：forward 传 hidden state activation，backward 反向传 gradient。这个边界是 PP 的主要通信对象，也是 pipeline bubble/等待依赖出现的位置。`,
-        stage,
-        hoverTargets:[line],
-        pickOnlyWhenFocus:true
-      }
-    );
-  }
 }
 function addFrontViewAnnotations(){
   // Front view uses the labels already attached to 3D model nodes/clusters.
@@ -2344,9 +1767,9 @@ function buildArchitecturePreview(){
   drawHiddenStateChain();
   addSideViewAnnotations();
   addFrontViewAnnotations();
-  addArchLabel('L0-L3: Dense decode layers, no experts',graphPos(1040,308,1),0x38bdf8,0.62,layerRenderOrder(1)+0.3);
-  addArchLabel(`L4-L49: MLA + Router + Dispatch + ${MODEL_CONFIG.routedExperts} experts + Shared Expert + Combine + Post-MLP RMSNorm`,
-    graphPos(1050,470,28),0xa78bfa,0.72,layerRenderOrder(28)+0.3);
+  addArchLabel('L0-L2: Dense decode layers, no experts',graphPos(1040,308,1),0x38bdf8,0.62,layerRenderOrder(1)+0.3);
+  addArchLabel('L3-L60: MLA + Router + Dispatch + Expert Pool + Shared Expert + Combine + Post-MLP RMSNorm',
+    graphPos(1050,470,32),0xa78bfa,0.72,layerRenderOrder(32)+0.3);
   applyViewPresentation();
 }
 function resetArchitecture(){
@@ -2387,50 +1810,15 @@ function highlightArchitecture(stage,step,prog){
 buildArchitecturePreview();
 
 /* ===== 下方:32 卡 UB-fabric 卡阵 ===== */
-const SC=1.45, BASE_Y=0.68*SC, RANK_PLANE_X=0;
-const CARD_SIZE={x:0.36*SC,y:0.04*SC,z:0.26*SC};
-const TP_X_PITCH=0.40*SC, DP_X_PITCH=1.05*SC, EP_Z_PITCH=0.34*SC;
-const hardwareStageZ=stage=>{
-  const [lo,hi]=DEMO_STAGE_RANGES[stage]||[0,0];
-  return (archDepth(lo)+archDepth(hi))*0.5;
-};
-const CARDS_PER_NODE=DEMO.tp*DEMO.ep;
-const rankGroupCenterX=dp=>RANK_PLANE_X+(dp-(DEMO.dp-1)/2)*DP_X_PITCH;
-const rankStageCenterZ=stage=>hardwareStageZ(stage);
-const rankX=(dp,tp)=>rankGroupCenterX(dp)+(tp-(DEMO.tp-1)/2)*TP_X_PITCH;
-const rankY=()=>BASE_Y;
-const rankZ=(stage,ep)=>rankStageCenterZ(stage)+(ep-(DEMO.ep-1)/2)*EP_Z_PITCH;
-const rankGroupBoundsFor=(stage,dp)=>{
-  const x=rankGroupCenterX(dp);
-  const y=rankY();
-  const z=rankStageCenterZ(stage);
-  const hx=(DEMO.tp-1)*TP_X_PITCH/2+CARD_SIZE.x/2+0.08*SC;
-  const hy=CARD_SIZE.y/2+0.055*SC;
-  const hz=(DEMO.ep-1)*EP_Z_PITCH/2+CARD_SIZE.z/2+0.075*SC;
-  return {
-    x,y,z,
-    x0:x-hx,x1:x+hx,y0:y-hy,y1:y+hy,z0:z-hz,z1:z+hz,
-    hx,hy,hz
-  };
-};
-const NODE_DEFS=[];
-for(let dpIndex=0;dpIndex<DEMO.dp;dpIndex++){
-  for(let stage=0;stage<DEMO.pp;stage++){
-    const id=dpIndex*DEMO.pp+stage;
-    const stageZ=hardwareStageZ(stage);
-    const b=rankGroupBoundsFor(stage,dpIndex);
-    NODE_DEFS.push({
-      id,dp:dpIndex,stage,
-      label:`D${dpIndex}·PP${stage}`,
-      x:b.x,
-      y:b.y,
-      z:b.z,
-      stageZ
-    });
-  }
-}
+const SC=1.7, BASE_Y=0.06*SC, COL_PITCH=0.56*SC, ROW_PITCH=0.42*SC;
+const NODE_DEFS=[
+  {id:0, dp:0, stage:0, label:'D0·P0', x:-1.05*SC, z:-1.2*SC},
+  {id:1, dp:0, stage:1, label:'D0·P1', x: 1.05*SC, z:-1.2*SC},
+  {id:2, dp:1, stage:0, label:'D1·P0', x:-1.05*SC, z: 1.2*SC},
+  {id:3, dp:1, stage:1, label:'D1·P1', x: 1.05*SC, z: 1.2*SC},
+];
 const nodeByDS=(dp,stage)=>NODE_DEFS.find(n=>n.dp===dp&&n.stage===stage);
-const boardGeo=new THREE.BoxGeometry(CARD_SIZE.x,CARD_SIZE.y,CARD_SIZE.z);
+const boardGeo=new THREE.BoxGeometry(0.42*SC,0.04*SC,0.3*SC);
 const pkgGeo=new THREE.BoxGeometry(0.2*SC,0.02*SC,0.16*SC);
 const ascendLogoTex=new THREE.TextureLoader().load('../hpc-topology-viewer-main/src/assets/ascend-logo.svg');
 ascendLogoTex.anisotropy=4;
@@ -2440,20 +1828,11 @@ const ascendLogoGeo=new THREE.PlaneGeometry(0.16*SC,0.061*SC);
 const ascendLogoPlateMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:false,opacity:1,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
 const ascendLogoMat=new THREE.MeshBasicMaterial({map:ascendLogoTex,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
 const boardEdge=new THREE.EdgesGeometry(boardGeo), pkgEdge=new THREE.EdgesGeometry(pkgGeo);
-const boardMeshes=[], pkgMeshes=[], boardEdgeLines=[], trayLines=[], nodeCards=Array.from({length:NODE_DEFS.length},()=>[]), nodeCenter=[];
-function localCoordsFromIndex(t){return {tp:Math.floor(t/DEMO.ep),ep:t%DEMO.ep};}
-const nodeBounds=node=>rankGroupBoundsFor(node.stage,node.dp,node.x);
-function cardWorld(node,t){
-  const local=localCoordsFromIndex(t);
-  return new THREE.Vector3(
-    rankX(node.dp,local.tp),
-    rankY(),
-    rankZ(node.stage,local.ep)
-  );
-}
+const boardMeshes=[], pkgMeshes=[], boardEdgeLines=[], trayLines=[], nodeCards=[[],[],[],[]], nodeCenter=[];
+function cardWorld(node,t){const col=t%2,row=Math.floor(t/2);
+  return new THREE.Vector3(node.x+(col-0.5)*COL_PITCH, BASE_Y, node.z+(row-1.5)*ROW_PITCH);}
 NODE_DEFS.forEach(node=>{
-  for(let t=0;t<CARDS_PER_NODE;t++){
-    const local=localCoordsFromIndex(t);
+  for(let t=0;t<8;t++){
     const p=cardWorld(node,t);
     const board=new THREE.Mesh(boardGeo,new THREE.MeshStandardMaterial({color:TH.board,emissive:0x000000,metalness:0.02,roughness:0.7}));
     board.position.copy(p);
@@ -2469,682 +1848,17 @@ NODE_DEFS.forEach(node=>{
     logo.rotation.x=-Math.PI/2;
     logo.position.set(0,0.044*SC,0);
     board.add(logo);
-    const rank=rankOf(node.dp,node.stage,local.tp,local.ep);
-    board.userData={card:true,node:node.id,nodeLabel:node.label,dp:node.dp,stage:node.stage,t,tp:local.tp,ep:local.ep,rank,baseY:p.y,role:null,active:false,focus:false};
+    const rank=(node.dp*2+node.stage)*8+t;
+    board.userData={card:true,node:node.id,nodeLabel:node.label,dp:node.dp,stage:node.stage,t,rank,role:null,active:false,focus:false};
     scene.add(board); boardMeshes.push(board); nodeCards[node.id].push(board);
   }
-  const b=nodeBounds(node);
-  const y=b.y0-0.018*SC;
-  const pts=[[b.x0,y,b.z0],[b.x1,y,b.z0],[b.x1,y,b.z1],[b.x0,y,b.z1],[b.x0,y,b.z0]].map(a=>new THREE.Vector3(...a));
+  const hx=0.62*SC,hz=0.92*SC,y=BASE_Y-0.03*SC;
+  const pts=[[node.x-hx,y,node.z-hz],[node.x+hx,y,node.z-hz],[node.x+hx,y,node.z+hz],[node.x-hx,y,node.z+hz],[node.x-hx,y,node.z-hz]].map(a=>new THREE.Vector3(...a));
   const trayLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:TH.tray,transparent:true,opacity:0.8}));
   scene.add(trayLine); trayLines.push(trayLine);
-  const [stageLo,stageHi]=DEMO_STAGE_RANGES[node.stage]||[0,0];
-  const tags=['hw:cards','comm:pp'];
-  const sideFill=addStaticFocusPlane(
-    new THREE.Vector3(node.x+0.012,b.y,b.z),
-    new THREE.Vector3(0,(b.y1-b.y0),(b.z1-b.z0)),
-    curTheme()==='light'?0xe6ece6:0x475569,
-    0.035,
-    tags,
-    {viewOnly:'right',focusColor:0x79c96b,focusOpacity:0.11,hoverOpacity:0.14,renderOrder:62}
-  );
-  const sideOutline=addStaticFocusLine([
-    new THREE.Vector3(node.x+0.018,b.y0,b.z0),
-    new THREE.Vector3(node.x+0.018,b.y1,b.z0),
-    new THREE.Vector3(node.x+0.018,b.y1,b.z1),
-    new THREE.Vector3(node.x+0.018,b.y0,b.z1),
-    new THREE.Vector3(node.x+0.018,b.y0,b.z0)
-  ],curTheme()==='light'?0x6b7280:0x94a3b8,0.46,2.0,tags,{viewOnly:'right',focusColor:0x79c96b,focusOpacity:0.9,hoverOpacity:1,hoverLinewidth:4.8,depthTest:false});
-  const sideGridH=addStaticFocusLine([
-    new THREE.Vector3(node.x+0.02,b.y,b.z0),
-    new THREE.Vector3(node.x+0.02,b.y,b.z1)
-  ],curTheme()==='light'?0x8b948b:0x718096,0.32,1.5,tags,{viewOnly:'right',focusColor:0x79c96b,focusOpacity:0.72,hoverOpacity:0.86,hoverLinewidth:3.2,depthTest:false});
-  const sideGridV=addStaticFocusLine([
-    new THREE.Vector3(node.x+0.02,b.y0,b.z),
-    new THREE.Vector3(node.x+0.02,b.y1,b.z)
-  ],curTheme()==='light'?0x8b948b:0x718096,0.32,1.5,tags,{viewOnly:'right',focusColor:0x79c96b,focusOpacity:0.72,hoverOpacity:0.86,hoverLinewidth:3.2,depthTest:false});
-  addStaticFocusHitBox(
-    new THREE.Vector3(node.x+0.02,b.y,b.z),
-    new THREE.Vector3(0.72,(b.y1-b.y0)+0.12,(b.z1-b.z0)+0.18),
-    tags,
-    {
-      viewOnly:'right',
-      title:`${node.label} rank group`,
-      body:`${node.label} 对应 PP${node.stage} 的一个 DP replica，包含 R${rankRangeForNode(node)}；rank 卡全部平铺在底部硬件平面，X 方向区分 DP/TP，Z 方向区分 PP/EP。stage range 是 L${stageLo}-L${stageHi}。`,
-      stage:node.stage,
-      hoverTargets:[sideFill,sideOutline,sideGridH,sideGridV]
-    }
-  );
-  const lab=makeBadgeSprite(
-    `D${node.dp} R${rankRangeForNode(node)}`,
-    curTheme()==='light'?0x111827:0xf8fafc,
-    0.98,
-    curTheme()==='light'?0xffffff:0x111827,
-    curTheme()==='light'?0xcbd5e1:0x475569
-  );
-  lab.rotation.y=Math.PI/2;
-  lab.renderOrder=68;
-  lab.position.set(node.x+0.03,b.y0-0.12,b.z);
-  lab.userData={
-    viewOnly:'right',
-    tags:['hw:cards','comm:tp','comm:ep','comm:dp','comm:pp'],
-    labelKind:'rank-group',
-    sideBoost:1.05
-  };
-  archLabels.push(lab);
-  scene.add(lab);
-  applyViewPresentation();
-  nodeCenter[node.id]=new THREE.Vector3(node.x,node.y,node.z);
+  const lab=makeSprite(node.label,sceneMutedColor(),1.65); lab.position.set(node.x,BASE_Y+0.25,node.z-hz-0.1); scene.add(lab);
+  nodeCenter[node.id]=new THREE.Vector3(node.x,BASE_Y,node.z);
 });
-const sideModeGray=()=>curTheme()==='light'?0xd7ded7:0x4b5563;
-const parallelGuideRegistry={pp:new Map(),tp:new Map(),ep:new Map(),dp:new Map()};
-function rememberParallelGuide(kind,key,hitBox,{prefer=false}={}){
-  const bucket=parallelGuideRegistry[kind];
-  if(!bucket||!hitBox)return hitBox;
-  if(prefer||!bucket.has(key))bucket.set(key,hitBox);
-  if(!bucket.has('first'))bucket.set('first',hitBox);
-  return hitBox;
-}
-function parallelGuideHit(kind,key){
-  const bucket=parallelGuideRegistry[kind];
-  if(!bucket)return null;
-  return (key&&bucket.get(key))||bucket.get('first')||null;
-}
-const sideModeRectPts=(x,y0,y1,z0,z1)=>[
-  new THREE.Vector3(x,y0,z0),
-  new THREE.Vector3(x,y1,z0),
-  new THREE.Vector3(x,y1,z1),
-  new THREE.Vector3(x,y0,z1),
-  new THREE.Vector3(x,y0,z0)
-];
-const unionBounds=bounds=>{
-  const x0=Math.min(...bounds.map(b=>b.x0)), x1=Math.max(...bounds.map(b=>b.x1));
-  const y0=Math.min(...bounds.map(b=>b.y0)), y1=Math.max(...bounds.map(b=>b.y1));
-  const z0=Math.min(...bounds.map(b=>b.z0)), z1=Math.max(...bounds.map(b=>b.z1));
-  return {x0,x1,y0,y1,z0,z1,x:(x0+x1)/2,y:(y0+y1)/2,z:(z0+z1)/2};
-};
-function addSideModeBox({x=RANK_PLANE_X+0.07,y0,y1,z0,z1,tags,color,title,body,stage=null,fillOpacity=0.018,focusOpacity=0.12,lineOpacity=0.14,lineWidth=1.7,renderOrder=64}){
-  const fill=addStaticFocusPlane(
-    new THREE.Vector3(x-0.004,(y0+y1)/2,(z0+z1)/2),
-    new THREE.Vector3(0,Math.max(0.001,y1-y0),Math.max(0.001,z1-z0)),
-    sideModeGray(),
-    fillOpacity,
-    tags,
-    {
-      viewOnly:'right',
-      focusColor:color,
-      focusOpacity,
-      hoverOpacity:Math.max(focusOpacity,0.16),
-      dimOpacity:0.01,
-      renderOrder
-    }
-  );
-  const outline=addStaticFocusLine(
-    sideModeRectPts(x,y0,y1,z0,z1),
-    sideModeGray(),
-    lineOpacity,
-    lineWidth,
-    tags,
-    {
-      viewOnly:'right',
-      focusColor:color,
-      focusOpacity:Math.max(0.9,focusOpacity*4.8),
-      hoverOpacity:1,
-      hoverLinewidth:lineWidth*2.4,
-      dimOpacity:0.012,
-      depthTest:false,
-      renderOrder:renderOrder+1
-    }
-  );
-  const hitBox=addStaticFocusHitBox(
-    new THREE.Vector3(x+0.018,(y0+y1)/2,(z0+z1)/2),
-    new THREE.Vector3(0.5,Math.max(0.06,y1-y0+0.035*SC),Math.max(0.08,z1-z0+0.035*SC)),
-    tags,
-    {viewOnly:'right',title,body,stage,hoverTargets:[fill,outline]}
-  );
-  return {fill,outline,hitBox};
-}
-function addSideModeLabel(text,x,y,z,tags,color,renderOrder=74){
-  addArchLabel(
-    text,
-    new THREE.Vector3(x,y,z),
-    color,
-    0.48,
-    renderOrder,
-    {
-      viewOnly:'right',
-      orientation:'right',
-      tags,
-      labelKind:'side-mode',
-      sideBoost:1.85,
-      focusOnly:true,
-      minScale:0.44
-    }
-  );
-}
-function addSideModeConnector(points,tags,color,renderOrder=72){
-  return addStaticFocusLine(
-    points,
-    color,
-    0.055,
-    1.35,
-    tags,
-    {
-      viewOnly:'right',
-      focusColor:color,
-      focusOpacity:0.88,
-      hoverOpacity:1,
-      hoverLinewidth:3.6,
-      dimOpacity:0.01,
-      depthTest:false,
-      renderOrder
-    }
-  );
-}
-function addGroundFocusPlane(center,size,color,opacity,tags,opts={}){
-  const mat=new THREE.MeshBasicMaterial({
-    color,transparent:true,opacity,depthWrite:false,depthTest:false,side:THREE.DoubleSide,toneMapped:false
-  });
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.001,size.x),Math.max(0.001,size.z)),mat);
-  mesh.rotation.x=-Math.PI/2;
-  mesh.position.copy(center);
-  mesh.renderOrder=opts.renderOrder??58;
-  mesh.userData={
-    viewOnly:opts.viewOnly||null,
-    tags,
-    baseOpacity:opacity,
-    baseColor:color,
-    focusColor:opts.focusColor,
-    focusOpacity:opts.focusOpacity,
-    hoverOpacity:opts.hoverOpacity??Math.max(0.16,opacity*2.8),
-    dimOpacity:opts.dimOpacity
-  };
-  staticFocusObjects.push(mesh);
-  scene.add(mesh);
-  applyStaticFocusObject(mesh);
-  return mesh;
-}
-const groundModeRectPts=(y,x0,x1,z0,z1)=>[
-  new THREE.Vector3(x0,y,z0),
-  new THREE.Vector3(x1,y,z0),
-  new THREE.Vector3(x1,y,z1),
-  new THREE.Vector3(x0,y,z1),
-  new THREE.Vector3(x0,y,z0)
-];
-function addGroundModeBox({y=BASE_Y+0.073*SC,x0,x1,z0,z1,tags,color,title,body,stage=null,fillOpacity=0.02,focusOpacity=0.18,lineOpacity=0.16,lineWidth=1.9,renderOrder=64}){
-  const fill=addGroundFocusPlane(
-    new THREE.Vector3((x0+x1)/2,y,(z0+z1)/2),
-    new THREE.Vector3(Math.max(0.001,x1-x0),0,Math.max(0.001,z1-z0)),
-    sideModeGray(),
-    fillOpacity,
-    tags,
-    {
-      focusColor:color,
-      focusOpacity,
-      hoverOpacity:Math.max(focusOpacity,0.2),
-      dimOpacity:0.012,
-      renderOrder
-    }
-  );
-  const outline=addStaticFocusLine(
-    groundModeRectPts(y+0.002*SC,x0,x1,z0,z1),
-    sideModeGray(),
-    lineOpacity,
-    lineWidth,
-    tags,
-    {
-      focusColor:color,
-      focusOpacity:Math.max(0.9,focusOpacity*4.5),
-      hoverOpacity:1,
-      hoverLinewidth:lineWidth*2.2,
-      dimOpacity:0.012,
-      depthTest:false,
-      renderOrder:renderOrder+1
-    }
-  );
-  const hitBox=addStaticFocusHitBox(
-    new THREE.Vector3((x0+x1)/2,y,(z0+z1)/2),
-    new THREE.Vector3(Math.max(0.12,x1-x0+0.035*SC),0.28,Math.max(0.12,z1-z0+0.035*SC)),
-    tags,
-    {title,body,stage,hoverTargets:[fill,outline]}
-  );
-  return {fill,outline,hitBox};
-}
-function addGroundModeLabel(text,x,z,tags,color,renderOrder=75,scale=1.34){
-  const lab=makeSprite(text,color,scale);
-  lab.rotation.x=-Math.PI/2;
-  lab.renderOrder=renderOrder;
-  lab.position.set(x,BASE_Y+0.086*SC,z);
-  lab.userData={viewOnly:null,tags,focusOnly:true,labelKind:'ground-mode'};
-  archLabels.push(lab);
-  scene.add(lab);
-  applyViewPresentation();
-  return lab;
-}
-function addParallelModeSideGuides(){
-  const allBounds=NODE_DEFS.map(nodeBounds);
-  const all=unionBounds(allBounds);
-  const y=BASE_Y+0.086*SC;
-  const cardXHalf=CARD_SIZE.x/2, cardZHalf=CARD_SIZE.z/2;
-  const padX=0.052*SC, padZ=0.052*SC;
-  const addCommConnector=(points,tags,color,renderOrder=74)=>addStaticFocusLine(
-    points,
-    color,
-    0.07,
-    1.55,
-    tags,
-    {
-      focusColor:color,
-      focusOpacity:0.95,
-      hoverOpacity:1,
-      hoverLinewidth:4.0,
-      dimOpacity:0.012,
-      depthTest:false,
-      renderOrder
-    }
-  );
-  const addEpA2ALine=(points,tags,renderOrder=82)=>addStaticFocusLine(
-    points,
-    LINE.ep,
-    0.16,
-    3.4,
-    tags,
-    {
-      focusColor:LINE.ep,
-      focusOpacity:1,
-      hoverOpacity:1,
-      hoverLinewidth:7.2,
-      dimOpacity:0.016,
-      depthTest:false,
-      renderOrder
-    }
-  );
-  const addEpEndpointTicks=(x,y,z0,z1,tags,renderOrder=83)=>{
-    const tick=0.055*SC;
-    [z0,z1].forEach(z=>{
-      addStaticFocusLine([
-        new THREE.Vector3(x,y-tick,z),
-        new THREE.Vector3(x,y+tick,z)
-      ],LINE.ep,0.14,2.8,tags,{
-        focusColor:LINE.ep,
-        focusOpacity:1,
-        hoverOpacity:1,
-        hoverLinewidth:5.4,
-        dimOpacity:0.016,
-        depthTest:false,
-        renderOrder
-      });
-    });
-  };
-  const addEpA2AArc=(x,y,z0,z1,tags,renderOrder=88)=>{
-    const mid=new THREE.Vector3(x,y+0.15*SC,(z0+z1)*0.5);
-    const pts=new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(x,y,z0),
-      mid,
-      new THREE.Vector3(x,y,z1)
-    ).getPoints(24);
-    return addStaticFocusLine(pts,LINE.ep,0.20,4.2,tags,{
-      focusColor:LINE.ep,
-      focusOpacity:1,
-      hoverOpacity:1,
-      hoverLinewidth:8.2,
-      dimOpacity:0.018,
-      depthTest:false,
-      renderOrder
-    });
-  };
-  const projX=RANK_PLANE_X+0.92;
-  const projBaseY=BASE_Y+0.48*SC;
-  const projDpPitch=0.42*SC;
-  const projTpPitch=0.15*SC;
-  const projY=(dp,tp)=>projBaseY+(DEMO.dp-1-dp)*projDpPitch+((DEMO.tp-1)/2-tp)*projTpPitch;
-  const projDpBounds=dp=>{
-    const ys=Array.from({length:DEMO.tp},(_,tp)=>projY(dp,tp));
-    return {y0:Math.min(...ys)-0.070*SC,y1:Math.max(...ys)+0.070*SC};
-  };
-  const projAllY=()=>{
-    const ys=[];
-    for(let dp=0;dp<DEMO.dp;dp++)for(let tp=0;tp<DEMO.tp;tp++)ys.push(projY(dp,tp));
-    return {y0:Math.min(...ys)-0.090*SC,y1:Math.max(...ys)+0.090*SC};
-  };
-  const allProjY=projAllY();
-  for(let tp=0;tp<DEMO.tp;tp++){
-    tpOverlayAnchors.push({
-      tp,
-      pos:new THREE.Vector3(projX+0.18,(allProjY.y0+allProjY.y1)/2,all.z0-0.16*SC),
-      dx:12,
-      dy:(tp-(DEMO.tp-1)/2)*46
-    });
-  }
-  for(let stage=0;stage<DEMO.pp;stage++){
-    const [stageLo,stageHi]=DEMO_STAGE_RANGES[stage]||[0,0];
-    const layerTag=stageHi<FIRST_MOE_LAYER?'layer:dense':'layer:moe';
-    const ppSideGuide=addSideModeBox({
-      x:projX-0.030*SC,
-      y0:allProjY.y0,
-      y1:allProjY.y1,
-      z0:rankZ(stage,0)-cardZHalf-padZ*1.4,
-      z1:rankZ(stage,DEMO.ep-1)+cardZHalf+padZ*1.4,
-      tags:['comm:pp','hw:cards','data:hidden'],
-      color:LINE.pp,
-      fillOpacity:0.006,
-      focusOpacity:0.13,
-      lineOpacity:0.07,
-      lineWidth:1.6,
-      renderOrder:63,
-      stage,
-      title:`PP${stage} side projection`,
-      body:`这是底部真实 rank 网格在侧视图里的 PP${stage} 投影，不是额外 rank。PP${stage} 覆盖 L${stageLo}-L${stageHi}，相邻 stage 之间传 hidden state / gradient。`
-    });
-    rememberParallelGuide('pp',`stage:${stage}`,ppSideGuide.hitBox);
-    for(let ep=0;ep<DEMO.ep;ep++){
-      addSideModeLabel(
-        epLabel(ep),
-        projX+0.315,
-        allProjY.y0-0.080*SC,
-        rankZ(stage,ep),
-        ['comm:ep','hw:cards','data:dispatch'],
-        LINE.ep,
-        92
-      );
-    }
-  }
-  for(let dp=0;dp<DEMO.dp;dp++){
-    const b=projDpBounds(dp);
-    dpOverlayAnchors.push({
-      dp,
-      pos:new THREE.Vector3(projX+0.18,(b.y0+b.y1)/2,all.z0-0.18*SC),
-      dx:12,
-      dy:0
-    });
-    const dpSideGuide=addSideModeBox({
-      x:projX,
-      y0:b.y0,
-      y1:b.y1,
-      z0:all.z0-0.060*SC,
-      z1:all.z1+0.060*SC,
-      tags:['comm:dp','hw:cards'],
-      color:LINE.dp,
-      fillOpacity:0.008,
-      focusOpacity:0.16,
-      lineOpacity:0.09,
-      lineWidth:1.9,
-      renderOrder:64,
-      title:`DP${dp} side projection`,
-      body:`这是 DP${dp} 完整模型副本在侧视图中的投影。文章里的 DP 不是切模型，而是复制模型副本、切 batch；同 PP/TP/EP 坐标的 D0/D1 在 backward 后同步梯度。`
-    });
-    rememberParallelGuide('dp',`dp:${dp}`,dpSideGuide.hitBox);
-    addSideModeLabel(`DP${dp}`,projX+0.17,(b.y0+b.y1)/2,all.z0-0.12*SC,['comm:dp','hw:cards'],LINE.dp,80);
-  }
-  NODE_DEFS.forEach(node=>{
-    const [stageLo,stageHi]=DEMO_STAGE_RANGES[node.stage]||[0,0];
-    const layerTag=stageHi<FIRST_MOE_LAYER?'layer:dense':'layer:moe';
-    for(let ep=0;ep<DEMO.ep;ep++){
-      const y0=projY(node.dp,DEMO.tp-1)-0.050*SC;
-      const y1=projY(node.dp,0)+0.050*SC;
-      const z=rankZ(node.stage,ep);
-      const tags=['comm:tp','hw:cards'];
-      const tpSideGuide=addSideModeBox({
-        x:projX+0.020*SC,
-        y0,
-        y1,
-        z0:z-cardZHalf-padZ,
-        z1:z+cardZHalf+padZ,
-        tags,
-        color:LINE.tp,
-        fillOpacity:0.008,
-        focusOpacity:0.22,
-        lineOpacity:0.10,
-        lineWidth:2.0,
-        renderOrder:66,
-        stage:node.stage,
-        title:`${node.label} · TP side projection · EP${ep}`,
-        body:`侧视投影：固定 DP${node.dp}/PP${node.stage}/EP${ep}，把 TP0 与 TP1 圈成一个层内张量并行通信组。真实 rank 仍在底部平面上；这里用于说明 TP 横切同一层内部张量。stage range L${stageLo}-L${stageHi}。`
-      });
-      rememberParallelGuide('tp',`${node.dp}:${node.stage}:ep${ep}`,tpSideGuide.hitBox);
-      addSideModeConnector([
-        new THREE.Vector3(projX+0.060*SC,projY(node.dp,0),z),
-        new THREE.Vector3(projX+0.060*SC,projY(node.dp,DEMO.tp-1),z)
-      ],tags,LINE.tp,77);
-    }
-    for(let tp=0;tp<DEMO.tp;tp++){
-      addSideModeLabel(
-        tpLabel(tp),
-        projX+0.155,
-        projY(node.dp,tp),
-        rankZ(node.stage,DEMO.ep-1)+cardZHalf+padZ+0.055*SC,
-        ['comm:tp','hw:cards'],
-        LINE.tp,
-        91
-      );
-    }
-    for(let tp=0;tp<DEMO.tp;tp++){
-      const y=projY(node.dp,tp);
-      const tags=['comm:ep','hw:cards','data:dispatch'];
-      const epSideGuide=addSideModeBox({
-        x:projX+0.052*SC,
-        y0:y-0.052*SC,
-        y1:y+0.052*SC,
-        z0:rankZ(node.stage,0)-cardZHalf-padZ,
-        z1:rankZ(node.stage,DEMO.ep-1)+cardZHalf+padZ,
-        tags,
-        color:LINE.ep,
-        fillOpacity:0.009,
-        focusOpacity:0.24,
-        lineOpacity:0.11,
-        lineWidth:2.0,
-        renderOrder:67,
-        stage:node.stage,
-        title:`${node.label} · EP side projection · TP${tp}`,
-        body:`侧视投影：固定 DP${node.dp}/PP${node.stage}/TP${tp}，把 EP0 与 EP1 圈成 MoE token dispatch/combine 的 All-to-All 通信组。真实 rank 仍在底部平面上。stage range L${stageLo}-L${stageHi}。`
-      });
-      rememberParallelGuide('ep',`${node.dp}:${node.stage}:tp${tp}`,epSideGuide.hitBox);
-      addSideModeConnector([
-        new THREE.Vector3(projX+0.092*SC,y,rankZ(node.stage,0)),
-        new THREE.Vector3(projX+0.092*SC,y,rankZ(node.stage,DEMO.ep-1))
-      ],tags,LINE.ep,78);
-      const epLineX=projX+0.142*SC;
-      addEpA2ALine([
-        new THREE.Vector3(epLineX,y,rankZ(node.stage,0)),
-        new THREE.Vector3(epLineX,y,rankZ(node.stage,DEMO.ep-1))
-      ],tags,86);
-      addEpEndpointTicks(epLineX,y,rankZ(node.stage,0),rankZ(node.stage,DEMO.ep-1),tags,87);
-    }
-    addEpA2AArc(
-      projX+0.205*SC,
-      (projY(node.dp,0)+projY(node.dp,DEMO.tp-1))*0.5,
-      rankZ(node.stage,0),
-      rankZ(node.stage,DEMO.ep-1),
-      ['comm:ep','hw:cards','data:dispatch'],
-      89
-    );
-    addSideModeLabel(
-      'EP0-EP1 A2A',
-      projX+0.28,
-      (projY(node.dp,0)+projY(node.dp,DEMO.tp-1))*0.5,
-      (rankZ(node.stage,0)+rankZ(node.stage,DEMO.ep-1))*0.5,
-      ['comm:ep','hw:cards','data:dispatch'],
-      LINE.ep,
-      90
-    );
-  });
-  addSideModeLabel(
-    'EP0-EP1 All-to-All',
-    projX+0.34,
-    allProjY.y1+0.12*SC,
-    (all.z0+all.z1)*0.5,
-    ['comm:ep','hw:cards','data:dispatch'],
-    LINE.ep,
-    92
-  );
-  for(let stage=0;stage<DEMO.pp;stage++){
-    const bounds=NODE_DEFS.filter(node=>node.stage===stage).map(nodeBounds);
-    const b=unionBounds(bounds);
-    const [stageLo,stageHi]=DEMO_STAGE_RANGES[stage]||[0,0];
-    const layerTag=stageHi<FIRST_MOE_LAYER?'layer:dense':'layer:moe';
-    addGroundModeBox({
-      x0:b.x0-0.040*SC,
-      x1:b.x1+0.040*SC,
-      z0:b.z0-0.070*SC,
-      z1:b.z1+0.070*SC,
-      tags:['comm:pp','hw:cards','data:hidden'],
-      color:LINE.pp,
-      fillOpacity:0.018,
-      focusOpacity:0.18,
-      lineOpacity:0.18,
-      lineWidth:2.2,
-      renderOrder:61,
-      stage,
-      title:`PP${stage} layer shard · L${stageLo}-L${stageHi}`,
-      body:`PP 是“按层竖切”。这个底部框圈出所有运行 PP${stage} 的 rank：D0/D1 两个副本、每个副本内 TP${DEMO.tp} × EP${DEMO.ep}。相邻 PP stage 之间传递 forward hidden state，backward 反向传 gradient。`
-    });
-    for(let ep=0;ep<DEMO.ep;ep++){
-      addGroundModeLabel(
-        `${epLabel(ep)} row`,
-        b.x1+0.10*SC,
-        rankZ(stage,ep),
-        ['comm:ep','hw:cards','data:dispatch'],
-        LINE.ep,
-        82,
-        0.98
-      );
-    }
-  }
-  for(let stage=0;stage<DEMO.pp-1;stage++){
-    const left=NODE_DEFS.filter(node=>node.stage===stage).map(nodeBounds);
-    const right=NODE_DEFS.filter(node=>node.stage===stage+1).map(nodeBounds);
-    if(!left.length||!right.length)continue;
-    for(let dp=0;dp<DEMO.dp;dp++){
-      for(let ep=0;ep<DEMO.ep;ep++){
-        addCommConnector([
-          new THREE.Vector3(rankGroupCenterX(dp),y,rankZ(stage,ep)),
-          new THREE.Vector3(rankGroupCenterX(dp),y,rankZ(stage+1,ep))
-        ],['comm:pp','hw:cards','data:hidden'],LINE.pp,72);
-      }
-    }
-  }
-  for(let dp=0;dp<DEMO.dp;dp++){
-    const bounds=NODE_DEFS.filter(node=>node.dp===dp).map(nodeBounds);
-    const b=unionBounds(bounds);
-    addGroundModeBox({
-      x0:b.x0-0.070*SC,
-      x1:b.x1+0.070*SC,
-      z0:all.z0-0.060*SC,
-      z1:all.z1+0.060*SC,
-      tags:['comm:dp','hw:cards'],
-      color:LINE.dp,
-      fillOpacity:0.020,
-      focusOpacity:0.17,
-      lineOpacity:0.20,
-      lineWidth:2.4,
-      renderOrder:61,
-      title:`DP${dp} replica row`,
-      body:`DP 是“复制模型、切数据”。这个框表示完整模型副本 DP${dp}：它覆盖 PP0-PP${DEMO.pp-1} 的所有层段，每个层段内部继续包含 TP${DEMO.tp} × EP${DEMO.ep}。不同 DP 副本吃不同 batch，backward 后在同 PP/TP/EP 坐标上做梯度同步。`
-    });
-    addGroundModeLabel(`DP${dp} full replica`,b.x,all.z0-0.12*SC,['comm:dp','hw:cards'],LINE.dp,78);
-  }
-  for(let stage=0;stage<DEMO.pp;stage++){
-    const [stageLo,stageHi]=DEMO_STAGE_RANGES[stage]||[0,0];
-    for(let tp=0;tp<DEMO.tp;tp++){
-      for(let ep=0;ep<DEMO.ep;ep++){
-        addCommConnector([
-          new THREE.Vector3(rankX(0,tp),y,rankZ(stage,ep)),
-          new THREE.Vector3(rankX(1,tp),y,rankZ(stage,ep))
-        ],['comm:dp','hw:cards'],LINE.dp,73);
-      }
-    }
-    addGroundModeBox({
-      x0:rankX(0,0)-cardXHalf-padX,
-      x1:rankX(1,DEMO.tp-1)+cardXHalf+padX,
-      z0:rankZ(stage,0)-cardZHalf-padZ,
-      z1:rankZ(stage,DEMO.ep-1)+cardZHalf+padZ,
-      tags:['comm:dp','hw:cards'],
-      color:LINE.dp,
-      fillOpacity:0.010,
-      focusOpacity:0.10,
-      lineOpacity:0.12,
-      lineWidth:1.7,
-      renderOrder:62,
-      stage,
-      title:`DP Grad Sync · PP${stage}`,
-      body:`这个同步框覆盖 PP${stage} 的 D0/D1 两个副本。DP 不切层、不切张量；它只把完整模型副本复制两份，并在 backward 后让相同 PP${stage}/TP/EP 坐标的 rank 做梯度 All-Reduce。stage range 是 L${stageLo}-L${stageHi}。`
-    });
-  }
-  NODE_DEFS.forEach(node=>{
-    const b=nodeBounds(node);
-    const [stageLo,stageHi]=DEMO_STAGE_RANGES[node.stage]||[0,0];
-    const layerTag=stageHi<FIRST_MOE_LAYER?'layer:dense':'layer:moe';
-    for(let ep=0;ep<DEMO.ep;ep++){
-      const z=rankZ(node.stage,ep);
-      const ranks=Array.from({length:DEMO.tp},(_,tp)=>`R${rankOf(node.dp,node.stage,tp,ep)}(TP${tp})`).join(' / ');
-      const tags=['comm:tp','hw:cards'];
-      addGroundModeBox({
-        x0:rankX(node.dp,0)-cardXHalf-padX,
-        x1:rankX(node.dp,DEMO.tp-1)+cardXHalf+padX,
-        z0:z-cardZHalf-padZ,
-        z1:z+cardZHalf+padZ,
-        tags,
-        color:LINE.tp,
-        fillOpacity:0.024,
-        focusOpacity:0.28,
-        lineOpacity:0.20,
-        lineWidth:2.35,
-        renderOrder:66,
-        stage:node.stage,
-        title:`${node.label} · TP group at EP${ep}`,
-        body:`TP 是“同一层内部横切张量”。这个框圈住固定 DP${node.dp}/PP${node.stage}/EP${ep} 下的 TP0↔TP1：${ranks}。它们共同计算同一层矩阵/注意力分片，并通过 All-Reduce / All-Gather / Reduce-Scatter 合并部分结果；stage range 为 L${stageLo}-L${stageHi}。`
-      });
-      addCommConnector([
-        new THREE.Vector3(rankX(node.dp,0),y,z),
-        new THREE.Vector3(rankX(node.dp,DEMO.tp-1),y,z)
-      ],tags,LINE.tp,74);
-    }
-    addGroundModeLabel(`TP groups`,b.x,b.z0-0.12*SC,['comm:tp','hw:cards'],LINE.tp,78);
-    for(let tp=0;tp<DEMO.tp;tp++){
-      addGroundModeLabel(
-        `${tpLabel(tp)} col`,
-        rankX(node.dp,tp),
-        b.z0-0.24*SC,
-        ['comm:tp','hw:cards'],
-        LINE.tp,
-        82,
-        0.96
-      );
-    }
-    for(let tp=0;tp<DEMO.tp;tp++){
-      const x=rankX(node.dp,tp);
-      const ranks=Array.from({length:DEMO.ep},(_,ep)=>`R${rankOf(node.dp,node.stage,tp,ep)}(EP${ep})`).join(' / ');
-      const tags=['comm:ep','hw:cards','data:dispatch'];
-      addGroundModeBox({
-        x0:x-cardXHalf-padX,
-        x1:x+cardXHalf+padX,
-        z0:rankZ(node.stage,0)-cardZHalf-padZ,
-        z1:rankZ(node.stage,DEMO.ep-1)+cardZHalf+padZ,
-        tags,
-        color:LINE.ep,
-        fillOpacity:0.026,
-        focusOpacity:0.30,
-        lineOpacity:0.20,
-        lineWidth:2.35,
-        renderOrder:67,
-        stage:node.stage,
-        title:`${node.label} · EP group at TP${tp}`,
-        body:`EP 是 MoE 内部的 expert/token 切分。这个框圈住固定 DP${node.dp}/PP${node.stage}/TP${tp} 下的 EP0↔EP1：${ranks}。Router 选中专家后，token dispatch/combine 在这个组内做 All-to-All；MoE stage range 为 L${stageLo}-L${stageHi}。`
-      });
-      addCommConnector([
-        new THREE.Vector3(x,y,rankZ(node.stage,0)),
-        new THREE.Vector3(x,y,rankZ(node.stage,DEMO.ep-1))
-      ],tags,LINE.ep,75);
-      addEpA2ALine([
-        new THREE.Vector3(x,y+0.018*SC,rankZ(node.stage,0)),
-        new THREE.Vector3(x,y+0.018*SC,rankZ(node.stage,DEMO.ep-1))
-      ],tags,84);
-      addEpEndpointTicks(x,y+0.018*SC,rankZ(node.stage,0),rankZ(node.stage,DEMO.ep-1),tags,85);
-    }
-    addGroundModeLabel(`EP groups`,b.x,b.z1+0.12*SC,['comm:ep','hw:cards','data:dispatch'],LINE.ep,79);
-  });
-}
-addParallelModeSideGuides();
 let grid=null;
 function rebuildGrid(){
   if(grid){
@@ -3199,7 +1913,8 @@ const addArc=(a,b,c,op,lift)=>{const mid=a.clone().add(b).multiplyScalar(0.5);mi
   return mid;};
 
 /* ===== 1F1B timeline trace ===== */
-const STAGE_RANGES=DEMO_STAGE_RANGES;
+const P0R=TRACE.config.stageRanges?.[0]||TRACE.config.stageRanges?.['0']||[0,30];
+const P1R=TRACE.config.stageRanges?.[1]||TRACE.config.stageRanges?.['1']||[31,60];
 const TRACE_TICKS=TRACE.ticks||[];
 const TRACE_LANES=TRACE.lanes||[];
 let traceIndex=Math.max(0,Math.min(TRACE_TICKS.length-1,TRACE.defaultTick??0));
@@ -3221,10 +1936,9 @@ function eventStep(evt){return evt?.opFocus?.step||evt?.step||'moe_residual';}
 function eventLayer(evt){
   if(evt?.opFocus&&evt.opFocus.layer!=null)return evt.opFocus.layer;
   if(evt?.layer!=null)return evt.layer;
-  const range=STAGE_RANGES[evt?.stage??0]||[0,0];
-  return range[0];
+  return evt?.stage===1?31:30;
 }
-function eventRange(evt){return evt?.layerRange||STAGE_RANGES[evt?.stage??0]||[0,0];}
+function eventRange(evt){return evt?.layerRange||(evt?.stage===1?P1R:P0R);}
 function eventProg(evt){
   const step=eventStep(evt);
   return {range:eventRange(evt),layer:eventLayer(evt),micro:evt?.micro??0,idx:Math.max(0,(evt?.stepIndex??1)-1),
@@ -3254,7 +1968,6 @@ function eventTags(evt){
   if(comm==='tp')tags.add('comm:tp');
   if(comm==='ep')tags.add('comm:ep');
   if(comm==='pp')tags.add('comm:pp');
-  if(comm==='dp')tags.add('comm:dp');
   if(step==='mla')tags.add('op:mla');
   if(step==='gate')tags.add('op:router');
   if(['a2a_dispatch','a2a_combine','experts'].includes(step)){tags.add('data:dispatch');tags.add('comm:ep');}
@@ -3264,12 +1977,8 @@ function eventTags(evt){
   if(step==='lm_head'){tags.add('data:logits');tags.add('op:head');tags.add('comm:tp');}
   return [...tags];
 }
-const cardsByLocal=(node,filter)=>nodeCards[node.id].filter(card=>filter(card.userData));
-const cardsForTpGroup=(node,epIndex)=>cardsByLocal(node,d=>d.ep===epIndex);
-const cardsForEpGroup=(node,tpIndex)=>cardsByLocal(node,d=>d.tp===tpIndex);
 function boardMatchesObjectFocus(board){
   if(!focusActive())return true;
-  if(objectFocus==='comm:dp')return true;
   if(objectFocus==='comm:pp')return true;
   return tagMatchesFocus(eventTags(board.userData.event));
 }
@@ -3283,16 +1992,15 @@ function applyBoardObjectFocus(board){
 
 /* ===== 渲染当前帧 ===== */
 let focusNode=0;   // 聚焦哪个硬件 node
-function roleText(evt,card){
+function roleText(evt,t){
   if(isBubbleEvent(evt))return 'pipeline bubble · this stage is filling or draining';
   const step=eventStep(evt), L=STEP_META[step].label, comm=eventComm(evt), phase=eventPhaseName(evt);
   if(comm==='pp')return `${phase} ${evt.label} · PP send/recv boundary`;
-  if(step==='experts') return `${phase} Expert Pool shard · TP${card.tp}/EP${card.ep}`;
-  if(comm==='tp') return `${phase} All-Reduce participant · TP shard ${card.tp}/${DEMO.tp}`;
-  if(comm==='ep') return `${phase} All-to-All participant · EP rank ${card.ep}/${DEMO.ep}`;
-  if(comm==='dp') return `${phase} DP gradient sync participant · replica D${card.dp}`;
+  if(step==='experts') return `${phase} Expert Pool shard · EP rank ${t}/8`;
+  if(comm==='tp') return `${phase} All-Reduce participant · TP shard ${t}/8`;
+  if(comm==='ep') return `${phase} All-to-All participant · EP rank ${t}/8`;
   if(['moe_prenorm','gate','moe_residual','final_norm'].includes(step)) return `${phase} ${L} · local per-rank compute`;
-  return `${phase} ${L} · TP${card.tp}/EP${card.ep}`;
+  return `${phase} ${L} · TP shard ${t}/8`;
 }
 function commLabel(evt){
   const comm=eventComm(evt);
@@ -3320,40 +2028,33 @@ function updatePlaybackInfo(fn,evt){
   // statusRight 留给异常诊断/选择，updateStatus 不再覆盖
 }
 function groupHalo(node,c,op,label){
-  const b=typeof nodeBounds==='function'?nodeBounds(node):{x0:node.x-0.72*SC,x1:node.x+0.72*SC,z0:node.z-1.02*SC,z1:node.z+1.02*SC,y1:node.y+0.12*SC};
-  const pad=0.035*SC,y=b.y1+0.035*SC;
-  const pts=[[b.x0-pad,y,b.z0-pad],[b.x1+pad,y,b.z0-pad],[b.x1+pad,y,b.z1+pad],[b.x0-pad,y,b.z1+pad],[b.x0-pad,y,b.z0-pad]].map(a=>new THREE.Vector3(...a));
+  const hx=0.72*SC,hz=1.02*SC,y=BASE_Y+0.02;
+  const pts=[[node.x-hx,y,node.z-hz],[node.x+hx,y,node.z-hz],[node.x+hx,y,node.z+hz],[node.x-hx,y,node.z+hz],[node.x-hx,y,node.z-hz]].map(a=>new THREE.Vector3(...a));
   dyn.add(fatLine(pts,c,lineLvl(op),LW.halo));
-  if(label){const sp=makeSprite(label,c,2.2);sp.position.set(node.x,b.y1+0.32*SC,b.z1+pad);dyn.add(sp);}
+  if(label){const sp=makeSprite(label,c,2.2);sp.position.set(node.x,BASE_Y+0.55,node.z+hz);dyn.add(sp);}
 }
 function commLines(node,evt,bright){
-  const cards=nodeCards[node.id], yL=node.y+0.32, comm=eventComm(evt);
+  const cards=nodeCards[node.id], yL=BASE_Y+0.32, comm=eventComm(evt);
   if(comm==='pp'){
     groupHalo(node,LINE.pp,(bright||objectFocus==='comm:pp')?0.58:0.2,null);
     return;
   }
-  if(comm==='tp'){  // All-Reduce:TP 组内
+  if(comm==='tp'){  // All-Reduce:TP 组内(8 卡)
     const hi=bright||objectFocus==='comm:tp';
-    for(let epIndex=0;epIndex<DEMO.ep;epIndex++){
-      const group=cardsForTpGroup(node,epIndex);
-      for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++)addLine(group[i].position,group[j].position,LINE.tp,hi?0.85:0.3,yL);
-    }
+    for(let t=0;t<8;t++)addLine(cards[t].position,cards[(t+1)%8].position,LINE.tp,hi?0.85:0.3,yL);
     groupHalo(node,LINE.tp,hi?0.65:0.22,null);
   }
-  if(comm==='ep'){  // All-to-All:EP 组内
+  if(comm==='ep'){  // All-to-All:EP 组内(8 卡)全互联
     const hi=bright||objectFocus==='comm:ep'||objectFocus==='data:dispatch';
-    for(let tpIndex=0;tpIndex<DEMO.tp;tpIndex++){
-      const group=cardsForEpGroup(node,tpIndex);
-      for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++)addLine(group[i].position,group[j].position,LINE.ep,hi?0.55:0.18,yL+0.03);
-    }
+    for(let i=0;i<8;i++)for(let j=i+1;j<8;j++)addLine(cards[i].position,cards[j].position,LINE.ep,hi?0.4:0.12,yL+0.03);
     groupHalo(node,LINE.ep,hi?0.65:0.22,null);
   }
 }
 function drawThreeDrillOverlay(){
   if(threeDrillTarget?.type!=='moe-a2a')return;
   const col=LINE.ep??0xf59e0b;
+  const yL=BASE_Y+0.42;
   NODE_DEFS.forEach(node=>{
-    const yL=node.y+0.42;
     const cards=nodeCards[node.id]||[];
     cards.forEach(board=>{
       board.userData.threeDrillLanding=true;
@@ -3362,14 +2063,11 @@ function drawThreeDrillOverlay(){
       board.material.color.setHex(mixHex(board.material.color.getHex(),col,curTheme()==='light'?0.46:0.58));
       board.material.emissive.setHex(col);
       board.material.emissiveIntensity=Math.max(board.material.emissiveIntensity,0.92);
-      board.position.y=board.userData.baseY??node.y;
+      board.position.y=Math.max(board.position.y,BASE_Y+0.12*SC);
       board.material.needsUpdate=true;
     });
-    for(let tpIndex=0;tpIndex<DEMO.tp;tpIndex++){
-      const group=cardsForEpGroup(node,tpIndex);
-      for(let i=0;i<group.length;i++)for(let j=i+1;j<group.length;j++){
-        addLine(group[i].position,group[j].position,col,0.96,yL);
-      }
+    for(let i=0;i<cards.length;i++)for(let j=i+1;j<cards.length;j++){
+      addLine(cards[i].position,cards[j].position,col,0.96,yL);
     }
     groupHalo(node,col,0.9,null);
   });
@@ -3395,33 +2093,29 @@ function drawStageOpTrail(stage,evt){
   if(p1&&p2)addLine(p1,p2,col,0.52);
 }
 function drawPpHandoffs(){
-  for(let dp=0;dp<DEMO.dp;dp++){
-    for(let stage=0;stage<DEMO.pp-1;stage++){
-      const left=nodeByDS(dp,stage), right=nodeByDS(dp,stage+1);
-      if(!left||!right)continue;
-      const a=nodeCenter[left.id].clone(); a.y+=0.3;
-      const b=nodeCenter[right.id].clone(); b.y+=0.3;
-      const s0=eventForNode(left), s1=eventForNode(right);
-      const hidden=(s1.dependsOn||[]).some(x=>x.includes('hidden'))||(s0.produces||[]).some(x=>x.includes('hidden'));
-      const grad=(s0.dependsOn||[]).some(x=>x.includes('grad'))||(s1.produces||[]).some(x=>x.includes('grad'));
-      if(hidden||grad||objectFocus==='comm:pp')addArc(hidden?a:b,hidden?b:a,LINE.pp,objectFocus==='comm:pp'?0.98:0.72,1.0);
-    }
-  }
+  [0,1].forEach(dp=>{
+    const a=nodeCenter[nodeByDS(dp,0).id].clone(); a.y=BASE_Y+0.3;
+    const b=nodeCenter[nodeByDS(dp,1).id].clone(); b.y=BASE_Y+0.3;
+    const s0=eventForNode(nodeByDS(dp,0)), s1=eventForNode(nodeByDS(dp,1));
+    const hidden=(s1.dependsOn||[]).some(x=>x.includes('hidden'))||(s0.produces||[]).some(x=>x.includes('hidden'));
+    const grad=(s0.dependsOn||[]).some(x=>x.includes('grad'))||(s1.produces||[]).some(x=>x.includes('grad'));
+    if(hidden||grad||objectFocus==='comm:pp')addArc(hidden?a:b,hidden?b:a,LINE.pp,objectFocus==='comm:pp'?0.98:0.92,1.4);
+  });
 }
 const activePrim={};
 function redraw(){
   clearDyn(); resetArchitecture();
   // 复位卡 + 架构高亮
   boardMeshes.forEach(b=>{b.material.color.setHex(TH.board);b.material.emissive.setHex(0x000000);
-    b.material.emissiveIntensity=0;b.position.y=b.userData.baseY??BASE_Y;b.userData.role=null;b.userData.active=false;b.userData.focus=false;b.userData.threeDrillLanding=false;});
+    b.material.emissiveIntensity=0;b.position.y=BASE_Y;b.userData.role=null;b.userData.active=false;b.userData.focus=false;b.userData.threeDrillLanding=false;});
 
   // 每个硬件 node 都在忙:按它当前算子着色
   NODE_DEFS.forEach(node=>{
     const evt=eventForNode(node), col=eventColor(evt), isFocus=node.id===focusNode;
     nodeCards[node.id].forEach((b,t)=>{
-      b.userData.active=!isBubbleEvent(evt); b.userData.role=roleText(evt,b.userData); b.userData.focus=isFocus; b.userData.event=evt;
+      b.userData.active=!isBubbleEvent(evt); b.userData.role=roleText(evt,t); b.userData.focus=isFocus; b.userData.event=evt;
       b.material.color.setHex(col); b.material.emissive.setHex(col);
-      b.material.emissiveIntensity=isBubbleEvent(evt)?0:(isFocus?0.95:0.48); b.position.y=b.userData.baseY??node.y;
+      b.material.emissiveIntensity=isBubbleEvent(evt)?0:(isFocus?0.85:0.4); b.position.y=BASE_Y+(isFocus&&!isBubbleEvent(evt)?0.14*SC:0.05*SC);
       applyBoardObjectFocus(b);
     });
     commLines(node,evt,isFocus);
@@ -3429,35 +2123,31 @@ function redraw(){
 
   // PP send/recv:只在当前 tick 存在 hidden/grad handoff 时画亮绿色弧线。
   drawPpHandoffs();
-  // DP 梯度同步:同 stage 跨 DP 副本
-  for(let stage=0;stage<DEMO.pp;stage++){
-    const aNode=nodeByDS(0,stage), bNode=nodeByDS(1,stage);
-    if(!aNode||!bNode)continue;
-    const a=nodeCenter[aNode.id], b=nodeCenter[bNode.id];
-    addArc(new THREE.Vector3(a.x,a.y+0.16,a.z),new THREE.Vector3(b.x,b.y+0.16,b.z),LINE.dp,objectFocus==='comm:dp'?0.96:0.26,0.7);
-  }
+  // DP 梯度 All-Reduce:同 stage 跨 DP 副本
+  [0,1].forEach(stage=>{const a=nodeCenter[nodeByDS(0,stage).id],b=nodeCenter[nodeByDS(1,stage).id];
+    addArc(new THREE.Vector3(a.x,BASE_Y+0.16,a.z),new THREE.Vector3(b.x,BASE_Y+0.16,b.z),0x9aa7ff,0.32,0.8);});
 
-  // 活跃架构层:按当前真实 layer 高亮 L0-L49 中对应切片
-  for(let stage=0;stage<DEMO.pp;stage++)activePrim[stage]=null;
-  for(let stage=0;stage<DEMO.pp;stage++){
+  // 活跃架构层:按当前真实 layer 高亮 L0-L60 中对应切片
+  activePrim[0]=activePrim[1]=null;
+  [0,1].forEach(stage=>{
     const evt={...stageCell(stage),stage};
-    if(isBubbleEvent(evt))continue;
+    if(isBubbleEvent(evt))return;
     const prog=eventProg(evt), step=curStep(prog), p=highlightArchitecture(stage,step,prog);
     activePrim[stage]=p;
     drawStageOpTrail(stage,evt);
     NODE_DEFS.filter(nd=>nd.stage===stage).forEach(nd=>addLine(p,nodeCenter[nd.id],eventColor(evt),0.26));
-  }
+  });
 
   // 聚焦:该卡当前层算子 → 卡区四角+中心(光柱)
   const fn=NODE_DEFS[focusNode], fevt=eventForNode(fn), fstep=eventStep(fevt), fcol=eventColor(fevt);
   const fp=activePrim[fn.stage];
-  if(fp&&!isBubbleEvent(fevt)){const cs=nodeCards[focusNode]||[];
-    cs.forEach(c=>addLine(fp,c.position,fcol,0.5));
+  if(fp&&!isBubbleEvent(fevt)){const cs=nodeCards[focusNode];
+    [cs[0],cs[1],cs[6],cs[7]].forEach(c=>addLine(fp,c.position,fcol,0.5));
     addLine(fp,nodeCenter[focusNode],fcol,0.55);}
   drawThreeDrillOverlay();
 
   // HUD
-  document.getElementById('fWho').textContent=`${fn.label} · global rank ${rankRangeForNode(fn)}`;
+  document.getElementById('fWho').textContent=`${fn.label} · global rank ${(fn.dp*2+fn.stage)*8}–${(fn.dp*2+fn.stage)*8+7}`;
   if(isBubbleEvent(fevt)){
     document.getElementById('fMeta').innerHTML=`tick <b>${frameAt().tick}</b> · <b>${frameAt().region}</b> · PP stage ${fn.stage} · DP${fn.dp}`;
     document.getElementById('fOp').textContent='Pipeline bubble';
@@ -3470,7 +2160,7 @@ function redraw(){
   }
   const tag=document.getElementById('fTag'), comm=eventComm(fevt);
   const cx='#'+(comm?LINE[comm]:fcol).toString(16).padStart(6,'0');
-  tag.textContent=comm==='pp'?'PP hidden/grad handoff':comm?(comm==='tp'?`TP 组内 ${DEMO.tp} rank · All-Reduce`:comm==='ep'?`EP 组内 ${DEMO.ep} rank · All-to-All`:'DP replicas · gradient sync'):(isBubbleEvent(fevt)?'等待依赖 / bubble':'逐卡本地 · 无通信');
+  tag.textContent=comm==='pp'?'PP hidden/grad handoff':comm?(comm==='tp'?'TP 组内 8 卡 · All-Reduce':'EP 组内 8 卡 · All-to-All'):(isBubbleEvent(fevt)?'等待依赖 / bubble':'逐卡本地 · 无通信');
   tag.style.color=cx; tag.style.borderColor=cx;
   updatePlaybackInfo(fn,fevt);
   renderSwimlane();
@@ -3478,20 +2168,15 @@ function redraw(){
 
 /* ===== Swimlane：32 rank 行 · 真实感 1F1B（wall-clock µs，复用 swimlane-task pattern 单段模式） ===== */
 const SW=window.PtoSwimlaneTaskPattern;
-swimHost=document.getElementById('swimlaneView');
+const swimHost=document.getElementById('swimlaneView');
 const lastTick=Math.max(1,TRACE_TICKS.length-1);
-const RT=buildSimulated1F1BRuntime({
-  dp:DEMO.dp,pp:DEMO.pp,tp:DEMO.tp,ep:DEMO.ep,
-  microbatches:TRACE.config.microbatches||8,
-  stageRanges:STAGE_RANGES,
-});
-const swimMetaText=`${RT.config.dp}×DP · ${RT.config.pp}×PP · ${RT.config.tp}×TP · ${RT.config.ep}×EP · ${RT.config.microbatches} micro-batches · ${(RT.timeRangeUs[1]/1000).toFixed(1)}ms`;
+const RT=buildSimulated1F1BRuntime();
+const swimMetaText=`${RT.config.dp}×DP · ${RT.config.pp}×PP · ${RT.config.tp}×TP · ${RT.config.microbatches} micro-batches · ${(RT.timeRangeUs[1]/1000).toFixed(1)}ms`;
 
 function taskColor(task){
   if(task?.kind==='tp')return LINE.tp;
   if(task?.kind==='ep')return LINE.ep;
   if(task?.kind==='pp')return LINE.pp;
-  if(task?.kind==='dp')return LINE.dp;
   if(task?.kind==='bubble')return SEM_COLOR['pipeline:bubble']??0xf43f5e;
   if(task?.kind==='F'||task?.kind==='B'){  // 按 microbatch 编号上色：可沿流水线追踪 F→B 流转；dark 下 backward 同色加深
     const base=SEM_COLOR[`rank:r${(task.microbatch||0)%32}:v0`]??(SEM_COLOR['sem:attention']??GRAY);
@@ -3518,6 +2203,7 @@ const sepLine=()=>lightT()?'rgba(15,23,42,0.10)':'rgba(255,255,255,0.10)';
 const gridLine=()=>lightT()?'rgba(15,23,42,0.16)':'rgba(255,255,255,0.16)';
 const accent=()=>toHex(LINE.tp);
 const fmtUs=u=>u>=1000?(u/1000).toFixed(2)+'ms':Math.round(u)+'µs';
+let swimTip=null, axisCanvas=null, bodyCanvas=null, scrollEl=null, swimBuilt=false;
 let commSplit=false;  // 通信展示模式：false=细条子轨；true=与计算同款双轨（行高×2，上计算/下通信）
 let swimHighlightTarget=null;  // CTA 下钻落点：MoE/loss -> EP A2A；rank -> 该 rank 的 wait/comm
 let threeDrillTarget=null;     // CTA 下钻落点：3D 同步高亮 A2A 路径 / rank 参与面
@@ -3577,7 +2263,7 @@ function setThreeDrillTarget(target){
   }
   if(threeDrillTarget?.type==='rank-wait'){
     const rank=Number(threeDrillTarget.rank);
-    const nodeIdx=NODE_DEFS.findIndex(n=>rank>=rankOf(n.dp,n.stage,0,0)&&rank<=rankOf(n.dp,n.stage,DEMO.tp-1,DEMO.ep-1));
+    const nodeIdx=NODE_DEFS.findIndex(n=>rank>=((n.dp*2+n.stage)*8)&&rank<((n.dp*2+n.stage)*8+8));
     if(nodeIdx>=0)focusNode=nodeIdx;
   }
   if(typeof redraw==='function')redraw();
@@ -3603,7 +2289,7 @@ function swimTaskHighlighted(task,row){
   const target=swimHighlightTarget;
   if(!target||!task||!row)return false;
   if(target.type==='moe-a2a')return task.kind==='ep';
-  if(target.type==='rank-wait')return row.rank===target.rank&&(task.kind==='bubble'||task.kind==='pp'||task.kind==='ep'||task.kind==='tp'||task.kind==='dp');
+  if(target.type==='rank-wait')return row.rank===target.rank&&(task.kind==='bubble'||task.kind==='pp'||task.kind==='ep'||task.kind==='tp');
   return false;
 }
 function swimRowHighlighted(row){
@@ -3626,8 +2312,8 @@ function drawSwimHighlight(ctx,x,y,w,h,{thin=false}={}){
 function swimRowTooltip(hit){
   const t=hit.task,r=hit.r;
   const row=(k,v,cls='')=>`<div class="pto-swimlane-task-tooltip__row"><span class="pto-swimlane-task-tooltip__key">${esc(k)}</span><span class="pto-swimlane-task-tooltip__value${cls?' '+cls:''}">${esc(v)}</span></div>`;
-  const kindName={F:'Forward 前向',B:'Backward 反向',tp:'TP All-Reduce',ep:'EP All-to-All',pp:'PP send/recv',dp:'DP gradient sync',bubble:'Pipeline bubble'}[t.kind]||t.kind;
-  const isComm=t.kind==='tp'||t.kind==='ep'||t.kind==='pp'||t.kind==='dp';
+  const kindName={F:'Forward 前向',B:'Backward 反向',tp:'TP All-Reduce',ep:'EP All-to-All',pp:'PP send/recv',bubble:'Pipeline bubble'}[t.kind]||t.kind;
+  const isComm=t.kind==='tp'||t.kind==='ep'||t.kind==='pp';
   const cat=isComm?'通信':(t.kind==='bubble'?'气泡':'计算');
   const catCls=isComm?'is-warn':(t.kind==='bubble'?'is-bad':'is-ok');
   const noteCls=swimHighlightTone()==='impact'?'is-warn':'is-bad';
@@ -3635,10 +2321,9 @@ function swimRowTooltip(hit){
   const desc={
     F:'前向计算：本 PP stage 负责的层区间前向传播。',
     B:'反向计算：本 PP stage 反向传播、求梯度。',
-    tp:`张量并行 All-Reduce：TP 组内 ${DEMO.tp} 个 rank 同步分片结果，与计算重叠执行。`,
+    tp:'张量并行 All-Reduce：TP 组内 8 卡同步分片结果，与计算重叠执行。',
     ep:'专家并行 All-to-All：MoE token 的 dispatch / combine 路由通信，与计算重叠执行。',
     pp:'流水线并行 send / recv：跨 PP stage 传递激活（前向）或梯度（反向）。',
-    dp:'数据并行 gradient sync：同 PP/TP/EP 坐标的 DP 副本同步梯度。',
     bubble:'流水线气泡：等待跨 stage 依赖的空闲，warmup / 稳态空泡 / drain。'
   }[t.kind]||'';
   return `<div class="pto-swimlane-task-tooltip__title">${esc(r.group)} · Rank ${r.rank}</div>`+
@@ -3740,7 +2425,7 @@ function paintBody(){
           task:{label:t.label,opName:t.opName},isSelected:sel,isRelated:related||landing,fontFamily:'JetBrains Mono, monospace'});
         if(landing)drawSwimHighlight(ctx,x,y,w,h);
         hitRects.push({x,y,w:Math.max(w,3),h,task:t,r,isLanding:landing});
-      }else if(commSplit){  // 通信（TP / EP / PP / DP）：双轨模式下用与计算同款的 bar，画在行下半区
+      }else if(commSplit){  // 通信（TP All-Reduce / EP All-to-All / PP send-recv）：双轨模式下用与计算同款的 bar，画在行下半区
         const y=top+rowH/2+3, h=13, sel=tCur>=t.startUs&&tCur<=t.startUs+t.durUs, cw=Math.max(w,3);
         SW.drawTaskBar(ctx,{x,y,width:cw,height:h,baseColor:toHex(taskColor(t)),
           task:{label:t.label,opName:t.opName},isSelected:sel,isRelated:related||landing,fontFamily:'JetBrains Mono, monospace'});
@@ -3758,7 +2443,7 @@ function paintBody(){
   ctx.strokeStyle=accent(); ctx.globalAlpha=0.85; ctx.lineWidth=1.2;
   ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,bodyH); ctx.stroke(); ctx.globalAlpha=1;
 }
-function paintSwimlane(){ if(!swimHost)return; if(!swimBuilt)buildSwimlane(); paintAxis(); paintBody(); }
+function paintSwimlane(){ if(!swimBuilt)buildSwimlane(); paintAxis(); paintBody(); }
 const commToggleBtn=document.getElementById('commModeToggle');
 commToggleBtn?.addEventListener('click',()=>{
   commSplit=!commSplit;
@@ -3778,7 +2463,7 @@ const analysisPanels={
 let moeMetrics=buildMoeRuntimeMetrics({
   firstMoeLayer:FIRST_MOE_LAYER,
   lastMoeLayer:LAST_MOE_LAYER,
-  expertsPerLayer:MODEL_CONFIG.routedExperts,
+  expertsPerLayer:256,
   step:TRACE.defaultTick??0
 });
 let moeLoadViewModel=buildMoeLoadViewModel(moeMetrics);
@@ -3795,7 +2480,7 @@ const focusContext={
   source:'init',
   step:TS.defaultStep??TS.collapseStep??STEP_MAX,
   window:null,
-  layer:null,op:null,rank:null,dp:null,stage:null,tp:null,ep:null,
+  layer:null,op:null,rank:null,dp:null,stage:null,tp:null,
   metric:null,severity:0,confidence:'inferred',
   regime:'healthy'
 };
@@ -3812,7 +2497,7 @@ function dispatch(intent={}){
   if(intent.source)focusContext.source=intent.source;
   if('layer' in intent)focusContext.layer=intent.layer;
   if('op' in intent)focusContext.op=intent.op;
-  if('rank' in intent){focusContext.rank=intent.rank;focusContext.dp=intent.dp;focusContext.stage=intent.stage;focusContext.tp=intent.tp;focusContext.ep=intent.ep;}
+  if('rank' in intent){focusContext.rank=intent.rank;focusContext.dp=intent.dp;focusContext.stage=intent.stage;focusContext.tp=intent.tp;}
   if('metric' in intent)focusContext.metric=intent.metric;
   if('severity' in intent)focusContext.severity=intent.severity;
   focusContext.regime=regimeOfStep(focusContext.step);
@@ -3825,19 +2510,21 @@ const LOSS_SERIES=[
   {id:'val_loss',label:'val loss',key:'val_loss',colorVar:'--highlight-l0a-violet-source',axis:'left',emphasis:true},
 ];
 /* Monitor 四图数据（副本内合成，不改共享 timeseries.js）：
-   健康区平稳趋势；进入路由坍缩区（s>=collapse）按“先平稳→逐渐震荡→剧烈抖动→后期长期高/低位”表现。 */
-const EPOCH=50;
+   健康区平稳趋势；进入路由坍缩区（s>=collapse）按需求做“先平稳→逐渐震荡→剧烈抖动→后期长期高/低位”。 */
+const EPOCH=50;  // 假设 1 epoch = 500 step；因本 demo 窗口仅 200 step，按比例缩到 50 step/epoch，使 val 在窗口内有 5 个点
 const MONITOR_DATA=(function(){
   const steps=TS.steps, col=TS.collapseStep, s0=steps[0];
   const rnd=(seed=>()=>(seed=(seed*9301+49297)%233280)/233280)(7919);
   const train_loss=[],val_loss=[],train_acc=[],val_acc=[],mfu=[];
-  const N=v=>(rnd()-0.5)*2*v;
+  // 抖动包络：随 k 增大而增强（剧烈抖动）；ramp 饱和后进入“长期高/低位”
+  const N=(v)=>(rnd()-0.5)*2*v;
   const r4=v=>+v.toFixed(4);
   steps.forEach(s=>{
     const t=s-s0;
-    const isEpoch=(s%EPOCH===0);
+    const isEpoch=(s%EPOCH===0);   // val 仅在 epoch 边界（每 EPOCH step）评估一次
     let tl,vl,ta,va;
     if(s<col){
+      // 健康区：平稳趋势 + 每 step 小抖动（横向平稳带小波动）
       const base=2.05-t*0.0015;
       tl=base+N(0.020);
       vl=base+0.06+N(0.025);
@@ -3846,20 +2533,26 @@ const MONITOR_DATA=(function(){
       mfu.push(r4(0.470+t*0.00015+N(0.012)));
     }else{
       const k=s-col;
-      const ramp=1-Math.exp(-k/22);
+      const ramp=1-Math.exp(-k/22);   // 0→1 饱和：前期渐变、后期长期高/低位
+      // 抖动用“每 step 随机”而非平滑正弦 → 200 点逐点锯齿、细密剧烈
+      // loss：逐渐走高 + 每 step 剧烈抖动 → 后期长期高位
       tl=Math.max(0.1,(2.00+2.6*ramp)+N(0.10+1.05*ramp));
       vl=Math.max(0.1,(2.06+3.0*ramp)+N(0.12+1.35*ramp));
+      // acc：逐渐走低 + 每 step 剧烈抖动 → 后期长期低位
       ta=Math.min(0.99,Math.max(0.05,(0.660-0.360*ramp)+N(0.020+0.13*ramp)));
       va=Math.min(0.99,Math.max(0.04,(0.640-0.380*ramp)+N(0.025+0.16*ramp)));
+      // MFU：先小幅提升，后续持续走低 + 每 step 剧烈抖动
       mfu.push(r4(Math.min(0.6,Math.max(0.03,(0.470+0.06*Math.exp(-k/3)-0.40*ramp)+N(0.020+0.14*ramp)))));
     }
     train_loss.push(r4(tl));
     train_acc.push(r4(ta));
+    // val 仅在 epoch 边界有数据点，其余为 null（图表/气泡会跳过 null）
     val_loss.push(isEpoch?r4(vl):null);
     val_acc.push(isEpoch?r4(va):null);
   });
   return {train_loss,val_loss,train_acc,val_acc,mfu};
 })();
+// 路由坍缩区（四图统一的红色底色区间；label 用于悬浮气泡角标）
 const COLLAPSE_REGION=[{start:TS.collapseStep,end:TS.steps[TS.steps.length-1],label:'路由坍缩'}];
 const fmtPct=v=>v==null?'—':(v*100).toFixed(1)+'%';
 const MONITOR_CARDS=[
@@ -3871,18 +2564,21 @@ const MONITOR_CARDS=[
     {id:'mfu',label:'MFU',key:'mfu',colorVar:'--highlight-accum-orange-source',emphasis:true},
   ]},
 ];
+// NPU 显存利用率：独立卡片，横轴=时间（每 5s 采样一次），不与 step 联动、自有悬浮气泡
 const NPU_SAMPLE_SEC=5;
 const NPU=(function(){
   const n=TS.steps.length;
-  const colIdx=TS.collapseStep-TS.steps[0];
+  const colIdx=TS.collapseStep-TS.steps[0];   // 坍缩点在采样序列中的下标（与 step 对应）
   const rnd=(seed=>()=>(seed=(seed*9301+49297)%233280)/233280)(4242);
   const time=[],mem=[];
   for(let i=0;i<n;i++){
     time.push(i*NPU_SAMPLE_SEC);
     let v;
     if(i<colIdx){
+      // 进入红区前：横向平稳 + 每个采样点小波动
       v=0.840+(rnd()-0.5)*2*0.012;
     }else{
+      // 进入红区后：每个采样点剧烈抖动并升高
       const k=i-colIdx;
       const ramp=1-Math.exp(-k/22);
       const amp=0.015+0.075*ramp;
@@ -3892,13 +2588,14 @@ const NPU=(function(){
   }
   return {time,mem,collapseTime:colIdx*NPU_SAMPLE_SEC};
 })();
+// NPU 时间轴上的红色路由坍缩区（与 step 坍缩点对应位置往后）
 const NPU_REGION=[{start:NPU.collapseTime,end:NPU.time[NPU.time.length-1],label:'路由坍缩'}];
 const NPU_CARD={id:'npu_mem',name:'NPU 显存利用率',note:'Ascend 950 | 单卡128 GB',
   series:[{id:'npu_mem',label:'NPU 显存利用率',key:'mem',colorVar:'--highlight-l0a-violet-source',axis:'left',emphasis:true}]};
-let npuCard=null;
-let monitorCards=[];
-let monitorHovering=false;
-let monitorSmoothing=0;
+let npuCard=null;  // {cfg,valEl,wrap,ctrl,size}
+let monitorCards=[];  // [{cfg,valEl,wrap,ctrl,size:{w,h}}]
+let monitorHovering=false;  // 鼠标是否悬浮在 Monitor 任一图表上 → 控制四图气泡显隐
+let monitorSmoothing=0;     // smoothing 滑条（0=不平滑；>0 原曲线淡化 + 叠加平滑曲线）
 const REGIME_LABEL={healthy:'健康区',fault:'根因 · 写越界',collapse:'路由坍缩'};
 let lossCtrl=null,lossReadoutEl=null,lossWrap=null,lossCardValEl=null,lossSize={w:0,h:0};
 // 按容器真实像素尺寸渲染（1 viewBox 单位 = 1px），避免 preserveAspectRatio 把文字/线放大
@@ -3920,6 +2617,7 @@ function syncLossChart(force){
     legend:false,
   });
 }
+/* Monitor 指标卡片：每张一个 compact mini chart（单序列）+ 当前 step 读数 */
 function syncMonitorCard(card,force){
   const w=Math.round(card.wrap.clientWidth||0), h=Math.round(card.wrap.clientHeight||0);
   if(w<2||h<2)return;
@@ -3939,6 +2637,7 @@ function syncMonitorCard(card,force){
   });
 }
 function syncMonitorCards(force){monitorCards.forEach(c=>syncMonitorCard(c,force));}
+// NPU 显存利用率：独立时间轴图，不联动 step；hover 由图表自身处理（独立气泡）
 function syncNpuCard(force){
   if(!npuCard)return;
   const w=Math.round(npuCard.wrap.clientWidth||0), h=Math.round(npuCard.wrap.clientHeight||0);
@@ -3957,15 +2656,17 @@ function syncNpuCard(force){
   });
   npuCard.valEl.textContent=fmtPct(NPU.mem[NPU.mem.length-1]);
 }
+// 统一控制四个图表（loss + 三卡）气泡显隐
 function setMonitorTooltips(v){
   monitorHovering=v;
   if(lossCtrl)lossCtrl.setTooltip(v);
   monitorCards.forEach(c=>c.ctrl&&c.ctrl.setTooltip(v));
 }
 function renderMonitorReadouts(){
-  const i=TS.steps.length-1;
+  const i=TS.steps.length-1;  // 固定显示最新 step 的值，不随鼠标变化
   monitorCards.forEach(c=>{c.valEl.textContent=fmtPct(MONITOR_DATA[c.cfg.series[0].key][i]);});
 }
+// 抽屉右上角 smoothing 滑条：拉动后四图原曲线淡化 + 叠加平滑曲线
 function buildSmoothingControl(){
   const wrap=document.createElement('div');wrap.className='opv-smooth';
   const lab=document.createElement('span');lab.textContent='smoothing';
@@ -3979,6 +2680,7 @@ function buildSmoothingControl(){
   wrap.appendChild(lab);wrap.appendChild(range);wrap.appendChild(out);
   return wrap;
 }
+// 卡片内自绘图例（不依赖图表内置 legend，确保始终落在卡片里）
 function buildMonitorLegend(series){
   const el=document.createElement('div');el.className='opv-monitor-legend';
   series.forEach(s=>{
@@ -3989,89 +2691,7 @@ function buildMonitorLegend(series){
   });
   return el;
 }
-function buildCard(cfg){
-  const card=document.createElement('div');card.className='opv-monitor-card';
-  const head=document.createElement('div');head.className='opv-monitor-card__head';
-  const name=document.createElement('span');name.className='opv-monitor-card__name';name.textContent=cfg.name;
-  head.appendChild(name);
-  const sub=document.createElement('div');sub.className='opv-monitor-card__sub';
-  const val=document.createElement('span');val.className='opv-monitor-card__val';val.textContent='—';
-  sub.appendChild(val);
-  if(cfg.legend)sub.appendChild(buildMonitorLegend(cfg.series));
-  else if(cfg.note){const note=document.createElement('span');note.className='opv-monitor-card__note';note.textContent=cfg.note;sub.appendChild(note);}
-  const wrap=document.createElement('div');wrap.className='opv-monitor-card__chart';
-  card.appendChild(head);card.appendChild(sub);card.appendChild(wrap);
-  return {card,valEl:val,wrap};
-}
-function syncMonitorCard(card,force){
-  const w=Math.round(card.wrap.clientWidth||0), h=Math.round(card.wrap.clientHeight||0);
-  if(w<2||h<2)return;
-  if(!force&&card.ctrl&&w===card.size.w&&h===card.size.h){card.ctrl.setCursor(focusContext.step);return;}
-  card.size={w,h};
-  card.ctrl=window.PtoTrainingMetricsChart.render(card.wrap,{
-    steps:TS.steps,
-    series:card.cfg.series.map(s=>({axis:'left',...s})),
-    data:MONITOR_DATA,
-    regions:COLLAPSE_REGION,smoothing:monitorSmoothing,
-    cursor:focusContext.step,
-    cursorTooltip:true,tipCarryForward:true,formatValue:fmtPct,
-    options:{width:w,height:h,pad:{t:18,r:10,b:20,l:38},xTicks:4},
-    onCursorHover:step=>{monitorHovering=true;dispatch({source:'loss',step});},
-    onCursorLeave:()=>setMonitorTooltips(false),
-    onBrush:false,legend:false,
-  });
-}
-function syncMonitorCards(force){monitorCards.forEach(c=>syncMonitorCard(c,force));}
-function syncNpuCard(force){
-  if(!npuCard)return;
-  const w=Math.round(npuCard.wrap.clientWidth||0), h=Math.round(npuCard.wrap.clientHeight||0);
-  if(w<2||h<2)return;
-  if(!force&&npuCard.ctrl&&w===npuCard.size.w&&h===npuCard.size.h)return;
-  npuCard.size={w,h};
-  npuCard.ctrl=window.PtoTrainingMetricsChart.render(npuCard.wrap,{
-    steps:NPU.time,
-    series:NPU_CARD.series,
-    data:{mem:NPU.mem},
-    regions:NPU_REGION,
-    smoothing:monitorSmoothing,
-    cursorTooltip:true,formatValue:fmtPct,formatCursor:t=>`${t}s`,
-    options:{width:w,height:h,pad:{t:18,r:10,b:20,l:38},xTicks:4},
-    onBrush:false,legend:false,
-  });
-  npuCard.valEl.textContent=fmtPct(NPU.mem[NPU.mem.length-1]);
-}
-function setMonitorTooltips(v){
-  monitorHovering=v;
-  if(lossCtrl)lossCtrl.setTooltip(v);
-  monitorCards.forEach(c=>c.ctrl&&c.ctrl.setTooltip(v));
-}
-function renderMonitorReadouts(){
-  const i=TS.steps.length-1;
-  monitorCards.forEach(c=>{c.valEl.textContent=fmtPct(MONITOR_DATA[c.cfg.series[0].key][i]);});
-}
-function buildSmoothingControl(){
-  const wrap=document.createElement('div');wrap.className='opv-smooth';
-  const lab=document.createElement('span');lab.textContent='smoothing';
-  const range=document.createElement('input');range.type='range';range.min='0';range.max='95';range.step='1';
-  range.value=String(Math.round(monitorSmoothing*100));range.setAttribute('aria-label','曲线平滑度');
-  const out=document.createElement('output');out.textContent=monitorSmoothing.toFixed(2);
-  range.addEventListener('input',()=>{
-    monitorSmoothing=(+range.value)/100;out.textContent=monitorSmoothing.toFixed(2);
-    syncLossChart(true);syncMonitorCards(true);syncNpuCard(true);
-  });
-  wrap.appendChild(lab);wrap.appendChild(range);wrap.appendChild(out);
-  return wrap;
-}
-function buildMonitorLegend(series){
-  const el=document.createElement('div');el.className='opv-monitor-legend';
-  series.forEach(s=>{
-    const it=document.createElement('span');
-    const sw=document.createElement('i');sw.style.background=`var(${s.colorVar})`;
-    it.appendChild(sw);it.appendChild(document.createTextNode(s.label));
-    el.appendChild(it);
-  });
-  return el;
-}
+// 构建一张指标卡片（标题 / 子行[值+图例或注记] / 图表容器）；返回 DOM 引用
 function buildCard(cfg){
   const card=document.createElement('div');card.className='opv-monitor-card';
   const head=document.createElement('div');head.className='opv-monitor-card__head';
@@ -4087,6 +2707,7 @@ function buildCard(cfg){
   return {card,valEl:val,wrap};
 }
 function renderLossReadout(){
+  // 卡头数值固定显示最新 step 的值，不随鼠标 hover 变化（变化值看气泡）
   const i=TS.steps.length-1;
   const tl=MONITOR_DATA.train_loss[i];
   if(lossCardValEl)lossCardValEl.textContent=(tl==null?'—':tl.toFixed(3));
@@ -4096,11 +2717,12 @@ const lossView={
   id:'loss',
   label:'Monitor',
   title:'训练监控',
-  meta:()=>'',  // 抽屉右上角改放 smoothing 滑条
+  meta:()=>'',  // 抽屉右上角改放 smoothing 滑条（见 onViewChange）
   panel:analysisPanels.loss,
   mount(){
     const v=document.createElement('div');v.className='opv-loss-view';
     const row=document.createElement('div');row.className='opv-monitor-row';
+    // 左 1/4：train/val loss 趋势图（与右侧卡片同款灰色卡片）
     const chartCol=document.createElement('div');chartCol.className='opv-monitor-chart opv-monitor-card';
     const lossHead=document.createElement('div');lossHead.className='opv-monitor-card__head';
     const lossName=document.createElement('span');lossName.className='opv-monitor-card__name';lossName.textContent='loss';
@@ -4110,11 +2732,13 @@ const lossView={
     lossSub.appendChild(lossCardValEl);lossSub.appendChild(buildMonitorLegend(LOSS_SERIES));
     lossWrap=document.createElement('div');lossWrap.className='opv-loss-chart-wrap opv-monitor-card__chart';
     chartCol.appendChild(lossHead);chartCol.appendChild(lossSub);chartCol.appendChild(lossWrap);
+    // 右 3/4：acc / MFU（step 联动）+ NPU 显存利用率（独立时间轴）
     const cardsWrap=document.createElement('div');cardsWrap.className='opv-monitor-cards';
     monitorCards=MONITOR_CARDS.map(cfg=>{
       const b=buildCard(cfg);cardsWrap.appendChild(b.card);
       return {cfg,valEl:b.valEl,wrap:b.wrap,ctrl:null,size:{w:0,h:0}};
     });
+    // NPU 显存利用率：独立卡片（不进 monitorCards 联动循环）
     const nb=buildCard(NPU_CARD);cardsWrap.appendChild(nb.card);
     npuCard={cfg:NPU_CARD,valEl:nb.valEl,wrap:nb.wrap,ctrl:null,size:{w:0,h:0}};
     row.appendChild(chartCol);row.appendChild(cardsWrap);
@@ -4132,7 +2756,7 @@ onContext(()=>{if(lossCtrl){lossCtrl.setCursor(focusContext.step);lossCtrl.setTo
 
 function handleAnalysisSelection(selection){
   if(selection?.type==='expert')dispatch({source:'moe',layer:selection.layer,op:'experts',metric:selection.metricId});
-  else if(selection?.type==='rank'||selection?.type==='card')dispatch({source:selection.type,rank:selection.rank,dp:selection.dp,stage:selection.stage,tp:selection.tp,ep:selection.ep});
+  else if(selection?.type==='rank'||selection?.type==='card')dispatch({source:selection.type,rank:selection.rank,dp:selection.dp,stage:selection.stage,tp:selection.tp});
   if(selection?.type==='expert'){
     setObjectFocus('op:experts');
     const value=Number(selection.value||0);
@@ -4146,10 +2770,37 @@ function handleAnalysisSelection(selection){
     if(idx>=0)focusNode=idx;
     setObjectFocus('hw:cards');
     redraw();
-    document.getElementById('statusRight').textContent=`Hardware focus · rank ${selection.rank} · D${selection.dp} P${selection.stage} TP${selection.tp} EP${selection.ep??0}`;
+    document.getElementById('statusRight').textContent=`Hardware focus · rank ${selection.rank} · D${selection.dp} P${selection.stage} TP${selection.tp}`;
   }
 }
-const moeView=createMoeLoadView({panel:analysisPanels.moe,viewModel:moeLoadViewModel,onSelect:handleAnalysisSelection});
+// Distribution 面积堆叠图数据：32 个专家的 token 占比（每 step 合计=1）。
+// step2000 路由坍缩后，2 个热点专家流量逐步提升并最终恒定占 ~92%。
+const MOE_DIST=(function(){
+  const steps=TS.steps.slice(), n=steps.length, experts=32, col=TS.collapseStep, hot=[7,20], dead=[2,13,25,29];
+  const rnd=(seed=>()=>(seed=(seed*9301+49297)%233280)/233280)(2025);
+  const series=Array.from({length:experts},()=>new Array(n));
+  for(let i=0;i<n;i++){
+    const s=steps[i];
+    // 2 个热点专家合计占比 H：坍缩前≈2/32，坍缩后按 ramp 升至 0.92 并恒定
+    const H=s<col ? (2/experts)*(1+(rnd()-0.5)*0.08)
+                  : (2/experts)+(0.92-2/experts)*(1-Math.exp(-(s-col)/22));
+    // 死专家衰减 dr：坍缩后期(col+25 起)线性降到 0 流量，col+80 后彻底变 0（死专家）
+    const dr=s>col+25 ? Math.min(1,(s-col-25)/55) : 0;
+    const restW=new Array(experts).fill(0); let restSum=0;
+    for(let e=0;e<experts;e++){
+      if(e===hot[0]||e===hot[1])continue;
+      const r0=0.7+rnd()*0.6;
+      const r=dead.includes(e) ? r0*(1-dr) : r0;   // 死专家权重趋于 0 → 占比趋于 0
+      restW[e]=r; restSum+=r;
+    }
+    for(let e=0;e<experts;e++){
+      const v=(e===hot[0]||e===hot[1]) ? H/2 : (1-H)*(restW[e]/restSum);
+      series[e][i]=+v.toFixed(5);
+    }
+  }
+  return {steps,experts,series,hot,dead,collapseStep:col};
+})();
+const moeView=createMoeLoadView({panel:analysisPanels.moe,viewModel:moeLoadViewModel,onSelect:handleAnalysisSelection,distribution:MOE_DIST});
 const cardView=createCardLoadView({panel:analysisPanels.card,viewModel:cardLoadViewModel,onSelect:handleAnalysisSelection});
 // step(主时间) → MoE 热力/异常派生：loop 内按帧合并，重 DOM 重挂只在 MoE tab 活动时做
 let moeStepPending=focusContext.step, moeStepApplied=null, moeViewDirty=false;
@@ -4162,7 +2813,7 @@ function collapseIntensity(step){
 function applyMoeStep(){
   if(moeStepPending===moeStepApplied)return;
   moeStepApplied=moeStepPending;
-    moeMetrics=buildMoeRuntimeMetrics({firstMoeLayer:FIRST_MOE_LAYER,lastMoeLayer:LAST_MOE_LAYER,expertsPerLayer:MODEL_CONFIG.routedExperts,step:moeStepPending,collapse:collapseIntensity(moeStepPending)});
+  moeMetrics=buildMoeRuntimeMetrics({firstMoeLayer:FIRST_MOE_LAYER,lastMoeLayer:LAST_MOE_LAYER,expertsPerLayer:256,step:moeStepPending,collapse:collapseIntensity(moeStepPending)});
   moeLoadViewModel=buildMoeLoadViewModel(moeMetrics);
   if(!selectedAnomalyId)buildAnomalyBadges();                 // 选中时不重建，保持诊断卡/选中态
   renderInspectorDiagnostics();
@@ -4210,7 +2861,7 @@ analysisDockController=createAnalysisDock({
     activeAnalysisView=id;
     if(commToggleBtn)commToggleBtn.hidden=id!=='timeline';
     if(id==='moe-load'&&moeViewDirty){moeView.setViewModel(moeLoadViewModel);moeViewDirty=false;}
-    // Monitor view uses the dock meta slot for the smoothing slider.
+    // Monitor：抽屉右上角 meta 区放 smoothing 滑条（其它视图由 dock 写回各自 meta 文本）
     const metaEl=document.getElementById('analysisMeta');
     if(metaEl&&id==='loss'){metaEl.textContent='';metaEl.appendChild(buildSmoothingControl());}
   }
@@ -4258,24 +2909,7 @@ function syncPlaybackToStep(){
 }
 
 const frameEl=document.querySelector('[data-ide-frame]');
-function initIdeCursorTracking(frame){
-  if(!frame)return;
-  const resetCursor=()=>{
-    frame.style.setProperty('--ide-cursor-alpha','0');
-    frame.style.setProperty('--ide-dot-opacity','0');
-  };
-  frame.addEventListener('pointermove',event=>{
-    const rect=frame.getBoundingClientRect();
-    frame.style.setProperty('--ide-cursor-x',`${Math.max(0,event.clientX-rect.left)}px`);
-    frame.style.setProperty('--ide-cursor-y',`${Math.max(0,event.clientY-rect.top)}px`);
-    frame.style.setProperty('--ide-cursor-alpha','0.14');
-    frame.style.setProperty('--ide-dot-opacity','0.5');
-  });
-  frame.addEventListener('pointerleave',resetCursor);
-  resetCursor();
-}
 window.PtoIdeFrame?.init?.(frameEl);
-initIdeCursorTracking(frameEl);
 
 const FPC=window.PtoFloatingPlaybackControl;
 const pbMount=document.getElementById('playbackMount');
@@ -4333,7 +2967,6 @@ if(window.ResizeObserver){
 }
 sizeRenderer();
 threeSceneReady=true;
-refreshAfterInspectorToggle();
 
 /* ===== 交互 ===== */
 let dragging=false,lx=0,ly=0,moved=false;
@@ -4365,22 +2998,8 @@ renderer.domElement.addEventListener('wheel',e=>{
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById('tip');
 function setMouse(e){const r=renderer.domElement.getBoundingClientRect();
   mouse.x=((e.clientX-r.left)/r.width)*2-1;mouse.y=-((e.clientY-r.top)/r.height)*2+1;ray.setFromCamera(mouse,camera);}
-function pick(e){
-  setMouse(e);
-  const archHit=ray.intersectObjects(archPickables,false)[0];
-  if(archHit){
-    setSelectedArch(archHit.object);
-    onHover(e);
-    return;
-  }
-  const hit=ray.intersectObjects(boardMeshes,false)[0];
-  if(hit){
-    focusNode=hit.object.userData.node;
-    redraw();
-    return;
-  }
-  clearArchSelection();
-}
+function pick(e){setMouse(e);const hit=ray.intersectObjects(boardMeshes,false)[0];
+  if(hit){focusNode=hit.object.userData.node;redraw();}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function distPointToSegment(px,py,ax,ay,bx,by){
   const dx=bx-ax,dy=by-ay,len2=dx*dx+dy*dy;
@@ -4395,10 +3014,9 @@ function projectToClient(v){
 }
 function hiddenRailHoverInfo(e){
   if(activeView!=='right'||!hiddenRailTip?.points?.length)return null;
-  if(objectFocus!=='data:hidden')return null;
   const pts=hiddenRailTip.points.map(projectToClient);
   for(let i=0;i<pts.length-1;i++){
-    if(distPointToSegment(e.clientX,e.clientY,pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y)<11)return hiddenRailTip;
+    if(distPointToSegment(e.clientX,e.clientY,pts[i].x,pts[i].y,pts[i+1].x,pts[i+1].y)<18)return hiddenRailTip;
   }
   return null;
 }
@@ -4410,22 +3028,13 @@ function neighborMeshesOf(id,layer){
     const m=archByKey.get(archKey(layer,nb))||archByKey.get(archKey(0,nb))||archByKey.get(archKey('input',nb))||archByKey.get(archKey('output',nb));
     if(m)out.add(m);
   });
-  const addLocal=neighborId=>{
-    const m=archByKey.get(archKey(layer,neighborId));
-    if(m)out.add(m);
-  };
-  if(id==='expert_pool'){addLocal('a2a_dispatch');addLocal('a2a_combine');}
-  if(id==='a2a_dispatch'||id==='a2a_combine')addLocal('expert_pool');
   return [...out];
 }
-// 架构层 → 负责计算它的 PP stage（stageRanges：L0-12 / L13-25 / L26-37 / L38-49；input 在头 stage、output 在尾 stage）
+// 架构层 → 负责计算它的 PP stage（stageRanges：L0-30→stage0，L31-60→stage1；input 在头 stage、output 在尾 stage）
 function stageForArchLayer(layer){
   if(layer==='input')return 0;
-  if(layer==='output')return DEMO.pp-1;
-  if(typeof layer==='number'){
-    const idx=STAGE_RANGES.findIndex(([lo,hi])=>layer>=lo&&layer<=hi);
-    return idx>=0?idx:null;
-  }
+  if(layer==='output')return 1;
+  if(typeof layer==='number')return layer<=P0R[1]?0:1;
   return null;
 }
 function setHoverArch(mesh){
@@ -4445,30 +3054,6 @@ function setHoverArch(mesh){
   updateArchLineHover();  // 上下游连线变 solid，其余保持透明
   if(newStage!==hoverStage){hoverStage=newStage;redraw();}  // 切换 stage：先 redraw 复位卡，再由 loop 点亮新 stage 的 16 卡
 }
-function setSelectedArch(mesh){
-  if(selectedArch===mesh)return;
-  if(selectedArch)setArchState(selectedArch,'selectedHighlight',false);
-  selectedArchNeighbors.forEach(m=>setArchState(m,'selectedNeighborHighlight',false));
-  selectedArch=mesh||null;
-  selectedArchNeighbors=[];
-  if(selectedArch){
-    setArchState(selectedArch,'selectedHighlight',true);
-    const d=selectedArch.userData;
-    selectedArchNeighbors=neighborMeshesOf(d.id,d.layer).filter(m=>m!==selectedArch);
-    selectedArchNeighbors.forEach(m=>setArchState(m,'selectedNeighborHighlight',true));
-    const stage=stageForArchLayer(d.layer);
-    if(stage!==hoverStage){hoverStage=stage; if(typeof redraw==='function')redraw();}
-    if(statusRight)statusRight.textContent=`Model selected · ${d.label} · ${layerName(d.layer)}`;
-  }else if(statusRight&&/^Model selected/.test(statusRight.textContent||'')){
-    statusRight.textContent='—';
-  }
-  applyViewPresentation();
-  updateArchLineHover();
-}
-function clearArchSelection(){
-  setSelectedArch(null);
-  if(typeof redraw==='function')redraw();
-}
 function layerName(layer){
   if(layer==='input')return 'Embedding / 输入静态区';
   if(layer==='output')return 'Final Norm / Head 静态区';
@@ -4477,10 +3062,10 @@ function layerName(layer){
 }
 function archObjectExplain(d){
   if(d.layer==='input')return '架构对象:模型入口与 Embedding,不随 decode layer 复制。';
-  if(d.layer==='output')return `架构对象:模型出口 Final RMSNorm / LM Head / 条件 Logits All-Gather,只在 L${LAST_MOE_LAYER} 之后执行一次。`;
-  if(d.id==='expert_pool')return `架构对象:${layerName(d.layer)} 的单个 Expert Pool block;它表示这一层内的 ${MODEL_CONFIG.routedExperts} routed experts,不是 ${DEMO.ep} 个层,也不是 ${DEMO.ep} 张卡。`;
+  if(d.layer==='output')return '架构对象:模型出口 Final RMSNorm / LM Head / 条件 Logits All-Gather,只在 L60 之后执行一次。';
+  if(d.id==='expert_pool')return `架构对象:${layerName(d.layer)} 的单个 Expert Pool block;它表示这一层内的 256 routed experts,不是 32 个层,也不是 32 个格子。`;
   if(d.id==='dense_layer_shell')return `架构对象:${layerName(d.layer)} 的 Dense layer 容器;它与 MoE layer 是同一层级,只是内部没有 Router、All-to-All 或 Expert Pool。`;
-  if(d.id==='dense_block')return `架构对象:${layerName(d.layer)};前 ${MODEL_CONFIG.denseLayers.length} 层是 Dense decoder,没有 Router、All-to-All、Expert Pool、Shared Expert。`;
+  if(d.id==='dense_block')return `架构对象:${layerName(d.layer)};前 3 层是 Dense decoder,没有 Router、All-to-All、Expert Pool、Shared Expert。`;
   if(d.id==='moe_residual')return `架构对象:${layerName(d.layer)} 的 Post-MLP RMSNorm;源码使用 fused npu_add_rms_norm 处理 residual add + RMSNorm,主图不单独画 Add 节点。`;
   return `架构对象:${layerName(d.layer)} 里的 ${d.label};播放高亮表示当前硬件 stage 正在执行这个算子步骤。`;
 }
@@ -4488,71 +3073,43 @@ function boardObjectExplain(d){
   const evt=eventForNode({dp:d.dp,stage:d.stage,id:d.node}), comm=eventComm(evt);
   const landingNote=threeDrillBoardNote(d);
   if(isBubbleEvent(evt)){
-    return `硬件对象:global rank ${d.rank},位于 DP${d.dp} / PP${d.stage} / TP${d.tp} / EP${d.ep};当前 tick 是 ${frameAt().region} 阶段的 pipeline bubble,等待依赖完成。${evt.explain||''}${landingNote}`;
+    return `硬件对象:global rank ${d.rank},位于 DP${d.dp} / PP${d.stage} / TP shard ${d.t};当前 tick 是 ${frameAt().region} 阶段的 pipeline bubble,等待依赖完成。${evt.explain||''}${landingNote}`;
   }
   const prog=eventProg(evt), step=curStep(prog);
-  const commText=comm==='pp'?'这一格表示 PP 边界 hidden state 或 gradient 的 send/recv。':comm==='tp'?`同 DP/PP/EP 下的 ${DEMO.tp} 个 TP rank 参与 All-Reduce。`:comm==='ep'?`同 DP/PP/TP 下的 ${DEMO.ep} 个 EP rank 参与 token All-to-All。`:comm==='dp'?'同 PP/TP/EP 坐标的 DP 副本参与梯度同步。':'本步骤主要是逐卡本地计算,没有集合通信。';
-  return `硬件对象:global rank ${d.rank},位于 DP${d.dp} / PP${d.stage} / TP${d.tp} / EP${d.ep};当前模拟 trace 为 ${evt.phase} micro-batch m${evt.micro},stage range L${eventRange(evt)[0]}-L${eventRange(evt)[1]},3D 代表算子是 L${prog.layer} · ${STEP_META[step].label}。${commText}${landingNote}`;
-}
-function staticPickCandidates({matchFocus=false}={}){
-  return staticFocusPickables.filter(o=>{
-    if(!o.visible)return false;
-    const tags=o.userData?.tags||[];
-    if(o.userData?.pickOnlyWhenFocus&&(!focusActive()||!tagMatchesFocus(tags)))return false;
-    if(matchFocus&&!tagMatchesFocus(tags))return false;
-    return true;
-  });
-}
-function pickStaticHit(objects){
-  const hits=ray.intersectObjects(objects,false);
-  if(!hits.length)return null;
-  hits.sort((a,b)=>{
-    const pa=a.object.userData?.pickPriority??0;
-    const pb=b.object.userData?.pickPriority??0;
-    if(pa!==pb)return pb-pa;
-    return a.distance-b.distance;
-  });
-  return hits[0];
-}
-function showStaticObjectTip(obj,e){
-  if(!obj)return;
-  setHoverArch(null);
-  setHoverStaticObject(obj);
-  const d=obj.userData||{};
-  tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
-  tip.querySelector('.t-id').textContent=d.title||'Parallel group';
-  tip.querySelector('.t-body').innerHTML=`<div class="t-explain">${esc(d.body||'Parallel communication object.')}</div>`;
-}
-function hideStaticObjectTip(obj=null){
-  if(!obj||hoverStaticObject===obj)setHoverStaticObject(null);
-  setHoverArch(null);
-  tip.style.display='none';
+  const commText=comm==='pp'?'这一格表示 PP 边界 hidden state 或 gradient 的 send/recv。':comm==='tp'?'同 node 的 8 卡组成 TP 组,参与 All-Reduce。':comm==='ep'?'同 node 的 8 卡组成 EP 组,参与 token All-to-All。':'本步骤主要是逐卡本地计算,没有集合通信。';
+  return `硬件对象:global rank ${d.rank},位于 DP${d.dp} / PP${d.stage} / TP shard ${d.t};当前模拟 trace 为 ${evt.phase} micro-batch m${evt.micro},stage range L${eventRange(evt)[0]}-L${eventRange(evt)[1]},3D 代表算子是 L${prog.layer} · ${STEP_META[step].label}。${commText}${landingNote}`;
 }
 function onHover(e){
   setMouse(e);
-  const showStaticHit=hit=>showStaticObjectTip(hit.object,e);
-  const focusedStaticHit=focusActive()
-    ? pickStaticHit(staticPickCandidates({matchFocus:true}))
-    : null;
-  if(focusedStaticHit){showStaticHit(focusedStaticHit);return;}
-  const priorityStaticHit=pickStaticHit(
-    staticPickCandidates({matchFocus:focusActive()}).filter(o=>(o.userData?.pickPriority??0)>0)
-  );
-  if(priorityStaticHit){showStaticHit(priorityStaticHit);return;}
   const hb=ray.intersectObjects(boardMeshes,false)[0];
   if(hb){const d=hb.object.userData;
-    setHoverStaticObject(null);
     setHoverArch(null);
     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
-    tip.querySelector('.t-id').textContent=`${d.nodeLabel} · TP${d.tp} · EP${d.ep} · global rank ${d.rank}`;
+    tip.querySelector('.t-id').textContent=`${d.nodeLabel} · TP rank ${d.t} · global rank ${d.rank}`;
     tip.querySelector('.t-body').innerHTML=
       `<div class="t-explain">${esc(boardObjectExplain(d))}</div>`+
       (d.role?`<div class="t-task">▸ ${esc(d.role)}</div>`:`<div class="t-idle">▸ 空闲</div>`);
     return;
   }
+  const railTip=hiddenRailHoverInfo(e);
+  if(railTip){
+    setHoverArch(null);
+    tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+    tip.querySelector('.t-id').textContent=railTip.title;
+    tip.querySelector('.t-body').innerHTML=`<div class="t-explain">${esc(railTip.body)}</div>`;
+    return;
+  }
+  const hs=ray.intersectObjects(staticFocusPickables.filter(o=>o.visible),false)[0];
+  if(hs){
+    setHoverArch(null);
+    const d=hs.object.userData;
+    tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
+    tip.querySelector('.t-id').textContent=d.title||'Hidden state';
+    tip.querySelector('.t-body').innerHTML=`<div class="t-explain">${esc(d.body||'Hidden state dataflow object.')}</div>`;
+    return;
+  }
   const hp=ray.intersectObjects(archPickables,false)[0];
   if(hp){
-    setHoverStaticObject(null);
     setHoverArch(hp.object);
     const d=hp.object.userData;
     tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
@@ -4562,112 +3119,13 @@ function onHover(e){
       (d.desc?`<div class="t-desc">${esc(d.desc)}</div>`:'');
     return;
   }
-  const hs=pickStaticHit(staticPickCandidates());
-  if(hs){showStaticHit(hs);return;}
-  const railTip=hiddenRailHoverInfo(e);
-  if(railTip){
-    setHoverStaticObject(null);
-    setHoverArch(null);
-    tip.style.display='block';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';
-    tip.querySelector('.t-id').textContent=railTip.title;
-    tip.querySelector('.t-body').innerHTML=`<div class="t-explain">${esc(railTip.body)}</div>`;
-    return;
-  }
-  hideStaticObjectTip();
+  setHoverArch(null);
+  tip.style.display='none';
 }
 
 /* ===== P0/P1 异常诊断：从现成指标派生异常 → 3D/Loss 徽标 → inspector 诊断卡 + 下一步 ===== */
 const anomalyLayer=document.getElementById('anomalyLayer');
 const anomalyEls=new Map();        // id -> {el, anomaly}（仅 3D 锚点）
-const epLabelLayer=document.getElementById('epLabelLayer');
-const epLabelEls=[];
-const tpLabelEls=[];
-const ppLabelEls=[];
-const dpLabelEls=[];
-function ensureEpOverlayLabels(){
-  if(!epLabelLayer)return;
-  if(!epLabelEls.length&&epOverlayAnchors.length){
-    const perBucket=Math.round(MODEL_CONFIG.routedExperts/DEMO.ep);
-    epOverlayAnchors.forEach(anchor=>{
-      const el=document.createElement('div');
-      el.className='opv-ep-label';
-      el.innerHTML=`${esc(epLabel(anchor.ep))}<span>${perBucket} routed experts</span>`;
-      epLabelLayer.appendChild(el);
-      epLabelEls.push({el,anchor});
-    });
-  }
-  if(!tpLabelEls.length&&tpOverlayAnchors.length){
-    tpOverlayAnchors.forEach(anchor=>{
-      const el=document.createElement('div');
-      el.className='opv-ep-label opv-tp-label';
-      el.innerHTML=`${esc(tpLabel(anchor.tp))}<span>tensor shard row</span>`;
-      epLabelLayer.appendChild(el);
-      tpLabelEls.push({el,anchor});
-    });
-  }
-  if(!ppLabelEls.length&&ppOverlayAnchors.length){
-    ppOverlayAnchors.forEach(anchor=>{
-      const el=document.createElement('div');
-      el.className='opv-ep-label opv-pp-label';
-      el.innerHTML=`${esc(ppLabel(anchor.stage))}<span>L${anchor.range[0]}-${anchor.range[1]}</span>`;
-      const showFromLabel=event=>{
-        event.stopPropagation();
-        if(!anchor.hitBox)return;
-        showStaticObjectTip(anchor.hitBox,event);
-      };
-      el.addEventListener('pointerenter',showFromLabel);
-      el.addEventListener('pointermove',showFromLabel);
-      el.addEventListener('pointerleave',event=>{
-        event.stopPropagation();
-        el.classList.remove('is-hovered');
-        hideStaticObjectTip(anchor.hitBox);
-      });
-      epLabelLayer.appendChild(el);
-      ppLabelEls.push({el,anchor});
-    });
-  }
-  if(!dpLabelEls.length&&dpOverlayAnchors.length){
-    dpOverlayAnchors.forEach(anchor=>{
-      const el=document.createElement('div');
-      el.className='opv-ep-label opv-dp-label';
-      el.innerHTML=`${esc(dpLabel(anchor.dp))}<span>full replica</span>`;
-      epLabelLayer.appendChild(el);
-      dpLabelEls.push({el,anchor});
-    });
-  }
-}
-function syncEpOverlayPositions(){
-  ensureEpOverlayLabels();
-  if(!epLabelEls.length&&!tpLabelEls.length&&!ppLabelEls.length&&!dpLabelEls.length)return;
-  const showEp=activeView==='right'&&objectFocus==='comm:ep';
-  const showTp=activeView==='right'&&objectFocus==='comm:tp';
-  const showPp=activeView==='right'&&objectFocus==='comm:pp';
-  const showDp=activeView==='right'&&objectFocus==='comm:dp';
-  if(!showEp){
-    epLabelEls.forEach(({el})=>{el.style.display='none';});
-  }
-  if(!showTp)tpLabelEls.forEach(({el})=>{el.style.display='none';});
-  if(!showPp)ppLabelEls.forEach(({el})=>{el.style.display='none';el.classList.remove('is-hovered');});
-  if(!showDp)dpLabelEls.forEach(({el})=>{el.style.display='none';});
-  if(!showEp&&!showTp&&!showPp&&!showDp)return;
-  const canvasRect=renderer.domElement.getBoundingClientRect();
-  const layerRect=epLabelLayer.getBoundingClientRect();
-  const syncList=(items,show)=>{
-    if(!show)return;
-    items.forEach(({el,anchor})=>{
-      const p=anchor.pos.clone().project(camera);
-      const inView=p.z<1&&p.x>=-1.08&&p.x<=1.08&&p.y>=-1.08&&p.y<=1.08;
-      if(!inView){el.style.display='none';el.classList.remove('is-hovered');return;}
-      el.style.display='block';
-      el.style.left=(canvasRect.left-layerRect.left+(p.x+1)*0.5*canvasRect.width+(anchor.dx||0))+'px';
-      el.style.top=(canvasRect.top-layerRect.top+(1-p.y)*0.5*canvasRect.height+(anchor.dy||0))+'px';
-    });
-  };
-  syncList(epLabelEls,showEp);
-  syncList(tpLabelEls,showTp);
-  syncList(ppLabelEls,showPp);
-  syncList(dpLabelEls,showDp);
-}
 let ALL_ANOMALIES=[], selectedAnomalyId=null;
 const pct=v=>Math.round(v*100);
 const SEV_NAME={1:'关注',2:'警告',3:'严重'};
@@ -4702,7 +3160,6 @@ function computeAnomalies(){
     swimlaneNote:'下钻会在 3D 高亮所有 EP All-to-All 链路和 32 个 rank 的参与面，同时在 Swimlane 高亮 A2A 通信片段。MoE token dispatch/combine 是 collective；这不是“所有 rank 独立报错”，而是把路由坍缩最可能放大的通信环节标出来。',
     anchor:{kind:'loss',step:TS.collapseStep},
     focus:{source:'loss',step:TS.collapseStep,metric:'load_balance',severity:3},
-    link:{objectFocus:'comm:ep',view:'right',guideKind:'ep',guideKey:'first',status:'Loss 坍缩 → 侧视图高亮 EP=2 token All-to-All 路径。'},
     actions:[
       {label:'定位坍缩层',primary:true,run:()=>{const m=ALL_ANOMALIES.find(x=>x.anchor.kind==='zone');if(m)selectAnomaly(m);}},
       {label:'下钻 A2A 路径',run:()=>drillSwimlane({type:'moe-a2a',label:'Loss 坍缩 → EP All-to-All',step:TS.collapseStep})},
@@ -4727,14 +3184,6 @@ function computeAnomalies(){
       swimlaneNote:'下钻会在 3D 高亮所有 EP All-to-All 链路和 32 个 rank 的参与面，同时在 Swimlane 高亮 A2A 通信片段。真正的根因不是“每张卡都坏了”，而是路由负载集中到少数专家后，A2A 通信和等待被一起放大。',
       anchor:{kind:'zone'},
       focus:{source:'anomaly',layer:peak.layer,op:'experts',metric:'load',severity:sev},
-      link:{
-        objectFocus:'comm:ep',
-        view:'right',
-        guideKind:'ep',
-        guideKey:`0:${stageForArchLayer(peak.layer)??FIRST_MOE_LAYER}:tp0`,
-        stage:stageForArchLayer(peak.layer),
-        status:`MoE 负载不均 → 高亮 L${peak.layer} 所在 PP stage 的 EP=2 A2A 组。`
-      },
       actions:[
         {label:'下钻 A2A 路径',primary:true,run:()=>drillSwimlane({type:'moe-a2a',label:`${range} → EP All-to-All`,layer:peak.layer,step:focusContext.step})},
         {label:'看 MoE 负载',run:()=>DOCK()?.setActiveView('moe-load')},
@@ -4757,7 +3206,6 @@ function computeAnomalies(){
       swimlaneNote:`下钻只高亮 rank ${worst.rank} 的空泡和通信片段，用来解释这张卡为什么掉队；这里才是具体 rank 异常落点。`,
       anchor:{kind:'card',nodeId:node?.id,dp:worst.dp,stage:worst.stage},
       focus:{source:'anomaly',rank:worst.rank,dp:worst.dp,stage:worst.stage,metric:'bubble',severity:sev},
-      link:{objectFocus:'hw:cards',view:'iso',nodeId:node?.id,status:`掉队 rank → 聚焦 D${worst.dp}·PP${worst.stage} 的真实 rank 卡。`},
       actions:[
         {label:'下钻 Swimlane',primary:true,run:()=>drillSwimlane({type:'rank-wait',rank:worst.rank,label:`R${worst.rank} 空泡/通信`,dp:worst.dp,stage:worst.stage})},
         {label:'看 Card 负载',run:()=>DOCK()?.setActiveView('card-load')},
@@ -4792,14 +3240,9 @@ const inspectorFocus=document.getElementById('inspectorFocus');
 const diagSummary=document.getElementById('diagSummary');
 const diagList=document.getElementById('diagList');
 let activeInspectorTab='diagnostics', selectedFindingId=null, INSPECTOR_FINDINGS=[];
-const CAT_LABEL={loss:'Loss',ep:'EP',rank:'Rank',pp:'PP',tp:'TP',dp:'DP',idle:'Rank',imbalance:'EP',size:'切法'};
+const CAT_LABEL={idle:'空闲',imbalance:'不均',size:'Size',loss:'Loss'};
 const avg=values=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0;
 const maxBy=(items,fn)=>items.reduce((best,item)=>!best||fn(item)>fn(best)?item:best,null);
-const stageRangeLabel=stage=>{
-  const [lo,hi]=DEMO_STAGE_RANGES[stage]||[0,0];
-  return `L${lo}-${hi}`;
-};
-const modeLink=(objectFocus,opts={})=>({objectFocus,view:'right',...opts});
 function setInspectorTab(id){
   activeInspectorTab=id==='focus'?'focus':'diagnostics';
   inspectorDiagnostics.hidden=activeInspectorTab!=='diagnostics';
@@ -4813,7 +3256,7 @@ inspectorTabs?.addEventListener('click',event=>{
   if(btn)setInspectorTab(btn.dataset.inspectorTab);
 });
 document.getElementById('diagClose')?.addEventListener('click',()=>{clearAnomalySelection();selectedFindingId=null;renderInspectorDiagnostics();});
-function findingFromAnomaly(a,{category,summary,recommendation,metrics=[],link=null}={}){
+function findingFromAnomaly(a,{category,summary,recommendation,metrics=[]}={}){
   return {
     ...a,
     id:`finding-${a.id}`,
@@ -4822,7 +3265,6 @@ function findingFromAnomaly(a,{category,summary,recommendation,metrics=[],link=n
     categories:[category],
     summary:summary||a.diagnosis.replace(/<[^>]+>/g,''),
     recommendation,
-    link:link||a.link,
     metrics
   };
 }
@@ -4833,20 +3275,20 @@ function buildInspectorFindings(){
   const peakLayer=maxBy(moeMetrics.layers,L=>L.maxLoadRatio);
   if(byId['loss-collapse'])out.push(findingFromAnomaly(byId['loss-collapse'],{
     category:'loss',
-    summary:'训练效果进入路由坍缩区，先看 EP All-to-All 和 MoE 负载，而不是只看单个 rank。',
+    summary:'训练效果已经进入路由坍缩区，先定位 MoE 负载而不是只看单个 rank。',
     metrics:[`step ${TS.collapseStep}`,'loss 发散']
   }));
   if(byId['moe-zone']&&peakLayer)out.push(findingFromAnomaly(byId['moe-zone'],{
-    category:'ep',
-    summary:`EP=${RT.config.ep} 表示 MoE expert/token 切分；L${peakLayer.layer} A2A skew ${peakLayer.allToAllSkew.toFixed(2)}× 会放大全局等待。`,
-    metrics:[`L${peakLayer.layer}`,`${peakLayer.maxLoadRatio.toFixed(2)}× cap`,`EP${RT.config.ep}`]
+    category:'imbalance',
+    summary:`MoE 负载集中到少数 expert，A2A skew ${peakLayer.allToAllSkew.toFixed(2)}× 会放大全局等待。`,
+    metrics:[`L${peakLayer.layer}`,`${peakLayer.maxLoadRatio.toFixed(2)}× cap`,`idle ${peakLayer.idleExperts}`]
   }));
   if(byId[`rank-${worstRank?.rank}`]&&worstRank)out.push(findingFromAnomaly(byId[`rank-${worstRank.rank}`],{
-    category:'rank',
-    summary:`R${worstRank.rank} 是具体掉队落点；它位于 D${worstRank.dp}·PP${worstRank.stage}，不是整个 DP/TP/EP 组都坏。`,
+    category:'idle',
+    summary:`R${worstRank.rank} 空闲最高，适合作为泳道空泡的第一下钻入口。`,
     metrics:[`bubble ${pct(worstRank.bubbleRatio)}%`,`comm ${pct(worstRank.commRatio)}%`,`D${worstRank.dp}·PP${worstRank.stage}`]
   }));
-  const stageStats=Array.from({length:RT.config.pp},(_,stage)=>{
+  const stageStats=[0,1].map(stage=>{
     const rows=rankLoadViewModel.ranks.filter(r=>r.stage===stage);
     return {
       stage,
@@ -4861,179 +3303,57 @@ function buildInspectorFindings(){
   const ppSkew=(ppWorst?.avgBubble??0)-(ppBest?.avgBubble??0);
   out.push({
     id:'finding-pp-size',
-    category:'pp',
-    categories:['pp','rank'],
+    category:'size',
+    categories:['size','idle'],
     severity:sevForRatio(Math.max(ppWorst?.avgBubble??0,ppSkew),0.12,0.22),
-    title:'PP=4 · 按层切分 / stage 空泡',
+    title:'PP size / stage 切分建议',
     label:'PP stage 空闲与切分',
-    summary:`PP 是按层纵切；${ppLabel(ppWorst?.stage??0)} ${stageRangeLabel(ppWorst?.stage??0)} 平均空泡 ${pct(ppWorst?.avgBubble??0)}%。`,
-    diagnosis:`PP=${RT.config.pp} 把 50 层切成 ${DEMO_STAGE_RANGES.map(([lo,hi],i)=>`PP${i}:L${lo}-${hi}`).join(' / ')}。${ppLabel(ppWorst?.stage??0)} 平均空泡 <b>${pct(ppWorst?.avgBubble??0)}%</b>，stage 间差 <b>${pct(ppSkew)}%</b>；PP 的主要通信对象是相邻 stage 的 hidden state / gradient send-recv。`,
-    evidence:[['切法',`按层切模型 · ${RT.config.pp} stages`],['micro-batch',`${RT.config.microbatches}`],['最高空泡 stage',`${ppLabel(ppWorst?.stage??0)} ${stageRangeLabel(ppWorst?.stage??0)}`],['stage 差异',`${pct(ppSkew)}%`]],
-    cause:'文章里的 PP 解决“整模型太长、装不下”，代价是 stage 间串行依赖、激活传输和 pipeline bubble；所以这里优先检查 stage range 与 micro-batch 是否让流水线饱满。',
+    summary:`PP${ppWorst?.stage??0} 平均空泡 ${pct(ppWorst?.avgBubble??0)}%，stage 间差 ${pct(ppSkew)}%。`,
+    diagnosis:`PP${ppWorst?.stage??0} 平均空泡 <b>${pct(ppWorst?.avgBubble??0)}%</b>，比另一侧高 <b>${pct(ppSkew)}%</b> —— 这更像 stage range / micro-batch 数导致的流水不均，而不是单卡故障。`,
+    evidence:[['PP 配置',`${RT.config.pp} stages`],['micro-batch',`${RT.config.microbatches}`],['最高空泡 stage',`PP${ppWorst?.stage??0}`],['stage 差异',`${pct(ppSkew)}%`]],
+    cause:'PP 切分需要让各 stage 的计算耗时接近，并用足够 micro-batch 覆盖 warmup / drain。',
     confidence:'推断',
-    swimlaneNote:'点击或 hover 这条诊断会切到侧视 PP 框；再看 Swimlane 中 PP send/recv 与 bubble 是否集中在同一个 stage。',
-    metrics:[`${ppLabel(ppWorst?.stage??0)}`,`bubble ${pct(ppWorst?.avgBubble??0)}%`,`skew ${pct(ppSkew)}%`],
-    link:modeLink('comm:pp',{guideKind:'pp',guideKey:`stage:${ppWorst?.stage??0}`,stage:ppWorst?.stage??0,status:`诊断联动：侧视图高亮 ${ppLabel(ppWorst?.stage??0)} ${stageRangeLabel(ppWorst?.stage??0)}。`}),
+    swimlaneNote:'先看 Card Load 和 Swimlane 的空泡是否集中在某个 PP stage；如果集中，优先调 layer range / micro-batch，再评估是否改变 PP size。',
+    metrics:[`PP${ppWorst?.stage??0}`,`bubble ${pct(ppWorst?.avgBubble??0)}%`,`skew ${pct(ppSkew)}%`],
     actions:[
-      {label:'高亮 PP 框',primary:true,run:()=>activateFindingLink(INSPECTOR_FINDINGS.find(f=>f.id==='finding-pp-size')||out.find(f=>f.id==='finding-pp-size'))},
-      {label:'看 Card 负载',run:()=>DOCK()?.setActiveView('card-load')},
+      {label:'看 Card 负载',primary:true,run:()=>DOCK()?.setActiveView('card-load')},
       {label:'下钻空泡',run:()=>worstRank&&drillSwimlane({type:'rank-wait',rank:worstRank.rank,label:`R${worstRank.rank} 空泡/通信`,dp:worstRank.dp,stage:worstRank.stage})},
     ]
   });
   const avgComm=avg(rankLoadViewModel.ranks.map(r=>r.commRatio));
   const maxComm=maxBy(rankLoadViewModel.ranks,r=>r.commRatio);
-  const maxCommNode=maxComm?nodeByDS(maxComm.dp,maxComm.stage):null;
-  const tpGroups=RT.config.dp*RT.config.pp*RT.config.ep;
   out.push({
     id:'finding-tp-size',
-    category:'tp',
-    categories:['tp'],
+    category:'size',
+    categories:['size'],
     severity:sevForRatio(Math.max(avgComm,maxComm?.commRatio??0),0.18,0.28),
-    title:'TP=2 · 同层张量切分 / All-Reduce',
+    title:'TP size / All-Reduce 建议',
     label:'TP 通信占比',
-    summary:`TP 是同一层内部横切；当前有 ${tpGroups} 个 TP 组，每组 TP0↔TP1，平均通信 ${pct(avgComm)}%。`,
-    diagnosis:`TP=${RT.config.tp} 不切 layer，而是在每个 DP/PP/EP 坐标内把同一层的矩阵/注意力分片给 TP0 与 TP1。当前 rank 平均通信占比 <b>${pct(avgComm)}%</b>，最高 rank <b>R${maxComm?.rank??'-'}</b> 为 <b>${pct(maxComm?.commRatio??0)}%</b>；TP 的代价是层内 All-Reduce / All-Gather / Reduce-Scatter 更密。`,
-    evidence:[['切法',`同层横切 · ${tpGroups} groups × ${RT.config.tp} ranks`],['代表组',`D${maxComm?.dp??0}·PP${maxComm?.stage??0}·EP${maxComm?.ep??0}`],['平均通信',`${pct(avgComm)}%`],['最高通信 rank',`R${maxComm?.rank??'-'}`]],
-    cause:'文章里的 TP 解决“单层太大或想提升单层并行度”，但它不是白赚性能；层内 collective 越频繁，网络和 overlap 就越关键。',
+    summary:`当前 TP=${RT.config.tp}，平均通信 ${pct(avgComm)}%，最高 rank 通信 ${pct(maxComm?.commRatio??0)}%。`,
+    diagnosis:`TP=${RT.config.tp} 下，rank 平均通信占比 <b>${pct(avgComm)}%</b>，最高 rank <b>${pct(maxComm?.commRatio??0)}%</b>。TP 增大通常会降低单卡计算量，但 All-Reduce 同步面也会变重。`,
+    evidence:[['TP size',`${RT.config.tp}`],['平均通信',`${pct(avgComm)}%`],['最高通信 rank',`R${maxComm?.rank??'-'}`],['最高通信占比',`${pct(maxComm?.commRatio??0)}%`]],
+    cause:'当通信占比接近或超过计算收益时，继续增大 TP 可能把瓶颈从计算转成同步等待。',
     confidence:'推断',
-    swimlaneNote:'点击或 hover 这条诊断会切到侧视 TP 组；Swimlane 双轨里应重点看 TP All-Reduce 是否压住计算条。',
-    metrics:[`TP${RT.config.tp}`,`${tpGroups} groups`,`max R${maxComm?.rank??'-'}`],
-    link:modeLink('comm:tp',{guideKind:'tp',guideKey:`${maxComm?.dp??0}:${maxComm?.stage??0}:ep${maxComm?.ep??0}`,nodeId:maxCommNode?.id,stage:maxComm?.stage,status:`诊断联动：高亮 D${maxComm?.dp??0}·PP${maxComm?.stage??0}·EP${maxComm?.ep??0} 的 TP0↔TP1 组。`}),
+    swimlaneNote:'切到通信双轨后对比 TP All-Reduce 是否持续压住计算；若 TP 通信条密集且空泡扩大，需要重新评估 TP size 或通信 overlap。',
+    metrics:[`TP${RT.config.tp}`,`avg comm ${pct(avgComm)}%`,`max R${maxComm?.rank??'-'}`],
     actions:[
-      {label:'高亮 TP 通信',primary:true,run:()=>{activateFindingLink(INSPECTOR_FINDINGS.find(f=>f.id==='finding-tp-size')||out.find(f=>f.id==='finding-tp-size'));commSplit=true;syncCommToggleButton();DOCK()?.setActiveView('timeline');requestAnimationFrame(()=>paintSwimlane());}},
+      {label:'高亮 TP 通信',primary:true,run:()=>{setObjectFocus('comm:tp');commSplit=true;syncCommToggleButton();DOCK()?.setActiveView('timeline');requestAnimationFrame(()=>paintSwimlane());}},
       {label:'看 Card 负载',run:()=>DOCK()?.setActiveView('card-load')},
     ]
   });
-  if(peakLayer){
-    const epStage=stageForArchLayer(peakLayer.layer)??0;
-    const expertsPerEp=Math.round(MODEL_CONFIG.routedExperts/RT.config.ep);
-    out.push({
-      id:'finding-ep-a2a',
-      category:'ep',
-      categories:['ep'],
-      severity:sevForRatio(Math.max(peakLayer.allToAllSkew,peakLayer.maxLoadRatio),1.25,1.65),
-      title:'EP=2 · MoE expert 切分 / A2A',
-      label:'EP token dispatch/combine',
-      summary:`EP=2 在每个 TP column 内把 80 个 routed experts 切成两份；当前峰值 A2A skew ${peakLayer.allToAllSkew.toFixed(2)}×。`,
-      diagnosis:`EP=${RT.config.ep} 是 MoE 内部的 expert/token 切法：Router Top-${MODEL_CONFIG.expertsPerTok} 选中专家后，token 先 dispatch 到 EP0/EP1 的 expert shard，再 combine 回主链路。当前 L${peakLayer.layer} 峰值负载 <b>${peakLayer.maxLoadRatio.toFixed(2)}×</b> capacity，A2A skew <b>${peakLayer.allToAllSkew.toFixed(2)}×</b>；这里要看 EP All-to-All，不要把它理解成 PP stage 或 DP 副本。`,
-      evidence:[['切法',`${MODEL_CONFIG.routedExperts} routed experts / EP${RT.config.ep} ≈ ${expertsPerEp} per EP`],['Top-K',`${MODEL_CONFIG.expertsPerTok}`],['峰值层',`L${peakLayer.layer} · ${stageRangeLabel(epStage)}`],['A2A skew',`${peakLayer.allToAllSkew.toFixed(2)}×`]],
-      cause:'EP 的代价是 MoE layer 内 token dispatch/combine 的 All-to-All；当路由负载集中到少数 experts，A2A skew 会把等待扩散到同组 rank。',
-      confidence:'推断',
-      swimlaneNote:'点击或 hover 这条诊断会切到侧视 EP0↔EP1 框；下钻 A2A 会在 3D 与 Swimlane 同时高亮 token dispatch/combine。',
-      metrics:[`EP${RT.config.ep}`,`L${peakLayer.layer}`,`A2A ${peakLayer.allToAllSkew.toFixed(2)}×`],
-      link:modeLink('comm:ep',{guideKind:'ep',guideKey:`0:${epStage}:tp0`,stage:epStage,status:`诊断联动：高亮 ${stageRangeLabel(epStage)} 内的 EP0↔EP1 token A2A。`}),
-      actions:[
-        {label:'高亮 EP A2A',primary:true,run:()=>activateFindingLink(INSPECTOR_FINDINGS.find(f=>f.id==='finding-ep-a2a')||out.find(f=>f.id==='finding-ep-a2a'))},
-        {label:'下钻 A2A 路径',run:()=>drillSwimlane({type:'moe-a2a',label:`L${peakLayer.layer} → EP All-to-All`,layer:peakLayer.layer,step:focusContext.step})},
-        {label:'看 MoE 负载',run:()=>DOCK()?.setActiveView('moe-load')},
-      ]
-    });
-  }
-  const dpStats=Array.from({length:RT.config.dp},(_,dp)=>{
-    const rows=rankLoadViewModel.ranks.filter(r=>r.dp===dp);
-    return {
-      dp,
-      avgBubble:avg(rows.map(r=>r.bubbleRatio)),
-      avgComm:avg(rows.map(r=>r.commRatio)),
-      worst:maxBy(rows,r=>r.commRatio)
-    };
-  });
-  const dpWorst=maxBy(dpStats,s=>s.avgComm+s.avgBubble*0.45);
-  const dpBest=dpStats.reduce((best,item)=>!best||item.avgComm<best.avgComm?item:best,null);
-  const dpSkew=(dpWorst?.avgComm??0)-(dpBest?.avgComm??0);
-  out.push({
-    id:'finding-dp-sync',
-    category:'dp',
-    categories:['dp'],
-    severity:sevForRatio(Math.max(dpWorst?.avgComm??0,dpSkew),0.16,0.26),
-    title:'DP=2 · 完整副本 / 梯度同步',
-    label:'DP replica gradient sync',
-    summary:`DP 不是切模型，而是复制两份完整 PP×TP×EP 模型副本；D${dpWorst?.dp??0} 平均通信 ${pct(dpWorst?.avgComm??0)}%。`,
-    diagnosis:`DP=${RT.config.dp} 在当前 32 rank 中表示两份完整模型副本：每份副本内部都是 PP${RT.config.pp} × TP${RT.config.tp} × EP${RT.config.ep}。DP 的通信对象不是 hidden state，也不是 token dispatch，而是 backward 后同 PP/TP/EP 坐标的 D0↔D1 梯度同步。当前 D${dpWorst?.dp??0} 平均通信 <b>${pct(dpWorst?.avgComm??0)}%</b>，D 间差 <b>${pct(dpSkew)}%</b>。`,
-    evidence:[['切法',`复制模型副本 · DP${RT.config.dp}`],['单副本占卡',`PP${RT.config.pp}×TP${RT.config.tp}×EP${RT.config.ep} = ${RT.config.pp*RT.config.tp*RT.config.ep}`],['同步对象',`同 PP/TP/EP 坐标的 D0↔D1`],['D 间通信差',`${pct(dpSkew)}%`]],
-    cause:'文章里的 DP 解决“单副本已能跑后，提高吞吐”，代价是每一步梯度 All-Reduce；所以 DP 诊断应看副本间同步，而不是某个 layer stage 的切分。',
-    confidence:'推断',
-    swimlaneNote:'点击或 hover 这条诊断会切到侧视 DP 副本框；Swimlane 里看 backward 后的 DP gradient sync 是否持续拉长。',
-    metrics:[`DP${RT.config.dp}`,`D${dpWorst?.dp??0}`,`skew ${pct(dpSkew)}%`],
-    link:modeLink('comm:dp',{guideKind:'dp',guideKey:`dp:${dpWorst?.dp??0}`,status:`诊断联动：高亮 DP${dpWorst?.dp??0} 完整模型副本与梯度同步面。`}),
-    actions:[
-      {label:'高亮 DP 同步',primary:true,run:()=>activateFindingLink(INSPECTOR_FINDINGS.find(f=>f.id==='finding-dp-sync')||out.find(f=>f.id==='finding-dp-sync'))},
-      {label:'看 Timeline',run:()=>{commSplit=true;syncCommToggleButton();DOCK()?.setActiveView('timeline');requestAnimationFrame(()=>paintSwimlane());}},
-    ]
-  });
   return out.sort((a,b)=>(b.severity||1)-(a.severity||1));
-}
-function hitBoxForFindingLink(link){
-  if(!link)return null;
-  if(link.objectFocus==='comm:pp'&&link.stage!=null){
-    const anchor=ppOverlayAnchors.find(a=>a.stage===link.stage);
-    if(anchor?.hitBox)return anchor.hitBox;
-  }
-  if(link.guideKind)return parallelGuideHit(link.guideKind,link.guideKey);
-  return null;
-}
-function activateFindingLink(finding,{preview=false}={}){
-  const link=finding?.link;
-  if(!link)return false;
-  if(!preview){
-    clearThreeDrillTarget({restoreObjectFocus:false});
-    clearSwimHighlight();
-  }
-  let needsRedraw=false;
-  if(link.nodeId!=null){
-    const idx=NODE_DEFS.findIndex(n=>n.id===link.nodeId);
-    if(idx>=0&&focusNode!==idx){focusNode=idx;needsRedraw=true;}
-  }
-  if(link.view&&activeView!==link.view)setActiveView(link.view);
-  if(link.objectFocus&&objectFocus!==link.objectFocus){
-    setObjectFocus(link.objectFocus);
-    needsRedraw=false;
-  }else if(needsRedraw){
-    redraw();
-  }
-  const hit=hitBoxForFindingLink(link);
-  if(hit)setHoverStaticObject(hit);
-  else if(link.stage!=null&&link.stage!==hoverStage){
-    hoverStage=link.stage;
-    redraw();
-  }
-  if(typeof syncEpOverlayPositions==='function')requestAnimationFrame(syncEpOverlayPositions);
-  if(statusRight&&link.status)statusRight.textContent=link.status;
-  return true;
-}
-let diagPreviewState=null, diagPreviewBtn=null;
-function beginInspectorFindingPreview(finding,btn){
-  if(!finding?.link)return;
-  if(!diagPreviewState)diagPreviewState={objectFocus,activeView,focusNode,status:statusRight?.textContent||''};
-  diagPreviewBtn?.classList.remove('is-previewing');
-  diagPreviewBtn=btn||null;
-  diagPreviewBtn?.classList.add('is-previewing');
-  activateFindingLink(finding,{preview:true});
-}
-function endInspectorFindingPreview({restore=true}={}){
-  diagPreviewBtn?.classList.remove('is-previewing');
-  diagPreviewBtn=null;
-  const prev=diagPreviewState;
-  diagPreviewState=null;
-  setHoverStaticObject(null);
-  if(!restore||!prev)return;
-  focusNode=prev.focusNode;
-  if(prev.activeView&&activeView!==prev.activeView)setActiveView(prev.activeView);
-  if(prev.objectFocus&&objectFocus!==prev.objectFocus)setObjectFocus(prev.objectFocus);
-  else redraw();
-  if(statusRight)statusRight.textContent=prev.status||'—';
 }
 function renderInspectorDiagnostics(){
   if(!diagList||!diagSummary)return;
   INSPECTOR_FINDINGS=buildInspectorFindings();
   const visible=INSPECTOR_FINDINGS;
   const severe=INSPECTOR_FINDINGS.filter(f=>(f.severity||1)>=3).length;
-  const comm=INSPECTOR_FINDINGS.filter(f=>['pp','tp','ep','dp'].some(k=>(f.categories||[f.category]).includes(k))).length;
-  const linked=INSPECTOR_FINDINGS.filter(f=>f.link?.objectFocus).length;
+  const idle=INSPECTOR_FINDINGS.filter(f=>(f.categories||[f.category]).includes('idle')).length;
+  const size=INSPECTOR_FINDINGS.filter(f=>(f.categories||[f.category]).includes('size')).length;
   diagSummary.innerHTML=[
     ['严重',severe],
-    ['通信对象',comm],
-    ['可联动',linked]
+    ['空闲线索',idle],
+    ['PP/TP 建议',size]
   ].map(([k,v])=>`<div class="opv-diag-summary__item"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
   diagList.innerHTML=visible.map(f=>{
     const selected=selectedFindingId===f.id||f.sourceAnomalyId===selectedAnomalyId;
@@ -5046,24 +3366,9 @@ function renderInspectorDiagnostics(){
 diagList?.addEventListener('click',event=>{
   const btn=event.target.closest('[data-finding-id]');
   if(!btn)return;
-  endInspectorFindingPreview({restore:false});
   const finding=INSPECTOR_FINDINGS.find(f=>f.id===btn.dataset.findingId);
   if(finding)selectInspectorFinding(finding);
 });
-diagList?.addEventListener('pointerover',event=>{
-  const btn=event.target.closest('[data-finding-id]');
-  if(!btn||btn===diagPreviewBtn)return;
-  const finding=INSPECTOR_FINDINGS.find(f=>f.id===btn.dataset.findingId);
-  if(finding)beginInspectorFindingPreview(finding,btn);
-});
-diagList?.addEventListener('pointerout',event=>{
-  const btn=event.target.closest('[data-finding-id]');
-  if(!btn)return;
-  const next=event.relatedTarget;
-  if(next instanceof Node&&btn.contains(next))return;
-  endInspectorFindingPreview();
-});
-diagList?.addEventListener('pointerleave',()=>endInspectorFindingPreview());
 function showDiagnosis(a){
   setInspectorTab('diagnostics');
   diagSev.dataset.sev=String(a.severity); diagSev.textContent=SEV_NAME[a.severity];
@@ -5094,7 +3399,6 @@ function selectInspectorFinding(finding){
   }
   selectedAnomalyId=null;
   refreshAnomalySelection();
-  activateFindingLink(finding);
   showDiagnosis(finding);
   renderInspectorDiagnostics();
 }
@@ -5112,7 +3416,6 @@ function selectAnomaly(a){
   }else if(a.anchor.kind==='zone'){
     setObjectFocus('op:experts');
   }
-  activateFindingLink(a);
   showDiagnosis(a);
   refreshAnomalySelection();
   renderInspectorDiagnostics();
@@ -5194,7 +3497,7 @@ function syncAnomalyPositions(){
     el.style.top=((1-p.y)*0.5*r.height)+'px';
   });
 }
-addEventListener('keydown',e=>{if(e.key==='Escape'){clearAnomalySelection();clearThreeDrillTarget();clearSwimHighlight();clearArchSelection();}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){clearAnomalySelection();clearThreeDrillTarget();clearSwimHighlight();}});
 
 /* ===== 循环 ===== */
 let ambientTickAt=0;
@@ -5204,12 +3507,11 @@ function loop(now){
   // hover 架构层 → 点亮负责它的 PP stage 的 16 张卡（pulse + 抬高）；移开后 setHoverArch 里 redraw 复位
   if(hoverStage!=null){
     const hp=0.55+Math.sin(now*0.006)*0.4;
-    boardMeshes.forEach(b=>{if(b.userData.stage===hoverStage){b.material.emissiveIntensity=hp;b.position.y=b.userData.baseY??BASE_Y;}});
+    boardMeshes.forEach(b=>{if(b.userData.stage===hoverStage){b.material.emissiveIntensity=hp;b.position.y=BASE_Y+0.2*SC;}});
   }
   applyMoeStep();
   if(innerPlaying&&now-ambientTickAt>INNER_PLAY_INTERVAL){ambientTickAt=now;advanceInnerTick(1);}
   syncAnomalyPositions();
-  syncEpOverlayPositions();
   animateAnomalyBox(now);
   renderer.render(scene,camera);
   syncAxisCamera();
