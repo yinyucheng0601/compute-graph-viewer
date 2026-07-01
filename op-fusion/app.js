@@ -1035,8 +1035,8 @@
   function initCursorFollow() {
     if (!els.frame) return;
     const show = () => {
-      els.frame.style.setProperty('--ide-cursor-alpha', document.documentElement.dataset.theme === 'light' ? '0.14' : '0.18');
-      els.frame.style.setProperty('--ide-dot-opacity', document.documentElement.dataset.theme === 'light' ? '0.18' : '0.22');
+      els.frame.style.setProperty('--ide-cursor-alpha', document.documentElement.dataset.theme === 'light' ? '0.20' : '0.28');
+      els.frame.style.setProperty('--ide-dot-opacity', document.documentElement.dataset.theme === 'light' ? '0.24' : '0.34');
     };
     const hide = () => {
       els.frame.style.setProperty('--ide-cursor-alpha', '0');
