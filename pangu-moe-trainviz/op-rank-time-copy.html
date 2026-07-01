@@ -187,7 +187,7 @@
   .opv-analysis-panel{position:absolute;inset:0;min-height:0}
   .opv-analysis-panel[hidden]{display:none}
   .opv-analysis-view{height:100%;display:flex;flex-direction:column;gap:8px;padding:8px 10px;min-height:0}
-  .opv-analysis-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;flex:none}
+  .opv-analysis-stats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;flex:none}
   .opv-analysis-stat{min-width:0;border:1px solid var(--border-subtle);border-radius:var(--radius-md);
     background:color-mix(in srgb,var(--foreground) 4%,transparent);padding:7px 9px}
   .opv-analysis-stat span{display:block;font:var(--text-label);color:var(--foreground-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -204,7 +204,24 @@
   .opv-dist-tip-grid{display:grid;grid-template-columns:repeat(4,auto);gap:2px 10px;margin-top:5px}
   .opv-dist-tip-grid span{display:inline-flex;align-items:center;gap:4px;font:10px/1.35 var(--font-mono);color:var(--foreground-secondary);white-space:nowrap}
   .opv-dist-tip-grid i{width:8px;height:8px;border-radius:2px;flex:none}
-  .opv-moe-dist-wrap{position:relative;flex:1;min-height:0}
+  .opv-moe-dist-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+  .opv-chart-body{position:relative;flex:1;min-height:0}
+  /* 标题浮在图表卡片内左上角（不占布局，画布已预留顶部留白） */
+  .opv-chart-head{position:absolute;top:8px;left:12px;z-index:6;display:flex;align-items:center;gap:6px}
+  .opv-chart-title{font:var(--text-label);color:var(--foreground-secondary);white-space:nowrap}
+  .opv-chart-help{flex:none;width:16px;height:16px;display:grid;place-items:center;padding:0;
+    border:1px solid var(--border-subtle);border-radius:50%;background:var(--surface-3);color:var(--foreground-muted);
+    font:700 10px/1 var(--font-sans);cursor:pointer;transition:color var(--duration-fast),border-color var(--duration-fast)}
+  .opv-chart-help:hover{color:var(--foreground);border-color:var(--border-strong)}
+  /* 说明气泡：fixed + portal 到 body（避开抽屉堆叠上下文，压过 play 悬浮栏）+ JS 钳制在视口内 */
+  .opv-chart-pop{position:fixed;z-index:1000;width:340px;
+    padding:12px 13px;border:1px solid var(--border-strong);border-radius:var(--radius-md);background:var(--surface-3);box-shadow:var(--shadow-md)}
+  .opv-chart-pop[hidden]{display:none}
+  .opv-chart-pop h4{margin:0 0 7px;font:var(--text-title-2);font-size:13px;color:var(--foreground)}
+  .opv-chart-pop h5{margin:9px 0 3px;font:800 11px/1.3 var(--font-sans);color:var(--foreground)}
+  .opv-chart-pop p{margin:0 0 6px;font:var(--text-body-sm);color:var(--foreground-secondary);line-height:1.5}
+  .opv-chart-pop code{font:var(--text-mono);font-size:11px;color:var(--foreground)}
+  .opv-chart-pop b{color:var(--foreground)}
   .opv-moe-dist{display:block;width:100%;height:100%;border:1px solid var(--border-subtle);
     border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 2.5%,transparent)}
   .opv-analysis-detail{border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:color-mix(in srgb,var(--foreground) 3.5%,transparent);padding:10px;overflow:auto}
@@ -2798,9 +2815,53 @@ const MOE_DIST=(function(){
       series[e][i]=+v.toFixed(5);
     }
   }
-  return {steps,experts,series,hot,dead,collapseStep:col};
+  return {steps,experts,series,hot,dead,collapseStep:col,title:'专家 token 占比'};
 })();
-const moeView=createMoeLoadView({panel:analysisPanels.moe,viewModel:moeLoadViewModel,onSelect:handleAnalysisSelection,distribution:MOE_DIST});
+// A2A Tail 数据：EP All-to-All 每 step 的分位延迟(µs) + 逐 rank 掉队者快照。
+// 业务：A2A 是 barrier 型 collective，整组节拍 = 最慢 rank；均值会骗人，P99 才逼近真实阻塞。
+// 剧情：坍缩后热点专家(MOE_DIST hot=[7,20] → EP rank 4/7)宿主 rank 收到成倍 token → 该 rank A2A 最慢
+//       → P99 相对 P50 张开(尾比↑)。Rank2 黑洞：0 token，在 barrier 上是别人等它(单独硬告警)。
+const A2A_TAIL=(function(){
+  const steps=TS.steps.slice(), n=steps.length, col=TS.collapseStep;
+  const RANKS=8, base=120, blackHole=2, hotRanks=[4,7];
+  const rnd=(seed=>()=>(seed=(seed*9301+49297)%233280)/233280)(4099);
+  const q=(arr,p)=>{const a=arr.slice().sort((x,y)=>x-y);const idx=(a.length-1)*p,lo=Math.floor(idx),hi=Math.ceil(idx);return lo===hi?a[lo]:a[lo]+(a[hi]-a[lo])*(idx-lo);};
+  const lat=[], p50=[], p95=[], p99=[], iter=[];
+  for(let i=0;i<n;i++){
+    const s=steps[i];
+    const skew=s<col?0:(1-Math.exp(-(s-col)/22));           // 坍缩后 0→1 ramp
+    const row=new Array(RANKS);
+    for(let r=0;r<RANKS;r++){
+      let l=base*(0.95+rnd()*0.12);                          // 健康抖动
+      if(hotRanks.includes(r))l=base*(1+3.0*skew)*(0.97+rnd()*0.08);  // 热点宿主 rank 变慢
+      if(r===blackHole&&s>=col)l=base*(0.2+rnd()*0.1);       // 黑洞：几乎不收发(0 token)
+      row[r]=+l.toFixed(1);
+    }
+    lat.push(row);
+    const eff=row.filter((_,r)=>!(r===blackHole&&s>=col));   // 分位在有效参与 barrier 的 rank 上算
+    p50[i]=+q(eff,0.5).toFixed(1); p95[i]=+q(eff,0.95).toFixed(1); p99[i]=+q(eff,0.99).toFixed(1);
+    iter[i]=Math.round(1400+(rnd()-0.5)*60);                 // 单 step 墙钟(µs 量级示意) → 气泡占比
+  }
+  const worstStep=steps[p99.indexOf(Math.max(...p99))];
+  const help=`
+    <h4>A2A 尾延迟 · 为什么盯 P99</h4>
+    <p>MoE 每层两次 <b>All-to-All</b>（dispatch/combine）是 <b>barrier 型 collective</b>：下一段计算要等 EP 组内<b>所有</b> rank，整组节拍 = <b>最慢 rank</b>。均值会骗人（7×100µs + 1×300µs 均值仅 125µs，真实阻塞 300µs），<b>只有 P99 逼近真实成本</b>。</p>
+    <h5>主看比例：尾比 P99/P50</h5>
+    <p>绝对 µs 随 batch/模型漂移，硬阈值难定；尾比无量纲、跨配置稳定。阈值 <b>&lt;1.2</b> 健康 · <b>1.2–1.5</b> warn · <b>&gt;1.5</b> alert。</p>
+    <h5>气泡占比</h5>
+    <p><code>(P99 − P50) / 单 step 墙钟</code> = 因等待掉队者浪费的 step 时间 → 掉的吞吐 / MFU。</p>
+    <h5>读图</h5>
+    <p><b>上·分位带</b>：带越厚尾巴越长；整体抬升 = 一起变慢，上沿翘起 = 出现掉队者。</p>
+    <p><b>下·掉队者条</b>：逐 rank 延迟，P99 说"有掉队者"，条形回答"是谁"。</p>
+    <p><b>灰色矮柱</b> = 收到 0 token（死专家）的 rank：自己很快做完，在 barrier 上空等那几根高柱热点 rank。它是尾延迟的<b>症状不是根因</b>，真正拖慢全组的是冲到 P99 的高柱。</p>`;
+  return {steps,collapseStep:col,ranks:RANKS,hotRanks,blackHole,lat,p50,p95,p99,iter,worstStep,ratioWarn:1.2,ratioAlert:1.5,
+    title:'A2A 尾延迟',help};
+})();
+// MoE Load 第 7 张指标卡：A2A 尾比（P99/P50，随 step 变化）——数据源在 A2A_TAIL，故在此注入
+function a2aTailRatioAt(step){const i=A2A_TAIL.steps.indexOf(step);return i<0||!A2A_TAIL.p50[i]?null:A2A_TAIL.p99[i]/A2A_TAIL.p50[i];}
+function augmentMoeStats(vm,step){const r=a2aTailRatioAt(step);if(r!=null)vm.stats=[...vm.stats,{label:'A2A 尾比',value:`${r.toFixed(2)}×`}];return vm;}
+augmentMoeStats(moeLoadViewModel,focusContext.step);
+const moeView=createMoeLoadView({panel:analysisPanels.moe,viewModel:moeLoadViewModel,onSelect:handleAnalysisSelection,distribution:MOE_DIST,a2aTail:A2A_TAIL});
 const cardView=createCardLoadView({panel:analysisPanels.card,viewModel:cardLoadViewModel,onSelect:handleAnalysisSelection});
 // step(主时间) → MoE 热力/异常派生：loop 内按帧合并，重 DOM 重挂只在 MoE tab 活动时做
 let moeStepPending=focusContext.step, moeStepApplied=null, moeViewDirty=false;
@@ -2815,6 +2876,7 @@ function applyMoeStep(){
   moeStepApplied=moeStepPending;
   moeMetrics=buildMoeRuntimeMetrics({firstMoeLayer:FIRST_MOE_LAYER,lastMoeLayer:LAST_MOE_LAYER,expertsPerLayer:256,step:moeStepPending,collapse:collapseIntensity(moeStepPending)});
   moeLoadViewModel=buildMoeLoadViewModel(moeMetrics);
+  augmentMoeStats(moeLoadViewModel,moeStepPending);
   if(!selectedAnomalyId)buildAnomalyBadges();                 // 选中时不重建，保持诊断卡/选中态
   renderInspectorDiagnostics();
   if(activeAnalysisView==='moe-load')moeView.setViewModel(moeLoadViewModel);

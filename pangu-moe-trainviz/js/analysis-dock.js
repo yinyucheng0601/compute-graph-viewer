@@ -130,16 +130,19 @@ export function createAnalysisDock({ tabsRoot, titleEl, metaEl, views, initialVi
   return { setActiveView, refresh, resize, get activeView() { return activeView; } };
 }
 
-export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) {
+export function createMoeLoadView({ panel, viewModel, onSelect, distribution, a2aTail }) {
   let metricId = viewModel.metricOptions[0]?.id || 'loadRatio';
   let canvas;
   let detail;
   let tooltip;
   let hoverCell = null;
   let selectedCell = null;
-  let mode = 'heatmap';   // 'heatmap' | 'distribution'（distribution 仅在传入 distribution 时可用）
+  let mode = 'heatmap';   // 'heatmap' | 'distribution' | 'a2atail'（后二者仅在传入对应数据时可用）
   let distCanvas, distTip, distTipEl;
   let distCursor = null;  // distribution 图当前游标 step（跟随鼠标的竖线）
+  let a2aCanvas, a2aTip, a2aTipEl;
+  let a2aCursor = null;   // A2A Tail 图当前游标 step（默认落在 P99 最差的 step）
+  let a2aHoverRank = null; // 掉队者条中鼠标悬停的 rank（高亮 + 加粗数值）
   // 自定义气泡定位：用气泡真实尺寸钳制在容器内，避免溢出屏幕
   function showDistTip(event, html) {
     if (!distTipEl) return;
@@ -171,13 +174,13 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
     if (!distribution || !distCanvas || panel.hidden) return;
     const wrap = panel.querySelector('[data-moe-dist-wrap]');
     if (!wrap || wrap.hidden) return;
-    const bounds = wrap.getBoundingClientRect();
+    const bounds = distCanvas.parentElement.getBoundingClientRect();
     const width = Math.max(460, bounds.width - 4);
     const height = Math.max(200, bounds.height - 4);
     const ctx = resizeCanvas(distCanvas, width, height);
     const { steps, experts, series, hot = [], dead = [], collapseStep } = distribution;
     const n = steps.length;
-    const padL = 44, padR = 12, padT = 14, padB = 26;
+    const padL = 44, padR = 12, padT = 30, padB = 26;
     const plotW = width - padL - padR, plotH = height - padT - padB;
     const x0 = steps[0], x1 = steps[n - 1];
     const mapX = s => padL + (s - x0) / (x1 - x0 || 1) * plotW;
@@ -232,7 +235,7 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
     const rect = distCanvas.getBoundingClientRect();
     const { steps, experts, series, hot = [], dead = [] } = distribution;
     const n = steps.length;
-    const padL = 44, padR = 12, padT = 14, padB = 26;
+    const padL = 44, padR = 12, padT = 30, padB = 26;
     const plotW = rect.width - padL - padR, plotH = rect.height - padT - padB;
     const x = event.clientX - rect.left, y = event.clientY - rect.top;
     if (x < padL || x > rect.width - padR || y < padT || y > padT + plotH) { distCursor = null; drawDistribution(); if (distTipEl) distTipEl.hidden = true; return; }
@@ -249,6 +252,165 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
       return `<span${hl}><i style="background:${distColor(e, hot, dead)}"></i>E${e} ${(series[e][i] * 100).toFixed(1)}%</span>`;
     }).join('');
     showDistTip(event, `<b>Step ${steps[i]} · ${experts} 专家 token 占比</b><div class="opv-dist-tip-grid">${rows}</div>`);
+  }
+
+  function showA2ATip(event, html) {
+    if (!a2aTipEl) return;
+    a2aTipEl.innerHTML = html;
+    a2aTipEl.hidden = false;
+    const pb = a2aTipEl.parentElement.getBoundingClientRect();
+    const tw = a2aTipEl.offsetWidth, th = a2aTipEl.offsetHeight;
+    let x = event.clientX - pb.left + 14, y = event.clientY - pb.top + 14;
+    if (x + tw > pb.width - 4) x = event.clientX - pb.left - tw - 14;
+    if (x < 4) x = 4;
+    if (y + th > pb.height - 4) y = pb.height - th - 4;
+    if (y < 4) y = 4;
+    a2aTipEl.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  // A2A Tail 布局：上=分位带时序（P50 线 + P50–P99 阴影带），下=游标 step 的逐 rank 掉队者条。
+  const A2A_PAD = { L: 46, R: 12, T: 30, B: 20, gap: 46 };  // 上下两图间距（含轴标签 + 16px 额外留白）
+  function a2aLayout(w, h) {
+    const { L, R, T, B, gap } = A2A_PAD;
+    const plotW = w - L - R;
+    const totalH = h - T - B - gap;
+    const bandH = Math.max(70, totalH * 0.6);
+    const barsH = Math.max(52, totalH - bandH);
+    const bandTop = T, bandBot = T + bandH;
+    const barsTop = bandBot + gap, barsBot = barsTop + barsH;
+    return { L, R, plotW, bandTop, bandBot, barsTop, barsBot, barsH };
+  }
+  function drawA2ATail() {
+    if (!a2aTail || !a2aCanvas || panel.hidden) return;
+    const wrap = panel.querySelector('[data-moe-a2a-wrap]');
+    if (!wrap || wrap.hidden) return;
+    const bounds = a2aCanvas.parentElement.getBoundingClientRect();
+    const width = Math.max(460, bounds.width - 4);
+    const height = Math.max(200, bounds.height - 4);
+    const ctx = resizeCanvas(a2aCanvas, width, height);
+    const { steps, p50, p95, p99, iter, collapseStep, ranks, hotRanks, blackHole, lat, ratioWarn, ratioAlert } = a2aTail;
+    const n = steps.length;
+    if (a2aCursor == null) a2aCursor = a2aTail.worstStep;
+    const ci = Math.max(0, steps.indexOf(a2aCursor));
+    const { L, plotW, bandTop, bandBot, barsTop, barsBot, barsH } = a2aLayout(width, height);
+    const x0 = steps[0], x1 = steps[n - 1];
+    const mapX = s => L + (s - x0) / (x1 - x0 || 1) * plotW;
+    const yMax = Math.max(...p99) * 1.08 || 1;
+    const mapY = v => bandTop + (1 - v / yMax) * (bandBot - bandTop);
+    const danger = readCssVar('--danger', '#ef4444');
+    const warn = readCssVar('--warning', '#d6aa35');
+    const ok = readCssVar('--success', '#3f9e6b');
+    const muted = readCssVar('--foreground-muted', 'rgba(255,255,255,0.45)');
+    ctx.clearRect(0, 0, width, height);
+
+
+    // y 网格 + 刻度（µs）
+    ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    [0, 0.5, 1].forEach(t => {
+      const v = yMax * t, y = mapY(v);
+      ctx.strokeStyle = readCssVar('--border-subtle', 'rgba(255,255,255,0.08)');
+      ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + plotW, y); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = muted; ctx.fillText(String(Math.round(v)), L - 6, y);
+    });
+
+    // P50–P99 阴影带
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const x = mapX(steps[i]), y = mapY(p99[i]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+    for (let i = n - 1; i >= 0; i--) ctx.lineTo(mapX(steps[i]), mapY(p50[i]));
+    ctx.closePath();
+    ctx.fillStyle = danger; ctx.globalAlpha = 0.14; ctx.fill(); ctx.globalAlpha = 1;
+    // P99 上沿
+    ctx.strokeStyle = danger; ctx.lineWidth = 1;
+    ctx.beginPath(); for (let i = 0; i < n; i++) { const x = mapX(steps[i]), y = mapY(p99[i]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+    // P50 中线
+    ctx.strokeStyle = readCssVar('--foreground-secondary', 'rgba(255,255,255,0.62)'); ctx.lineWidth = 1.3;
+    ctx.beginPath(); for (let i = 0; i < n; i++) { const x = mapX(steps[i]), y = mapY(p50[i]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+
+    // 坍缩竖线
+    if (collapseStep != null) {
+      const cx = mapX(collapseStep);
+      ctx.strokeStyle = danger; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(cx, bandTop); ctx.lineTo(cx, bandBot); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = danger; ctx.font = '700 10px PingFang SC, sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('路由坍缩', cx + 4, bandTop + 2);
+    }
+    // x 刻度
+    ctx.fillStyle = muted; ctx.font = '10px JetBrains Mono, monospace'; ctx.textBaseline = 'top';
+    [x0, Math.round((x0 + x1) / 2), x1].forEach((s, idx) => { ctx.textAlign = idx === 0 ? 'left' : idx === 2 ? 'right' : 'center'; ctx.fillText(String(s), mapX(s), bandBot + 4); });
+    // 游标竖线
+    const cx = mapX(a2aCursor);
+    ctx.strokeStyle = readCssVar('--foreground-secondary', 'rgba(255,255,255,0.6)'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, bandTop); ctx.lineTo(cx, bandBot); ctx.stroke();
+
+    // ===== 掉队者条（当前游标 step 的逐 rank 延迟）=====
+    const row = lat[ci];
+    const barMax = Math.max(...row, p99[ci]) * 1.08 || 1;
+    const slot = plotW / ranks;
+    const bw = Math.min(46, slot * 0.62);
+    const p50v = p50[ci] || 1;
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.fillStyle = readCssVar('--foreground-secondary', 'rgba(255,255,255,0.62)'); ctx.font = '700 10px PingFang SC, sans-serif';
+    ctx.fillText(`Step ${steps[ci]} · 各 rank A2A 延迟`, L, barsTop - 8);
+    // P99 参考线
+    const p99y = barsBot - (p99[ci] / barMax) * barsH;
+    ctx.strokeStyle = danger; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(L, p99y); ctx.lineTo(L + plotW, p99y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = danger; ctx.font = '9px JetBrains Mono, monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('P99', L + 2, p99y - 1);
+    // 基线
+    ctx.strokeStyle = readCssVar('--border-default', 'rgba(255,255,255,0.12)'); ctx.beginPath(); ctx.moveTo(L, barsBot); ctx.lineTo(L + plotW, barsBot); ctx.stroke();
+    const primary = readCssVar('--primary', '#4369ef');
+    const fg = readCssVar('--foreground', '#fff');
+    const fgSec = readCssVar('--foreground-secondary', 'rgba(255,255,255,0.62)');
+    for (let r = 0; r < ranks; r++) {
+      const cxr = L + slot * (r + 0.5);
+      const v = row[r], h = (v / barMax) * barsH, y = barsBot - h;
+      const isBH = (r === blackHole && steps[ci] >= collapseStep);
+      const lr = v / p50v;
+      const isHover = r === a2aHoverRank;
+      const col = isBH ? readCssVar('--foreground-muted', '#5b6473') : lr >= ratioAlert ? danger : lr >= ratioWarn ? warn : ok;
+      ctx.fillStyle = col; ctx.globalAlpha = isBH ? 0.35 : isHover ? 1 : 0.85;
+      ctx.fillRect(cxr - bw / 2, y, bw, h); ctx.globalAlpha = 1;
+      if (isBH || isHover) { ctx.strokeStyle = isHover ? primary : col; ctx.lineWidth = isHover ? 1.5 : 1; ctx.strokeRect(cxr - bw / 2, y, bw, h); }
+      // 柱顶数值（µs）：随游标 step / 悬停实时更新
+      ctx.fillStyle = isHover ? fg : fgSec;
+      ctx.font = (isHover ? '700 ' : '') + '9px JetBrains Mono, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(String(Math.round(v)), cxr, y - 2);
+      // rank 轴标签
+      ctx.fillStyle = isHover ? fg : muted;
+      ctx.font = '9px JetBrains Mono, monospace'; ctx.textBaseline = 'top';
+      ctx.fillText('EP' + r + (isBH ? '⚠' : ''), cxr, barsBot + 3);
+    }
+  }
+  function onA2AMove(event) {
+    if (!a2aTail) return;
+    const rect = a2aCanvas.getBoundingClientRect();
+    const { steps, p50, p95, p99, iter, lat, ranks, blackHole, collapseStep, hotRanks, ratioWarn, ratioAlert } = a2aTail;
+    const n = steps.length;
+    const { L, plotW, bandTop, bandBot, barsTop, barsBot } = a2aLayout(rect.width, rect.height);
+    const x = event.clientX - rect.left, y = event.clientY - rect.top;
+    if (x < L || x > L + plotW) { if (a2aHoverRank != null) { a2aHoverRank = null; drawA2ATail(); } if (a2aTipEl) a2aTipEl.hidden = true; return; }
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - L) / plotW * (n - 1))));
+    if (y >= bandTop && y <= bandBot) {
+      a2aCursor = steps[i]; a2aHoverRank = null; drawA2ATail();
+      const ratio = p50[i] ? p99[i] / p50[i] : 1, bubble = iter[i] ? (p99[i] - p50[i]) / iter[i] : 0;
+      const rcol = ratio >= ratioAlert ? readCssVar('--danger', '#ef4444') : ratio >= ratioWarn ? readCssVar('--warning', '#d6aa35') : readCssVar('--success', '#3f9e6b');
+      const kv = (k, v) => `<span style="display:flex;justify-content:space-between;gap:18px"><span>${k}</span><span>${v}</span></span>`;
+      showA2ATip(event, `<b>Step ${steps[i]}</b>`
+        + kv('尾比 P99/P50', `<b style="color:${rcol}">${ratio.toFixed(2)}×</b>`)
+        + kv('气泡', `<b>${(bubble * 100).toFixed(0)}%</b>`)
+        + kv('P50', `<b>${p50[i]} µs</b>`)
+        + kv('P95', `<b>${p95[i]} µs</b>`));
+    } else if (y >= barsTop && y <= barsBot) {
+      const slot = plotW / ranks, r = Math.max(0, Math.min(ranks - 1, Math.floor((x - L) / slot)));
+      if (r !== a2aHoverRank) { a2aHoverRank = r; drawA2ATail(); }
+      const ci = Math.max(0, steps.indexOf(a2aCursor)), v = lat[ci][r];
+      const isBH = (r === blackHole && steps[ci] >= collapseStep), lr = v / (p50[ci] || 1);
+      const state = isBH ? '0 token · 空等热点 rank（症状非根因）' : lr >= ratioAlert ? '掉队 alert' : lr >= ratioWarn ? '偏慢 warn' : '正常';
+      showA2ATip(event, `<b>EP${r} · Step ${steps[ci]}</b><span>A2A 延迟 ${v} µs · 相对 P50 ${lr.toFixed(2)}×</span><span>${state}${hotRanks.includes(r) ? ' · 热点专家宿主' : ''}</span>`);
+    } else { if (a2aHoverRank != null) { a2aHoverRank = null; drawA2ATail(); } if (a2aTipEl) a2aTipEl.hidden = true; }
   }
 
   function metric() {
@@ -364,13 +526,28 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
           <canvas class="opv-moe-heatmap" aria-label="MoE expert load heatmap"></canvas>
           <aside class="opv-analysis-detail"></aside>
         </div>
-        ${distribution ? '<div class="opv-moe-dist-wrap" data-moe-dist-wrap hidden><canvas class="opv-moe-dist" aria-label="专家 token 占比面积堆叠图"></canvas></div>' : ''}
+        ${distribution ? `<div class="opv-moe-dist-wrap" data-moe-dist-wrap hidden>
+          <div class="opv-chart-body">
+            <canvas class="opv-moe-dist" aria-label="专家 token 占比面积堆叠图"></canvas>
+            <div class="opv-chart-head"><span class="opv-chart-title">${esc(distribution.title || 'Distribution')}</span></div>
+          </div>
+        </div>` : ''}
+        ${a2aTail ? `<div class="opv-moe-dist-wrap" data-moe-a2a-wrap hidden>
+          <div class="opv-chart-body">
+            <canvas class="opv-moe-dist" aria-label="A2A 尾延迟分位带 + 掉队者"></canvas>
+            <div class="opv-chart-head">
+              <span class="opv-chart-title">${esc(a2aTail.title || 'A2A Tail')}</span>
+              ${a2aTail.help ? '<button class="opv-chart-help" type="button" aria-label="图表说明" title="图表说明">?</button><div class="opv-chart-pop" hidden>' + a2aTail.help + '</div>' : ''}
+            </div>
+          </div>
+        </div>` : ''}
       </div>`;
     canvas = panel.querySelector('.opv-moe-heatmap');
     detail = panel.querySelector('.opv-analysis-detail');
     tooltip = makeTooltip(panel);
     const heatWrap = panel.querySelector('[data-moe-heat-wrap]');
     const distWrap = panel.querySelector('[data-moe-dist-wrap]');
+    const a2aWrap = panel.querySelector('[data-moe-a2a-wrap]');
     const metricTabs = panel.querySelector('[data-metric-tabs]');
     const chips = [];
     viewModel.metricOptions.forEach(item => {
@@ -383,6 +560,7 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
         chips.forEach(c => c.classList.toggle('is-active', c === btn));
         if (heatWrap) heatWrap.hidden = false;
         if (distWrap) distWrap.hidden = true;
+        if (a2aWrap) a2aWrap.hidden = true;
         draw();
       });
       if (item.id === metricId && mode === 'heatmap') btn.classList.add('is-active');
@@ -398,11 +576,12 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
         chips.forEach(c => c.classList.toggle('is-active', c === dbtn));
         if (heatWrap) heatWrap.hidden = true;
         if (distWrap) distWrap.hidden = false;
+        if (a2aWrap) a2aWrap.hidden = true;
         drawDistribution();
       });
       if (mode === 'distribution') dbtn.classList.add('is-active');
       metricTabs.appendChild(dbtn); chips.push(dbtn);
-      distCanvas = panel.querySelector('.opv-moe-dist');
+      distCanvas = panel.querySelector('[data-moe-dist-wrap] .opv-moe-dist');
       distTip = makeTooltip(distWrap);
       distTipEl = distWrap.querySelector('.opv-analysis-tooltip');
       if (distTipEl) distTipEl.classList.add('opv-dist-tip');
@@ -410,6 +589,58 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
       distCanvas.addEventListener('pointerleave', () => { distCursor = null; drawDistribution(); if (distTipEl) distTipEl.hidden = true; });
       // 还原当前模式可见性（setViewModel 重挂载后保持在 Distribution）
       if (mode === 'distribution') { if (heatWrap) heatWrap.hidden = true; distWrap.hidden = false; }
+    }
+    if (a2aTail) {
+      const abtn = document.createElement('button');
+      abtn.type = 'button';
+      abtn.className = 'opv-analysis-chip';
+      abtn.textContent = 'A2A Tail';
+      abtn.addEventListener('click', () => {
+        mode = 'a2atail';
+        chips.forEach(c => c.classList.toggle('is-active', c === abtn));
+        if (heatWrap) heatWrap.hidden = true;
+        if (distWrap) distWrap.hidden = true;
+        if (a2aWrap) a2aWrap.hidden = false;
+        drawA2ATail();
+      });
+      if (mode === 'a2atail') abtn.classList.add('is-active');
+      metricTabs.appendChild(abtn); chips.push(abtn);
+      a2aCanvas = panel.querySelector('[data-moe-a2a-wrap] .opv-moe-dist');
+      a2aTip = makeTooltip(a2aWrap);
+      a2aTipEl = a2aWrap.querySelector('.opv-analysis-tooltip');
+      if (a2aTipEl) a2aTipEl.classList.add('opv-dist-tip');
+      a2aCanvas.addEventListener('pointermove', onA2AMove);
+      a2aCanvas.addEventListener('pointerleave', () => { if (a2aTipEl) a2aTipEl.hidden = true; if (a2aHoverRank != null) { a2aHoverRank = null; drawA2ATail(); } });
+      // 问号说明气泡：悬停/点击显示；fixed 定位并钳制在视口内（不溢出屏幕、无滚动条）
+      const a2aHelp = a2aWrap.querySelector('.opv-chart-help');
+      const a2aPop = a2aWrap.querySelector('.opv-chart-pop');
+      if (a2aHelp && a2aPop) {
+        // portal 到 body：脱离抽屉的堆叠上下文，才能压过 z-index:50 的 play 悬浮栏
+        document.querySelectorAll('body > .opv-chart-pop').forEach(n => n.remove());
+        document.body.appendChild(a2aPop);
+        let hideTimer = null;
+        const place = () => {
+          a2aPop.style.left = '0px'; a2aPop.style.top = '0px';   // 先落位再量真实尺寸
+          const r = a2aHelp.getBoundingClientRect();
+          const pw = a2aPop.offsetWidth, ph = a2aPop.offsetHeight;
+          let left = r.left;
+          if (left + pw > window.innerWidth - 8) left = window.innerWidth - 8 - pw;
+          if (left < 8) left = 8;
+          let top = r.bottom + 6;
+          if (top + ph > window.innerHeight - 8) top = r.top - 6 - ph;  // 下方放不下 → 向上翻
+          if (top < 8) top = 8;
+          a2aPop.style.left = left + 'px'; a2aPop.style.top = top + 'px';
+        };
+        const open = () => { clearTimeout(hideTimer); a2aPop.hidden = false; place(); };
+        const scheduleHide = () => { hideTimer = setTimeout(() => { a2aPop.hidden = true; }, 140); };
+        a2aHelp.addEventListener('mouseenter', open);
+        a2aHelp.addEventListener('mouseleave', scheduleHide);
+        a2aPop.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+        a2aPop.addEventListener('mouseleave', scheduleHide);
+        a2aHelp.addEventListener('click', event => { event.stopPropagation(); a2aPop.hidden ? open() : (a2aPop.hidden = true); });
+      }
+      // 还原当前模式可见性（setViewModel 重挂载后保持在 A2A Tail）
+      if (mode === 'a2atail') { if (heatWrap) heatWrap.hidden = true; if (distWrap) distWrap.hidden = true; a2aWrap.hidden = false; }
     }
     canvas.addEventListener('pointermove', event => {
       hoverCell = cellAt(event);
@@ -441,7 +672,7 @@ export function createMoeLoadView({ panel, viewModel, onSelect, distribution }) 
     });
   }
 
-  function renderByMode() { mode === 'distribution' ? drawDistribution() : draw(); }
+  function renderByMode() { mode === 'distribution' ? drawDistribution() : mode === 'a2atail' ? drawA2ATail() : draw(); }
   function setViewModel(next) { viewModel = next; selectedCell = null; hoverCell = null; mount(); renderByMode(); }
 
   return { panel, mount, render: renderByMode, resize: renderByMode, setViewModel };
