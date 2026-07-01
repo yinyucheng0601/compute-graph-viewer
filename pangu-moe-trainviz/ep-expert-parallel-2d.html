@@ -1,0 +1,1899 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pangu Pro MoE 72BA16B · MoE Expert Layer</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css" />
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css" />
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css" />
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css" />
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css" />
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--ide-frame-page-bg);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+      letter-spacing: 0;
+    }
+
+    .pto-ide-frame {
+      width: 100vw;
+      height: 100vh;
+      aspect-ratio: auto;
+      border-radius: 0;
+      box-shadow: none;
+      --ide-gradient-left-alpha: .24;
+      --ide-gradient-right-alpha: .22;
+      --ide-gradient-center-alpha: .11;
+      --ide-gradient-lower-alpha: .08;
+      --ide-aura-left-alpha: .30;
+      --ide-aura-right-alpha: .24;
+      --ide-aura-center-alpha: .12;
+      --ide-aura-lower-alpha: .10;
+      --ide-aura-bottom-alpha: .10;
+    }
+
+    .pto-ide-frame__host-chip span {
+      max-width: 360px;
+      overflow: hidden;
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pto-ide-frame__host-chip b { color: var(--accent); }
+    [data-ide-pane="editor-preview"] > .pto-ide-frame__pane-header { display: none; }
+    [data-ide-pane="analysis-dock"] > .pto-ide-frame__pane-header { gap: 8px; }
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-pane="inspector"] { display: none; }
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"] > [data-ide-pane="editor-preview"] {
+      flex: 1 1 0% !important;
+      width: auto !important;
+    }
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"] > .pto-workbench-shell__split-gutter:has(+ [data-ide-pane="inspector"]) { display: none; }
+    .pto-ide-frame[data-analysis-open="false"] [data-ide-pane="analysis-dock"] { display: none; }
+    .pto-ide-frame[data-analysis-open="false"] [data-ide-split="ep-vertical"] > [data-ide-pane="stage-row"] {
+      flex: 1 1 100% !important;
+      height: 100% !important;
+    }
+    .pto-ide-frame[data-analysis-open="false"] [data-ide-split="ep-vertical"] > [data-split-direction="vertical"].pto-workbench-shell__split-gutter { display: none; }
+
+    .ep-icon-btn {
+      display: inline-grid;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-muted);
+      cursor: pointer;
+    }
+
+    .ep-icon-btn:hover { background: var(--state-hover); color: var(--foreground-secondary); }
+    .ep-icon-btn.is-active {
+      border-color: var(--ide-frame-control-border);
+      background: var(--ide-frame-control-bg);
+      color: var(--foreground);
+    }
+    .ep-icon-btn svg,
+    .ep-rail-icon,
+    .ep-window-icon {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .ep-lang-toggle {
+      min-width: 38px;
+      height: 28px;
+      padding: 0 9px;
+      border: 1px solid var(--ide-frame-control-border);
+      border-radius: var(--radius-sm);
+      background: var(--ide-frame-control-bg);
+      color: var(--foreground);
+      cursor: pointer;
+      font: 800 11px / 1 var(--font-sans);
+      letter-spacing: 0;
+    }
+
+    .ep-lang-toggle:hover { background: var(--state-hover); }
+
+    .ep-top-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      color: var(--foreground-muted);
+      font: var(--ide-frame-meta-font);
+      white-space: nowrap;
+    }
+
+    .ep-top-meta strong { color: var(--foreground); font-weight: 700; }
+
+    .ep-popup {
+      position: fixed;
+      z-index: 160;
+      top: 52px;
+      right: 14px;
+      width: 360px;
+      max-height: calc(100vh - 96px);
+      overflow: auto;
+      padding: 14px;
+      display: grid;
+      gap: 14px;
+      border: 1px solid var(--ide-frame-pane-border);
+      border-radius: var(--radius-md);
+      background: var(--ide-frame-pane-fill);
+      box-shadow: var(--ide-frame-pane-shadow);
+      backdrop-filter: var(--ide-frame-pane-backdrop-filter);
+      -webkit-backdrop-filter: var(--ide-frame-pane-backdrop-filter);
+    }
+    .ep-popup[hidden] { display: none; }
+    .ep-popup__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .ep-popup__title { color: var(--foreground); font: var(--ide-frame-title-font); }
+    .ep-popup__close {
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-muted);
+      cursor: pointer;
+      font: var(--text-label);
+      padding: 3px 7px;
+    }
+    .ep-popup__close:hover { background: var(--state-hover); color: var(--foreground); }
+
+    .ep-explorer {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      padding: 10px 8px 12px;
+      font: 600 12px / 1.2 var(--font-sans);
+    }
+    .ep-explorer-root {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      padding: 0 7px;
+      border-radius: var(--radius-sm);
+      color: var(--foreground);
+      font: 800 11px / 1 var(--font-sans);
+      letter-spacing: .04em;
+    }
+    .ep-tree { display: flex; flex-direction: column; gap: 1px; }
+    .ep-tree-row {
+      --depth: 0;
+      min-width: 0;
+      min-height: 25px;
+      display: grid;
+      grid-template-columns: 12px 16px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+      padding: 0 7px 0 calc(7px + (var(--depth) * 14px));
+      border-radius: var(--radius-sm);
+      color: var(--foreground-secondary);
+    }
+    .ep-tree-row.is-active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--foreground); }
+    .ep-tree-row.is-muted { color: var(--foreground-muted); }
+    .ep-tree-caret {
+      width: 0;
+      height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 5px solid currentColor;
+      opacity: .72;
+      transform: rotate(90deg);
+    }
+    .ep-tree-spacer { width: 12px; }
+    .ep-tree-icon { position: relative; width: 16px; height: 16px; color: var(--foreground-muted); }
+    .ep-tree-icon--folder::before {
+      position: absolute;
+      left: 1px;
+      top: 5px;
+      width: 14px;
+      height: 9px;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      content: "";
+    }
+    .ep-tree-icon--folder::after {
+      position: absolute;
+      left: 2px;
+      top: 3px;
+      width: 6px;
+      height: 4px;
+      border: 1.5px solid currentColor;
+      border-bottom: 0;
+      border-radius: 2px 2px 0 0;
+      content: "";
+    }
+    .ep-tree-icon--file::before {
+      position: absolute;
+      left: 3px;
+      top: 2px;
+      width: 10px;
+      height: 13px;
+      border: 1.5px solid currentColor;
+      border-radius: 2px;
+      content: "";
+    }
+    .ep-tree-icon--file::after {
+      position: absolute;
+      right: 3px;
+      top: 2px;
+      width: 4px;
+      height: 4px;
+      border-left: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      background: var(--ide-frame-pane-bg);
+      content: "";
+    }
+    .ep-tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ep-tree-badge { color: var(--foreground-muted); font: 700 10px / 1 var(--font-mono); }
+
+    .ep-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 68% 18%, color-mix(in srgb, #4f6df6 10%, transparent), transparent 34%),
+        color-mix(in srgb, var(--ide-frame-pane-bg) 35%, transparent);
+    }
+
+    .ep-side-scroll {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+      padding: 14px;
+      cursor: crosshair;
+    }
+
+    .ep-side-view-wrap {
+      min-width: 0;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+    }
+
+    .ep-side-view {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      transform: scale(var(--ep-stage-scale, 1));
+      transform-origin: center center;
+      transition: transform 120ms ease;
+    }
+
+    .ep-side-view text {
+      fill: color-mix(in srgb, var(--foreground) 72%, transparent);
+      font-family: var(--font-sans);
+      letter-spacing: 0;
+    }
+    .ep-side-view .mono { font-family: var(--font-mono); }
+    .ep-side-view .lane-label { fill: color-mix(in srgb, var(--foreground) 76%, transparent); font-size: 15px; font-weight: 800; }
+    .ep-side-view .tiny-label { fill: color-mix(in srgb, var(--foreground-muted) 88%, transparent); font-size: 10px; font-weight: 700; }
+    .ep-side-view .band-label { fill: color-mix(in srgb, var(--foreground-muted) 82%, transparent); font-size: 11px; font-weight: 700; }
+    .ep-side-view .rank-label { fill: color-mix(in srgb, var(--foreground-secondary) 80%, transparent); font-size: 10px; font-weight: 800; }
+    .ep-side-view [data-object] { cursor: pointer; }
+    .ep-side-view [data-object]:hover { filter: drop-shadow(0 0 7px color-mix(in srgb, #4f6df6 50%, transparent)); }
+    .ep-side-view .layer-hit { fill: transparent; pointer-events: all; }
+    .ep-side-view [data-front-expert] { cursor: pointer; }
+    .ep-side-view .moe-overlay,
+    .ep-side-view .moe-route,
+    .ep-side-view text { pointer-events: none; }
+
+    .ep-stage-tools {
+      position: absolute;
+      z-index: 44;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .ep-stage-tools > * { pointer-events: auto; }
+    .ep-stage-toolbar,
+    .ep-layer-playback {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 13%, transparent);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 82%, transparent);
+      box-shadow: 0 10px 34px rgba(0, 0, 0, .18);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .ep-stage-btn {
+      min-width: 28px;
+      height: 28px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--foreground) 6%, transparent);
+      color: var(--foreground);
+      cursor: pointer;
+      font: 800 12px / 1 var(--font-sans);
+      padding: 0 9px;
+      white-space: nowrap;
+    }
+    .ep-stage-btn:hover { background: color-mix(in srgb, var(--foreground) 12%, transparent); }
+    .ep-stage-btn.is-active { background: #4f6df6; color: #fff; }
+    .ep-zoom-slider { width: 112px; height: 28px; margin: 0; accent-color: #4f6df6; cursor: pointer; }
+    .ep-zoom-value {
+      min-width: 40px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+    .ep-layer-readout {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground-secondary);
+      font: 700 11px / 1 var(--font-sans);
+    }
+    .ep-layer-readout b { color: var(--foreground); font-family: var(--font-mono); font-size: 10px; }
+
+    .ep-object-panel {
+      position: absolute;
+      z-index: 45;
+      top: 66px;
+      right: 12px;
+      width: 292px;
+      max-height: min(500px, calc(100% - 90px));
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 13%, transparent);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 86%, transparent);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, .18);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .ep-object-panel[hidden] { display: none; }
+    .ep-object-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .ep-object-panel__title { color: var(--foreground); font: var(--text-label); font-weight: 800; }
+    .ep-object-panel__group { margin-top: 9px; }
+    .ep-object-panel__label { margin: 0 0 5px; color: var(--foreground-muted); font: var(--text-label); }
+    .ep-object-panel__items { display: flex; flex-wrap: wrap; gap: 5px; }
+    .ep-chip-btn {
+      height: 25px;
+      padding: 0 8px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font: 700 11px / 1 var(--font-sans);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    .ep-chip-btn:hover { background: color-mix(in srgb, var(--foreground) 8%, transparent); color: var(--foreground); }
+    .ep-chip-btn.is-active { border-color: #4f6df6; background: #4f6df6; color: #fff; }
+
+    .ep-analysis-tabs {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-right: 8px;
+      flex: none;
+    }
+    .ep-analysis-tab {
+      height: 25px;
+      padding: 0 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font: 700 11px / 1 var(--font-sans);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    .ep-analysis-tab:hover { background: var(--state-hover); color: var(--foreground); }
+    .ep-analysis-tab.is-active { border-color: #4f6df6; background: #4f6df6; color: #fff; }
+    .ep-analysis-dock { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    .ep-analysis-view {
+      height: 100%;
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+    .ep-analysis-stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+      flex: none;
+    }
+    .ep-stat {
+      min-width: 0;
+      padding: 7px 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+    }
+    .ep-stat span {
+      display: block;
+      overflow: hidden;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ep-stat b {
+      display: block;
+      overflow: hidden;
+      margin-top: 3px;
+      color: var(--foreground);
+      font: var(--text-mono);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ep-grid-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+    .ep-heatmap-shell,
+    .ep-table-shell,
+    .ep-detail-card {
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 2.5%, transparent);
+    }
+    .ep-heatmap {
+      display: grid;
+      grid-template-columns: repeat(64, minmax(7px, 1fr));
+      grid-template-rows: repeat(48, 8px);
+      gap: 1px;
+      min-width: 640px;
+      padding: 9px;
+    }
+    .ep-heat-cell {
+      border: 0;
+      border-radius: 1px;
+      cursor: pointer;
+      min-width: 0;
+      min-height: 0;
+    }
+    .ep-heat-cell.is-selected { outline: 1px solid var(--foreground); outline-offset: 0; }
+    .ep-detail-card { padding: 10px; }
+    .ep-detail-title { margin: 0 0 8px; color: var(--foreground); font: var(--text-title-2); font-size: 13px; }
+    .ep-kv { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 6px 8px; font: var(--text-label); }
+    .ep-kv span { color: var(--foreground-muted); }
+    .ep-kv b { min-width: 0; overflow: hidden; color: var(--foreground); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .ep-table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .ep-table th,
+    .ep-table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--foreground-secondary);
+      font: 600 11px / 1.3 var(--font-sans);
+      text-align: left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    .ep-table th { color: var(--foreground-muted); background: color-mix(in srgb, var(--foreground) 5%, transparent); }
+    .ep-table tbody tr { cursor: pointer; }
+    .ep-table tbody tr:hover { background: color-mix(in srgb, #4f6df6 8%, transparent); }
+
+    .ep-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 6px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+      color: var(--foreground-secondary);
+      font: 700 10px / 1 var(--font-sans);
+      white-space: nowrap;
+    }
+    .ep-pill.ok { border-color: color-mix(in srgb, #16a34a 42%, transparent); color: #15803d; }
+    .ep-pill.warn { border-color: color-mix(in srgb, #f59e0b 48%, transparent); color: #b45309; }
+    .ep-pill.info { border-color: color-mix(in srgb, #4f6df6 44%, transparent); color: #3154d4; }
+
+    .ep-coverage-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      overflow: auto;
+    }
+    .ep-coverage-row {
+      min-width: 0;
+      min-height: 62px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: start;
+      padding: 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+      cursor: pointer;
+    }
+    .ep-coverage-row b { display: block; color: var(--foreground); font: var(--text-mono); }
+    .ep-coverage-row span { display: block; margin-top: 4px; color: var(--foreground-secondary); font: var(--text-label); line-height: 1.25; }
+
+    .ep-framework-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(170px, 1fr));
+      gap: 8px;
+      min-width: 760px;
+    }
+    .ep-framework-item {
+      min-height: 116px;
+      padding: 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+      cursor: pointer;
+    }
+    .ep-framework-item h3 { margin: 0; color: var(--foreground); font: var(--text-title-2); font-size: 13px; }
+    .ep-framework-item p { margin: 8px 0 0; color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.35; }
+
+    .ep-inspector-body {
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+      gap: 16px;
+      overflow: auto;
+      padding: 12px;
+    }
+    .ep-section-label {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .ep-note {
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.55;
+    }
+    .ep-note b { color: var(--foreground); }
+    .ep-legend { display: grid; gap: 6px; }
+    .ep-legend-row { display: flex; align-items: center; gap: 8px; color: var(--foreground-secondary); font: var(--text-body-sm); }
+    .ep-legend-dot { width: 10px; height: 10px; border-radius: 2px; background: var(--legend-color); flex: none; }
+    .ep-source-box {
+      display: grid;
+      gap: 6px;
+      padding: 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+    }
+    .ep-source-line {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 8px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+    .ep-source-line span:first-child { color: var(--foreground-muted); }
+    .ep-source-line span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .ep-status {
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--foreground-muted);
+      font: 600 12px / 1 var(--font-sans);
+    }
+    .ep-status__group { min-width: 0; display: flex; align-items: center; gap: 14px; }
+    .ep-status__left { flex: 1 1 auto; overflow: hidden; }
+    .ep-status__right { flex: 0 1 auto; justify-content: flex-end; overflow: hidden; }
+    .ep-status__item { min-width: 0; display: inline-flex; align-items: center; gap: 5px; color: var(--foreground-muted); white-space: nowrap; }
+    .ep-status__dynamic { overflow: hidden; text-overflow: ellipsis; }
+
+    @media (max-width: 980px) {
+      .pto-ide-frame__topbar-center { display: none; }
+      [data-ide-pane="inspector"],
+      [data-split-direction="horizontal"].pto-workbench-shell__split-gutter { display: none; }
+      [data-ide-split="standalone-main"] > [data-ide-pane="editor-preview"] { flex: 1 1 100% !important; width: 100% !important; }
+      .ep-analysis-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ep-grid-wrap { grid-template-columns: 1fr; }
+      .ep-detail-card { display: none; }
+      .ep-coverage-list { grid-template-columns: 1fr; }
+      .ep-stage-tools { top: 8px; right: 8px; }
+      .ep-zoom-slider,
+      .ep-zoom-value,
+      .ep-layer-readout { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <section class="pto-ide-frame" data-ide-frame data-host="standalone" data-cursor-dots="true" data-inspector-open="true" data-analysis-open="true" aria-label="Pangu Pro MoE Expert Layer">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+      <div class="pto-ide-frame__topbar-left">
+        <div class="pto-ide-frame__host-chip">
+          <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
+          <span id="hostTitle">Pangu Pro MoE 72BA16B · <b>MoE 专家层</b></span>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-center">
+        <div class="pto-ide-frame__workspace">
+          <div class="ep-top-meta">
+            <span id="topSource">arXiv 2505.21411v2</span>
+            <span><strong id="topModelFacts">64 routed experts · Top-8 · 4 shared</strong></span>
+            <span id="topLayerFacts">48 MoGE layers + 2 no-op slots</span>
+          </div>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-right">
+        <div class="pto-ide-frame__window-actions">
+          <button id="langToggle" class="ep-lang-toggle" type="button" title="Switch language" aria-label="Switch language">EN</button>
+          <button id="infoToggle" class="ep-icon-btn" type="button" aria-expanded="false" aria-controls="infoPanel" title="说明与图例" aria-label="说明与图例">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.5h.01"></path></svg>
+          </button>
+          <button id="themeToggle" class="ep-icon-btn" type="button" aria-pressed="true" title="切换主题" aria-label="切换主题">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6.5 6.5 0 0 0 7.8 8.8A8 8 0 1 1 12 3z"></path></svg>
+          </button>
+          <button id="analysisToggle" class="ep-icon-btn is-active" type="button" aria-expanded="true" title="隐藏底部分析面板" aria-label="隐藏底部分析面板">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect><path d="M4 14h16"></path></svg>
+          </button>
+          <button id="inspectorToggle" class="ep-icon-btn is-active" type="button" aria-expanded="true" title="隐藏 Inspector" aria-label="隐藏 Inspector">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect><path d="M14 4v16"></path></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle explorer" aria-controls="ep-explorer-pane" aria-expanded="true" aria-pressed="true" title="Explorer">
+          <svg class="pto-ide-frame__rail-icon ep-rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
+          <svg class="pto-ide-frame__rail-icon ep-rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Communication" title="Communication">
+          <svg class="pto-ide-frame__rail-icon ep-rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path><circle cx="7" cy="7" r="2"></circle><circle cx="17" cy="12" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Terminal" title="Terminal">
+          <svg class="pto-ide-frame__rail-icon ep-rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
+        </button>
+      </nav>
+
+      <div class="pto-ide-frame__workarea">
+        <div class="pto-ide-frame__split" data-ide-split="ep-vertical" data-split-direction="vertical" data-sizes="66,34" data-min-size="330,190">
+          <section class="pto-ide-frame__pane pto-ide-frame__pane--stack" data-ide-pane="stage-row">
+            <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="18,56,26" data-pixel-sizes="280" data-min-size="220,440,260">
+              <aside id="ep-explorer-pane" class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer">
+                <header class="pto-ide-frame__pane-header">
+                  <span class="pto-ide-frame__pane-title">资源管理器</span>
+                  <span class="pto-ide-frame__pane-meta">PANGU</span>
+                </header>
+                <div class="pto-ide-frame__pane-body ep-explorer">
+                  <div class="ep-explorer-root">PANGU-MOE-TRAINVIZ</div>
+                  <div class="ep-tree" aria-label="Pangu MoE files">
+                    <div class="ep-tree-row" style="--depth:0"><span class="ep-tree-caret"></span><span class="ep-tree-icon ep-tree-icon--folder"></span><span class="ep-tree-name">paper-source</span></div>
+                    <div class="ep-tree-row" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">arxiv-2505.21411v2</span><span class="ep-tree-badge">SRC</span></div>
+                    <div class="ep-tree-row" style="--depth:0"><span class="ep-tree-caret"></span><span class="ep-tree-icon ep-tree-icon--folder"></span><span class="ep-tree-name">visual-data</span></div>
+                    <div class="ep-tree-row is-active" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">moe-expert-layer-2d.html</span><span class="ep-tree-badge">HTML</span></div>
+                    <div class="ep-tree-row" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">SPEC-moe-expert-layer-2d.md</span><span class="ep-tree-badge">MD</span></div>
+                    <div class="ep-tree-row" style="--depth:0"><span class="ep-tree-caret"></span><span class="ep-tree-icon ep-tree-icon--folder"></span><span class="ep-tree-name">moe-objects</span></div>
+                    <div class="ep-tree-row" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">router-top8-groups</span><span class="ep-tree-badge">MOE</span></div>
+                    <div class="ep-tree-row" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">expert-pool-64</span><span class="ep-tree-badge">MOE</span></div>
+                    <div class="ep-tree-row" style="--depth:1"><span class="ep-tree-spacer"></span><span class="ep-tree-icon ep-tree-icon--file"></span><span class="ep-tree-name">dispatch-combine</span><span class="ep-tree-badge">MOE</span></div>
+                  </div>
+                </div>
+              </aside>
+
+              <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
+                <div class="pto-ide-frame__pane-body ep-stage">
+                  <div class="ep-side-scroll" id="stageSurface">
+                    <div class="ep-side-view-wrap">
+                      <svg id="sideView" class="ep-side-view" viewBox="0 0 1600 900" role="img" aria-label="Pangu Pro MoE 72BA16B MoE side view"></svg>
+                    </div>
+                  </div>
+
+                  <div class="ep-stage-tools" aria-label="side-view tools">
+                    <div class="ep-stage-toolbar">
+                      <button id="zoomOut" class="ep-stage-btn" type="button" title="缩小" aria-label="缩小">-</button>
+                      <input id="zoomSlider" class="ep-zoom-slider" type="range" min="80" max="145" value="100" step="1" aria-label="侧视图缩放" />
+                      <button id="zoomIn" class="ep-stage-btn" type="button" title="放大" aria-label="放大">+</button>
+                      <button id="zoomReset" class="ep-stage-btn" type="button" title="重置视图" aria-label="重置视图">↺</button>
+                      <output id="zoomValue" class="ep-zoom-value">100%</output>
+                    </div>
+                    <div class="ep-layer-playback">
+                      <div class="ep-layer-readout"><span>Layer</span><b id="layerReadout">L18</b></div>
+                      <button id="layerBack" class="ep-stage-btn" type="button" title="上一层" aria-label="上一层">‹</button>
+                      <button id="layerFwd" class="ep-stage-btn" type="button" title="下一层" aria-label="下一层">›</button>
+                      <button id="objectToggle" class="ep-stage-btn" type="button" aria-expanded="false" aria-controls="objectPanel" title="对象聚焦" aria-label="对象聚焦">☷</button>
+                    </div>
+                  </div>
+
+                  <div class="ep-object-panel" id="objectPanel" hidden>
+                    <div class="ep-object-panel__head">
+                      <span class="ep-object-panel__title">对象聚焦</span>
+                      <button class="ep-chip-btn is-active" type="button" data-focus="all">All</button>
+                    </div>
+                    <div class="ep-object-panel__group">
+                      <div class="ep-object-panel__label">Operators</div>
+                      <div class="ep-object-panel__items">
+                        <button class="ep-chip-btn" type="button" data-focus="router">Router</button>
+                        <button class="ep-chip-btn" type="button" data-focus="dispatch">Dispatch</button>
+                        <button class="ep-chip-btn" type="button" data-focus="experts">Expert Pool</button>
+                        <button class="ep-chip-btn" type="button" data-focus="combine">Combine</button>
+                      </div>
+                    </div>
+                    <div class="ep-object-panel__group">
+                      <div class="ep-object-panel__label">MoE data</div>
+                      <div class="ep-object-panel__items">
+                        <button class="ep-chip-btn" type="button" data-focus="tokens">Token route</button>
+                        <button class="ep-chip-btn" type="button" data-focus="shared">Shared experts</button>
+                        <button class="ep-chip-btn" type="button" data-focus="groups">8 groups</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <aside id="inspectPane" class="pto-ide-frame__pane" data-ide-pane="inspector">
+                <header class="pto-ide-frame__pane-header">
+                  <span class="pto-ide-frame__pane-title">Inspector</span>
+                  <span class="pto-ide-frame__pane-meta" id="inspectorKind">layer</span>
+                </header>
+                <div class="pto-ide-frame__pane-body ep-inspector-body">
+                  <div>
+                    <div class="ep-section-label" id="selectedObjectLabel">Selected Object</div>
+                    <div class="ep-source-box" id="inspectorKv"></div>
+                  </div>
+                  <div>
+                    <div class="ep-section-label" id="legendLabel">Legend</div>
+                    <div class="ep-legend">
+                      <div class="ep-legend-row"><span class="ep-legend-dot" style="--legend-color:#7fcbd3"></span><span id="legendMla">Attention / MLA lane</span></div>
+                      <div class="ep-legend-row"><span class="ep-legend-dot" style="--legend-color:#b99ae7"></span><span id="legendRouter">Router, dispatch, combine</span></div>
+                      <div class="ep-legend-row"><span class="ep-legend-dot" style="--legend-color:#ead66f"></span><span id="legendExperts">64 routed experts and 4 shared experts</span></div>
+                      <div class="ep-legend-row"><span class="ep-legend-dot" style="--legend-color:#4f6df6"></span><span id="legendRoute">Forward hidden-state route</span></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="ep-section-label" id="sourceFidelityLabel">Source Fidelity</div>
+                    <div class="ep-source-box" id="sourceBox"></div>
+                  </div>
+                  <div>
+                    <div class="ep-section-label" id="coverageGateLabel">Coverage Gate</div>
+                    <div class="ep-source-box" id="coverageMini"></div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="pto-ide-frame__pane" data-ide-pane="analysis-dock">
+            <header class="pto-ide-frame__pane-header">
+              <div class="ep-analysis-tabs" id="analysisTabs"></div>
+              <span class="pto-ide-frame__pane-title" id="analysisTitle">Expert coverage</span>
+              <span class="pto-ide-frame__pane-meta" id="analysisMeta">48 x 64 routed experts · MoE objects</span>
+              <button id="metricToggle" class="ep-chip-btn" type="button">metric: load</button>
+            </header>
+            <div class="pto-ide-frame__pane-body">
+              <div id="analysisDock" class="ep-analysis-dock"></div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" data-ide-slot="status" aria-label="IDE status">
+          <div class="ep-status">
+            <div class="ep-status__group ep-status__left">
+              <span class="ep-status__item ep-status__dynamic" id="statusLeft">Pangu Pro MoE 72BA16B · total 71.99B · activated 16.50B</span>
+            </div>
+            <div class="ep-status__group ep-status__right">
+              <span class="ep-status__item ep-status__dynamic" id="statusRight">coverage pending</span>
+              <span class="ep-status__item">UTF-8</span>
+              <span class="ep-status__item">LF</span>
+              <span class="ep-status__item">HTML</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="ep-popup" id="infoPanel" hidden aria-label="说明与图例">
+    <div class="ep-popup__head">
+      <div class="ep-popup__title" id="infoTitle">Pangu MoE side view</div>
+      <button id="infoClose" class="ep-popup__close" type="button">关闭</button>
+    </div>
+    <div class="ep-note" id="infoNote">
+      <b>目标模型唯一版本：</b>Pangu Pro MoE 72BA16B，数据常量来自 arXiv 2505.21411v2。
+    </div>
+    <div class="ep-source-box">
+      <div class="ep-source-line"><span id="infoExpertsKey">Experts</span><span id="infoExpertsVal">64 routed, Top-8 active, 4 shared</span></div>
+      <div class="ep-source-line"><span id="infoGroupsKey">MoGE</span><span id="infoGroupsVal">8 groups, 8 experts/group, 1 active/group</span></div>
+      <div class="ep-source-line"><span id="infoViewKey">Front view</span><span id="infoViewVal">selected layer expands to router, experts, shared experts, dispatch and combine</span></div>
+    </div>
+  </section>
+
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script>
+    const MODEL = {
+      id: "pangu-pro-moe-72ba16b",
+      name: "Pangu Pro MoE 72BA16B",
+      source: "arXiv:2505.21411v2",
+      totalParamsB: 71.99,
+      activatedParamsB: 16.50,
+      realLayers: 48,
+      trainingSlots: 50,
+      noOpSlots: [48, 49],
+      routedExpertsPerLayer: 64,
+      sharedExpertsPerLayer: 4,
+      topK: 8,
+      groups: 8,
+      expertsPerGroup: 8,
+      activatedPerGroup: 1,
+      idealGroupShare: "12.5%",
+      training: { ep: 2, expertsPerEpShard: 32 }
+    };
+
+    const ANALYSIS_TABS = [
+      ["experts", "tabExperts"],
+      ["communication", "tabCommunication"],
+      ["coverage", "tabCoverage"]
+    ];
+
+    const I18N = {
+      zh: {
+        hostTitle: "Pangu Pro MoE 72BA16B · <b>MoE 专家层</b>",
+        topModelFacts: "64 路由专家 · Top-8 · 4 共享专家",
+        topLayerFacts: "48 个 MoGE 层 + 2 个 no-op 槽",
+        infoTitle: "Pangu MoE 侧视图",
+        infoClose: "关闭",
+        infoNote: "<b>目标模型唯一版本：</b>Pangu Pro MoE 72BA16B，数据常量来自 arXiv 2505.21411v2。",
+        infoExpertsKey: "专家",
+        infoExpertsVal: "64 路由专家，Top-8 激活，4 共享专家",
+        infoGroupsKey: "MoGE",
+        infoGroupsVal: "8 组，每组 8 专家，每组激活 1 个",
+        infoViewKey: "正视层",
+        infoViewVal: "选中层展开为 router、专家池、共享专家、dispatch 与 combine",
+        stageSide: "侧视",
+        stageFront: "正视层",
+        stageComm: "通信",
+        tabExperts: "专家",
+        tabCommunication: "MoE 通信",
+        tabCoverage: "覆盖",
+        analysisExperts: "专家覆盖",
+        analysisCommunication: "MoE 通信矩阵",
+        analysisCoverage: "覆盖检查",
+        metric: "指标",
+        selectedObject: "选中对象",
+        legend: "图例",
+        sourceFidelity: "来源可信度",
+        coverageGate: "覆盖检查",
+        legendMla: "注意力 / MLA 通道",
+        legendRouter: "Router、dispatch、combine",
+        legendExperts: "64 路由专家和 4 共享专家",
+        legendRoute: "前向 hidden-state 路由",
+        sidePost: "Post-MLP RMSNorm",
+        sideCombine: "Token Combine",
+        sideShared: "共享专家 · 4",
+        sidePool: "Expert Pool · 64 路由",
+        sideDispatch: "Token Dispatch",
+        sideRouter: "Router · Top-8 · 8 组",
+        sidePre: "Pre-RMSNorm",
+        sideMla: "MLA 注意力",
+        sideFocus: "L18-L42 MoE 路由聚焦",
+        sideInput: "Input / Embed",
+        sideOutput: "LM Head",
+        sideFooter: "MoE group-balanced routing: 8 组 × 8 专家",
+        frontTitle: "MoE 层正视图",
+        frontRouter: "Router",
+        frontDispatch: "Token Dispatch",
+        frontExpertPool: "64 路由专家",
+        frontShared: "4 共享专家",
+        frontCombine: "Token Combine",
+        frontDataPath: "层内数据路径",
+        frontInput: "hidden states",
+        frontOutput: "residual output"
+      },
+      en: {
+        hostTitle: "Pangu Pro MoE 72BA16B · <b>MoE Expert Layer</b>",
+        topModelFacts: "64 routed experts · Top-8 · 4 shared",
+        topLayerFacts: "48 MoGE layers + 2 no-op slots",
+        infoTitle: "Pangu MoE side view",
+        infoClose: "Close",
+        infoNote: "<b>Single target model:</b> Pangu Pro MoE 72BA16B. Constants come from arXiv 2505.21411v2.",
+        infoExpertsKey: "Experts",
+        infoExpertsVal: "64 routed, Top-8 active, 4 shared",
+        infoGroupsKey: "MoGE",
+        infoGroupsVal: "8 groups, 8 experts/group, 1 active/group",
+        infoViewKey: "Front view",
+        infoViewVal: "selected layer expands to router, expert pool, shared experts, dispatch and combine",
+        stageSide: "Side",
+        stageFront: "Layer Front",
+        stageComm: "Comm",
+        tabExperts: "Experts",
+        tabCommunication: "MoE Comm",
+        tabCoverage: "Coverage",
+        analysisExperts: "Expert coverage",
+        analysisCommunication: "MoE communication matrix",
+        analysisCoverage: "Coverage gate",
+        metric: "metric",
+        selectedObject: "Selected Object",
+        legend: "Legend",
+        sourceFidelity: "Source Fidelity",
+        coverageGate: "Coverage Gate",
+        legendMla: "Attention / MLA lane",
+        legendRouter: "Router, dispatch, combine",
+        legendExperts: "64 routed experts and 4 shared experts",
+        legendRoute: "Forward hidden-state route",
+        sidePost: "Post-MLP RMSNorm",
+        sideCombine: "Token Combine",
+        sideShared: "Shared Experts · 4",
+        sidePool: "Expert Pool · 64 routed",
+        sideDispatch: "Token Dispatch",
+        sideRouter: "Router · Top-8 · 8 groups",
+        sidePre: "Pre-RMSNorm",
+        sideMla: "MLA Attention",
+        sideFocus: "L18-L42 MoE route focus",
+        sideInput: "Input / Embed",
+        sideOutput: "LM Head",
+        sideFooter: "MoE group-balanced routing: 8 groups x 8 experts",
+        frontTitle: "MoE Layer Front View",
+        frontRouter: "Router",
+        frontDispatch: "Token Dispatch",
+        frontExpertPool: "64 Routed Experts",
+        frontShared: "4 Shared Experts",
+        frontCombine: "Token Combine",
+        frontDataPath: "In-layer data path",
+        frontInput: "hidden states",
+        frontOutput: "residual output"
+      }
+    };
+
+    const state = {
+      lang: "zh",
+      tab: "experts",
+      metric: "loadRatio",
+      selectedLayer: 18,
+      expandedLayer: 18,
+      selectedExpert: null,
+      selectedComm: null,
+      selectedCoverage: null,
+      focus: "all",
+      zoom: 100
+    };
+    const pageParams = new URLSearchParams(window.location.search);
+    if (pageParams.get("lang") === "en") state.lang = "en";
+
+    const layers = Array.from({ length: MODEL.trainingSlots }, (_, slot) => ({
+      slot,
+      layer: slot < MODEL.realLayers ? slot : null,
+      kind: slot < MODEL.realLayers ? "moge" : "noop"
+    }));
+
+    const expertCells = [];
+    for (let layer = 0; layer < MODEL.realLayers; layer += 1) {
+      for (let expert = 0; expert < MODEL.routedExpertsPerLayer; expert += 1) {
+        const group = Math.floor(expert / MODEL.expertsPerGroup);
+        const epShard = expert < MODEL.training.expertsPerEpShard ? 0 : 1;
+        const wave = Math.sin((layer + 1) * 0.71 + (expert + 1) * 0.37);
+        const groupBoost = group === layer % MODEL.groups ? 0.18 : 0;
+        const tailBoost = layer > 36 ? 0.06 : 0;
+        const loadRatio = clamp(0.42 + ((wave + 1) * 0.28) + groupBoost + tailBoost, 0.18, 1.26);
+        const assignedTokens = Math.round(384 * loadRatio + ((expert % 5) * 11));
+        const a2aSend = Math.round(assignedTokens * (epShard === 0 ? 0.51 : 0.49));
+        const a2aRecv = Math.round(assignedTokens * (epShard === 0 ? 0.49 : 0.51));
+        const routerProbMass = clamp((100 / MODEL.routedExpertsPerLayer) * (0.66 + loadRatio * 0.42), 0.5, 2.8);
+        expertCells.push({
+          id: `L${layer}.E${expert}`,
+          layer,
+          expert,
+          group,
+          epShard,
+          localExpert: expert % MODEL.training.expertsPerEpShard,
+          groupExpert: expert % MODEL.expertsPerGroup,
+          loadRatio,
+          assignedTokens,
+          a2aSend,
+          a2aRecv,
+          routerProbMass
+        });
+      }
+    }
+
+    const sharedExpertCells = [];
+    for (let layer = 0; layer < MODEL.realLayers; layer += 1) {
+      for (let shared = 0; shared < MODEL.sharedExpertsPerLayer; shared += 1) {
+        sharedExpertCells.push({ id: `L${layer}.S${shared}`, layer, shared, localSharedExpert: shared });
+      }
+    }
+
+    const epBuckets = [];
+    for (let layer = 0; layer < MODEL.realLayers; layer += 1) {
+      for (let ep = 0; ep < MODEL.training.ep; ep += 1) {
+        const experts = expertCells.filter((cell) => cell.layer === layer && cell.epShard === ep);
+        epBuckets.push({
+          id: `L${layer}.EP${ep}`,
+          layer,
+          ep,
+          experts: experts.length,
+          expertStart: ep * MODEL.training.expertsPerEpShard,
+          expertEnd: ep * MODEL.training.expertsPerEpShard + MODEL.training.expertsPerEpShard - 1,
+          assignedTokens: sum(experts, "assignedTokens"),
+          a2aSend: sum(experts, "a2aSend"),
+          a2aRecv: sum(experts, "a2aRecv"),
+          loadRatio: avg(experts, "loadRatio")
+        });
+      }
+    }
+
+    const communicationEdges = buildCommunicationEdges();
+    const coverage = buildCoverageReport();
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initCursorAura();
+      wireChrome();
+      wireStageControls();
+      renderAll();
+    });
+
+    function renderAll() {
+      renderStage();
+      renderAnalysisTabs();
+      renderAnalysisDock();
+      renderInspector();
+      renderSourceBox();
+      renderCoverageMini();
+      updateChromeLabels();
+      applyLanguage();
+    }
+
+    function t(key) {
+      return I18N[state.lang]?.[key] || I18N.en[key] || key;
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = state.lang === "zh" ? "zh-CN" : "en";
+      $("#langToggle").textContent = state.lang === "zh" ? "EN" : "中";
+      $("#hostTitle").innerHTML = t("hostTitle");
+      $("#topSource").textContent = MODEL.source;
+      $("#topModelFacts").textContent = t("topModelFacts");
+      $("#topLayerFacts").textContent = t("topLayerFacts");
+      $("#infoTitle").textContent = t("infoTitle");
+      $("#infoClose").textContent = t("infoClose");
+      $("#infoNote").innerHTML = t("infoNote");
+      $("#infoExpertsKey").textContent = t("infoExpertsKey");
+      $("#infoExpertsVal").textContent = t("infoExpertsVal");
+      $("#infoGroupsKey").textContent = t("infoGroupsKey");
+      $("#infoGroupsVal").textContent = t("infoGroupsVal");
+      $("#infoViewKey").textContent = t("infoViewKey");
+      $("#infoViewVal").textContent = t("infoViewVal");
+      $("#selectedObjectLabel").textContent = t("selectedObject");
+      $("#legendLabel").textContent = t("legend");
+      $("#sourceFidelityLabel").textContent = t("sourceFidelity");
+      $("#coverageGateLabel").textContent = t("coverageGate");
+      $("#legendMla").textContent = t("legendMla");
+      $("#legendRouter").textContent = t("legendRouter");
+      $("#legendExperts").textContent = t("legendExperts");
+      $("#legendRoute").textContent = t("legendRoute");
+    }
+
+    function wireChrome() {
+      const frame = $("[data-ide-frame]");
+      $("#infoToggle").addEventListener("click", () => {
+        const panel = $("#infoPanel");
+        const nextHidden = !panel.hidden;
+        panel.hidden = nextHidden;
+        $("#infoToggle").setAttribute("aria-expanded", String(!nextHidden));
+      });
+      $("#infoClose").addEventListener("click", () => {
+        $("#infoPanel").hidden = true;
+        $("#infoToggle").setAttribute("aria-expanded", "false");
+      });
+      $("#themeToggle").addEventListener("click", () => {
+        const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+        document.documentElement.dataset.theme = next;
+        $("#themeToggle").setAttribute("aria-pressed", String(next === "light"));
+      });
+      $("#langToggle").addEventListener("click", () => {
+        state.lang = state.lang === "zh" ? "en" : "zh";
+        renderAll();
+      });
+      $("#analysisToggle").addEventListener("click", () => {
+        const isOpen = frame.dataset.analysisOpen !== "false";
+        frame.dataset.analysisOpen = String(!isOpen);
+        $("#analysisToggle").classList.toggle("is-active", !isOpen);
+        $("#analysisToggle").setAttribute("aria-expanded", String(!isOpen));
+      });
+      $("#inspectorToggle").addEventListener("click", () => {
+        const isOpen = frame.dataset.inspectorOpen !== "false";
+        frame.dataset.inspectorOpen = String(!isOpen);
+        $("#inspectorToggle").classList.toggle("is-active", !isOpen);
+        $("#inspectorToggle").setAttribute("aria-expanded", String(!isOpen));
+      });
+    }
+
+    function wireStageControls() {
+      $("#zoomSlider").addEventListener("input", (event) => setZoom(Number(event.target.value)));
+      $("#zoomOut").addEventListener("click", () => setZoom(state.zoom - 5));
+      $("#zoomIn").addEventListener("click", () => setZoom(state.zoom + 5));
+      $("#zoomReset").addEventListener("click", () => setZoom(100));
+      $("#layerBack").addEventListener("click", () => selectLayer(state.selectedLayer - 1));
+      $("#layerFwd").addEventListener("click", () => selectLayer(state.selectedLayer + 1));
+      $("#objectToggle").addEventListener("click", () => {
+        const panel = $("#objectPanel");
+        panel.hidden = !panel.hidden;
+        $("#objectToggle").setAttribute("aria-expanded", String(!panel.hidden));
+      });
+      $$("#objectPanel [data-focus]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.focus = button.dataset.focus;
+          $$("#objectPanel [data-focus]").forEach((item) => item.classList.toggle("is-active", item === button));
+          renderStage();
+          renderInspector();
+        });
+      });
+      $("#metricToggle").addEventListener("click", () => {
+        const order = ["loadRatio", "assignedTokens", "a2aSend", "routerProbMass"];
+        state.metric = order[(order.indexOf(state.metric) + 1) % order.length];
+        renderAll();
+      });
+    }
+
+    function setZoom(value) {
+      state.zoom = clamp(value, 80, 145);
+      $("#zoomSlider").value = String(state.zoom);
+      $("#zoomValue").textContent = `${state.zoom}%`;
+      $("#sideView").style.setProperty("--ep-stage-scale", String(state.zoom / 100));
+    }
+
+    function metricLabel(metric) {
+      return {
+        loadRatio: "load",
+        assignedTokens: "assigned tokens",
+        a2aSend: "dispatch tokens",
+        a2aRecv: "combine tokens",
+        routerProbMass: "router prob"
+      }[metric] || metric;
+    }
+
+    function frontPanelBounds(x) {
+      const panelW = 340;
+      const panelX = clamp(x - panelW / 2, 88, 1600 - panelW - 88);
+      return { panelW, panelX, centerX: panelX + panelW / 2 };
+    }
+
+    function selectLayer(layer) {
+      state.selectedLayer = (layer + MODEL.realLayers) % MODEL.realLayers;
+      state.expandedLayer = state.selectedLayer;
+      state.selectedExpert = null;
+      state.selectedComm = null;
+      state.selectedCoverage = null;
+      renderAll();
+    }
+
+    function renderStage() {
+      renderSideView();
+    }
+
+    function initCursorAura() {
+      const frame = $("[data-ide-frame]");
+      if (!frame) return;
+      let fadeTimer = null;
+      const update = (event) => {
+        const rect = frame.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+        const y = ((event.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+        frame.style.setProperty("--ide-cursor-x", `${x}%`);
+        frame.style.setProperty("--ide-cursor-y", `${y}%`);
+        frame.style.setProperty("--ide-cursor-alpha", ".18");
+        window.clearTimeout(fadeTimer);
+        fadeTimer = window.setTimeout(() => frame.style.setProperty("--ide-cursor-alpha", ".04"), 240);
+      };
+      frame.addEventListener("pointermove", update);
+      frame.addEventListener("pointerleave", () => frame.style.setProperty("--ide-cursor-alpha", "0"));
+    }
+
+    function renderSideView() {
+      const svg = $("#sideView");
+      const x0 = 235;
+      const w = 1130;
+      const inlinePanelW = 340;
+      const inlineGap = 34;
+      const isExpanded = Number.isInteger(state.expandedLayer);
+      const expandedLayer = isExpanded ? state.expandedLayer : null;
+      const normalStep = isExpanded
+        ? (w - inlinePanelW - inlineGap * 2) / Math.max(1, MODEL.realLayers - 1)
+        : w / MODEL.realLayers;
+      const layerX = (layer) => {
+        if (!isExpanded) return x0 + layer * normalStep + normalStep / 2;
+        if (layer < expandedLayer) return x0 + layer * normalStep + normalStep / 2;
+        if (layer === expandedLayer) return x0 + layer * normalStep + inlineGap + inlinePanelW / 2;
+        return x0 + expandedLayer * normalStep + inlineGap * 2 + inlinePanelW + (layer - expandedLayer - 1) * normalStep + normalStep / 2;
+      };
+      const focusX1 = layerX(18) - normalStep * .65;
+      const focusX2 = layerX(42) + normalStep * .65;
+      const selectedX = layerX(state.selectedLayer);
+      const bandCount = 5;
+      const bandWidth = w / bandCount;
+      const layerGroups = [];
+      const focusPeak = Math.max(...expertCells
+        .filter((cell) => cell.layer >= 18 && cell.layer <= 42)
+        .map((cell) => cell.loadRatio));
+
+      for (let layer = 0; layer < MODEL.realLayers; layer += 1) {
+        const x = layerX(layer);
+        if (layer === expandedLayer) {
+          layerGroups.push(renderInlineLayerFrontView(layer, x));
+          continue;
+        }
+        const bucketLoad = avg(epBuckets.filter((bucket) => bucket.layer === layer), "loadRatio");
+        const hot = Math.min(128, 62 + bucketLoad * 42);
+        const active = layer === state.selectedLayer;
+        const opacity = active ? .95 : .42;
+        layerGroups.push(`
+          <g data-object="layer" data-id="L${layer}" opacity="${opacity}">
+            <rect class="layer-hit" x="${x - 14}" y="106" width="28" height="756" rx="6"></rect>
+            <rect x="${x - 4}" y="148" width="8" height="650" rx="2" fill="#7fcbd3" opacity=".36"></rect>
+            <rect x="${x - 7}" y="122" width="14" height="50" rx="1" fill="#ead66f" opacity=".62"></rect>
+            <rect x="${x - 7}" y="212" width="14" height="48" rx="1" fill="#b99ae7" opacity=".60"></rect>
+            <rect x="${x - 7}" y="296" width="14" height="52" rx="1" fill="#ead66f" opacity=".48"></rect>
+            <rect x="${x - 6}" y="${500 - hot}" width="12" height="${hot}" rx="2" fill="${heatColor(bucketLoad)}" opacity=".74"></rect>
+            <rect x="${x - 7}" y="594" width="14" height="48" rx="1" fill="#b99ae7" opacity=".62"></rect>
+            <rect x="${x - 7}" y="668" width="14" height="46" rx="1" fill="#b99ae7" opacity=".58"></rect>
+            <rect x="${x - 7}" y="738" width="14" height="48" rx="1" fill="#ead66f" opacity=".55"></rect>
+            <rect x="${x - 7}" y="804" width="14" height="45" rx="1" fill="#7fcbd3" opacity=".58"></rect>
+            ${active ? `<rect x="${x - 10}" y="116" width="20" height="738" rx="4" fill="none" stroke="#4f6df6" stroke-width="2.4" opacity=".95"></rect>` : ""}
+          </g>
+        `);
+      }
+
+      const moeBands = Array.from({ length: bandCount }, (_, band) => {
+        const x = x0 + band * bandWidth;
+        const start = band * 10;
+        const end = band === bandCount - 1 ? "47 + S48/S49" : start + 9;
+        return `
+          <g class="moe-overlay" data-object="moe-band" data-id="B${band}">
+            <rect x="${x}" y="46" width="${bandWidth - 4}" height="808" rx="2" fill="none" stroke="currentColor" opacity=".08"></rect>
+            <text class="band-label" x="${x + bandWidth / 2}" y="70" text-anchor="middle">MoE L${start}-${end}</text>
+          </g>
+        `;
+      }).join("");
+
+      const groupTiles = Array.from({ length: MODEL.groups }, (_, group) => {
+        const x = 390 + group * 128;
+        const start = group * MODEL.expertsPerGroup;
+        const end = start + MODEL.expertsPerGroup - 1;
+        return `
+          <g data-object="group" data-id="G${group}">
+            <rect x="${x}" y="842" width="98" height="32" rx="5" fill="color-mix(in srgb, var(--ide-frame-pane-bg) 82%, transparent)" stroke="currentColor" opacity=".22"></rect>
+            <rect x="${x + 13}" y="852" width="32" height="9" rx="1" fill="#b99ae7" opacity=".72"></rect>
+            <rect x="${x + 53}" y="852" width="32" height="9" rx="1" fill="#ead66f" opacity=".72"></rect>
+            <text class="rank-label mono" x="${x + 49}" y="894" text-anchor="middle">G${group} · E${start}-${end}</text>
+          </g>
+        `;
+      }).join("");
+
+      const modeOpacity = (key) => state.focus === "all" || state.focus === key ? 1 : .16;
+      const expandedBounds = isExpanded ? frontPanelBounds(layerX(expandedLayer)) : null;
+      const sideTokenRoute = expandedBounds ? `
+        <path class="moe-route" d="M62 878 L230 826 H${expandedBounds.centerX} V806" fill="none" stroke="#4f6df6" stroke-width="4.4" opacity=".70" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowBlue)"></path>
+        <circle class="moe-route" cx="${expandedBounds.centerX}" cy="800" r="7" fill="#4f6df6" opacity=".86"></circle>
+        <path class="moe-route" d="M${expandedBounds.centerX} 170 C${expandedBounds.centerX + 94} 150 ${x0 + w + 54} 154 1470 144" fill="none" stroke="#4f6df6" stroke-width="4.4" opacity=".70" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowBlue)"></path>
+        <circle class="moe-route" cx="${expandedBounds.centerX}" cy="170" r="7" fill="#4f6df6" opacity=".86"></circle>
+      ` : `
+        <path class="moe-route" d="M62 878 L230 620 H1385 L1470 144" fill="none" stroke="#4f6df6" stroke-width="5.2" opacity=".68" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowBlue)"></path>
+      `;
+      svg.innerHTML = `
+        <defs>
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#4f6df6" flood-opacity=".18"></feDropShadow>
+          </filter>
+          <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f6df6"></path>
+          </marker>
+          <marker id="arrowViolet" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#b99ae7"></path>
+          </marker>
+        </defs>
+        <rect x="0" y="0" width="1600" height="900" rx="18" fill="color-mix(in srgb, var(--ide-frame-pane-bg) 38%, transparent)"></rect>
+        ${moeBands}
+        <path d="M210 126 H1388" stroke="#ead66f" stroke-width="4" opacity=".34"></path>
+        <path d="M210 236 H1388" stroke="#b99ae7" stroke-width="4" opacity=".34"></path>
+        <path d="M210 324 H1388" stroke="#ead66f" stroke-width="3" opacity=".28"></path>
+        <path d="M210 436 H1388" stroke="#b99ae7" stroke-width="3" opacity=".28"></path>
+        <path d="M210 620 H1388" stroke="#b99ae7" stroke-width="4" opacity=".34"></path>
+        <path d="M210 692 H1388" stroke="#b99ae7" stroke-width="4" opacity=".32"></path>
+        <path d="M210 762 H1388" stroke="#ead66f" stroke-width="4" opacity=".30"></path>
+        <path d="M210 826 H1388" stroke="#7fcbd3" stroke-width="4" opacity=".30"></path>
+
+        <text class="lane-label" x="820" y="130" text-anchor="middle">${t("sidePost")}</text>
+        <text class="lane-label" x="820" y="240" text-anchor="middle">${t("sideCombine")}</text>
+        <text class="lane-label" x="820" y="328" text-anchor="middle">${t("sideShared")}</text>
+        <text class="lane-label" x="820" y="438" text-anchor="middle">${t("sidePool")}</text>
+        <text class="lane-label" x="820" y="624" text-anchor="middle">${t("sideDispatch")}</text>
+        <text class="lane-label" x="820" y="696" text-anchor="middle">${t("sideRouter")}</text>
+        <text class="lane-label" x="820" y="766" text-anchor="middle">${t("sidePre")}</text>
+        <text class="lane-label" x="820" y="830" text-anchor="middle">${t("sideMla")}</text>
+
+        <g opacity="${modeOpacity("experts")}">${layerGroups.join("")}</g>
+        <g class="moe-route" opacity="${modeOpacity("tokens")}">
+          <path d="M${x0 - 62} 602 C${x0 + 80} 520 ${focusX1 - 80} 610 ${focusX1} 472" fill="none" stroke="#b99ae7" stroke-width="2" opacity=".26" marker-end="url(#arrowViolet)"></path>
+          <path d="M${focusX2} 472 C${focusX2 + 130} 600 ${x0 + w - 60} 520 ${x0 + w + 28} 602" fill="none" stroke="#b99ae7" stroke-width="2" opacity=".26" marker-end="url(#arrowViolet)"></path>
+          <path d="M${selectedX} 620 C${selectedX - 96} 560 ${selectedX - 88} 488 ${selectedX} 436 C${selectedX + 88} 488 ${selectedX + 96} 560 ${selectedX} 620" fill="none" stroke="#b99ae7" stroke-width="2.6" opacity=".52"></path>
+        </g>
+        <g opacity="${modeOpacity("dispatch")}">
+          ${sideTokenRoute}
+          <path class="moe-route" d="M64 872 L232 826 H1385" fill="none" stroke="#4f6df6" stroke-width="2.4" opacity=".22"></path>
+        </g>
+        <g class="moe-overlay" opacity="${modeOpacity("experts")}" data-object="focus-region" data-id="L18-L42">
+          <rect x="${focusX1}" y="338" width="${focusX2 - focusX1}" height="214" rx="0" fill="none" stroke="#ff4f75" stroke-width="2.4" stroke-dasharray="8 6"></rect>
+          <path d="M${focusX1} 338 h58 M${focusX2} 338 h-58 M${focusX1} 552 h58 M${focusX2} 552 h-58" fill="none" stroke="#ff4f75" stroke-width="4"></path>
+        </g>
+        <g data-object="noop" data-id="S48-S49">
+          <rect x="1394" y="120" width="40" height="724" rx="4" fill="none" stroke="#f59e0b" stroke-dasharray="7 7" opacity=".42"></rect>
+          <text class="tiny-label mono" x="1414" y="106" text-anchor="middle">S48/S49 no-op</text>
+        </g>
+        <g data-object="input" data-id="input">
+          <rect x="46" y="792" width="126" height="56" rx="7" fill="color-mix(in srgb, var(--ide-frame-pane-bg) 74%, transparent)" stroke="currentColor" opacity=".28"></rect>
+          <text class="lane-label" x="109" y="824" text-anchor="middle">${t("sideInput")}</text>
+        </g>
+        <g data-object="output" data-id="lm-head">
+          <rect x="1428" y="102" width="126" height="56" rx="7" fill="color-mix(in srgb, var(--ide-frame-pane-bg) 74%, transparent)" stroke="currentColor" opacity=".28"></rect>
+          <text class="lane-label" x="1491" y="134" text-anchor="middle">${t("sideOutput")}</text>
+        </g>
+        ${groupTiles}
+        <text class="tiny-label mono" x="236" y="892">${t("sideFooter")}</text>
+      `;
+
+      svg.onclick = (event) => {
+        const expertNode = event.target.closest("[data-front-expert]");
+        if (expertNode && svg.contains(expertNode)) {
+          state.selectedExpert = expertNode.dataset.frontExpert;
+          const target = expertCells.find((cell) => cell.id === state.selectedExpert);
+          if (target) {
+            state.selectedLayer = target.layer;
+            state.expandedLayer = target.layer;
+          }
+          state.selectedComm = null;
+          state.selectedCoverage = null;
+          renderAll();
+          return;
+        }
+
+        const node = event.target.closest("[data-object]");
+        if (!node || !svg.contains(node)) return;
+        const id = node.dataset.id || node.dataset.object;
+        let handled = false;
+        if (/^L\d+$/.test(id)) {
+          const nextLayer = Number(id.slice(1));
+          state.selectedLayer = nextLayer;
+          state.expandedLayer = state.expandedLayer === nextLayer ? null : nextLayer;
+          state.selectedExpert = null;
+          state.selectedComm = null;
+          state.selectedCoverage = null;
+          handled = true;
+        } else if (node.dataset.object === "group") {
+          state.focus = "groups";
+          handled = true;
+        }
+        if (handled) renderAll();
+      };
+    }
+
+    function renderInlineLayerFrontView(layer, x) {
+      const { panelW, panelX, centerX } = frontPanelBounds(x);
+      const layerCells = expertCells.filter((cell) => cell.layer === layer);
+      const selected = selectedExpertCell();
+      const activeByGroup = Array.from({ length: MODEL.groups }, (_, group) => {
+        const cells = layerCells.filter((cell) => cell.group === group);
+        return cells.reduce((best, cell) => cell.loadRatio > best.loadRatio ? cell : best, cells[0]);
+      });
+
+      const gridX = panelX + 78;
+      const gridY = 334;
+      const cellSize = 20;
+      const gap = 5;
+      const cellPoint = (cell) => {
+        const col = cell.groupExpert;
+        const row = 7 - cell.group;
+        return {
+          x: gridX + col * (cellSize + gap) + cellSize / 2,
+          y: gridY + row * (cellSize + gap) + cellSize / 2
+        };
+      };
+      const experts = layerCells.map((cell) => {
+        const col = cell.groupExpert;
+        const row = 7 - cell.group;
+        const ex = gridX + col * (cellSize + gap);
+        const ey = gridY + row * (cellSize + gap);
+        const isActive = activeByGroup[cell.group]?.id === cell.id;
+        const isSelected = selected?.id === cell.id;
+        return `
+          <g data-front-expert="${cell.id}">
+            <rect x="${ex}" y="${ey}" width="${cellSize}" height="${cellSize}" rx="2" fill="${heatColor(cell.loadRatio)}" opacity="${isActive ? ".98" : ".72"}" stroke="${isSelected ? "#4f6df6" : isActive ? "#ffffff" : "transparent"}" stroke-width="${isSelected ? "2.4" : isActive ? "1.2" : "0"}"></rect>
+            ${isActive ? `<circle cx="${ex + cellSize - 2}" cy="${ey + 2}" r="2.2" fill="#ffffff" opacity=".9"></circle>` : ""}
+          </g>
+        `;
+      }).join("");
+      const expertRoutes = activeByGroup.map((cell) => {
+        const point = cellPoint(cell);
+        const dx = (point.x - centerX) * .48;
+        return `
+          <path class="moe-route" d="M${centerX} 548 C${centerX + dx} 520 ${point.x} 520 ${point.x} ${point.y + 16}" fill="none" stroke="#4f6df6" stroke-width="2.2" opacity=".48" marker-end="url(#arrowBlue)"></path>
+          <path class="moe-route" d="M${point.x} ${point.y - 16} C${point.x} 282 ${centerX + dx} 260 ${centerX} 244" fill="none" stroke="#4f6df6" stroke-width="2.2" opacity=".42" marker-end="url(#arrowBlue)"></path>
+        `;
+      }).join("");
+
+      const groupLabels = Array.from({ length: MODEL.groups }, (_, group) => {
+        const y = gridY + (7 - group) * (cellSize + gap) + 11;
+        const active = activeByGroup[group];
+        return `<text class="tiny-label mono" x="${gridX - 10}" y="${y}" text-anchor="end">G${group}${active ? ` E${active.expert}` : ""}</text>`;
+      }).join("");
+
+      const shared = Array.from({ length: MODEL.sharedExpertsPerLayer }, (_, index) => {
+        const sx = panelX + 68 + index * 50;
+        return `
+          <g data-object="shared" data-id="L${layer}.S${index}">
+            <rect x="${sx}" y="270" width="42" height="22" rx="4" fill="#ead66f" opacity=".78"></rect>
+            <text class="tiny-label mono" x="${sx + 21}" y="285" text-anchor="middle">S${index}</text>
+          </g>
+        `;
+      }).join("");
+
+      const routePath = `
+        <path class="moe-route" d="M${centerX} 820 V770" fill="none" stroke="#4f6df6" stroke-width="4.2" opacity=".82" marker-end="url(#arrowBlue)"></path>
+        <path class="moe-route" d="M${centerX} 734 V666" fill="none" stroke="#4f6df6" stroke-width="4.2" opacity=".82" marker-end="url(#arrowBlue)"></path>
+        <path class="moe-route" d="M${centerX} 632 V548" fill="none" stroke="#4f6df6" stroke-width="4.2" opacity=".82" marker-end="url(#arrowBlue)"></path>
+        ${expertRoutes}
+        <path class="moe-route" d="M${centerX} 244 V214" fill="none" stroke="#4f6df6" stroke-width="4.2" opacity=".76" marker-end="url(#arrowBlue)"></path>
+        <path class="moe-route" d="M${centerX} 198 V170" fill="none" stroke="#4f6df6" stroke-width="4.2" opacity=".72" marker-end="url(#arrowBlue)"></path>
+      `;
+
+      return `
+        <g data-object="layer" data-id="L${layer}" filter="url(#softShadow)">
+          <path d="M${x - 7} 116 L${panelX + 18} 124 L${panelX + 18} 838 L${x - 7} 854 Z" fill="#4f6df6" opacity=".08"></path>
+          <rect x="${panelX}" y="108" width="${panelW}" height="744" rx="16" fill="color-mix(in srgb, var(--ide-frame-pane-bg) 84%, transparent)" stroke="#4f6df6" stroke-width="2.4" opacity=".98"></rect>
+          <path d="M${panelX + panelW} 126 L${panelX + panelW + 20} 142 L${panelX + panelW + 20} 830 L${panelX + panelW} 852 Z" fill="#4f6df6" opacity=".10"></path>
+          <text class="lane-label mono" x="${centerX}" y="136" text-anchor="middle">L${layer} · ${t("frontTitle")}</text>
+          <text class="tiny-label mono" x="${centerX}" y="156" text-anchor="middle">64 routed · Top-8 · 4 shared</text>
+          ${routePath}
+
+          <rect x="${panelX + 62}" y="170" width="${panelW - 124}" height="28" rx="6" fill="#ead66f" opacity=".50"></rect>
+          <text class="tiny-label" x="${centerX}" y="188" text-anchor="middle">${t("sidePost")}</text>
+
+          <rect x="${panelX + 54}" y="214" width="${panelW - 108}" height="30" rx="6" fill="#b99ae7" opacity=".56"></rect>
+          <text class="tiny-label" x="${centerX}" y="234" text-anchor="middle">${t("frontCombine")}</text>
+
+          <g>
+            <text class="tiny-label" x="${centerX}" y="263" text-anchor="middle">${t("frontShared")}</text>
+            ${shared}
+          </g>
+
+          <rect x="${panelX + 34}" y="312" width="${panelW - 68}" height="226" rx="10" fill="color-mix(in srgb, #ead66f 10%, var(--ide-frame-pane-bg))" stroke="currentColor" stroke-opacity=".10"></rect>
+          <text class="tiny-label" x="${centerX}" y="332" text-anchor="middle">${t("frontExpertPool")}</text>
+          ${groupLabels}
+          ${experts}
+
+          <rect x="${panelX + 54}" y="548" width="${panelW - 108}" height="30" rx="6" fill="#b99ae7" opacity=".52"></rect>
+          <text class="tiny-label" x="${centerX}" y="568" text-anchor="middle">${t("frontDispatch")}</text>
+
+          <rect x="${panelX + 50}" y="632" width="${panelW - 100}" height="34" rx="7" fill="color-mix(in srgb, #b99ae7 18%, var(--ide-frame-pane-bg))" stroke="#b99ae7" stroke-opacity=".44"></rect>
+          <text class="tiny-label" x="${centerX}" y="646" text-anchor="middle">${t("frontRouter")}</text>
+          <text class="tiny-label mono" x="${centerX}" y="660" text-anchor="middle">8 groups · 1 active/group</text>
+
+          <rect x="${panelX + 62}" y="706" width="${panelW - 124}" height="28" rx="6" fill="#ead66f" opacity=".42"></rect>
+          <text class="tiny-label" x="${centerX}" y="724" text-anchor="middle">${t("sidePre")}</text>
+
+          <rect x="${panelX + 62}" y="770" width="${panelW - 124}" height="30" rx="6" fill="#7fcbd3" opacity=".48"></rect>
+          <text class="tiny-label" x="${centerX}" y="790" text-anchor="middle">${t("sideMla")}</text>
+        </g>
+      `;
+    }
+
+    function renderAnalysisTabs() {
+      $("#analysisTabs").innerHTML = ANALYSIS_TABS.map(([id, labelKey]) => (
+        `<button class="ep-analysis-tab ${state.tab === id ? "is-active" : ""}" type="button" data-tab="${id}">${t(labelKey)}</button>`
+      )).join("");
+      $$("#analysisTabs [data-tab]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.tab = button.dataset.tab;
+          renderAll();
+        });
+      });
+    }
+
+    function renderAnalysisDock() {
+      const title = {
+        experts: t("analysisExperts"),
+        communication: t("analysisCommunication"),
+        coverage: t("analysisCoverage")
+      }[state.tab];
+      $("#analysisTitle").textContent = title;
+      $("#metricToggle").textContent = `${t("metric")}: ${metricLabel(state.metric)}`;
+
+      if (state.tab === "experts") renderExpertHeatmap();
+      if (state.tab === "communication") renderCommunicationMatrix();
+      if (state.tab === "coverage") renderCoveragePanel();
+    }
+
+    function renderExpertHeatmap() {
+      const active = selectedExpertCell() || expertCells.find((cell) => cell.layer === state.selectedLayer && cell.expert === 0);
+      const stats = [
+        ["routed cells", "3,072"],
+        ["shared cells", "192"],
+        ["router groups", "8"],
+        ["selected layer", `L${state.selectedLayer}`],
+        ["active experts/layer", "8"],
+        ["router", "Top-8"]
+      ];
+      $("#analysisDock").innerHTML = `
+        <div class="ep-analysis-view">
+          <div class="ep-analysis-stats">${stats.map(statHtml).join("")}</div>
+          <div class="ep-grid-wrap">
+            <div class="ep-heatmap-shell"><div class="ep-heatmap">
+              ${expertCells.map((cell) => `<button class="ep-heat-cell ${state.selectedExpert === cell.id ? "is-selected" : ""}" data-id="${cell.id}" title="${cell.id} · ${metricLabel(state.metric)}: ${formatMetric(cell[state.metric])}" style="background:${heatColor(normalizeMetric(cell, state.metric))}"></button>`).join("")}
+            </div></div>
+            <aside class="ep-detail-card">
+              <h3 class="ep-detail-title">${active ? active.id : "Expert"}</h3>
+              <div class="ep-kv">
+                ${kvRows(active ? expertRows(active) : layerRows(state.selectedLayer))}
+              </div>
+            </aside>
+          </div>
+        </div>
+      `;
+      $$(".ep-heat-cell").forEach((cell) => {
+        cell.addEventListener("click", () => {
+          const target = expertCells.find((item) => item.id === cell.dataset.id);
+          if (!target) return;
+          state.selectedExpert = target.id;
+          state.selectedLayer = target.layer;
+          state.expandedLayer = target.layer;
+          state.selectedComm = null;
+          state.selectedCoverage = null;
+          renderAll();
+        });
+      });
+    }
+
+    function renderCommunicationMatrix() {
+      $("#analysisMeta").textContent = "MoE token dispatch + combine";
+      $("#analysisDock").innerHTML = `
+        <div class="ep-analysis-view">
+          <div class="ep-table-shell">
+            <table class="ep-table">
+              <thead><tr><th style="width:86px;">Domain</th><th style="width:172px;">Edge</th><th>Scope</th><th>Pattern</th><th>Source</th><th>Target</th><th style="width:58px;">Count</th><th style="width:96px;">Fidelity</th></tr></thead>
+              <tbody>${communicationEdges.map((edge) => `
+                <tr data-comm="${edge.id}">
+                  <td><span class="ep-pill ${edge.status === "gap" ? "warn" : "info"}">${edge.domain}</span></td>
+                  <td>${edge.id}</td><td>${edge.scope}</td><td>${edge.pattern}</td><td>${edge.sourceObject}</td><td>${edge.targetObject}</td><td>${edge.count}</td><td>${edge.fidelity}</td>
+                </tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </div>`;
+      $$("[data-comm]").forEach((row) => {
+        row.addEventListener("click", () => {
+          state.selectedComm = row.dataset.comm;
+          state.selectedExpert = null;
+          state.selectedCoverage = null;
+          renderAll();
+        });
+      });
+    }
+
+    function renderCoveragePanel() {
+      $("#analysisMeta").textContent = `${coverage.score}% structural coverage`;
+      $("#analysisDock").innerHTML = `
+        <div class="ep-analysis-view">
+          <div class="ep-analysis-stats">
+            ${[
+              ["coverage", `${coverage.score}%`],
+              ["real layers", "48"],
+              ["MoE slots", "50"],
+              ["token routes", "96"],
+              ["no-op slots", "2"],
+              ["violations", "0"]
+            ].map(statHtml).join("")}
+          </div>
+          <div class="ep-coverage-list">${coverage.items.map((item) => coverageRow(item)).join("")}</div>
+        </div>`;
+      $$("[data-coverage]").forEach((row) => {
+        row.addEventListener("click", () => {
+          state.selectedCoverage = row.dataset.coverage;
+          state.selectedExpert = null;
+          state.selectedComm = null;
+          renderAll();
+        });
+      });
+    }
+
+    function renderSimpleTable(rows, heads) {
+      $("#analysisDock").innerHTML = `
+        <div class="ep-analysis-view">
+          <div class="ep-table-shell">
+            <table class="ep-table">
+              <thead><tr>${heads.map((head) => `<th>${head}</th>`).join("")}</tr></thead>
+              <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    function renderInspector() {
+      let kind = "layer";
+      let rows = layerRows(state.selectedLayer);
+      if (state.selectedExpert) {
+        const cell = selectedExpertCell();
+        if (cell) {
+          kind = "expert";
+          rows = expertRows(cell);
+        }
+      } else if (state.selectedComm) {
+        const edge = communicationEdges.find((item) => item.id === state.selectedComm);
+        if (edge) {
+          kind = "comm";
+          rows = [
+            ["edge", edge.id],
+            ["domain", edge.domain],
+            ["scope", edge.scope],
+            ["pattern", edge.pattern],
+            ["source", edge.sourceObject],
+            ["target", edge.targetObject],
+            ["count", edge.count],
+            ["fidelity", edge.fidelity],
+            ["status", edge.status]
+          ];
+        }
+      } else if (state.selectedCoverage) {
+        const item = coverage.items.find((entry) => entry.id === state.selectedCoverage);
+        kind = "coverage";
+        rows = item ? [
+          ["gate", item.label],
+          ["actual", item.actual],
+          ["expected", item.expected],
+          ["object", item.object],
+          ["status", item.status]
+        ] : [
+          ["region", "L18-L42 MoE route focus"],
+          ["purpose", "side-view focal overlay"],
+          ["fidelity", "synthetic load sample"],
+          ["status", "visual helper"]
+        ];
+      }
+      $("#inspectorKind").textContent = kind;
+      $("#inspectorKv").innerHTML = rows.map(sourceLine).join("");
+    }
+
+    function renderSourceBox() {
+      const rows = [
+        ["model", MODEL.name],
+        ["paper", MODEL.source],
+        ["target", "72BA16B only"],
+        ["expert load", "synthetic distribution"],
+        ["scope", "MoE router, experts, dispatch/combine only"]
+      ];
+      $("#sourceBox").innerHTML = rows.map(sourceLine).join("");
+    }
+
+    function renderCoverageMini() {
+      $("#coverageMini").innerHTML = coverage.items.slice(0, 5).map((item) => sourceLine([item.label, `${item.actual}/${item.expected} ${item.status}`])).join("");
+      $("#statusRight").textContent = `coverage ${coverage.score}% · ${communicationEdges.length} comm objects`;
+    }
+
+    function updateChromeLabels() {
+      $("#layerReadout").textContent = `L${state.selectedLayer}`;
+      $("#analysisMeta").textContent = {
+        experts: `L${state.selectedLayer} · ${metricLabel(state.metric)}`,
+        communication: "MoE dispatch/combine catalog",
+        coverage: `${coverage.score}% structural coverage`
+      }[state.tab];
+    }
+
+    function layerRows(layer) {
+      const buckets = epBuckets.filter((bucket) => bucket.layer === layer);
+      const hot = expertCells.filter((cell) => cell.layer === layer).reduce((best, cell) => cell.loadRatio > best.loadRatio ? cell : best, expertCells[layer * 64]);
+      return [
+        ["object", `MoGE layer L${layer}`],
+        ["slot", `MoE slot S${layer}`],
+        ["router", `Top-${MODEL.topK}, ${MODEL.groups} groups`],
+        ["routed experts", MODEL.routedExpertsPerLayer],
+        ["shared experts", MODEL.sharedExpertsPerLayer],
+        ["assigned tokens", formatNumber(sum(buckets, "assignedTokens"))],
+        ["token route", "dispatch + combine"],
+        ["hot expert", hot ? `${hot.id} ${hot.loadRatio.toFixed(2)}x` : "none"],
+        ["fidelity", "paper constants + synthetic distribution"]
+      ];
+    }
+
+    function expertRows(cell) {
+      return [
+        ["object", cell.id],
+        ["layer", `L${cell.layer}`],
+        ["expert", `E${cell.expert}`],
+        ["group", `G${cell.group}, local ${cell.groupExpert}`],
+        ["load", `${cell.loadRatio.toFixed(3)}x`],
+        ["assigned", formatNumber(cell.assignedTokens)],
+        ["dispatch tokens", formatNumber(cell.a2aSend)],
+        ["combine tokens", formatNumber(cell.a2aRecv)],
+        ["router prob", `${cell.routerProbMass.toFixed(2)}%`]
+      ];
+    }
+
+    function kvRows(rows) {
+      return rows.map(([key, value]) => `<span>${key}</span><b title="${String(value)}">${value}</b>`).join("");
+    }
+
+    function sourceLine([key, value]) {
+      return `<div class="ep-source-line"><span>${key}</span><span title="${String(value)}">${value}</span></div>`;
+    }
+
+    function statHtml([label, value]) {
+      return `<div class="ep-stat"><span>${label}</span><b>${value}</b></div>`;
+    }
+
+    function coverageRow(item) {
+      return `<div class="ep-coverage-row" data-coverage="${item.id}">
+        <div><b>${item.actual} / ${item.expected}</b><span>${item.label}</span></div>
+        <em class="ep-pill ${item.status === "pass" ? "ok" : "warn"}" style="font-style:normal">${item.status}</em>
+      </div>`;
+    }
+
+    function selectedExpertCell() {
+      return expertCells.find((cell) => cell.id === state.selectedExpert);
+    }
+
+    function buildCommunicationEdges() {
+      const edges = [];
+      for (let layer = 0; layer < MODEL.realLayers; layer += 1) {
+        const buckets = epBuckets.filter((bucket) => bucket.layer === layer);
+        edges.push({
+          id: `comm-dispatch-L${layer}`,
+          domain: "MoE",
+          scope: `L${layer}`,
+          pattern: "token dispatch",
+          sourceObject: `router-L${layer}`,
+          targetObject: "64 routed experts",
+          count: 1,
+          fidelity: "derived",
+          status: "paper",
+          tokens: sum(buckets, "a2aSend")
+        });
+        edges.push({
+          id: `comm-combine-L${layer}`,
+          domain: "MoE",
+          scope: `L${layer}`,
+          pattern: "token combine",
+          sourceObject: "64 routed experts",
+          targetObject: `residual-L${layer}`,
+          count: 1,
+          fidelity: "derived",
+          status: "paper",
+          tokens: sum(buckets, "a2aRecv")
+        });
+      }
+      edges.push(
+        { id: "comm-moge-group-balance", domain: "MoGE", scope: "router", pattern: "8 groups, 1 active expert per group", sourceObject: "router probability groups", targetObject: "Top-8 selected experts", count: MODEL.groups, fidelity: "paper constant", status: "paper" },
+        { id: "comm-moe-shared-experts", domain: "MoE", scope: "shared experts", pattern: "shared expert residual branch", sourceObject: "hidden states", targetObject: "4 shared experts", count: MODEL.realLayers * MODEL.sharedExpertsPerLayer, fidelity: "paper constant", status: "paper" }
+      );
+      return edges;
+    }
+
+    function buildCoverageReport() {
+      const dispatchCount = communicationEdges.filter((edge) => edge.id.startsWith("comm-dispatch-L")).length;
+      const combineCount = communicationEdges.filter((edge) => edge.id.startsWith("comm-combine-L")).length;
+      const noopViolations = communicationEdges.filter((edge) => /L4[89]/.test(edge.id)).length;
+      const items = [
+        coverageItem("layers", "real MoGE layers", MODEL.realLayers, layers.filter((item) => item.kind === "moge").length, "Layer"),
+        coverageItem("training-slots", "MoE visual slots", MODEL.trainingSlots, layers.length, "Schedule"),
+        coverageItem("routed-experts", "routed expert cells", MODEL.realLayers * MODEL.routedExpertsPerLayer, expertCells.length, "Expert"),
+        coverageItem("shared-experts", "shared expert cells", MODEL.realLayers * MODEL.sharedExpertsPerLayer, sharedExpertCells.length, "SharedExpert"),
+        coverageItem("route-summaries", "MoE route summaries", MODEL.realLayers * MODEL.training.ep, epBuckets.length, "RouteSummary"),
+        coverageItem("routers", "router objects", MODEL.realLayers, MODEL.realLayers, "Router"),
+        coverageItem("dispatch", "forward dispatch edges", MODEL.realLayers, dispatchCount, "CommunicationEdge"),
+        coverageItem("combine", "forward combine edges", MODEL.realLayers, combineCount, "CommunicationEdge"),
+        coverageItem("noop", "no-op slot MoE route violations", 0, noopViolations, "NoOpSlot")
+      ];
+      const pass = items.filter((item) => item.status === "pass").length;
+      return { score: Math.round(pass / items.length * 100), items };
+    }
+
+    function coverageItem(id, label, expected, actual, object) {
+      return { id, label, expected, actual, object, status: expected === actual ? "pass" : "warn" };
+    }
+
+    function normalizeMetric(cell, metric) {
+      if (metric === "loadRatio") return cell.loadRatio;
+      if (metric === "assignedTokens") return cell.assignedTokens / 430;
+      if (metric === "a2aSend") return cell.a2aSend / 220;
+      if (metric === "a2aRecv") return cell.a2aRecv / 220;
+      if (metric === "routerProbMass") return cell.routerProbMass / 1.65;
+      return cell.loadRatio;
+    }
+
+    function heatColor(value) {
+      const v = clamp(value, 0, 1.35);
+      if (v < .55) return colorMix("#2563eb", "#22c55e", v / .55);
+      if (v < 1) return colorMix("#22c55e", "#f59e0b", (v - .55) / .45);
+      return colorMix("#f59e0b", "#ef4444", (v - 1) / .35);
+    }
+
+    function colorMix(a, b, t) {
+      const ca = hexToRgb(a);
+      const cb = hexToRgb(b);
+      const v = clamp(t, 0, 1);
+      return `rgb(${Math.round(ca.r + (cb.r - ca.r) * v)}, ${Math.round(ca.g + (cb.g - ca.g) * v)}, ${Math.round(ca.b + (cb.b - ca.b) * v)})`;
+    }
+
+    function hexToRgb(hex) {
+      const value = hex.replace("#", "");
+      return { r: parseInt(value.slice(0, 2), 16), g: parseInt(value.slice(2, 4), 16), b: parseInt(value.slice(4, 6), 16) };
+    }
+
+    function formatMetric(value) {
+      if (typeof value !== "number") return value;
+      if (value > 100) return formatNumber(Math.round(value));
+      return value.toFixed(2);
+    }
+
+    function formatNumber(value) {
+      if (typeof value !== "number") return value;
+      return new Intl.NumberFormat("en-US").format(value);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function sum(items, key) {
+      return items.reduce((total, item) => total + Number(item[key] || 0), 0);
+    }
+
+    function avg(items, key) {
+      return items.length ? sum(items, key) / items.length : 0;
+    }
+  </script>
+</body>
+</html>
