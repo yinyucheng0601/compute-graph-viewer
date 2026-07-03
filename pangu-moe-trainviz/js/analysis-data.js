@@ -251,6 +251,200 @@ export function buildCardLoadViewModel(rankViewModel, collapse = 0) {
   };
 }
 
+// ===== Layer Scan：逐层 × 逐 step 指标（可切换）——单跑自身信号，非双跑 diff =====
+// 同一「层深 × 时间」轴可承载多种量。这里做成 4 个可切换通道：
+//   梯度/负载 = 异常型（色=偏离健康基线；首超标/峰值有意义；算子占比=对异常的贡献）
+//   耗时/显存 = 成本型（色=绝对成本；算子占比=计算/资源占用，火焰图式）
+// 都自洽于 timeseries.js 的故障链：faultStep 起，faultLayer（Router 所在 MoE 层）为中心，
+// 沿层深向下游累积，collapseStep 后在故障带饱和/变贵。
+const LAYER_SCAN_OP_META = {
+  mla: { label: 'MLA', sem: 'sem:attention' },
+  moe_prenorm: { label: 'Pre-RMSNorm', sem: 'sem:norm' },
+  gate: { label: 'Router', sem: 'sem:gate' },
+  a2a_dispatch: { label: 'A2A dispatch', sem: 'sem:comm' },
+  experts: { label: 'Experts', sem: 'sem:moe' },
+  a2a_combine: { label: 'A2A combine', sem: 'sem:comm' },
+  moe_residual: { label: 'Post-RMSNorm', sem: 'sem:norm' },
+  dense: { label: 'Dense FFN', sem: 'module:decoder' },
+  norm: { label: 'RMSNorm', sem: 'sem:norm' },
+};
+// 算子权重档：贡献型（bug 在 Router）/ 耗时型（Experts+MLA 最贵）/ 显存型（Experts+MLA 占用大）
+const LAYER_SCAN_PROFILE = {
+  contrib: {
+    moe: { gate: 0.30, experts: 0.24, a2a_dispatch: 0.14, a2a_combine: 0.14, mla: 0.07, moe_prenorm: 0.05, moe_residual: 0.06 },
+    dense: { dense: 0.50, mla: 0.34, norm: 0.16 },
+  },
+  time: {
+    moe: { experts: 0.42, mla: 0.20, a2a_dispatch: 0.10, a2a_combine: 0.10, moe_residual: 0.07, moe_prenorm: 0.06, gate: 0.05 },
+    dense: { dense: 0.58, mla: 0.30, norm: 0.12 },
+  },
+  mem: {
+    moe: { experts: 0.38, mla: 0.28, a2a_dispatch: 0.08, a2a_combine: 0.08, moe_prenorm: 0.07, moe_residual: 0.06, gate: 0.05 },
+    dense: { dense: 0.50, mla: 0.34, norm: 0.16 },
+  },
+};
+
+export function buildLayerScanMetrics({
+  steps,
+  faultStep,
+  collapseStep,
+  totalLayers = 61,
+  firstMoeLayer = 3,
+  lastMoeLayer = 60,
+  faultLayer = 47,
+} = {}) {
+  const stepCount = steps.length;
+  const lastStep = steps[stepCount - 1];
+  const layers = [];
+  for (let layer = 0; layer < totalLayers; layer++) {
+    const isMoe = layer >= firstMoeLayer && layer <= lastMoeLayer;
+    layers.push({ layer, isMoe, isDense: !isMoe });
+  }
+  const isMoeL = layer => layer >= firstMoeLayer && layer <= lastMoeLayer;
+  const gauss = (x, mu, sigma) => Math.exp(-((x - mu) ** 2) / (2 * sigma * sigma));
+  const originF = layer => gauss(layer, faultLayer, 3.2);
+  const downF = layer => layer > faultLayer ? clamp01((layer - faultLayer) / Math.max(1, lastMoeLayer - faultLayer)) : 0;
+  const rampF = s => s >= faultStep ? clamp01((s - faultStep) / Math.max(1, collapseStep - faultStep)) : 0;
+  const postF = s => s >= collapseStep ? clamp01((s - collapseStep) / Math.max(1, lastStep - collapseStep)) : 0;
+  // 共享异常骨架 0..1（MoE 为主；故障层为中心 + 向下游累积 + 沿时间爬升/饱和）
+  const anomF = (layer, s) => {
+    if (!isMoeL(layer)) return 0;
+    const r = rampF(s), p = postF(s), o = originF(layer), d = downF(layer);
+    const nz = (hash01(layer, s, 23) - 0.5) * 0.06;
+    return clamp01(r * (0.50 * o + 0.28 * d) + p * (0.42 * o + 0.50 * d + 0.08) + (r + p) * nz);
+  };
+
+  // 各通道的物理量取值（raw），归一化到 [lo,hi] 用于上色
+  const CHANNEL_SPECS = [
+    {
+      id: 'grad', label: '梯度', unit: 'grad norm', kind: 'anomaly', digits: 1,
+      lo: 0.8, hi: 8, warnRaw: 2.5, profile: 'contrib', markerLabel: '首问题层',
+      opLabel: '算子分解 · 占该层梯度异常',
+      desc: '逐层梯度范数；健康≈1，故障层及下游随 step 爆炸（与 grad_norm 发散一致）。占比=各算子对梯度异常的贡献。',
+      rawFn: (layer, s) => 0.9 + (hash01(layer, s, 7) - 0.5) * 0.15 + anomF(layer, s) * 7.0,
+    },
+    {
+      id: 'load', label: '负载', unit: '×cap', kind: 'anomaly', digits: 2,
+      lo: 0.6, hi: 3.0, warnRaw: 1.3, profile: 'contrib', markerLabel: '首问题层',
+      opLabel: '算子分解 · 占该层负载偏移',
+      desc: 'MoE 逐层专家负载（×capacity）；Dense 无专家故为空。坍缩后热点专家过载、token 溢出。占比=各算子对负载偏移的贡献。',
+      rawFn: (layer, s) => isMoeL(layer) ? 0.72 + (hash01(layer, s, 11) - 0.5) * 0.12 + anomF(layer, s) * 2.3 : 0,
+    },
+    {
+      id: 'time', label: '耗时', unit: 'µs', kind: 'cost', digits: 0,
+      lo: 500, hi: 1700, warnRaw: 1300, profile: 'time', markerLabel: '最耗时层',
+      opLabel: '算子分解 · 占该层耗时',
+      desc: '逐层前反向耗时；MoE 结构性更贵，坍缩后热点层因负载不均/A2A 等待更慢。占比=计算耗时（火焰图式）。',
+      rawFn: (layer, s) => {
+        const structural = isMoeL(layer) ? 1080 : 600;
+        const slow = isMoeL(layer) ? postF(s) * (0.15 + 0.55 * originF(layer)) * structural : 0;
+        return structural * (1 + (hash01(layer, s, 13) - 0.5) * 0.06) + slow;
+      },
+    },
+    {
+      id: 'mem', label: '显存', unit: 'GB', kind: 'cost', digits: 1,
+      lo: 1.5, hi: 3.6, warnRaw: 3.1, profile: 'mem', markerLabel: '显存峰值层',
+      opLabel: '算子分解 · 占该层显存',
+      desc: '逐层激活显存峰值；MoE（激活+专家权重）更高，坍缩后 rerouted buffer / 碎片略升。占比=显存占用（结构性）。',
+      rawFn: (layer, s) => {
+        const structural = isMoeL(layer) ? 2.6 : 2.0;
+        const bump = isMoeL(layer) ? postF(s) * originF(layer) * 0.7 : 0;
+        return structural * (1 + (hash01(layer, s, 29) - 0.5) * 0.04) + bump;
+      },
+    },
+  ];
+
+  function buildChannel(spec) {
+    const scores = new Float32Array(totalLayers * stepCount);
+    const raw = new Float32Array(totalLayers * stepCount);
+    const span = Math.max(1e-6, spec.hi - spec.lo);
+    const warnThreshold = clamp01((spec.warnRaw - spec.lo) / span);
+    let maxRaw = -Infinity;
+    for (let layer = 0; layer < totalLayers; layer++) {
+      for (let si = 0; si < stepCount; si++) {
+        const v = spec.rawFn(layer, steps[si]);
+        raw[layer * stepCount + si] = v;
+        scores[layer * stepCount + si] = clamp01((v - spec.lo) / span);
+        if (v > maxRaw) maxRaw = v;
+      }
+    }
+    const perLayer = layers.map(({ layer, isMoe }) => {
+      let firstDivergeStep = null, peak = 0, peakStep = steps[0], peakRaw = raw[layer * stepCount];
+      for (let si = 0; si < stepCount; si++) {
+        const nv = scores[layer * stepCount + si];
+        if (firstDivergeStep == null && nv >= warnThreshold) firstDivergeStep = steps[si];
+        if (nv > peak) { peak = nv; peakStep = steps[si]; peakRaw = raw[layer * stepCount + si]; }
+      }
+      return { layer, isMoe, firstDivergeStep, peak, peakStep, peakRaw };
+    });
+    const diverged = perLayer.filter(l => l.firstDivergeStep != null);
+    const epicenter = diverged.length
+      ? diverged.reduce((b, l) => (l.firstDivergeStep < b.firstDivergeStep
+          || (l.firstDivergeStep === b.firstDivergeStep && l.peak > b.peak)) ? l : b)
+      : perLayer.reduce((b, l) => l.peak > b.peak ? l : b, perLayer[0]);
+    const peakLayer = perLayer.reduce((b, l) => l.peak > b.peak ? l : b, perLayer[0]);
+    const marker = spec.kind === 'anomaly'
+      ? { layer: epicenter.layer, step: epicenter.firstDivergeStep ?? epicenter.peakStep }
+      : { layer: peakLayer.layer, step: peakLayer.peakStep };
+    const scoreAt = (layer, step) => {
+      const si = steps.indexOf(step);
+      return si < 0 || layer < 0 || layer >= totalLayers ? 0 : scores[layer * stepCount + si];
+    };
+    const rawAt = (layer, step) => {
+      const si = steps.indexOf(step);
+      return si < 0 || layer < 0 || layer >= totalLayers ? 0 : raw[layer * stepCount + si];
+    };
+    const wmapOf = layer => LAYER_SCAN_PROFILE[spec.profile][isMoeL(layer) ? 'moe' : 'dense'];
+    // share = 占该层该指标的比例（条长）；score = 强度 0..1（颜色，主导算子≈该层归一分）
+    const ops = (layer, step) => {
+      const nv = scoreAt(layer, step);
+      const entries = Object.entries(wmapOf(layer)).map(([op, w]) => ({ op, w: w * (0.85 + hash01(layer, step, op.length * 7) * 0.30) }));
+      const sum = entries.reduce((a, d) => a + d.w, 0) || 1;
+      const maxW = entries.reduce((m, d) => Math.max(m, d.w), 0) || 1;
+      return entries.map(d => ({
+        op: d.op, label: LAYER_SCAN_OP_META[d.op].label, sem: LAYER_SCAN_OP_META[d.op].sem,
+        share: d.w / sum, score: clamp01(nv * (d.w / maxW)),
+      }));
+    };
+    const domOp = Object.entries(LAYER_SCAN_PROFILE[spec.profile].moe).reduce((b, e) => e[1] > b[1] ? e : b)[0];
+    // 阈值文本：>标准值（含紧凑单位，如 >2.5 / >1.30× / >1300µs / >3.1GB）
+    const su = spec.unit === 'grad norm' ? '' : spec.unit === '×cap' ? '×' : spec.unit;
+    const warnText = `>${spec.warnRaw.toFixed(spec.digits)}${su}`;
+    const stats = spec.kind === 'anomaly' ? [
+      { label: spec.markerLabel, value: `L${epicenter.layer}` },
+      { label: `首超标（${warnText}）`, value: epicenter.firstDivergeStep != null ? `step ${epicenter.firstDivergeStep}` : '—' },
+      { label: '峰值', value: `${maxRaw.toFixed(spec.digits)} ${spec.unit}` },
+      { label: '超标层数', value: `${diverged.length}` },
+      { label: '主导算子', value: LAYER_SCAN_OP_META[domOp].label },
+      { label: 'MoE 层', value: `L${firstMoeLayer}-L${lastMoeLayer}` },
+    ] : [
+      { label: spec.markerLabel, value: `L${peakLayer.layer}` },
+      { label: '峰值', value: `${maxRaw.toFixed(spec.digits)} ${spec.unit}` },
+      { label: `首超阈（${warnText}）`, value: epicenter.firstDivergeStep != null ? `step ${epicenter.firstDivergeStep}` : '—' },
+      { label: '超阈层数', value: `${diverged.length}` },
+      { label: '主导算子', value: LAYER_SCAN_OP_META[domOp].label },
+      { label: 'MoE 层', value: `L${firstMoeLayer}-L${lastMoeLayer}` },
+    ];
+    return {
+      id: spec.id, label: spec.label, unit: spec.unit, kind: spec.kind, digits: spec.digits,
+      scores, raw, warnThreshold, warnText, perLayer, epicenter, peakLayer, marker, maxRaw, markerLabel: spec.markerLabel,
+      scoreAt, rawAt, ops, opLabel: spec.opLabel, desc: spec.desc, stats,
+    };
+  }
+
+  const channels = {};
+  const channelOrder = CHANNEL_SPECS.map(s => s.id);
+  CHANNEL_SPECS.forEach(s => { channels[s.id] = buildChannel(s); });
+
+  return {
+    schema: 'pangu.layer-scan.mock.v2',
+    steps, stepCount, totalLayers, firstMoeLayer, lastMoeLayer, faultStep, collapseStep, faultLayer,
+    layers, channels, channelOrder, defaultChannel: 'grad',
+    title: 'Layer Scan',
+    meta: `L0-L${lastMoeLayer} × ${stepCount} steps · 指标可切换`,
+  };
+}
+
 function compDuration(stage, type, microbatch, forwardBaseUs, backwardBaseUs) {
   const base = type === 'F' ? forwardBaseUs : backwardBaseUs;
   const stageWeight = stage === 0 ? 0.9 : 1.08;
