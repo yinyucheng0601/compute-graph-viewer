@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ascend C Puzzles IDE Demo</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="./pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="./pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="./pto-design-system/css/style.css">
+  <link rel="stylesheet" href="./pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="./pto-design-system/patterns/floating-playback-control/pattern.css">
+  <link rel="stylesheet" href="./pto-design-system/patterns/ide-frame/pattern.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--ide-gradient-bg);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+
+    :root,
+    :root[data-theme='dark'] {
+      --ide-bg-start: #12151b;
+      --ide-bg-mid: #0d1016;
+      --ide-bg-end: #080b10;
+      --ide-glow-left: 48 122 255;
+      --ide-glow-right: 25 204 168;
+      --ide-glow-center: 255 170 59;
+      --ide-glow-lower: 124 141 184;
+      --ide-glow-bottom: 67 105 239;
+      --ide-dot-color: 116 140 190;
+      --ide-dot-hot-color: 25 204 168;
+      --ide-cursor-color: 67 105 239;
+      --ide-gradient-left-alpha: 0.13;
+      --ide-gradient-right-alpha: 0.10;
+      --ide-gradient-center-alpha: 0.045;
+      --ide-gradient-lower-alpha: 0.04;
+      --ide-aura-left-alpha: 0.16;
+      --ide-aura-right-alpha: 0.14;
+      --ide-aura-center-alpha: 0.06;
+      --ide-aura-lower-alpha: 0.05;
+      --ide-aura-bottom-alpha: 0.06;
+      --ide-dot-opacity: 0;
+      --ide-dot-size: 1px;
+      --ide-dot-gap: 22px;
+      --ide-dot-hot-radius: 220px;
+      --ide-cursor-x: 50%;
+      --ide-cursor-y: 40%;
+      --ide-cursor-alpha: 0;
+      --ide-cursor-radius: 380px;
+      --ide-gradient-bg:
+        radial-gradient(circle at top left, rgb(var(--ide-glow-left) / var(--ide-gradient-left-alpha)), transparent 28%),
+        radial-gradient(circle at top right, rgb(var(--ide-glow-right) / var(--ide-gradient-right-alpha)), transparent 30%),
+        radial-gradient(circle at 52% 8%, rgb(var(--ide-glow-center) / var(--ide-gradient-center-alpha)), transparent 34%),
+        radial-gradient(circle at 20% 86%, rgb(var(--ide-glow-lower) / var(--ide-gradient-lower-alpha)), transparent 34%),
+        linear-gradient(180deg, var(--ide-bg-start) 0%, var(--ide-bg-mid) 44%, var(--ide-bg-end) 100%);
+      --ide-aura-bg:
+        radial-gradient(circle at var(--ide-cursor-x) var(--ide-cursor-y), rgb(var(--ide-cursor-color) / var(--ide-cursor-alpha)) 0, transparent var(--ide-cursor-radius)),
+        radial-gradient(circle at 12% 12%, rgb(var(--ide-glow-left) / var(--ide-aura-left-alpha)), transparent 0 22rem),
+        radial-gradient(circle at 88% 8%, rgb(var(--ide-glow-right) / var(--ide-aura-right-alpha)), transparent 0 24rem),
+        radial-gradient(circle at 52% 18%, rgb(var(--ide-glow-center) / var(--ide-aura-center-alpha)), transparent 0 20rem),
+        radial-gradient(circle at 18% 78%, rgb(var(--ide-glow-lower) / var(--ide-aura-lower-alpha)), transparent 0 18rem),
+        radial-gradient(circle at 72% 86%, rgb(var(--ide-glow-bottom) / var(--ide-aura-bottom-alpha)), transparent 0 18rem);
+      --ide-frame-page-bg: #101114;
+      --ide-frame-bg: #101114;
+      --puzzle-blue: #5a92e6;
+      --puzzle-cyan: #19cca8;
+      --puzzle-amber: #ffaa3b;
+      --puzzle-red: #ff4b7b;
+      --puzzle-purple: #9b7cff;
+      --viz-grid: color-mix(in srgb, var(--foreground) 13%, transparent);
+      --viz-cell: color-mix(in srgb, var(--puzzle-blue) 20%, transparent);
+      --viz-cell-strong: color-mix(in srgb, var(--puzzle-blue) 42%, transparent);
+      --viz-active: color-mix(in srgb, var(--puzzle-red) 72%, transparent);
+      --viz-pad: color-mix(in srgb, var(--foreground) 9%, transparent);
+    }
+
+    .asc-demo-frame {
+      width: 100vw;
+      height: 100vh;
+      aspect-ratio: auto;
+      border-radius: 0;
+      box-shadow: none;
+      background: var(--ide-gradient-bg);
+      --floating-playback-expanded-width: min(760px, calc(100vw - 160px));
+    }
+
+    .asc-demo-frame .pto-ide-frame__topbar,
+    .asc-demo-frame .pto-ide-frame__body,
+    .asc-demo-frame .pto-ide-frame__floating-playback-mount {
+      position: relative;
+      z-index: 1;
+    }
+
+    .asc-demo-frame .pto-ide-frame__topbar-center { display: none; }
+    .asc-demo-frame .pto-ide-frame__split {
+      --pto-workbench-shell-gutter: 8px;
+      padding-left: 0;
+      padding-bottom: 0;
+      background: transparent;
+      overflow: visible;
+    }
+    .asc-demo-frame .pto-workbench-shell__split-gutter {
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .top-actions { display: flex; gap: 4px; }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-muted);
+      cursor: pointer;
+    }
+    .icon-btn:hover,
+    .icon-btn.is-active {
+      background: var(--ide-frame-control-bg);
+      color: var(--foreground);
+    }
+    .icon-btn svg,
+    .rail-icon,
+    .mini-icon {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-pane="inspector"] { display: none; }
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"] > [data-ide-pane="editor-preview"] {
+      flex: 1 1 100% !important;
+      width: 100% !important;
+    }
+    .pto-ide-frame[data-inspector-open="false"] [data-ide-split="standalone-main"] > [data-split-direction="horizontal"].pto-workbench-shell__split-gutter {
+      display: none;
+    }
+
+    .explorer-body {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: auto;
+    }
+    .explorer-title {
+      padding: 0 2px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .puzzle-card {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+      color: var(--foreground-secondary);
+      text-align: left;
+      cursor: pointer;
+    }
+    .puzzle-card:hover,
+    .puzzle-card.is-active {
+      background: var(--state-selected);
+      border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+      color: var(--foreground);
+    }
+    .puzzle-card__top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+    .puzzle-card__id {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+    }
+    .puzzle-card__title {
+      margin: 0 0 6px;
+      color: var(--foreground);
+      font: 700 12.5px / 1.25 var(--font-sans);
+    }
+    .puzzle-card__desc {
+      margin: 0;
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 7px;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 7%, transparent);
+      color: var(--foreground-secondary);
+      font: 700 10px / 1 var(--font-sans);
+      white-space: nowrap;
+    }
+    .status-badge.is-ready { color: var(--success); }
+    .status-badge.is-designing { color: var(--warning); }
+    .status-badge.is-compared { color: var(--puzzle-cyan); }
+
+    .tab-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+    }
+    .tab-btn {
+      height: 26px;
+      padding: 0 10px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      cursor: pointer;
+    }
+    .tab-btn:hover,
+    .tab-btn.is-active {
+      background: var(--state-selected);
+      color: var(--foreground);
+    }
+
+    .workbench {
+      height: 100%;
+      overflow: auto;
+      padding: 14px;
+    }
+    .view { display: none; height: 100%; min-height: 620px; }
+    .view.is-active { display: block; }
+    .view-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 14px;
+      height: 100%;
+      min-height: 620px;
+    }
+    .view-main,
+    .view-side,
+    .viz-panel {
+      min-width: 0;
+      border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 78%, transparent);
+      overflow: hidden;
+    }
+    .section-head {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+    }
+    .section-head h3 {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+    }
+    .section-meta {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+    }
+    .section-body { padding: 12px; }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      gap: 14px;
+    }
+    .summary-panel {
+      border-top: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      padding: 14px 0 0;
+      margin-top: 14px;
+    }
+    .summary-panel:first-child {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .summary-panel h3,
+    .side-title {
+      margin: 0 0 9px;
+      color: var(--foreground);
+      font: 700 13px / 1.25 var(--font-sans);
+    }
+    .summary-panel p {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+    .formula {
+      display: block;
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground);
+      font: 600 13px / 1.5 var(--font-mono);
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+    }
+    .metric span {
+      display: block;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+    .metric b {
+      display: block;
+      margin-top: 5px;
+      color: var(--foreground);
+      font: 700 15px / 1.25 var(--font-sans);
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .table-like {
+      display: grid;
+      gap: 1px;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+    .table-like div {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      font: var(--text-body-sm);
+    }
+    .table-like span {
+      padding: 8px;
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 86%, transparent);
+      color: var(--foreground-secondary);
+    }
+    .table-like .head span {
+      color: var(--foreground);
+      font-weight: 700;
+    }
+
+    .control-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .control-field {
+      display: grid;
+      gap: 6px;
+    }
+    .control-field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+    .control-field output {
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+    .control-field input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+    }
+    .control-field select {
+      width: 100%;
+      height: 30px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground);
+      font: var(--text-body-sm);
+    }
+
+    .scheme-row,
+    .check-row,
+    .inspector-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 28px;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+    .check-row b,
+    .inspector-row b { color: var(--foreground); font-weight: 700; }
+    .check-row.is-warning b { color: var(--warning); }
+    .check-row.is-danger b { color: var(--danger); }
+    .check-row.is-ok b { color: var(--success); }
+
+    .tiling-map {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+    }
+    .tensor-ruler {
+      display: grid;
+      grid-template-columns: repeat(16, minmax(18px, 1fr));
+      gap: 3px;
+    }
+    .tensor-cell {
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--viz-grid);
+      border-radius: 6px;
+      background: var(--viz-cell);
+      color: var(--foreground-secondary);
+      font: 700 10px / 1 var(--font-mono);
+    }
+    .tensor-cell.is-core { background: color-mix(in srgb, var(--puzzle-cyan) 24%, transparent); }
+    .tensor-cell.is-tail { background: color-mix(in srgb, var(--puzzle-amber) 42%, transparent); color: var(--foreground); }
+    .tensor-cell.is-active { background: var(--viz-active); color: white; }
+    .core-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .core-card {
+      padding: 9px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+    }
+    .core-card h4 {
+      margin: 0 0 8px;
+      color: var(--foreground);
+      font: var(--text-label);
+    }
+    .tile-bar {
+      height: 12px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 7%, transparent);
+    }
+    .tile-bar span {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      background: linear-gradient(90deg, var(--puzzle-blue), var(--puzzle-cyan));
+    }
+    .ub-meter {
+      height: 10px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+    .ub-meter span {
+      display: block;
+      height: 100%;
+      width: var(--usage);
+      background: linear-gradient(90deg, var(--success), var(--warning));
+    }
+
+    .api-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 12px;
+      height: 100%;
+    }
+    .api-canvas {
+      display: grid;
+      grid-template-columns: minmax(250px, 0.8fr) minmax(280px, 1fr);
+      grid-template-rows: minmax(210px, 0.85fr) minmax(240px, 1fr);
+      gap: 12px;
+      min-height: 610px;
+    }
+    .fm-grid-wrap,
+    .matrix-wrap,
+    .filter-wrap,
+    .mapping-wrap {
+      height: 100%;
+      min-height: 0;
+    }
+    .feature-grid {
+      display: grid;
+      gap: 4px;
+      justify-content: start;
+      align-content: start;
+      padding: 12px;
+    }
+    .feature-cell,
+    .matrix-cell,
+    .format-cell {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--viz-grid);
+      border-radius: 5px;
+      background: var(--viz-cell);
+      color: var(--foreground-secondary);
+      font: 700 10px / 1 var(--font-mono);
+      cursor: pointer;
+    }
+    .feature-cell.is-pad,
+    .matrix-cell.is-pad { background: var(--viz-pad); color: var(--foreground-muted); }
+    .feature-cell.is-window { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--puzzle-red) 70%, transparent); }
+    .feature-cell.is-sampled,
+    .matrix-cell.is-filled { background: var(--viz-active); color: white; }
+    .feature-cell.is-selected,
+    .matrix-cell.is-selected {
+      outline: 2px solid var(--puzzle-amber);
+      outline-offset: 2px;
+    }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 24px);
+      gap: 3px;
+      padding: 12px;
+      overflow: auto;
+    }
+    .matrix-cell {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+    }
+    .filter-box {
+      display: grid;
+      grid-template-columns: repeat(3, 46px);
+      gap: 7px;
+      padding: 18px;
+      justify-content: center;
+    }
+    .filter-cell {
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--viz-grid);
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--puzzle-red) 18%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+    }
+    .filter-cell.is-sampled {
+      background: color-mix(in srgb, var(--puzzle-red) 68%, transparent);
+      color: white;
+    }
+    .mapping-text {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+    .mapping-text code {
+      display: block;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground);
+      font: var(--text-mono);
+      white-space: normal;
+    }
+
+    .pipeline-grid {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+    }
+    .timeline {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 8px;
+    }
+    .lane-label {
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+    .lane {
+      position: relative;
+      min-height: 42px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      border-radius: var(--radius-sm);
+      background:
+        repeating-linear-gradient(90deg, transparent 0 59px, color-mix(in srgb, var(--foreground) 6%, transparent) 60px 61px),
+        color-mix(in srgb, var(--foreground) 4%, transparent);
+    }
+    .stage {
+      position: absolute;
+      top: 7px;
+      left: calc(var(--start) * 1%);
+      width: calc(var(--dur) * 1%);
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      color: white;
+      font: 700 10px / 1 var(--font-sans);
+      background: var(--stage-color);
+      cursor: grab;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+    }
+    .stage:active { cursor: grabbing; }
+    .stage.is-wait {
+      background: color-mix(in srgb, var(--warning) 55%, transparent);
+      color: var(--foreground);
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .compare-card {
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+    }
+    .compare-card h4 {
+      margin: 0 0 9px;
+      color: var(--foreground);
+      font: var(--text-label);
+    }
+
+    .format-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+    }
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 28px);
+      gap: 4px;
+      padding: 12px;
+    }
+    .format-cell.is-active {
+      background: var(--viz-active);
+      color: white;
+    }
+    .format-cell.is-pad {
+      background: var(--viz-pad);
+      color: var(--foreground-muted);
+    }
+
+    .inspector {
+      padding: 12px;
+      display: grid;
+      gap: 14px;
+      overflow: auto;
+    }
+    .inspector-section {
+      display: grid;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+    .inspector-section:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .inspector-section h3 {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+    }
+    .soft-note {
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .terminal-lines {
+      padding: 10px 12px;
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1100px) {
+      .view-grid,
+      .overview-grid,
+      .api-layout,
+      .api-canvas,
+      .format-layout {
+        grid-template-columns: 1fr;
+      }
+      .view { min-height: auto; }
+      .api-canvas { grid-template-rows: auto; }
+      .compare-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section class="pto-ide-frame asc-demo-frame" data-ide-frame data-host="standalone" data-inspector-open="true" aria-label="Ascend C Puzzles IDE Demo">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+      <div class="pto-ide-frame__topbar-left">
+        <div class="pto-ide-frame__host-chip">
+          <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+            <path d="m7 9 3 3-3 3"></path>
+            <path d="M12 15h5"></path>
+          </svg>
+          <span>Ascend C Puzzles · <b>UX prototype</b></span>
+        </div>
+        <div class="pto-ide-frame__workspace" data-ide-slot="workspace-switcher">
+          <span>operator-design-lab</span>
+          <span class="pto-ide-frame__crumbs" id="topCrumb">PZ-003 / API Visualizer</span>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-center"></div>
+      <div class="pto-ide-frame__topbar-right">
+        <div class="pto-ide-frame__window-actions top-actions" data-ide-slot="window-controls">
+          <button id="exportBtn" class="btn btn-sm btn-ghost" type="button">Export Snapshot</button>
+          <button id="themeToggle" class="icon-btn" type="button" aria-label="切换主题" title="切换主题">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6.5 6.5 0 0 0 7.8 8.8A8 8 0 1 1 12 3z"></path></svg>
+          </button>
+          <button id="inspectorToggle" class="icon-btn is-active" type="button" aria-expanded="true" aria-controls="inspectPane" aria-label="隐藏 Inspector">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M15 3v18"></path></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle puzzle explorer" aria-controls="puzzleExplorer" aria-expanded="true" aria-pressed="true" title="Explorer">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Source control" title="Source control">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M6 15V3"></path><path d="M9 18a9 9 0 0 0 9-9"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" data-ide-toggle="terminal" aria-controls="bottomTerminal" aria-label="Terminal" title="Terminal">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
+        </button>
+      </nav>
+
+      <div class="pto-ide-frame__workarea">
+        <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-storage-key="ascend-c-puzzles-main-v1" data-split-direction="horizontal" data-sizes="23,52,25" data-pixel-sizes="310" data-min-size="260,440,260">
+          <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="puzzleExplorer">
+            <header class="pto-ide-frame__pane-header">
+              <h2 class="pto-ide-frame__pane-title">Puzzle Explorer</h2>
+              <span class="pto-ide-frame__pane-meta">4 puzzles</span>
+            </header>
+            <div class="pto-ide-frame__pane-body explorer-body" id="puzzleList"></div>
+          </aside>
+
+          <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
+            <div class="tab-strip" role="tablist" aria-label="Puzzle views">
+              <button class="tab-btn" type="button" data-view-tab="overview">Overview</button>
+              <button class="tab-btn" type="button" data-view-tab="tiling">Tiling</button>
+              <button class="tab-btn" type="button" data-view-tab="api">API Visualizer</button>
+              <button class="tab-btn" type="button" data-view-tab="pipeline">Pipeline</button>
+              <button class="tab-btn" type="button" data-view-tab="format">Format Lab</button>
+            </div>
+            <header class="pto-ide-frame__pane-header">
+              <h2 class="pto-ide-frame__pane-title" id="mainTitle">Load3D Im2col</h2>
+              <span class="pto-ide-frame__pane-meta" id="mainMeta">PZ-003 · mock mode</span>
+            </header>
+            <div class="pto-ide-frame__pane-body workbench">
+              <section class="view" data-view="overview" id="overviewView"></section>
+              <section class="view" data-view="tiling" id="tilingView"></section>
+              <section class="view" data-view="api" id="apiView"></section>
+              <section class="view" data-view="pipeline" id="pipelineView"></section>
+              <section class="view" data-view="format" id="formatView"></section>
+            </div>
+          </section>
+
+          <aside class="pto-ide-frame__pane" data-ide-pane="inspector" id="inspectPane">
+            <header class="pto-ide-frame__pane-header">
+              <h2 class="pto-ide-frame__pane-title">Inspector</h2>
+              <span class="pto-ide-frame__pane-meta" id="inspectorMeta">API Visualizer</span>
+            </header>
+            <div class="pto-ide-frame__pane-body inspector" id="inspectorBody"></div>
+          </aside>
+        </div>
+
+        <div class="pto-ide-frame__bottom-dock">
+          <section class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization" aria-label="Mock log">
+            <div class="terminal-lines" id="mockLog">mock-check: Load3D mapping uses preset data; no CANN backend is attached.</div>
+          </section>
+          <section class="pto-ide-frame__bottom-view" data-ide-bottom-panel="terminal" id="bottomTerminal" hidden aria-label="Terminal">
+            <div class="terminal-lines">ascend-puzzles % export --review-snapshot PZ-003<br>snapshot: overview + tiling + Load3D map + pipeline compare</div>
+          </section>
+        </div>
+
+        <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" data-ide-slot="status" aria-label="IDE status">
+          <div class="ide-status">
+            <div class="ide-status__group ide-status__group--left">
+              <span class="ide-status__item">Mock mode</span>
+              <span class="ide-status__item">No CANN backend</span>
+              <span class="ide-status__item" id="statusPuzzle">PZ-003</span>
+            </div>
+            <div class="ide-status__group ide-status__group--right">
+              <span class="ide-status__item" id="statusView">API Visualizer</span>
+              <span class="ide-status__item">UTF-8</span>
+              <span class="ide-status__item">UX prototype</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <div class="pto-ide-frame__floating-playback-mount" data-ide-slot="playback" id="playbackMount"></div>
+  </section>
+
+  <script src="./pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="./pto-design-system/patterns/floating-playback-control/pattern.js"></script>
+  <script src="./pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script>
+    (() => {
+      const puzzles = [
+        {
+          id: 'PZ-001',
+          title: 'Elementwise Add',
+          status: 'Not started',
+          type: 'Warmup',
+          requirement: 'Create a minimal operator design for C = A + B and reason about shape, dtype, and a first tiling pass.',
+          performanceGoal: 'Keep the first puzzle focused on complete coverage and simple vector-friendly tiles.',
+          formula: 'C[i] = A[i] + B[i]',
+          inputs: [['A', '1024 x 1024', 'half / ND'], ['B', '1024 x 1024', 'half / ND']],
+          outputs: [['C', '1024 x 1024', 'half / ND']],
+          apis: ['DataCopy', 'Add', 'DataCopy'],
+          tiling: 'Split linear elements across cores; align tile length to 32B.'
+        },
+        {
+          id: 'PZ-002',
+          title: 'Copy & Alignment',
+          status: 'Designing',
+          type: 'Memory movement',
+          requirement: 'Move a strided tensor slice while preserving alignment and explaining tail handling.',
+          performanceGoal: 'Minimize unaligned copy fragments and surface tail policy decisions.',
+          formula: 'Y[n] = X[n * stride]',
+          inputs: [['X', '4096 x 64', 'int8 / ND']],
+          outputs: [['Y', '2048 x 64', 'int8 / ND']],
+          apis: ['DataCopy', 'SetLoadDataPaddingValue'],
+          tiling: 'Prefer 32B aligned chunks; pad tail when the slice is short.'
+        },
+        {
+          id: 'PZ-003',
+          title: 'Load3D Im2col',
+          status: 'Compared',
+          type: 'API data transform',
+          requirement: 'Use Load3D to prepare feature map tiles for cube computation, then explain how each window becomes matrix data.',
+          performanceGoal: 'Expose data movement, repeatMode, and layout decisions before pipeline planning.',
+          formula: 'Y = Conv2D(X, W)',
+          inputs: [['x', 'NC1HWC0 = 1 x 2 x 4 x 4 x 16', 'half / NC1HWC0']],
+          outputs: [['im2col', 'HoWo x HkWkCi', 'half / NZ-like matrix']],
+          apis: ['Load3D', 'DataCopy', 'Mmad'],
+          tiling: 'Split Ho*Wo across cores; align C0 to 16; keep Load3D windows repeatable.'
+        },
+        {
+          id: 'PZ-004',
+          title: 'Cube + Vector Fusion',
+          status: 'Ready for review',
+          type: 'Pipeline',
+          requirement: 'Compare cube-heavy and vector post-process scheduling under the same tiling strategy.',
+          performanceGoal: 'Reduce idle gaps between Cube Compute and Vector Compute while keeping buffer pressure visible.',
+          formula: 'Z = activation(Mmad(A, B) + bias)',
+          inputs: [['A', '128 x 64', 'half / NZ'], ['B', '64 x 128', 'half / NZ']],
+          outputs: [['Z', '128 x 128', 'half / ND']],
+          apis: ['Load3D', 'Mmad', 'Add', 'Relu', 'DataCopy'],
+          tiling: 'Double-buffer friendly tileM=32, tileN=32, tileK=32.'
+        }
+      ];
+
+      const tilingSchemes = [
+        { name: 'Baseline', tileM: 16, tileN: 16, tileK: 32, align: 16, ub: 58, tail: 'mask', coverage: 96, risk: 'More tail fragments' },
+        { name: 'Aligned', tileM: 32, tileN: 16, tileK: 32, align: 32, ub: 64, tail: 'pad', coverage: 100, risk: 'Padding overhead' },
+        { name: 'Double-buffer friendly', tileM: 32, tileN: 32, tileK: 32, align: 32, ub: 82, tail: 'pad', coverage: 100, risk: 'Higher UB pressure' }
+      ];
+
+      const pipelineSchemes = {
+        serial: {
+          name: 'Serial baseline',
+          score: 42,
+          gaps: 6,
+          buffer: '48%',
+          sync: 5,
+          note: 'Readable but cube/vector lanes wait for each other.',
+          stages: [
+            ['CopyIn', 2, 16, 'Load A/B tile', '--puzzle-blue'],
+            ['Cube Compute', 22, 22, 'Mmad tile', '--puzzle-purple'],
+            ['Vector Compute', 50, 18, 'Bias + activation', '--puzzle-cyan'],
+            ['CopyOut', 74, 16, 'Store result tile', '--puzzle-amber'],
+            ['Sync / Buffer', 18, 6, 'wait', '--warning']
+          ]
+        },
+        auto: {
+          name: 'Auto overlapped',
+          score: 76,
+          gaps: 3,
+          buffer: '72%',
+          sync: 3,
+          note: 'CopyIn for tile n+1 overlaps cube compute for tile n.',
+          stages: [
+            ['CopyIn', 2, 24, 'Load tile n/n+1', '--puzzle-blue'],
+            ['Cube Compute', 18, 30, 'Mmad tile n', '--puzzle-purple'],
+            ['Vector Compute', 42, 22, 'Post-process tile n-1', '--puzzle-cyan'],
+            ['CopyOut', 62, 24, 'Store tile n-1', '--puzzle-amber'],
+            ['Sync / Buffer', 35, 10, 'buffer handoff', '--warning']
+          ]
+        },
+        manual: {
+          name: 'Manual tuned',
+          score: 82,
+          gaps: 2,
+          buffer: '78%',
+          sync: 2,
+          note: 'Vector lane is pulled earlier; buffer pressure increases but idle gaps shrink.',
+          stages: [
+            ['CopyIn', 2, 26, 'Load tile n/n+1', '--puzzle-blue'],
+            ['Cube Compute', 16, 31, 'Mmad tile n', '--puzzle-purple'],
+            ['Vector Compute', 36, 25, 'Bias + activation', '--puzzle-cyan'],
+            ['CopyOut', 58, 26, 'Store result', '--puzzle-amber'],
+            ['Sync / Buffer', 28, 12, 'double buffer', '--warning']
+          ]
+        }
+      };
+
+      const state = {
+        puzzleId: 'PZ-003',
+        view: 'api',
+        tilingScheme: 'Aligned',
+        tileM: 32,
+        tileN: 16,
+        alignment: 32,
+        apiStep: 3,
+        selectedSource: '1,1',
+        selectedMatrix: null,
+        api: {
+          H: 4, W: 4, C1: 2, C0: 16,
+          padTop: 1, padBottom: 1, padLeft: 1, padRight: 1,
+          filterH: 2, filterW: 2,
+          strideH: 1, strideW: 1,
+          dilationH: 1, dilationW: 1,
+          leftTopH: 0, leftTopW: 0,
+          repeatMode: 0, repeatTime: 3, channelSize: 16, padValue: 0
+        },
+        pipeline: 'auto',
+        formatIndex: 9
+      };
+
+      const $ = (sel, root = document) => root.querySelector(sel);
+      const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+      const puzzle = () => puzzles.find((item) => item.id === state.puzzleId) || puzzles[0];
+      const statusClass = (status) => status === 'Ready for review' ? 'is-ready' : status === 'Compared' ? 'is-compared' : status === 'Designing' ? 'is-designing' : '';
+
+      function renderPuzzles() {
+        $('#puzzleList').innerHTML = `
+          <div class="explorer-title">Ascend C Operator Puzzles</div>
+          ${puzzles.map((item) => `
+            <button class="puzzle-card ${item.id === state.puzzleId ? 'is-active' : ''}" type="button" data-puzzle="${item.id}">
+              <div class="puzzle-card__top">
+                <span class="puzzle-card__id">${item.id}</span>
+                <span class="status-badge ${statusClass(item.status)}">${item.status}</span>
+              </div>
+              <h3 class="puzzle-card__title">${item.title}</h3>
+              <p class="puzzle-card__desc">${item.type}</p>
+            </button>
+          `).join('')}
+          <div class="soft-note">Inspired by puzzle-based accelerator learning. All checks and mappings are mock UX data.</div>
+        `;
+        $$('[data-puzzle]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            state.puzzleId = btn.dataset.puzzle;
+            if (state.puzzleId === 'PZ-003') state.view = 'api';
+            else state.view = 'overview';
+            renderAll();
+          });
+        });
+      }
+
+      function renderOverview() {
+        const p = puzzle();
+        $('#overviewView').innerHTML = `
+          <div class="overview-grid">
+            <section class="view-main">
+              <header class="section-head"><h3>${p.id} · ${p.title}</h3><span class="status-badge ${statusClass(p.status)}">${p.status}</span></header>
+              <div class="section-body">
+                <section class="summary-panel">
+                  <h3>需求描述</h3>
+                  <p>${p.requirement}</p>
+                </section>
+                <section class="summary-panel">
+                  <h3>性能要求</h3>
+                  <p>${p.performanceGoal}</p>
+                </section>
+                <section class="summary-panel">
+                  <h3>算法公式</h3>
+                  <code class="formula">${p.formula}</code>
+                </section>
+                <section class="summary-panel">
+                  <h3>初始 Tiling 策略</h3>
+                  <p>${p.tiling}</p>
+                </section>
+                <div class="action-row">
+                  <button class="btn btn-sm" type="button" data-open-view="tiling">Open Tiling</button>
+                  <button class="btn btn-sm" type="button" data-open-view="api">Open API Visualizer</button>
+                  <button class="btn btn-sm" type="button" data-open-view="pipeline">Open Pipeline</button>
+                  <button class="btn btn-solid btn-sm" type="button" data-open-view="format">Open Format Lab</button>
+                </div>
+              </div>
+            </section>
+            <section class="view-side">
+              <header class="section-head"><h3>Tensor / API</h3><span class="section-meta">mock spec</span></header>
+              <div class="section-body">
+                <h3 class="side-title">输入</h3>
+                ${renderTensorTable(p.inputs)}
+                <h3 class="side-title" style="margin-top:14px">输出</h3>
+                ${renderTensorTable(p.outputs)}
+                <h3 class="side-title" style="margin-top:14px">需要使用的接口</h3>
+                <div class="action-row">${p.apis.map((api) => `<span class="status-badge">${api}</span>`).join('')}</div>
+              </div>
+            </section>
+          </div>
+        `;
+        $$('[data-open-view]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            state.view = btn.dataset.openView;
+            renderAll();
+          });
+        });
+      }
+
+      function renderTensorTable(rows) {
+        return `<div class="table-like">
+          <div class="head"><span>Name</span><span>Shape</span><span>DType / Format</span></div>
+          ${rows.map((row) => `<div><span>${row[0]}</span><span>${row[1]}</span><span>${row[2]}</span></div>`).join('')}
+        </div>`;
+      }
+
+      function renderTiling() {
+        const selected = tilingSchemes.find((s) => s.name === state.tilingScheme) || tilingSchemes[1];
+        const tileCount = Math.ceil(16 / Math.max(1, state.tileM / 8));
+        $('#tilingView').innerHTML = `
+          <div class="view-grid">
+            <section class="view-main">
+              <header class="section-head">
+                <h3>Tiling Puzzle · core/block/tile</h3>
+                <span class="section-meta">${selected.name}</span>
+              </header>
+              <div class="tiling-map">
+                <div class="tensor-ruler">
+                  ${Array.from({ length: 16 }, (_, i) => `<div class="tensor-cell ${i >= 14 ? 'is-tail' : i < Math.min(12, tileCount + 4) ? 'is-core' : ''} ${i === 5 ? 'is-active' : ''}">${i}</div>`).join('')}
+                </div>
+                <div class="core-grid">
+                  ${Array.from({ length: 8 }, (_, i) => `
+                    <div class="core-card">
+                      <h4>Core ${i}</h4>
+                      <div class="tile-bar"><span style="--w:${Math.min(100, 42 + state.tileM + i * 2)}%"></span></div>
+                      <div class="scheme-row"><span>range</span><b>${i * state.tileM}-${(i + 1) * state.tileM - 1}</b></div>
+                    </div>
+                  `).join('')}
+                </div>
+                <section class="viz-panel">
+                  <header class="section-head"><h3>方案对比</h3><span class="section-meta">demo scoring</span></header>
+                  <div class="section-body compare-grid">
+                    ${tilingSchemes.map((scheme) => `
+                      <button class="compare-card puzzle-card ${scheme.name === state.tilingScheme ? 'is-active' : ''}" type="button" data-tiling-scheme="${scheme.name}">
+                        <h4>${scheme.name}</h4>
+                        <div class="scheme-row"><span>tile</span><b>${scheme.tileM} x ${scheme.tileN} x ${scheme.tileK}</b></div>
+                        <div class="scheme-row"><span>align</span><b>${scheme.align}B</b></div>
+                        <div class="scheme-row"><span>UB</span><b>${scheme.ub}%</b></div>
+                        <p class="puzzle-card__desc">${scheme.risk}</p>
+                      </button>
+                    `).join('')}
+                  </div>
+                </section>
+              </div>
+            </section>
+            <aside class="view-side">
+              <header class="section-head"><h3>Tiling Controls</h3><span class="section-meta">mock</span></header>
+              <div class="section-body control-stack">
+                ${rangeField('tileM', 'tileM', 8, 64, state.tileM, 8)}
+                ${rangeField('tileN', 'tileN', 8, 64, state.tileN, 8)}
+                ${rangeField('alignment', 'alignment', 16, 64, state.alignment, 16)}
+                <div class="control-field"><label>tail policy <output>${selected.tail}</output></label><select id="tailPolicy"><option>${selected.tail}</option><option>pad</option><option>mask</option></select></div>
+                <div class="ub-meter" title="UB usage"><span style="--usage:${selected.ub}%"></span></div>
+                ${checks([
+                  ['Coverage', selected.coverage === 100 ? 'complete' : 'partial', selected.coverage === 100 ? 'is-ok' : 'is-warning'],
+                  ['Tail handling', selected.tail, 'is-ok'],
+                  ['Alignment', `${state.alignment}B`, state.alignment >= 32 ? 'is-ok' : 'is-warning'],
+                  ['UB budget', `${selected.ub}%`, selected.ub > 80 ? 'is-warning' : 'is-ok'],
+                  ['Pipeline readiness', selected.name.includes('Double') ? 'strong' : 'medium', selected.name.includes('Double') ? 'is-ok' : 'is-warning']
+                ])}
+              </div>
+            </aside>
+          </div>
+        `;
+        bindRange('tileM');
+        bindRange('tileN');
+        bindRange('alignment');
+        $$('[data-tiling-scheme]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const scheme = tilingSchemes.find((s) => s.name === btn.dataset.tilingScheme);
+            state.tilingScheme = scheme.name;
+            state.tileM = scheme.tileM;
+            state.tileN = scheme.tileN;
+            state.alignment = scheme.align;
+            renderAll();
+          });
+        });
+      }
+
+      function rangeField(id, label, min, max, value, step) {
+        return `<div class="control-field"><label for="${id}">${label}<output id="${id}Out">${value}</output></label><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"></div>`;
+      }
+
+      function bindRange(id) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('input', () => {
+          state[id] = Number(input.value);
+          const out = document.getElementById(`${id}Out`);
+          if (out) out.textContent = input.value;
+          renderTiling();
+          renderInspector();
+        });
+      }
+
+      function checks(rows) {
+        return `<div>${rows.map(([label, value, cls]) => `<div class="check-row ${cls}"><span>${label}</span><b>${value}</b></div>`).join('')}</div>`;
+      }
+
+      function renderApi() {
+        $('#apiView').innerHTML = `
+          <div class="api-layout">
+            <aside class="view-side">
+              <header class="section-head"><h3>Load3D Params</h3><span class="section-meta">mock</span></header>
+              <div class="section-body control-stack" id="apiControls"></div>
+            </aside>
+            <section class="api-canvas">
+              <article class="viz-panel fm-grid-wrap">
+                <header class="section-head"><h3>Feature Map</h3><span class="section-meta">NC1HWC0 simplified</span></header>
+                <div class="feature-grid" id="featureGrid"></div>
+              </article>
+              <article class="viz-panel matrix-wrap">
+                <header class="section-head"><h3>Im2col / Target Matrix</h3><span class="section-meta" id="matrixMeta">repeatMode ${state.api.repeatMode}</span></header>
+                <div class="matrix-grid" id="matrixGrid"></div>
+              </article>
+              <article class="viz-panel filter-wrap">
+                <header class="section-head"><h3>Filter Window</h3><span class="section-meta">stride / dilation</span></header>
+                <div class="filter-box" id="filterBox"></div>
+              </article>
+              <article class="viz-panel mapping-wrap">
+                <header class="section-head"><h3>Mapping Explanation</h3><span class="section-meta">click any cell</span></header>
+                <div class="mapping-text" id="mappingText"></div>
+              </article>
+            </section>
+          </div>
+        `;
+        renderApiControls();
+        renderFeatureGrid();
+        renderFilterBox();
+        renderMatrix();
+        renderMapping();
+        syncPlayback();
+      }
+
+      function renderApiControls() {
+        const fields = [
+          ['strideH', 1, 3, 1], ['strideW', 1, 3, 1], ['dilationH', 1, 3, 1], ['dilationW', 1, 3, 1],
+          ['padTop', 0, 2, 1], ['padLeft', 0, 2, 1], ['repeatMode', 0, 1, 1], ['repeatTime', 1, 5, 1]
+        ];
+        $('#apiControls').innerHTML = fields.map(([id, min, max, step]) => rangeField(`api-${id}`, id, min, max, state.api[id], step)).join('');
+        fields.forEach(([id]) => {
+          const input = document.getElementById(`api-${id}`);
+          input.addEventListener('input', () => {
+            state.api[id] = Number(input.value);
+            document.getElementById(`api-${id}Out`).textContent = input.value;
+            renderApi();
+            renderInspector();
+          });
+        });
+      }
+
+      function currentWindow() {
+        const p = state.api;
+        const step = Math.max(0, Math.min(5, state.apiStep));
+        const baseH = step >= 3 ? p.strideH : 0;
+        const baseW = step >= 2 ? p.strideW : 0;
+        return { h: baseH + p.padTop, w: baseW + p.padLeft };
+      }
+
+      function renderFeatureGrid() {
+        const p = state.api;
+        const rows = p.H + p.padTop + p.padBottom;
+        const cols = p.W + p.padLeft + p.padRight;
+        const win = currentWindow();
+        const sampled = sampleCoords();
+        const grid = $('#featureGrid');
+        grid.style.gridTemplateColumns = `repeat(${cols}, 28px)`;
+        grid.innerHTML = Array.from({ length: rows * cols }, (_, idx) => {
+          const r = Math.floor(idx / cols);
+          const c = idx % cols;
+          const srcH = r - p.padTop;
+          const srcW = c - p.padLeft;
+          const isPad = srcH < 0 || srcW < 0 || srcH >= p.H || srcW >= p.W;
+          const inWindow = r >= win.h && c >= win.w && r <= win.h + (p.filterH - 1) * p.dilationH && c <= win.w + (p.filterW - 1) * p.dilationW;
+          const key = `${srcH},${srcW}`;
+          const isSampled = sampled.some((item) => item.key === key);
+          const selected = state.selectedSource === key;
+          return `<button class="feature-cell ${isPad ? 'is-pad' : ''} ${inWindow ? 'is-window' : ''} ${isSampled ? 'is-sampled' : ''} ${selected ? 'is-selected' : ''}" type="button" data-source="${key}" title="source ${key}">${isPad ? 'pad' : srcH * p.W + srcW}</button>`;
+        }).join('');
+        $$('[data-source]', grid).forEach((cell) => {
+          cell.addEventListener('click', () => {
+            state.selectedSource = cell.dataset.source;
+            state.selectedMatrix = null;
+            renderApi();
+            renderInspector();
+          });
+        });
+      }
+
+      function sampleCoords() {
+        const p = state.api;
+        const win = currentWindow();
+        const coords = [];
+        for (let kh = 0; kh < p.filterH; kh += 1) {
+          for (let kw = 0; kw < p.filterW; kw += 1) {
+            const srcH = win.h + kh * p.dilationH - p.padTop;
+            const srcW = win.w + kw * p.dilationW - p.padLeft;
+            coords.push({ kh, kw, srcH, srcW, key: `${srcH},${srcW}` });
+          }
+        }
+        return coords;
+      }
+
+      function renderFilterBox() {
+        const sampled = sampleCoords();
+        $('#filterBox').innerHTML = Array.from({ length: 9 }, (_, i) => {
+          const kh = Math.floor(i / 3);
+          const kw = i % 3;
+          const hit = sampled.some((item) => item.kh === kh && item.kw === kw);
+          return `<div class="filter-cell ${hit ? 'is-sampled' : ''}">${kh},${kw}</div>`;
+        }).join('');
+      }
+
+      function renderMatrix() {
+        const p = state.api;
+        const sampled = sampleCoords();
+        const offset = p.repeatMode === 0 ? state.apiStep * 4 : state.apiStep * 12;
+        $('#matrixMeta').textContent = `repeatMode ${p.repeatMode}`;
+        $('#matrixGrid').innerHTML = Array.from({ length: 96 }, (_, i) => {
+          const row = Math.floor(i / 12);
+          const col = i % 12;
+          const local = i - offset;
+          const filled = local >= 0 && local < sampled.length * 2;
+          const sample = sampled[local % sampled.length];
+          const selected = state.selectedMatrix === String(i) || (sample && sample.key === state.selectedSource && filled);
+          const isPad = sample && (sample.srcH < 0 || sample.srcW < 0 || sample.srcH >= p.H || sample.srcW >= p.W);
+          return `<button class="matrix-cell ${filled ? 'is-filled' : ''} ${isPad ? 'is-pad' : ''} ${selected ? 'is-selected' : ''}" type="button" data-matrix="${i}" data-source="${sample ? sample.key : ''}">${filled ? (isPad ? 'P' : local % sampled.length) : ''}</button>`;
+        }).join('');
+        $$('[data-matrix]').forEach((cell) => {
+          cell.addEventListener('click', () => {
+            state.selectedMatrix = cell.dataset.matrix;
+            if (cell.dataset.source) state.selectedSource = cell.dataset.source;
+            renderApi();
+            renderInspector();
+          });
+        });
+      }
+
+      function renderMapping() {
+        const p = state.api;
+        const [h, w] = (state.selectedSource || '1,1').split(',').map(Number);
+        const isPad = h < 0 || w < 0 || h >= p.H || w >= p.W;
+        const matrix = state.selectedMatrix || 'auto';
+        $('#mappingText').innerHTML = `
+          <p>当前选择把一个 feature map 位置解释为 Load3D 的滑窗取样，再展开到目标矩阵。</p>
+          <code>${isPad ? `padding(${p.padValue})` : `source[h=${h}, w=${w}, c0=0..15]`} -> filter window -> im2col[cell=${matrix}]</code>
+          <p>repeatMode=${p.repeatMode} 改变下一次 repeat 写入矩阵的位置：mode 0 偏向窗口位置移动，mode 1 偏向在 feature map 上推进 C0/窗口序列。</p>
+        `;
+      }
+
+      function renderPipeline() {
+        const scheme = pipelineSchemes[state.pipeline];
+        $('#pipelineView').innerHTML = `
+          <div class="view-grid">
+            <section class="view-main">
+              <header class="section-head"><h3>Cube / Vector Fusion Pipeline</h3><span class="section-meta">${scheme.name}</span></header>
+              <div class="pipeline-grid">
+                <div class="action-row">
+                  ${Object.entries(pipelineSchemes).map(([key, item]) => `<button class="btn btn-sm ${key === state.pipeline ? 'btn-solid' : 'btn-ghost'}" type="button" data-pipeline="${key}">${item.name}</button>`).join('')}
+                  <button class="btn btn-sm" type="button" id="manualTuneBtn">Manual tune vector lane</button>
+                </div>
+                <div class="timeline">
+                  ${scheme.stages.map((stage) => `
+                    <div class="lane-label">${stage[0]}</div>
+                    <div class="lane">
+                      <div class="stage ${stage[0].includes('Sync') ? 'is-wait' : ''}" style="--start:${stage[1]};--dur:${stage[2]};--stage-color:var(${stage[4]})" title="${stage[3]}">${stage[3]}</div>
+                    </div>
+                  `).join('')}
+                </div>
+                <section class="viz-panel">
+                  <header class="section-head"><h3>方案对比</h3><span class="section-meta">mock structure score</span></header>
+                  <div class="section-body compare-grid">
+                    ${Object.entries(pipelineSchemes).map(([key, item]) => `
+                      <button class="compare-card puzzle-card ${key === state.pipeline ? 'is-active' : ''}" type="button" data-pipeline="${key}">
+                        <h4>${item.name}</h4>
+                        <div class="scheme-row"><span>Overlap</span><b>${item.score}</b></div>
+                        <div class="scheme-row"><span>Idle gaps</span><b>${item.gaps}</b></div>
+                        <div class="scheme-row"><span>Peak buffer</span><b>${item.buffer}</b></div>
+                        <p class="puzzle-card__desc">${item.note}</p>
+                      </button>
+                    `).join('')}
+                  </div>
+                </section>
+              </div>
+            </section>
+            <aside class="view-side">
+              <header class="section-head"><h3>Pipeline Inspector</h3><span class="section-meta">structure</span></header>
+              <div class="section-body">
+                ${checks([
+                  ['Overlap score', scheme.score, scheme.score > 70 ? 'is-ok' : 'is-warning'],
+                  ['Idle gaps', scheme.gaps, scheme.gaps <= 3 ? 'is-ok' : 'is-warning'],
+                  ['Peak buffer', scheme.buffer, scheme.buffer === '78%' ? 'is-warning' : 'is-ok'],
+                  ['Sync count', scheme.sync, scheme.sync <= 3 ? 'is-ok' : 'is-warning']
+                ])}
+                <div class="soft-note" style="margin-top:12px">${scheme.note} This is structural only; profiling remains the real validation step.</div>
+              </div>
+            </aside>
+          </div>
+        `;
+        $$('[data-pipeline]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            state.pipeline = btn.dataset.pipeline;
+            renderAll();
+          });
+        });
+        $('#manualTuneBtn')?.addEventListener('click', () => {
+          state.pipeline = 'manual';
+          renderAll();
+        });
+        syncPlayback();
+      }
+
+      function renderFormat() {
+        $('#formatView').innerHTML = `
+          <div class="view-grid">
+            <section class="view-main">
+              <header class="section-head"><h3>Format Lab · ND / NZ</h3><span class="section-meta">independent tool</span></header>
+              <div class="section-body format-layout">
+                <article class="viz-panel">
+                  <header class="section-head"><h3>ND logical order</h3><span class="section-meta">shape 4 x 8</span></header>
+                  <div class="format-grid">${Array.from({ length: 32 }, (_, i) => `<button class="format-cell ${state.formatIndex === i ? 'is-active' : ''}" type="button" data-format-index="${i}">${i}</button>`).join('')}</div>
+                </article>
+                <article class="viz-panel">
+                  <header class="section-head"><h3>NZ physical blocks</h3><span class="section-meta">mock block layout</span></header>
+                  <div class="format-grid">${Array.from({ length: 40 }, (_, i) => `<button class="format-cell ${i >= 32 ? 'is-pad' : ''} ${state.formatIndex === nzIndex(i) ? 'is-active' : ''}" type="button" data-format-index="${nzIndex(i)}">${i >= 32 ? 'pad' : nzIndex(i)}</button>`).join('')}</div>
+                </article>
+              </div>
+            </section>
+            <aside class="view-side">
+              <header class="section-head"><h3>Mapping</h3><span class="section-meta">click element</span></header>
+              <div class="section-body">
+                <div class="soft-note">logical[${state.formatIndex}] maps into a tiled NZ-like physical block. This tool is independent and can be opened from any puzzle page.</div>
+                ${checks([
+                  ['Source format', 'ND', 'is-ok'],
+                  ['Target format', 'NZ-like', 'is-ok'],
+                  ['Padding cells', 8, 'is-warning'],
+                  ['Reference', 'mock only', 'is-warning']
+                ])}
+              </div>
+            </aside>
+          </div>
+        `;
+        $$('[data-format-index]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            state.formatIndex = Number(btn.dataset.formatIndex);
+            renderAll();
+          });
+        });
+      }
+
+      function nzIndex(i) {
+        if (i >= 32) return -1;
+        const block = Math.floor(i / 16);
+        const local = i % 16;
+        const r = local % 4;
+        const c = Math.floor(local / 4);
+        return block * 16 + r * 4 + c;
+      }
+
+      function renderInspector() {
+        const p = puzzle();
+        const viewName = state.view === 'api' ? 'API Visualizer' : state.view[0].toUpperCase() + state.view.slice(1);
+        $('#inspectorMeta').textContent = viewName;
+        let body = `
+          <section class="inspector-section">
+            <h3>当前 Puzzle</h3>
+            <div class="inspector-row"><span>ID</span><b>${p.id}</b></div>
+            <div class="inspector-row"><span>状态</span><b>${p.status}</b></div>
+            <div class="inspector-row"><span>视图</span><b>${viewName}</b></div>
+          </section>
+        `;
+        if (state.view === 'api') {
+          body += `
+            <section class="inspector-section">
+              <h3>Load3D 映射</h3>
+              <div class="inspector-row"><span>step</span><b>${state.apiStep} / 5</b></div>
+              <div class="inspector-row"><span>repeatMode</span><b>${state.api.repeatMode}</b></div>
+              <div class="inspector-row"><span>selected source</span><b>${state.selectedSource}</b></div>
+              <div class="soft-note">逐元素映射用于解释参数如何改变数据处理结果，不是官方 API 计算器。</div>
+            </section>
+          `;
+        } else if (state.view === 'tiling') {
+          body += `
+            <section class="inspector-section">
+              <h3>Tiling 风险</h3>
+              <div class="inspector-row"><span>tileM</span><b>${state.tileM}</b></div>
+              <div class="inspector-row"><span>tileN</span><b>${state.tileN}</b></div>
+              <div class="inspector-row"><span>alignment</span><b>${state.alignment}B</b></div>
+              <div class="soft-note">当前检查是 UX demo 规则，用来表达工具可以如何暴露切分和对齐风险。</div>
+            </section>
+          `;
+        } else if (state.view === 'pipeline') {
+          const scheme = pipelineSchemes[state.pipeline];
+          body += `
+            <section class="inspector-section">
+              <h3>流水方案</h3>
+              <div class="inspector-row"><span>方案</span><b>${scheme.name}</b></div>
+              <div class="inspector-row"><span>overlap</span><b>${scheme.score}</b></div>
+              <div class="inspector-row"><span>buffer</span><b>${scheme.buffer}</b></div>
+              <div class="soft-note">${scheme.note}</div>
+            </section>
+          `;
+        } else {
+          body += `
+            <section class="inspector-section">
+              <h3>提示</h3>
+              <div class="soft-note">从左侧选择 puzzle 后，可自由进入 Tiling、API Visualizer、Pipeline 或 Format Lab；这里不是向导流程。</div>
+            </section>
+          `;
+        }
+        body += `
+          <section class="inspector-section">
+            <h3>Review Notes</h3>
+            <div class="soft-note">Demo scope: product/UX prototype only. Mock data, no backend, no kernel generation.</div>
+          </section>
+        `;
+        $('#inspectorBody').innerHTML = body;
+      }
+
+      function renderAll() {
+        const p = puzzle();
+        renderPuzzles();
+        renderOverview();
+        renderTiling();
+        renderApi();
+        renderPipeline();
+        renderFormat();
+        renderInspector();
+        $$('[data-view]').forEach((view) => view.classList.toggle('is-active', view.dataset.view === state.view));
+        $$('[data-view-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.viewTab === state.view));
+        $('#mainTitle').textContent = p.title;
+        $('#mainMeta').textContent = `${p.id} · ${p.type}`;
+        $('#topCrumb').textContent = `${p.id} / ${state.view}`;
+        $('#statusPuzzle').textContent = p.id;
+        $('#statusView').textContent = state.view === 'api' ? 'API Visualizer' : state.view;
+        $('#mockLog').textContent = `mock-check: ${p.id} ${p.title} / ${state.view}; checks are UX demo rules, not compiler diagnostics.`;
+      }
+
+      function initTabs() {
+        $$('[data-view-tab]').forEach((tab) => {
+          tab.addEventListener('click', () => {
+            state.view = tab.dataset.viewTab;
+            renderAll();
+          });
+        });
+      }
+
+      let playbackControl;
+      function initPlayback() {
+        const mount = $('#playbackMount');
+        if (window.PtoFloatingPlaybackControl && mount) {
+          const control = window.PtoFloatingPlaybackControl.createControl({
+            ids: {
+              shell: 'ascPlaybackShell',
+              toggle: 'ascPlaybackToggle',
+              collapsedButton: 'ascPlaybackCollapsed',
+              collapsedIcon: 'ascPlaybackCollapsedIcon',
+              controls: 'ascPlaybackControls',
+              stepBack: 'ascStepBack',
+              play: 'ascPlay',
+              stepForward: 'ascStepForward',
+              replay: 'ascReplay',
+              scrubber: 'ascScrubber',
+              scrubberLabel: 'ascScrubberLabel',
+              scrubberOpname: 'ascScrubberOpname',
+              scrubberHover: 'ascScrubberHover'
+            }
+          });
+          mount.appendChild(control);
+          playbackControl = window.PtoFloatingPlaybackControl.init({ root: control });
+          window.PtoFloatingPlaybackControl.initScrubberHover({
+            root: control,
+            getTotalSteps: () => 6,
+            getLabelForStep: (step) => `Load3D step ${step}`
+          });
+          $('#ascStepBack').addEventListener('click', () => { state.apiStep = Math.max(0, state.apiStep - 1); renderAll(); });
+          $('#ascStepForward').addEventListener('click', () => { state.apiStep = Math.min(5, state.apiStep + 1); renderAll(); });
+          $('#ascReplay').addEventListener('click', () => { state.apiStep = 0; renderAll(); });
+          $('#ascPlay').addEventListener('click', () => { state.apiStep = (state.apiStep + 1) % 6; renderAll(); });
+          $('#ascScrubber').addEventListener('input', (event) => { state.apiStep = Number(event.target.value); renderAll(); });
+          syncPlayback();
+        }
+      }
+
+      function syncPlayback() {
+        const scrubber = $('#ascScrubber');
+        const label = $('#ascScrubberLabel');
+        const opname = $('#ascScrubberOpname');
+        if (!scrubber) return;
+        scrubber.min = 0;
+        scrubber.max = 5;
+        scrubber.value = state.apiStep;
+        if (label) label.textContent = `${state.apiStep} / 5`;
+        if (opname) opname.textContent = state.view === 'pipeline' ? 'Pipeline structure playback' : 'Load3D mapping playback';
+        playbackControl?.sync?.();
+      }
+
+      function initFrame() {
+        window.PtoIdeFrame?.initAll?.();
+        $('#inspectorToggle').addEventListener('click', () => {
+          const frame = $('[data-ide-frame]');
+          const open = frame.dataset.inspectorOpen !== 'false';
+          frame.dataset.inspectorOpen = open ? 'false' : 'true';
+          $('#inspectorToggle').classList.toggle('is-active', !open);
+          $('#inspectorToggle').setAttribute('aria-expanded', String(!open));
+        });
+        $('#themeToggle').addEventListener('click', () => {
+          const root = document.documentElement;
+          root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        });
+        $('#exportBtn').addEventListener('click', () => {
+          $('#mockLog').textContent = `snapshot: ${puzzle().id} exported overview + tiling + API mapping + pipeline compare (mock).`;
+        });
+      }
+
+      initTabs();
+      renderAll();
+      initPlayback();
+      initFrame();
+    })();
+  </script>
+</body>
+</html>
