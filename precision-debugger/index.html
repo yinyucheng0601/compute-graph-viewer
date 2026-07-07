@@ -36,6 +36,7 @@
   --border-subtle:rgba(255,255,255,.07);--border-default:rgba(255,255,255,.11);--border-strong:rgba(255,255,255,.18);
   --primary:#4369ef;--primary-hover:#5a92e6;--primary-foreground:#fff;
   --success:#22c68a;--warning:#ffab3d;--danger:#ff4b6e;
+  --c-pass:color-mix(in srgb,var(--success) 42%,var(--foreground-muted));  /* 达标 = 中性偏静，让传播(amber)/首错(红)成为焦点 */
   --state-hover:rgba(255,255,255,.06);--state-press:rgba(255,255,255,.1);
   --state-muted:rgba(255,255,255,.06);--state-selected:rgba(67,105,239,.16);
   --tone-critical-bg:color-mix(in srgb,var(--danger) 15%,transparent);
@@ -59,6 +60,7 @@
   --tone-info-bg:color-mix(in srgb,var(--primary) 12%,transparent);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;font:var(--text-body);background:var(--surface-3);color:var(--foreground);
   -webkit-font-smoothing:antialiased;overflow:hidden}
@@ -81,7 +83,7 @@ body{margin:0;font:var(--text-body);background:var(--surface-3);color:var(--fore
 .ide-crumb{flex:1 1 auto;display:flex;align-items:center;gap:8px;justify-content:center;font:var(--text-mono);font-size:11px;color:var(--foreground-muted);min-width:0;overflow:hidden}
 .ide-crumb strong{color:var(--foreground);font-weight:600}
 .ide-crumb span{opacity:.45}
-.ide-winactions{display:flex;align-items:center;gap:3px;flex:0 0 auto}
+.ide-winactions{display:flex;align-items:center;gap:3px;flex:0 0 auto;margin-left:auto}
 .ide-wbtn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;color:var(--foreground-muted);cursor:pointer}
 .ide-wbtn:hover{background:var(--state-hover);color:var(--foreground)}
 .ide-wbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -190,6 +192,17 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .compat-panel[hidden]{display:none}
 .compat-panel .cp-note{font:var(--text-body-sm);font-size:11px;color:var(--foreground-secondary);line-height:1.5}
 .compat-panel .compat{margin-top:8px}
+/* 真实 config 读出 */
+.chip-btn{cursor:pointer;gap:5px}
+.chip-btn .chev{font-size:9px;color:var(--foreground-muted)}
+.cfg-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font:600 11px/1 var(--font-sans);color:var(--foreground);margin-bottom:7px}
+.cfg-src{font:var(--text-mono);font-size:9px;color:var(--foreground-muted);background:var(--state-muted);padding:2px 6px;border-radius:4px}
+.cfg-grid{display:flex;flex-direction:column;gap:3px}
+.cfg-row{display:flex;justify-content:space-between;gap:10px;font:var(--text-mono);font-size:10px}
+.cfg-k{color:var(--foreground-muted)}
+.cfg-v{color:var(--foreground);text-align:right}
+.cfg-note{margin-top:8px;font:var(--text-mono);font-size:9px;color:var(--foreground-muted);line-height:1.5}
+.cfg-pre{margin:5px 0 0;padding:7px 8px;background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:6px;font:var(--text-mono);font-size:9.5px;color:var(--foreground-secondary);white-space:pre-wrap;word-break:break-all;line-height:1.5}
 .pane-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
   padding:11px var(--space-4);border-bottom:1px solid var(--border-subtle);flex:0 0 auto}
 .pane-head h2{margin:0;font:var(--text-title-2);font-size:13px}
@@ -200,10 +213,68 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 
 /* ===================== graph stage ===================== */
 .graph-pane{overflow:hidden}
+/* 层内计算图 · 中间面板 header 最左侧返回按钮 */
+.head-left{display:flex;align-items:center;gap:12px;min-width:0}
+.back-head{flex:0 0 auto;height:30px}
+/* 整网侧视图（40 层逐层精度） · 无限画布 */
+.side-stage{position:absolute;inset:0;overflow:hidden;cursor:grab}
+.side-stage.is-grabbing{cursor:grabbing}
+.side-stage[hidden]{display:none}
+#sideSvg{position:absolute;left:0;top:0;transform-origin:0 0;display:block}
+/* 整网图层工具（浮动左上）：2D/3D + 染色 */
+.side-toolbar{position:absolute;left:12px;top:12px;z-index:22;display:flex;align-items:center;gap:6px;padding:4px;border-radius:var(--radius-lg);background:color-mix(in srgb,var(--ide-pane-bg) 82%,transparent);border:1px solid var(--border-subtle);box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.side-toolbar .seg{background:color-mix(in srgb,var(--foreground) 6%,transparent);border:1px solid var(--border-subtle)}
+.side-toolbar .segbtn{height:24px;padding:0 12px}
+.stbtn{height:26px;padding:0 10px;font-size:11px}
+/* 整网 3D 深度视图（CSS 3D） */
+.side-3d{position:absolute;inset:0;overflow:hidden;perspective:1500px;perspective-origin:50% 40%;cursor:grab}
+.side-3d.is-grabbing{cursor:grabbing}
+.side-3d[hidden]{display:none}
+.scene3d{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}
+.layer3d{position:absolute;width:232px;height:300px;left:-116px;top:-150px;transform-style:preserve-3d;border-radius:14px;
+  background:color-mix(in srgb,var(--ide-pane-bg) 90%,transparent);border:1px solid var(--border-default);
+  box-shadow:0 16px 38px rgba(0,0,0,.42);padding:12px 13px 22px;cursor:pointer;
+  transition:transform var(--duration-base) var(--easing-out),box-shadow var(--duration-fast),border-color var(--duration-fast)}
+.layer3d .l3-h{display:flex;align-items:center;justify-content:space-between;font:700 13px/1 var(--font-sans);color:var(--foreground);margin-bottom:6px}
+.layer3d .l3-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.layer3d .l3-graph{display:block;width:100%;height:236px}
+.layer3d .l3-cos{position:absolute;left:13px;bottom:8px;font:var(--text-mono);font-size:9.5px;color:var(--foreground-muted)}
+.layer3d .l3-cos.bad{color:var(--danger)}
+/* 顺序即优先级：hover(中性) < 首错(红) < 选中(蓝) */
+.layer3d:hover,.layer3d.is-hover{border-color:var(--border-strong);box-shadow:0 0 18px color-mix(in srgb,var(--foreground) 20%,transparent),0 22px 46px rgba(0,0,0,.5);z-index:6;--l3-lift:-30px}
+.layer3d.is-hover .l3-cos{color:var(--foreground)}
+.layer3d.is-root{border-color:var(--danger);box-shadow:0 0 30px color-mix(in srgb,var(--danger) 60%,transparent),0 18px 42px rgba(0,0,0,.45)}
+.layer3d.is-sel{border-color:var(--primary);border-width:2px}
+.layer3d .l3-fb{position:absolute;top:-38px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;font:800 12px/1 var(--font-sans);padding:6px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 6px 18px color-mix(in srgb,var(--danger) 50%,transparent)}
+.layer3d .l3-fb::after{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--danger)}
+#sideSvg .sv-hit{fill:transparent;cursor:pointer}
+#sideSvg .sv-lane{stroke:var(--border-subtle);stroke-width:1;opacity:.5}
+#sideSvg .sv-cell{transition:opacity var(--duration-fast)}
+#sideSvg .sv-lanelbl{fill:var(--foreground-secondary);font-family:var(--font-sans);font-size:11px;font-weight:600}
+#sideSvg .sv-lanelbl.on{fill:var(--primary)}
+#sideSvg .sv-lanehit{fill:transparent;cursor:pointer}
+#sideSvg .sv-shape{fill:var(--foreground-muted);font-family:var(--font-mono);font-size:8px;opacity:.85}
+#sideSvg .sv-cap{fill:var(--foreground-muted);font-family:var(--font-mono);font-size:10px}
+#sideSvg .sv-axis{fill:var(--foreground-muted);font-family:var(--font-mono);font-size:10px}
+#sideSvg .sv-band{fill:var(--foreground-muted);font-family:var(--font-mono);font-size:9.5px;opacity:.7}
+#sideSvg [data-layer]:hover .sv-colbox{stroke:var(--primary);stroke-width:1.6;opacity:.9}
+.side-cta{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:22;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:var(--radius-pill);background:var(--danger);color:#fff;font:600 12px/1 var(--font-sans);box-shadow:var(--shadow-lg);cursor:pointer;border:0}
+.side-cta[hidden]{display:none}
+.side-cta:hover{filter:brightness(1.06)}
+.side-cta.ok{background:var(--success)}
+/* 整网空态/边界态统一 banner（达标 / rank 无首错） */
+.side-state{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:21;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--radius-pill);font:600 12px/1 var(--font-sans);white-space:nowrap;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:1;transition:opacity .4s var(--easing-default)}
+.side-state.out{opacity:0}
+.side-state[hidden]{display:none}
+.side-state.ok{background:var(--tone-success-bg);color:var(--success);border:1px solid color-mix(in srgb,var(--success) 34%,transparent)}
+.side-state.info{background:var(--tone-warning-bg);color:var(--warning);border:1px solid color-mix(in srgb,var(--warning) 34%,transparent)}
 .stage{width:100%;height:100%;overflow:hidden;cursor:grab;color:var(--foreground);
   background-image:radial-gradient(circle,color-mix(in srgb,var(--foreground) 5%,transparent) 1px,transparent 1.6px);
   background-size:24px 24px}
 .stage.is-grabbing{cursor:grabbing}
+@keyframes graphIn{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
+#stage.enter{animation:graphIn .3s var(--easing-out)}
+@media (prefers-reduced-motion:reduce){#stage.enter{animation:none}}
 /* floating canvas-level zoom control (bottom-right) — grouped panel */
 .canvas-zoom{position:absolute;right:12px;bottom:12px;z-index:20;display:flex;align-items:center;gap:3px;padding:4px;border-radius:var(--radius-lg);background:color-mix(in srgb,var(--ide-pane-bg) 82%,transparent);border:1px solid var(--border-subtle);box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .canvas-zoom .btn{background:transparent;border-color:transparent;box-shadow:none}
@@ -220,6 +291,7 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .cl-panel{display:flex;flex-wrap:wrap;gap:7px 12px;max-width:min(420px,calc(100% - 24px));padding:9px 11px;border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:color-mix(in srgb,var(--ide-pane-bg) 92%,transparent);color:var(--foreground-secondary);font:var(--text-mono);font-size:10.5px;box-shadow:var(--shadow-md);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .cl-panel[hidden]{display:none}
 .cl-panel .item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cl-panel .cl-note{flex-basis:100%;color:var(--foreground-muted);font-size:9px;border-top:1px solid var(--border-subtle);padding-top:6px;margin-top:2px;line-height:1.5}
 .cl-panel .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
 #gsvg{transform-origin:0 0;font-family:var(--font-sans)}
 
@@ -257,8 +329,9 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .nd.p-ok .nd-rect{stroke:color-mix(in srgb,var(--success) 50%,transparent);stroke-width:1.6}
 .nd.p-high .nd-rect{stroke:var(--warning);stroke-width:2.4}
 .nd.p-crit .nd-rect{stroke:var(--danger);stroke-width:3;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--danger) 50%,transparent))}
-.nd.p-crit.p-root .nd-rect{animation:ppulse 1.7s var(--easing-default) infinite}
-@keyframes ppulse{0%,100%{filter:drop-shadow(0 0 4px color-mix(in srgb,var(--danger) 45%,transparent))}50%{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--danger) 70%,transparent))}}
+.nd.p-crit.p-root .nd-rect{animation:ppulse 2.6s var(--easing-default) infinite}
+@keyframes ppulse{0%,100%{filter:drop-shadow(0 0 3px color-mix(in srgb,var(--danger) 34%,transparent))}50%{filter:drop-shadow(0 0 7px color-mix(in srgb,var(--danger) 52%,transparent))}}
+@media (prefers-reduced-motion:reduce){.nd.p-crit.p-root .nd-rect{animation:none}}
 /* status chip under node */
 .p-chip{pointer-events:none}
 .p-chipbg{stroke:var(--surface-1);stroke-width:1}
@@ -337,7 +410,7 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .isec:last-child{margin-bottom:0}
 .ikick{font:var(--text-label);letter-spacing:.5px;text-transform:uppercase;color:var(--foreground-muted);margin-bottom:8px}
 .icard{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:8px}
-.icard.crit{border-color:color-mix(in srgb,var(--danger) 45%,transparent);background:color-mix(in srgb,var(--danger) 7%,var(--surface-1))}
+.icard.crit{border-color:var(--border-subtle);border-left:3px solid var(--danger);background:var(--surface-1)}
 .icard.high{border-color:color-mix(in srgb,var(--warning) 42%,transparent);background:color-mix(in srgb,var(--warning) 6%,var(--surface-1))}
 .icard.ok{border-color:color-mix(in srgb,var(--success) 40%,transparent)}
 .inode-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
@@ -369,7 +442,7 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .pnode{display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;border-radius:var(--radius-sm)}
 .pnode:hover{background:var(--state-hover)}
 .pnode .pdot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--foreground-muted)}
-.pnode.ok .pdot{background:var(--success)}.pnode.high .pdot{background:var(--warning)}.pnode.crit .pdot{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+.pnode.ok .pdot{background:var(--c-pass)}.pnode.high .pdot{background:var(--warning)}.pnode.crit .pdot{background:var(--danger);box-shadow:0 0 8px var(--danger)}
 .pnode .pname{font:var(--text-body-sm);flex:1 1 auto}
 .pnode .pcos{font:var(--text-mono);font-size:10.5px;color:var(--foreground-muted)}
 .pnode.crit .pname{font-weight:700;color:var(--danger)}
@@ -584,8 +657,9 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
 .pbtn:hover{color:var(--foreground)}
 .pbtn.on{background:var(--surface-1);color:var(--foreground);box-shadow:var(--shadow-sm)}
 /* operator search */
-.gsearch-wrap{position:relative}
-.gsearch{height:30px;width:150px;border-radius:var(--radius-md);border:1px solid var(--border-default);background:var(--surface-1);color:var(--foreground);font:var(--text-body-sm);padding:0 10px}
+.gsearch-wrap{position:relative;display:inline-flex;align-items:center}
+.gsearch-ic{position:absolute;left:9px;width:14px;height:14px;color:var(--foreground-muted);pointer-events:none}
+.gsearch{height:30px;width:158px;border-radius:var(--radius-md);border:1px solid var(--border-default);background:var(--surface-1);color:var(--foreground);font:var(--text-body-sm);padding:0 10px 0 28px}
 .gsearch:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 22%,transparent)}
 .gsearch-menu{position:absolute;top:calc(100% + 5px);left:0;z-index:120;min-width:240px;max-height:300px;overflow-y:auto;background:var(--background-elevated);border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:4px}
 .gsearch-menu[hidden]{display:none}
@@ -631,7 +705,9 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
 .dtabs-wrap{position:sticky;top:0;z-index:6;background:var(--ide-pane-bg);padding-top:2px;margin-bottom:8px}
 .dtabs{margin:0}
 /* zoom-adaptive node labels — hide chips/flags when zoomed out, keep status rings */
-#gsvg.z-small .p-chip,#gsvg.z-small .p-flag,#gsvg.z-small .p-fb{display:none}
+#gsvg.z-small .p-chip,#gsvg.z-small .p-flag{display:none}
+/* 首错标识（.p-fb）在缩小时也保持可见，并反向放大避免看不清 */
+#gsvg.z-small .p-fb{transform:scale(1.7);transform-box:fill-box;transform-origin:left bottom}
 /* per-operator grouped list */
 .grouplist{display:flex;flex-direction:column;gap:6px}
 .grp{border:1px solid var(--border-subtle);border-radius:var(--radius-md);overflow:hidden;background:var(--surface-1)}
@@ -664,9 +740,8 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
   <div class="ide-topbar">
     <div class="ide-lights" aria-hidden="true"><span class="l r"></span><span class="l y"></span><span class="l g"></span></div>
     <div class="ide-ws" title="工作区"><svg viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>PyPTO · qwen3_14b.precision</div>
-    <div class="ide-crumb" aria-label="精度定位链路">整网结构<span>/</span>逐层精度比对<span>/</span><strong>首错定位</strong><span>/</span>算子精度下钻<span>/</span>根因判定</div>
     <div class="ide-winactions">
-      <span class="ide-wbtn" title="后退"><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></span>
+      <span class="ide-wbtn" id="frameBack" title="后退 · 返回整网侧视图" onclick="frameBack()"><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></span>
       <span class="ide-wbtn" title="前进"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
       <span class="ide-wbtn" title="左侧面板（配置）" onclick="toggleSide()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></span>
       <span class="ide-wbtn" title="右侧面板（概览 Inspector）" onclick="toggleInspector()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></span>
@@ -701,7 +776,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
       <div class="side-body">
         <section class="side-sec">
           <div class="side-k">调试对象 <span class="help" data-tip="candidate = 待测（910B 昇腾）vs golden = 参考（A100 fp32）。场景切训练/推理；rank = 张量并行分片（首错可能只在部分 rank 命中，随 rank 漂移）；step = 训练步（决定采集点）。">?</span></div>
-          <div class="side-row"><span class="side-lbl">模型</span><span class="chip" id="modelChip" title="candidate 910B ⟵ golden A100">Qwen3-14B</span></div>
+          <div class="side-row"><span class="side-lbl">模型</span><span class="chip" id="modelChip" title="candidate 910B ⟵ golden A100 · 真实 Qwen3-14B config">Qwen3-14B</span></div>
           <div class="side-row"><span class="side-lbl">对比基线</span><span class="cmp-mini" id="cmpVal">910B ⟵ A100</span></div>
           <div class="side-row"><span class="side-lbl">场景</span><button class="toggle" id="scenBtn" title="切换 训练 / 推理">推理 ⇄</button></div>
           <div class="side-row"><span class="side-lbl">rank · step</span><span style="display:flex;gap:6px"><select class="hsel" id="rankSel" title="TP rank · 首错可能随 rank 漂移"></select><select class="hsel" id="stepSel" title="训练 step"></select></span></div>
@@ -717,24 +792,40 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
           <div class="side-row"><span class="side-lbl">rel-p99 ≤</span><input class="thr-in" id="thRel" value="1e-2"></div>
         </section>
         <section class="side-sec">
-          <div class="side-k">状态 <span class="help" data-tip="可比性 = input/weight/config/seed/version 五要素是否对齐（任一失配则 diff 不可信、拦截定位，可点击卡片模拟失配）。首错 = 前向序上第一个越界的算子/层，点击可在图上定位。">?</span></div>
-          <div class="fb-chip ok side-chip" id="compatChip" title="可比性前置门 · 点击展开五要素（可模拟失配）" onclick="toggleCompatPanel()"><span class="dot"></span><span id="compatText">可比 5/5</span><span class="chev" id="compatChev">▸</span></div>
-          <div class="compat-panel" id="compatPanel" hidden></div>
+          <div class="side-k">状态 <span class="help" data-tip="首错 = 前向序上第一个越界的算子/层，点击可在图上定位。">?</span></div>
           <div class="fb-chip side-chip" id="fbChip" title="首错状态 · 点击在整网图上定位"><span class="dot"></span><span id="fbText">首错定位中…</span></div>
         </section>
-        <button class="btn btn-solid" id="exportBtn" style="width:100%;justify-content:center" title="导出复现包 + Markdown 交接报告">导出复现包 + 报告</button>
       </div>
     </aside>
     <div class="workmain" id="workMain">
     <section class="center">
       <div class="pane-head">
-        <div>
-          <h2>计算图 · Qwen3-14B 整网</h2>
-          <div class="meta" id="graphMeta">中央算子脊柱 · 旁挂权重张量 · 双击模块展开/收起</div>
+        <div class="head-left">
+          <button class="btn back-head" id="backToSide" onclick="setMainView('side')" title="返回整网侧视图" hidden><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>返回</button>
+          <div>
+            <h2 id="centerTitle">整网逐层 · Qwen3-14B ×40 层</h2>
+            <div class="meta" id="graphMeta">Decoder ×40 · 逐层精度总览 · 点击某层进入层内计算图</div>
+          </div>
         </div>
         <div class="toolbar">
+          <span id="sideOnlyTools" style="display:inline-flex;align-items:center;gap:8px">
+            <span class="seg" id="sideDimToggle" title="整网 2D 网格 / 3D 层叠视图">
+              <button class="segbtn on" data-d="2d" onclick="setSideDim('2d')">2D</button>
+              <button class="segbtn" data-d="3d" onclick="setSideDim('3d')">3D</button>
+            </span>
+            <span class="tsep"></span>
+            <span class="seg-lbl">算子染色</span>
+            <span class="seg" id="colorModeSeg" title="整网格子染色方式">
+              <button class="segbtn" data-c="off" onclick="setColorMode('off')" title="不染色（中性）">关</button>
+              <button class="segbtn on" data-c="cat" onclick="setColorMode('cat')" title="按算子类别：归一化/线性/位置·激活/注意力">类别</button>
+              <button class="segbtn" data-c="dual" onclick="setColorMode('dual')" title="双轴：含 matmul=蓝/无=灰 · 左侧条=有权重">含matmul·权重</button>
+            </span>
+            <span class="tsep"></span>
+          </span>
+          <span id="graphOnlyTools" style="display:none;align-items:center;gap:8px">
           <div class="gsearch-wrap">
-            <input class="gsearch" id="gsearch" placeholder="🔍 搜算子…" spellcheck="false" autocomplete="off">
+            <svg class="gsearch-ic svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="gsearch" id="gsearch" placeholder="搜算子…" spellcheck="false" autocomplete="off">
             <div class="gsearch-menu" id="gsearchMenu" hidden></div>
           </div>
           <span class="tsep"></span>
@@ -747,6 +838,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
             <option value="5" selected>L5 · Operator</option>
           </select>
           <span class="tsep"></span>
+          </span>
           <span class="seg-lbl">精度视图</span>
           <div class="seg" id="precMode" title="精度视图模式：关 / 叠加着色 / 聚焦首错路径">
             <button class="segbtn" data-m="off" onclick="setPrecMode('off')" title="不叠加精度">关</button>
@@ -757,6 +849,17 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
       </div>
       <div class="pane-body graph-pane">
         <div id="stage" class="stage"><svg id="gsvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div id="sideWrap" class="side-stage">
+          <svg id="sideSvg" width="1520" height="648" viewBox="0 0 1520 648" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="side3d" class="side-3d" hidden><div class="scene3d" id="scene3d"></div></div>
+          <div class="side-state" id="sideState" hidden></div>
+          <div class="drilltip" id="sideTip"></div>
+          <div class="canvas-zoom" id="sideZoom">
+            <button class="btn btn-icon" onclick="sideZoom(1.18)" title="放大"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="btn btn-icon" onclick="sideZoom(0.85)" title="缩小"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+            <button class="btn btn-icon" onclick="fitSide()" title="适配画布"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          </div>
+        </div>
         <div class="canvas-legend">
           <div class="cl-panel" id="legend" hidden>
             <span class="item"><span class="sw" style="background:var(--op-sem-norm)"></span>归一化</span>
@@ -844,8 +947,17 @@ const SEM = {
   comm: 'var(--op-sem-comm)', io: 'var(--op-sem-io)',
 };
 
-/* real Qwen3-14B spec — drives buildGraph (dense, GQA 40:8, head_dim 128, per-head QK-Norm, no bias) */
-const SPEC = { name: 'Qwen3-14B', layers: 40, qh: 40, kvh: 8, topk: 0, experts: 0, variant: 'dense', qknorm: true, attnBias: false };
+/* real Qwen3-14B spec — 源自 HF Qwen/Qwen3-14B config.json（drives buildGraph；dense, GQA 40:8, head_dim 128, per-head QK-Norm, no bias） */
+const SPEC = { name: 'Qwen3-14B', layers: 40, qh: 40, kvh: 8, headDim: 128, hidden: 5120, intermediate: 17408, vocab: 151936, maxPos: 40960, ropeTheta: 1e6, rmsEps: 1e-6, act: 'silu', dtype: 'bfloat16', topk: 0, experts: 0, variant: 'dense', qknorm: true, attnBias: false };
+/* 真实生成配置 · generation_config.json */
+const GENCFG = { temperature: 0.6, top_p: 0.95, top_k: 20, eos: [151645, 151643], pad: 151643 };
+/* 真实特殊 token id（Qwen3 tokenizer）*/
+const SPECIAL = { im_start: 151644, im_end: 151645, endoftext: 151643 };
+/* 真实业务输入样例（ChatML，Qwen3 对话模板；prefill seq=4096） */
+const SAMPLE_INPUT = {
+  tmpl: '<|im_start|>system\nYou are Qwen, created by Alibaba Cloud.<|im_end|>\n<|im_start|>user\n请分析这段昇腾算子的精度问题…<|im_end|>\n<|im_start|>assistant\n',
+  seq: 4096, batch: 1,
+};
 
 /* graph engine state */
 let G = null, NM = {};
@@ -856,6 +968,20 @@ const graphViewMode = 'drill';       /* drill-only build; no flat mode */
 let flatDepth = 3;
 let baseGraph = null;                 /* cached built graph */
 let overlayOn = true;                 /* precision overlay toggle */
+let mainView = 'side';                 /* 'side' = 整网 40 层侧视图 · 'graph' = 层内计算图（首错层） */
+let sideSel = null;                    /* 侧视图选中层（点击/下钻后持久，蓝框） */
+let sideHover = null;                  /* 侧视图 hover 层（临时，中性描边） */
+let laneSel = null;                    /* 跨视图联动：选中某算子(lane)看它在 40 层的表现 */
+let viewLayer = null;                  /* 已下钻进入的层（front view）· null=首错层 */
+let side3d = false;                     /* 整网侧视图 2D / 3D */
+let orbit = { rx: -16, ry: -32, z: 1 }; /* 3D 默认：等距斜视，深度轴投影为「左下→右上」 */
+let colorMode = 'cat';                   /* 整网染色图层：'cat' 类别 · 'dual' 双轴(是否matmul/有无权重) · 'off' 关 */
+/* 算子类别配色（浅色 · 参考业务分类：RMSNorm / Linear / RoPE·SwiGLU / Attention 核） */
+const CAT_COLOR = { norm: '#2BB3A3', linear: '#4C6FF5', elem: '#8B5CF6', attn: '#E0559A', kv: '#38BDF8', io: '#5F5E5A' };
+const DUAL = { mm: '#4C6FF5', nomm: '#6b7280', weight: '#2BB3A3' };   /* 双轴：含 matmul=蓝/无=灰；有权重=左侧色条 */
+let sideV = { tx: 0, ty: 0, z: 1 };    /* 侧视图无限画布 transform */
+let sidePan = null;                    /* 侧视图拖拽状态 */
+let sideDragged = false;               /* 拖拽后抑制误触 click */
 let expandedModules = new Set([
   'model', 'transformer', 'decoder', 'attention', 'qkv_projection', 'q_lane', 'k_lane', 'v_lane', 'attention_core', 'mlp', 'ffn',
 ]);
@@ -1016,10 +1142,10 @@ const ROOTINFO = {
 
     io('token_ids', 'Token IDs', 'Input');
     y += 104;
-    op('embedding', 'Parallel Embedding', 'Op', 'embedding');
+    op('embedding', 'Parallel Embedding', 'Op', 'embedding', { typeLabel: '查表 gather' });
     y += GRAPH_LAYOUT.decoderEntryGap;
     flow('token_ids', 'embedding');
-    pL('emb_w', 'Embedding W', '[vocab, h]', 'embedding');
+    pL('emb_w', 'Embedding W', '[151936, 5120]', 'embedding');
 
     const qx = 300;
     const kx = 560;
@@ -1113,7 +1239,7 @@ const ROOTINFO = {
 
       op('o_proj', 'O Projection', 'Op', 'linear', { x: cx, w: laneW, typeLabel: 'h->h' });
       flow('o_residual_add', 'o_proj', 'ATTN');
-      pL('oproj_w', 'O-Proj W', '[v, h]', 'o_proj');
+      pL('oproj_w', 'O-Proj W', '[5120, 5120]', 'o_proj');
       y += 96;
 
       op('post_attention_norm', 'Post Attention RMSNorm', 'Op', 'norm', { fuseRec: 'add_rmsnorm', typeLabel: 'post-attn' });
@@ -1131,15 +1257,15 @@ const ROOTINFO = {
       pR('pre_mlp_g', 'pre-mlp γ', '[h]', 'pre_mlp_norm');
       ffnEntry = 'pre_mlp_norm';
     } else {
-      op('attn_norm', 'attn RMSNorm', 'Op', 'norm', { fuseRec: 'add_rmsnorm', typeLabel: 'AddRmsNorm?' });
+      op('attn_norm', 'attn RMSNorm', 'Op', 'norm', { fuseRec: 'add_rmsnorm', typeLabel: 'RMSNorm' });
       y += 96;
       flow('embedding', 'attn_norm');
       pR('attn_g', 'attn γ', '[h]', 'attn_norm');
 
-      op('q_proj', 'Q Projection', 'Logical Linear', 'linear', { x: qx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'candidate' });
-      op('k_proj', 'K Projection', 'Logical Linear', 'linear', { x: kx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'candidate' });
-      op('v_proj', 'V Projection', 'Logical Linear', 'linear', { x: vx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'candidate' });
-      N.push({ id: 'qkv_w', label: 'QKV W', typeLabel: spec.attnBias ? 'logical +bias' : 'logical shard', kind: 'param', x: Lx, y, w: Wp, h: 42 });
+      op('q_proj', 'Q Projection', 'Logical Linear', 'linear', { x: qx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'proj' });
+      op('k_proj', 'K Projection', 'Logical Linear', 'linear', { x: kx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'proj' });
+      op('v_proj', 'V Projection', 'Logical Linear', 'linear', { x: vx, w: laneW, fuseRec: 'qkv_merge', typeLabel: spec.attnBias ? '+bias' : 'proj' });
+      N.push({ id: 'qkv_w', label: 'QKV W', typeLabel: spec.attnBias ? '[5120, 7168]+bias' : '[5120, 7168]', kind: 'param', x: Lx, y, w: Wp, h: 42 });
       flow('attn_norm', 'q_proj', 'Q');
       flow('attn_norm', 'k_proj', 'K');
       flow('attn_norm', 'v_proj', 'V');
@@ -1197,7 +1323,7 @@ const ROOTINFO = {
       pL('o_w', 'O-Proj W', '[hd, h]', 'attn_output_linear');
       y += 96;
 
-      op('ffn_norm', 'ffn RMSNorm', 'Op', 'norm', { fuseRec: 'add_rmsnorm', typeLabel: 'AddRmsNorm?' });
+      op('ffn_norm', 'ffn RMSNorm', 'Op', 'norm', { fuseRec: 'add_rmsnorm', typeLabel: 'RMSNorm' });
       y += 96;
       flow('attn_output_linear', 'ffn_norm');
       pR('ffn_g', 'ffn γ', '[h]', 'ffn_norm');
@@ -1268,7 +1394,7 @@ const ROOTINFO = {
       y += 88;
       flow('dispatch', 'experts', 'TOKENS', 'comm');
       pL('eup_w', 'Expert up W', '[h, ffn]', 'experts');
-      pR('edn_w', 'Expert down W', '[ffn, h]', 'experts');
+      pR('edn_w', 'Expert down W', '[17408, 5120]', 'experts');
       op('mlp_act', 'SwiGLU (in expert)', 'Op', 'act', { fuseRec: 'swiglu', typeLabel: 'SiluAndMul' });
       y += 92;
       flow('experts', 'mlp_act', 'COMBINE', 'comm');
@@ -1278,14 +1404,14 @@ const ROOTINFO = {
       op('gate_up', 'Gate/Up Proj', 'Op', 'linear', { typeLabel: 'merged' });
       y += 88;
       flow(ffnEntry, 'gate_up');
-      pL('gu_w', 'Gate/Up W', '[h, 2·ffn]', 'gate_up');
+      pL('gu_w', 'Gate/Up W', '[5120, 34816]', 'gate_up');
       op('mlp_act', 'SwiGLU', 'Op', 'act', { fuseRec: 'swiglu', typeLabel: 'SiluAndMul' });
       y += 88;
       flow('gate_up', 'mlp_act');
       op('down_proj', 'Down Proj', 'Op', 'linear', { typeLabel: 'ffn->h' });
       y += 92;
       flow('mlp_act', 'down_proj');
-      pL('dn_w', 'Down W', '[ffn, h]', 'down_proj');
+      pL('dn_w', 'Down W', '[17408, 5120]', 'down_proj');
       lastBlock = 'down_proj';
     }
 
@@ -1296,7 +1422,7 @@ const ROOTINFO = {
     op('lm_head', 'LM Head', 'Op', 'linear', { typeLabel: 'h->vocab' });
     y += 104;
     flow('final_norm', 'lm_head');
-    pL('lm_w', 'LM Head W', '[h, vocab]', 'lm_head');
+    pL('lm_w', 'LM Head W', '[5120, 151936]', 'lm_head');
     io('logits', 'Logits', 'Output');
     y += 60;
     flow('lm_head', 'logits', 'LOSS');
@@ -1597,7 +1723,7 @@ const ROOTINFO = {
       }
     } else if (qkvProjectionBox) {
       CL.push({ id: 'qkv_projection', label: 'QKV Projection · logical lanes', ...qkvProjectionBox });
-      H.push({ id: 'qkv_projection', label: 'QKV Projection', typeLabel: 'Fusion candidate view', parentModule: 'attention', childIds: qkvProjectionOps, sem: 'linear' });
+      H.push({ id: 'qkv_projection', label: 'QKV Projection', typeLabel: 'q/k/v 合并投影', parentModule: 'attention', childIds: qkvProjectionOps, sem: 'linear' });
     }
     if (!isPangu && qLaneBox) {
       CL.push({ id: 'q_lane', label: 'Q Lane', ...qLaneBox });
@@ -1612,7 +1738,7 @@ const ROOTINFO = {
       H.push({ id: 'v_lane', label: 'V Lane', typeLabel: 'Value / cache path', parentModule: 'attention', childIds: vLaneOps, sem: 'attention' });
     }
     if (!isPangu && attentionCoreBox) {
-      CL.push({ id: 'attention_core', label: 'Attention Core · flash candidate', ...attentionCoreBox });
+      CL.push({ id: 'attention_core', label: 'Attention Core · 数学视图（eager · 物化 [S,S]）', ...attentionCoreBox });
       H.push({ id: 'attention_core', label: 'Attention Core', typeLabel: 'QK softmax V', parentModule: 'attention', childIds: attentionCoreOps, sem: 'attention' });
     }
     if (!isPangu && moeClusterOps.length) {
@@ -2004,12 +2130,10 @@ function graphForCurrentView() {
   return applyHierarchyProjection(ensureBaseGraph());
 }
 function renderActiveGraph(options = {}) {
+  if (mainView === 'side') { if (side3d) render3D(); else renderSideView(); updateCenterHead(); return; }
   const graph = graphForCurrentView();
   renderGraph(graph, { preserveView: options.preserveView });
-  const base = ensureBaseGraph();
-  const opCount = base.nodes.filter((n) => n.kind === 'op').length;
-  const moduleCount = base.hierarchy ? base.hierarchy.length : 0;
-  els.graphMeta.textContent = `${SPEC.name} · Decoder ×${SPEC.layers} · GQA ${SPEC.qh}:${SPEC.kvh}`;
+  updateCenterHead();
 }
 
 function renderGraph(graph, options = {}) {
@@ -2017,7 +2141,7 @@ function renderGraph(graph, options = {}) {
   NM = {};
   graph.nodes.forEach((n) => { NM[n.id] = n; });
   const gated = !comparable();   /* 不可比 → 图上不下任何精度结论 */
-  const prec = gated ? { statusById: {}, badIds: [], rootId: null, path: [] } : computePrecision();
+  const prec = gated ? { statusById: {}, badIds: [], rootId: null, path: [] } : currentGraphPrec();
   const badSet = new Set(prec.badIds);
 
   /* 聚焦首错路径：只亮 input→首错→传播链前缀，dim 其余 */
@@ -2155,12 +2279,11 @@ function renderGraph(graph, options = {}) {
     /* precision overlay — single clean 首错 tag on the root; propagation shown by ring only.
        drill happens via double-click or the inspector button, NOT a graph button. */
     if (st && st.root) {
-      const cos = node.id in PREC ? ' · ' + PREC[node.id].cos.toFixed(4) : '';
-      const bw = 96;
+      const bw = 60;
       const badge = svg('g', { class: 'p-fb' });
       badge.appendChild(svg('rect', { class: 'p-fb-bg', x: -node.w / 2, y: -node.h / 2 - 15, width: bw, height: 16, rx: 8 }));
       const bt = svg('text', { class: 'p-fb-tx', x: -node.w / 2 + bw / 2, y: -node.h / 2 - 6.5, 'text-anchor': 'middle', 'dominant-baseline': 'central' });
-      bt.textContent = '▲ 首错' + cos;
+      bt.textContent = '▲ 首错';
       badge.appendChild(bt);
       group.appendChild(badge);
     }
@@ -2323,12 +2446,422 @@ function layerCurveHtml() {
   const thr = `<line x1="${x0}" y1="${ty.toFixed(1)}" x2="${x0 + pw}" y2="${ty.toFixed(1)}" stroke="var(--warning)" stroke-width="1" stroke-dasharray="3 3"/><text x="${x0 + pw}" y="${(ty - 3).toFixed(1)}" fill="var(--warning)" font-size="10" text-anchor="end" style="font-family:var(--font-mono)">cos≥${CFG.cos}</text>`;
   const pts = LC.map((c, i) => `${xOf(i).toFixed(1)},${yOf(c).toFixed(1)}`).join(' ');
   const line = `<polyline points="${pts}" fill="none" stroke="var(--foreground-secondary)" stroke-width="1.4"/>`;
-  const dots = LC.map((c, i) => { const bad = c < CFG.cos - 1e-9, isfb = i === fb; return `<circle class="lc-dot" cx="${xOf(i).toFixed(1)}" cy="${yOf(c).toFixed(1)}" r="${isfb ? 3.4 : 1.9}" fill="${isfb ? 'var(--danger)' : bad ? 'var(--warning)' : 'var(--success)'}"${isfb ? ' onclick="revealRoot()"' : ''}><title>layer ${i} · cosine ${c.toFixed(5)}${isfb ? ' · 首错层' : bad ? ' · 越界' : ' · 达标'}</title></circle>`; }).join('');
+  const dots = LC.map((c, i) => { const bad = c < CFG.cos - 1e-9, isfb = i === fb; return `<circle class="lc-dot" cx="${xOf(i).toFixed(1)}" cy="${yOf(c).toFixed(1)}" r="${isfb ? 3.4 : 1.9}" fill="${isfb ? 'var(--danger)' : bad ? 'var(--warning)' : 'var(--c-pass)'}"${isfb ? ' onclick="revealRoot()"' : ''}><title>layer ${i} · cosine ${c.toFixed(5)}${isfb ? ' · 首错层' : bad ? ' · 越界' : ' · 达标'}</title></circle>`; }).join('');
   const fbmark = fb >= 0 ? `<line x1="${xOf(fb).toFixed(1)}" y1="${y0}" x2="${xOf(fb).toFixed(1)}" y2="${y0 + ph}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity="0.55"/><text x="${xOf(fb).toFixed(1)}" y="${y0 + 6}" fill="var(--danger)" font-size="10" text-anchor="middle" font-weight="700" style="font-family:var(--font-mono)">L${fb}</text>` : '';
   const axis = `<text x="${x0}" y="${H - 4}" fill="var(--foreground-muted)" font-size="10" style="font-family:var(--font-mono)">layer 0</text><text x="${x0 + pw}" y="${H - 4}" fill="var(--foreground-muted)" font-size="10" text-anchor="end" style="font-family:var(--font-mono)">39</text>`;
   const cap = fb >= 0 ? `<b style="color:var(--danger)">首错层 L${fb}</b> · 之后逐层传播` : `<b style="color:var(--success)">全 40 层达标</b>`;
   return `<div class="laycurve"><div class="lc-cap"><span>compare-network · 逐层 cosine</span><span>${cap}</span></div>
     <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${thr}${line}${dots}${fbmark}${axis}</svg></div>`;
+}
+
+/* ===================== 整网侧视图（多层 · side view，参考 ep-expert-parallel-2d 的侧视思路） =====================
+   X 轴 = 40 个 DecoderLayer 脊柱；Y 轴 = 层内前向阶段（lane）；逐层叠加精度：首错层高亮、之后传播。
+   点击首错层 → 展开为「层内计算图」（front view，即已有的详细计算图）。 */
+/* mm = 含 matmul · w = 有权重（γ 记为弱权重 wk） */
+const SIDE_STAGES = [
+  { key: 'attn_norm', label: 'attn RMSNorm', shape: '[B,S,5120]', cat: 'norm', mm: false, w: 'wk' },
+  { key: 'qkv', label: 'Q / K / V Proj', shape: 'Q[B,S,5120] KV[B,S,1024]', cat: 'linear', mm: true, w: true },
+  { key: 'qknorm', label: 'Q·K Norm', shape: '[B,40|8,S,128]', cat: 'norm', mm: false, w: 'wk' },
+  { key: 'rope', label: 'RoPE', shape: '[B,40|8,S,128]', cat: 'elem', mm: false, w: false },
+  { key: 'qk', label: 'QKᵀ MatMul', shape: '[B,40,S,S]', cat: 'attn', mm: true, w: false },
+  { key: 'softmax', label: 'Softmax', shape: '[B,40,S,S]', cat: 'attn', mm: false, w: false },
+  { key: 'av', label: 'AV MatMul', shape: '[B,40,S,128]', cat: 'attn', mm: true, w: false },
+  { key: 'oproj', label: 'O Proj', shape: '[B,S,5120]', cat: 'linear', mm: true, w: true },
+  { key: 'ffn_norm', label: 'ffn RMSNorm', shape: '[B,S,5120]', cat: 'norm', mm: false, w: 'wk' },
+  { key: 'gate_up', label: 'Gate / Up Proj', shape: '[B,S,34816]', cat: 'linear', mm: true, w: true },
+  { key: 'act', label: 'SwiGLU', shape: '[B,S,17408]', cat: 'elem', mm: false, w: false },
+  { key: 'down', label: 'Down Proj', shape: '[B,S,5120]', cat: 'linear', mm: true, w: true },
+];
+const SOFTMAX_LANE = 5;   /* 首错阶段所在 lane index */
+function layerStatus(L, fb) { return fb < 0 ? 'clean' : L < fb ? 'clean' : L === fb ? 'root' : 'prop'; }
+/* 整网空态/边界态统一 banner —— 状态变化时弹出，3s 后淡出（不常驻、不因重渲染反复出现）*/
+let sideStateTimer = null, sideStateKey = '';
+function updateSideState(fb) {
+  const ss = document.getElementById('sideState'); if (!ss) return;
+  let key = '', cls = '', txt = '';
+  if (fb < 0) {
+    if (!rankBad()) { key = 'rank'; cls = 'side-state info'; txt = `● 当前 rank${S.rank} 无首错 · 命中在 rank4–7（点右侧矩阵切换）`; }
+    else if (S.fixed) { key = 'fixed'; cls = 'side-state ok'; txt = '✓ 已应用修复回归 · 全 40 层达标'; }
+    else { key = 'pass'; cls = 'side-state ok'; txt = '✓ 全 40 层达标 · 当前阈值下无首错'; }
+  }
+  if (key === sideStateKey) return;   /* 状态没变 → 不重复弹（避免 hover 重渲染反复出现）*/
+  sideStateKey = key;
+  if (sideStateTimer) { clearTimeout(sideStateTimer); sideStateTimer = null; }
+  ss.classList.remove('out');
+  if (!key) { ss.hidden = true; return; }
+  ss.className = cls; ss.textContent = txt; ss.hidden = false;
+  sideStateTimer = setTimeout(() => { ss.classList.add('out'); sideStateTimer = setTimeout(() => { ss.hidden = true; ss.classList.remove('out'); }, 400); }, 3000);
+}
+/* 每层·每算子的真实误差量（0..1）——让每层卡片/列真的不同：
+   达标层≈0；首错层误差在 softmax 起、下游高、前段低；传播层≈该层整体 drift。 */
+function stageDrift(L, i, fb) {
+  const LC = activeLayerCos();
+  const ld = Math.min(1, Math.max(0, (CFG.cos - LC[L]) / 0.006));   /* 该层整体 drift 0..1 */
+  if (fb < 0 || ld <= 0.001) return 0;
+  if (L === fb) {
+    if (i < SOFTMAX_LANE) return 0.06;            /* 输入正常 */
+    if (i === SOFTMAX_LANE) return 1;             /* 首错阶段 */
+    return 0.66 - 0.05 * (i - SOFTMAX_LANE);      /* 层内下游递减 */
+  }
+  return ld * (0.55 + 0.45 * (i >= SOFTMAX_LANE ? 1 : 0.5));   /* 传播层：注意力后段更明显 */
+}
+function stageHue(i) {
+  const s = SIDE_STAGES[i];
+  if (colorMode === 'off') return null;
+  if (colorMode === 'dual') return s.mm ? DUAL.mm : DUAL.nomm;   /* 含 matmul=蓝 / 无=灰 */
+  return CAT_COLOR[s.cat];
+}
+function stageWBar(i) {
+  if (colorMode !== 'dual') return null;
+  const w = SIDE_STAGES[i].w;                                    /* 左侧色条=有无权重 */
+  return w === true ? DUAL.weight : w === 'wk' ? `color-mix(in srgb,${DUAL.weight} 42%,transparent)` : null;
+}
+/* 结构 vs 精度 视觉分工：
+   结构（算子类别/双轴 hue）= 低饱和背景；精度（首错红/传播 amber）= 高对比焦点。
+   精度关 → 只看结构；精度开 → 误差越大越向 amber/红 靠、越亮，让精度第一眼抓到。 */
+function sideCell(L, i, fb, heatOn) {
+  const neutral = 'color-mix(in srgb,var(--foreground) 14%,transparent)';
+  const hue = stageHue(i), wbar = stageWBar(i);
+  if (!heatOn) return { fill: hue ? `color-mix(in srgb,${hue} 46%,transparent)` : neutral, op: hue ? 0.5 : 0.4, d: 0, wbar };
+  const d = stageDrift(L, i, fb);
+  const structDim = hue ? `color-mix(in srgb,${hue} 20%,transparent)` : neutral;   /* 结构退为低饱和底 */
+  const precCol = (L === fb && i === SOFTMAX_LANE) ? 'var(--danger)' : 'var(--warning)';
+  const fill = d > 0.02 ? `color-mix(in srgb,${precCol} ${Math.min(82, d * 100).toFixed(0)}%,${structDim})` : structDim;
+  const op = 0.24 + 0.64 * d;
+  return { fill, op, d, wbar };
+}
+/* 3D 卡片上「弱弱」展示的层内计算图框架（脊柱 + 12 阶段节点 + QKV 分叉），亮度按误差 */
+function cardMiniGraph(L, fb, heatOn) {
+  const W = 200, nodeW = 104, nodeH = 13, cx = W / 2, top = 13, gap = 18.6, nL = SIDE_STAGES.length;
+  const yOf = (i) => top + i * gap;
+  /* 节点之间用短连接段串成线性 flow（去掉圈/长竖线） */
+  let g = '';
+  for (let i = 0; i < nL - 1; i++) g += `<line x1="${cx}" y1="${(yOf(i) + nodeH / 2).toFixed(1)}" x2="${cx}" y2="${(yOf(i + 1) - nodeH / 2).toFixed(1)}" stroke="color-mix(in srgb,var(--foreground) 24%,transparent)" stroke-width="1.4"/>`;
+  SIDE_STAGES.forEach((s, i) => {
+    const c = sideCell(L, i, fb, heatOn), y = yOf(i);
+    const wb = c.wbar ? `<rect x="${cx - nodeW / 2}" y="${y - nodeH / 2}" width="3" height="${nodeH}" rx="1" fill="${c.wbar}"/>` : '';
+    g += `<rect x="${(cx - nodeW / 2).toFixed(1)}" y="${(y - nodeH / 2).toFixed(1)}" width="${nodeW}" height="${nodeH}" rx="3.5" fill="${c.fill}" opacity="${(0.5 + c.op * 0.5).toFixed(2)}"/>${wb}`;
+  });
+  return `<svg class="l3-graph" viewBox="0 0 ${W} ${(yOf(nL - 1) + 12).toFixed(0)}" preserveAspectRatio="none">${g}</svg>`;
+}
+function renderSideView() {
+  const svg = els.sideSvg; if (!svg) return;
+  const gated = !comparable();
+  const LC = activeLayerCos();
+  const fb = gated ? -1 : layerFirstBad();
+  if (sideSel !== null && sideSel >= SPEC.layers) sideSel = null;   /* 默认无选中态，仅 hover/点击才高亮列 */
+  const N = SPEC.layers;
+  const x0 = 224, xEnd = 1500, step = (xEnd - x0) / N;
+  const colX = (L) => x0 + L * step + step / 2;
+  const cellW = Math.min(step - 8, 18), cellH = 18;
+  const laneTop = 74, laneBot = 552, nL = SIDE_STAGES.length;
+  const laneY = (i) => laneTop + i * (laneBot - laneTop) / (nL - 1);
+  const heatOn = overlayOn && !gated, focusOn = S.focus && !gated;
+
+  /* lane 参考线 + 标签（含真实张量 shape）+ 选中某 lane 看它在 40 层的表现（跨视图联动） */
+  let lanes = '';
+  SIDE_STAGES.forEach((s, i) => {
+    const y = laneY(i), on = i === laneSel;
+    if (on) lanes += `<rect x="${(x0 - 8).toFixed(1)}" y="${(y - cellH / 2 - 3).toFixed(1)}" width="${(xEnd - x0 + 14).toFixed(1)}" height="${cellH + 6}" rx="4" fill="color-mix(in srgb,var(--primary) 9%,transparent)" stroke="color-mix(in srgb,var(--primary) 50%,transparent)" stroke-width="1"/>`;
+    lanes += `<line class="sv-lane" x1="${x0 - 8}" y1="${y.toFixed(1)}" x2="${xEnd + 4}" y2="${y.toFixed(1)}"/>`;
+    lanes += `<text class="sv-lanelbl${on ? ' on' : ''}" x="212" y="${(y - 1).toFixed(1)}" text-anchor="end">${esc(s.label)}</text>`;
+    lanes += `<text class="sv-shape" x="212" y="${(y + 10).toFixed(1)}" text-anchor="end">${esc(s.shape)}</text>`;
+    lanes += `<rect class="sv-lanehit" data-lane="${i}" x="0" y="${(y - 10).toFixed(1)}" width="214" height="20"/>`;
+  });
+
+  /* 5 层 band 分组（每 8 层）*/
+  let bands = '';
+  const bandN = 5, per = N / bandN;
+  for (let b = 0; b < bandN; b++) {
+    const bx = colX(b * per) - step / 2, bw = per * step;
+    bands += `<rect x="${bx.toFixed(1)}" y="58" width="${bw.toFixed(1)}" height="502" rx="3" fill="none" stroke="var(--border-subtle)" opacity=".4"/>`;
+    bands += `<text class="sv-band" x="${(bx + bw / 2).toFixed(1)}" y="50" text-anchor="middle">L${b * per}–${b * per + per - 1}</text>`;
+  }
+
+  /* 每层脊柱 */
+  let cols = '';
+  for (let L = 0; L < N; L++) {
+    const x = colX(L), cos = LC[L], st = layerStatus(L, fb);
+    const drift = Math.max(0, CFG.cos - cos);
+    const sel = L === sideSel, hov = L === sideHover && L !== sideSel;
+    const dim = focusOn && st === 'clean' ? 0.26 : 1;
+    let cells = '';
+    SIDE_STAGES.forEach((s, i) => {
+      const laneDim = (laneSel !== null && i !== laneSel) ? 0.32 : 1;
+      const cy = laneY(i), c = sideCell(L, i, fb, heatOn);
+      const rootCell = heatOn && st === 'root' && i === SOFTMAX_LANE;   /* 首错阶段：红描边定位 */
+      cells += `<rect class="sv-cell" x="${(x - cellW / 2).toFixed(1)}" y="${(cy - cellH / 2).toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH}" rx="3" fill="${c.fill}" opacity="${(c.op * dim * laneDim).toFixed(2)}"${rootCell ? ' stroke="var(--danger)" stroke-width="2"' : ''}/>`;
+      if (c.wbar) cells += `<rect x="${(x - cellW / 2).toFixed(1)}" y="${(cy - cellH / 2).toFixed(1)}" width="2.4" height="${cellH}" rx="1" fill="${c.wbar}" opacity="${(dim * laneDim).toFixed(2)}"/>`;
+    });
+    /* 逐层 drift 热条（精度开关关闭时不展示） */
+    const hb = Math.min(24, drift / 0.006 * 24);
+    const heat = (heatOn && hb > 0.5) ? `<rect x="${(x - 5).toFixed(1)}" y="${(laneBot + 28 - hb).toFixed(1)}" width="10" height="${hb.toFixed(1)}" rx="2" fill="${st === 'root' ? 'var(--danger)' : 'var(--warning)'}" opacity=".8"/>` : '';
+    /* 列框：选中=蓝框(持久) · 首错=红框 · hover=中性描边(临时) · 默认无 */
+    const boxStroke = sel ? 'var(--primary)' : (st === 'root' && heatOn) ? 'var(--danger)' : hov ? 'var(--border-strong)' : 'none';
+    const boxW = sel ? 1.8 : (st === 'root' && heatOn) ? 1.6 : 1.2;
+    const colBox = (boxStroke !== 'none') ? `<rect class="sv-colbox" x="${(x - step / 2 + 2).toFixed(1)}" y="60" width="${(step - 4).toFixed(1)}" height="500" rx="5" fill="transparent" stroke="${boxStroke}" stroke-width="${boxW}"/>` : '';
+    const fbTag = st === 'root' && heatOn ? `<g><rect x="${(x - 34).toFixed(1)}" y="26" width="68" height="22" rx="11" fill="var(--danger)"/><text x="${x.toFixed(1)}" y="41.5" text-anchor="middle" fill="#fff" font-weight="800" font-size="13" style="font-family:var(--font-sans)">▲ 首错</text><path d="M${x.toFixed(1)} 48 v10" stroke="var(--danger)" stroke-width="2"/></g>` : '';
+    const hit = `<rect class="sv-hit" data-layer="${L}" x="${(x - step / 2).toFixed(1)}" y="58" width="${step.toFixed(1)}" height="524"/>`;
+    cols += `<g data-layer="${L}" opacity="${dim}">${colBox}${cells}${heat}${fbTag}</g>${hit}`;
+  }
+
+  /* 层轴刻度 */
+  let axis = '';
+  const ticks = [0, 8, 16, 24, 32, N - 1];
+  ticks.forEach((L) => {
+    if (fb >= 0 && Math.abs(L - fb) < 3 && L !== fb) return;
+    axis += `<text class="sv-axis" x="${colX(L).toFixed(1)}" y="600" text-anchor="middle" ${L === fb ? 'fill="var(--danger)" font-weight="700"' : ''}>L${L}</text>`;
+  });
+  if (fb >= 0 && !ticks.includes(fb)) axis += `<text class="sv-axis" x="${colX(fb).toFixed(1)}" y="600" text-anchor="middle" fill="var(--danger)" font-weight="700">L${fb}</text>`;
+
+  const yLbl = `<text class="sv-band" x="212" y="44" text-anchor="end">层内前向阶段 · 真实 shape ↓</text>`;
+  /* 真实业务数据 caption（整网层）*/
+  const cap = `<text class="sv-cap" x="224" y="632">真实 Qwen3-14B · hidden 5120 · GQA 40:8 · head_dim 128 · intermediate 17408 · vocab 151936 · bf16 · prefill seq ${SAMPLE_INPUT.seq}（ChatML）</text>`;
+  svg.innerHTML = `<rect x="0" y="0" width="1520" height="648" rx="14" fill="color-mix(in srgb,var(--ide-pane-bg) 40%,transparent)"/>${bands}${lanes}${yLbl}${cols}${axis}${cap}`;
+  updateSideState(fb);
+}
+function showSideTip(L, event) {
+  const tip = els.sideTip; if (!tip) return;
+  const LC = activeLayerCos(), fb = comparable() ? layerFirstBad() : -1, cos = LC[L], st = layerStatus(L, fb);
+  const dot = st === 'root' ? 'var(--danger)' : st === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
+  const lbl = st === 'root' ? '首错层 · 根因起点' : st === 'prop' ? '传播层 · 误差自首错传入' : '达标层';
+  const badge = st === 'root' ? 'crit' : st === 'prop' ? 'high' : 'ok';
+  tip.innerHTML = `<div class="dtip-h"><span class="dtip-dot" style="background:${dot}"></span><span class="dtip-title">layer.${L}</span><span class="dtip-badge dtip-${badge}">${st === 'root' ? '首错' : st === 'prop' ? '传播' : '达标'}</span></div>
+    <div class="dtip-sub">Qwen3-14B DecoderLayer · GQA ${SPEC.qh}:${SPEC.kvh} · head_dim ${SPEC.headDim} · bf16</div>
+    <div class="dtip-rows"><div class="dtip-row"><span class="dtip-k">layer cosine</span><span class="dtip-v ${st === 'clean' ? '' : 'bad'}">${cos.toFixed(5)}</span></div>
+    <div class="dtip-row"><span class="dtip-k">判定</span><span class="dtip-v">${lbl}</span></div>
+    <div class="dtip-row"><span class="dtip-k"></span><span class="dtip-v" style="color:var(--primary)">点击进入层内计算图 →</span></div></div>`;
+  tip.classList.add('on');
+  const r = els.sideWrap.getBoundingClientRect();
+  let x = event.clientX - r.left + 14, y = event.clientY - r.top + 14;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  if (x + w > r.width - 8) x = event.clientX - r.left - w - 14;
+  if (y + h > r.height - 8) y = event.clientY - r.top - h - 14;
+  tip.style.left = Math.max(6, x) + 'px'; tip.style.top = Math.max(6, y) + 'px';
+}
+function hideSideTip() { if (els.sideTip) els.sideTip.classList.remove('on'); }
+/* 侧视图无限画布：pan / wheel-zoom / fit */
+function applySideView() { if (els.sideSvg) els.sideSvg.style.transform = `translate(${sideV.tx}px,${sideV.ty}px) scale(${sideV.z})`; }
+function fitSide() {
+  if (side3d) { fitOrbit(); return; }
+  const c = els.sideWrap; if (!c) return;
+  const r = c.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0) return;
+  const GW = 1520, GH = 648, pad = 18;
+  const z = Math.min((r.width - pad * 2) / GW, (r.height - pad * 2) / GH);
+  sideV.z = Math.max(0.2, Math.min(1.4, z));
+  sideV.tx = (r.width - GW * sideV.z) / 2;
+  sideV.ty = (r.height - GH * sideV.z) / 2;
+  applySideView();
+}
+function sideZoom(f) {
+  if (side3d) { orbit.z = Math.max(0.22, Math.min(2, orbit.z * f)); applyOrbit(); return; }
+  sideV.z = Math.max(0.25, Math.min(2.8, sideV.z * f)); applySideView();
+}
+/* ===== 整网 3D 深度视图（CSS 3D · 40 层沿深度堆叠）===== */
+const SIDE3D = { gap: 46 };   /* 纯深度堆叠，左下→右上的斜向由视角投影得到 */
+function applyOrbit() {
+  const scene = document.getElementById('scene3d'); if (!scene) return;
+  const N = SPEC.layers, cz = (N - 1) / 2 * SIDE3D.gap;
+  scene.style.transform = `translate(-50%,-50%) scale(${orbit.z}) rotateX(${orbit.rx}deg) rotateY(${orbit.ry}deg) translate3d(0px,0px,${cz.toFixed(1)}px)`;
+}
+/* 自动缩放，让整叠 40 层在当前视角下完整落入画布（切到 3D / resize 时调用） */
+function fitOrbit() {
+  const c = document.getElementById('side3d'); if (!c) return;
+  const r = c.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0) return;
+  const N = SPEC.layers, cz = (N - 1) / 2 * SIDE3D.gap;
+  const hw = 124, hh = 162, rx = orbit.rx * Math.PI / 180, ry = orbit.ry * Math.PI / 180;
+  const zs = [-cz - 70, cz + 70], xs = [-hw, hw], ys = [-hh, hh];
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (const x of xs) for (const y of ys) for (const z of zs) {
+    const X = x * Math.cos(ry) + z * Math.sin(ry);
+    const Z = -x * Math.sin(ry) + z * Math.cos(ry);
+    const Y = y * Math.cos(rx) - Z * Math.sin(rx);
+    minX = Math.min(minX, X); maxX = Math.max(maxX, X); minY = Math.min(minY, Y); maxY = Math.max(maxY, Y);
+  }
+  const pad = 44;
+  const z = Math.min((r.width - pad * 2) / (maxX - minX), (r.height - pad * 2) / (maxY - minY)) * 0.82;
+  orbit.z = Math.max(0.22, Math.min(1.3, z));
+  applyOrbit();
+}
+function render3D() {
+  const scene = document.getElementById('scene3d'); if (!scene) return;
+  const LC = activeLayerCos(), fb = comparable() ? layerFirstBad() : -1;
+  const heatOn = overlayOn && comparable();
+  const N = SPEC.layers;
+  let html = '';
+  for (let L = 0; L < N; L++) {
+    const st = layerStatus(L, fb);
+    const dot = st === 'root' ? 'var(--danger)' : st === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
+    const isRoot = st === 'root' && heatOn, isSel = L === sideSel;
+    const cls = 'layer3d' + (isRoot ? ' is-root' : '') + (isSel ? ' is-sel' : '');
+    const pull = isRoot ? 62 : 0, scl = isRoot ? 1.12 : 1;          /* 首错卡抽出放大，不埋在队列里 */
+    html += `<div class="${cls}" data-layer="${L}" style="--l3-tf:translate3d(0,0,${(-L * SIDE3D.gap + pull).toFixed(1)}px) scale(${scl});transform:var(--l3-tf) translateY(var(--l3-lift,0px))">
+      ${isRoot ? '<div class="l3-fb">▲ 首错层</div>' : ''}
+      <div class="l3-h"><span>layer.${L}</span><span class="l3-dot" style="background:${dot}" title="${st === 'root' ? '首错' : st === 'prop' ? '传播' : '达标'}"></span></div>
+      ${cardMiniGraph(L, fb, heatOn)}
+      <div class="l3-cos ${st === 'clean' ? '' : 'bad'}">cosine ${LC[L].toFixed(5)}</div></div>`;
+  }
+  scene.innerHTML = html;
+  applyOrbit();
+  updateSideState(fb);
+}
+function setSideDim(d) {
+  side3d = (d === '3d');
+  if (els.sideSvg) els.sideSvg.style.display = side3d ? 'none' : '';
+  const d3 = document.getElementById('side3d'); if (d3) d3.hidden = !side3d;
+  document.querySelectorAll('#sideDimToggle .segbtn').forEach((b) => b.classList.toggle('on', b.dataset.d === d));
+  hideSideTip();
+  if (side3d) { render3D(); requestAnimationFrame(fitOrbit); } else { renderSideView(); requestAnimationFrame(fitSide); }
+  renderLegend();
+}
+function bindSide3D() {
+  const c = document.getElementById('side3d'); if (!c) return;
+  let down = null;
+  c.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.side-toolbar') || e.target.closest('.side-cta') || e.target.closest('.canvas-zoom')) return;
+    const lh = e.target.closest('[data-layer]');
+    down = { x: e.clientX, y: e.clientY, rx: orbit.rx, ry: orbit.ry, moved: false, layer: lh ? +lh.dataset.layer : null, pid: e.pointerId };
+  });
+  c.addEventListener('pointermove', (e) => {
+    if (down) {
+      const dx = e.clientX - down.x, dy = e.clientY - down.y;
+      if (!down.moved && Math.abs(dx) + Math.abs(dy) > 4) { down.moved = true; c.classList.add('is-grabbing'); hideSideTip(); try { c.setPointerCapture(down.pid); } catch (_) {} }
+      /* 更灵活的旋转；范围保持在 ±90° 之内避免卡片侧立（edge-on）导致整网“消失” */
+      if (down.moved) { orbit.ry = Math.max(-86, Math.min(86, down.ry + dx * 0.4)); orbit.rx = Math.max(-80, Math.min(80, down.rx - dy * 0.4)); applyOrbit(); }
+      return;
+    }
+    /* hover 反馈：高亮卡片 + 层信息浮卡 */
+    const card = e.target.closest('.layer3d');
+    c.querySelectorAll('.layer3d.is-hover').forEach((n) => { if (n !== card) n.classList.remove('is-hover'); });
+    if (!card) { hideSideTip(); return; }
+    card.classList.add('is-hover');
+    showSideTip(+card.dataset.layer, e);
+  });
+  c.addEventListener('mouseleave', () => { hideSideTip(); c.querySelectorAll('.layer3d.is-hover').forEach((n) => n.classList.remove('is-hover')); });
+  const end = () => { if (!down) return; const info = down; down = null; c.classList.remove('is-grabbing'); try { c.releasePointerCapture(info.pid); } catch (_) {} if (!info.moved && info.layer !== null) { sideSel = info.layer; enterLayer(info.layer); } };   /* 3D 点层直接进入层内计算图 */
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', () => { down = null; c.classList.remove('is-grabbing'); });
+  c.addEventListener('wheel', (e) => { e.preventDefault(); orbit.z = Math.max(0.4, Math.min(1.9, orbit.z * (e.deltaY < 0 ? 1.1 : 0.9))); applyOrbit(); }, { passive: false });
+}
+function setColorMode(m) {
+  colorMode = m;
+  document.querySelectorAll('#colorModeSeg .segbtn').forEach((b) => b.classList.toggle('on', b.dataset.c === m));
+  if (mainView === 'side') { if (side3d) render3D(); else renderSideView(); }
+  renderLegend();
+}
+/* 图例随视图切换：侧视图=染色图层(类别/双轴/关)+精度；层内计算图=算子语义 */
+function renderLegend() {
+  const el = els.legend; if (!el) return;
+  let items;
+  if (mainView === 'side') {
+    let cat;
+    if (colorMode === 'cat') cat = [[CAT_COLOR.norm, 'RMSNorm 归一化'], [CAT_COLOR.linear, 'Linear 投影'], [CAT_COLOR.elem, 'RoPE / SwiGLU'], [CAT_COLOR.attn, 'Attention 核']];
+    else if (colorMode === 'dual') cat = [[DUAL.mm, '含 matmul'], [DUAL.nomm, '无 matmul（如 Softmax）'], [DUAL.weight, '左侧条 = 有权重']];
+    else cat = [['color-mix(in srgb,var(--foreground) 15%,transparent)', '算子（未染色）']];
+    items = cat.concat([['var(--danger)', '首错 · Softmax'], ['var(--warning)', '传播层'], ['var(--primary)', '选中层（蓝框，≠ 首错）']]);
+  } else {
+    items = [['var(--op-sem-norm)', '归一化'], ['var(--op-sem-attention)', '注意力'], ['var(--op-sem-qknorm)', 'QK-Norm'], ['var(--op-sem-rope)', 'RoPE'], ['var(--op-sem-linear)', 'Linear/GEMM'], ['var(--op-sem-act)', '激活'], ['var(--op-sem-comm)', 'Comm/Cache'], ['var(--success)', '精度达标'], ['var(--warning)', '传播异常'], ['var(--danger)', '首错/根因']];
+  }
+  const note = mainView === 'side' ? '<span class="cl-note">B=batch · S=seq=4096 · 40|8 = Q头|KV头 · head_dim=128 · 格子亮度=该层该算子误差量</span>' : '';
+  el.innerHTML = items.map(([c, t]) => `<span class="item"><span class="sw" style="background:${c}"></span>${t}</span>`).join('') + note;
+}
+function bindSideView() {
+  const c = els.sideWrap; if (!c) return;
+  /* 在 pointerdown 记录目标层；未拖动 → pointerup 直接进入层内计算图（不依赖 click 事件，避开 pointer-capture 吞掉 click 的问题） */
+  c.addEventListener('pointerdown', (e) => {
+    if (side3d || e.target.closest('.canvas-zoom') || e.target.closest('.side-cta') || e.target.closest('.side-toolbar')) return;
+    const lh = e.target.closest('[data-layer]'), la = e.target.closest('[data-lane]');
+    sidePan = { x: e.clientX, y: e.clientY, tx: sideV.tx, ty: sideV.ty, moved: false, layer: lh ? +lh.dataset.layer : null, lane: la ? +la.dataset.lane : null, pid: e.pointerId };
+  });
+  c.addEventListener('pointermove', (e) => {
+    if (side3d) return;
+    if (sidePan) {
+      const dx = e.clientX - sidePan.x, dy = e.clientY - sidePan.y;
+      if (!sidePan.moved && Math.abs(dx) + Math.abs(dy) > 4) {
+        sidePan.moved = true; c.classList.add('is-grabbing');
+        try { c.setPointerCapture(sidePan.pid); } catch (_) {}   /* 仅真正拖动时才捕获，避免吞点击 */
+      }
+      if (sidePan.moved) { sideV.tx = sidePan.tx + dx; sideV.ty = sidePan.ty + dy; applySideView(); hideSideTip(); }
+      return;
+    }
+    const h = e.target.closest('[data-layer]');
+    if (!h) { if (sideHover !== null) { sideHover = null; renderSideView(); } hideSideTip(); return; }
+    const L = +h.dataset.layer;
+    if (L !== sideHover) { sideHover = L; renderSideView(); }
+    showSideTip(L, e);
+  });
+  const end = (e) => {
+    if (!sidePan) return;
+    const info = sidePan; sidePan = null; c.classList.remove('is-grabbing');
+    try { c.releasePointerCapture(info.pid); } catch (_) {}
+    if (!info.moved) {
+      if (info.lane !== null) { laneSel = (laneSel === info.lane ? null : info.lane); renderSideView(); }   /* 点 lane → 看该算子 40 层表现 */
+      else if (info.layer !== null) { sideSel = info.layer; enterLayer(info.layer); }                        /* 点层 → 进入层内计算图 */
+    }
+  };
+  c.addEventListener('pointerup', end);
+  c.addEventListener('pointercancel', () => { sidePan = null; c.classList.remove('is-grabbing'); });
+  c.addEventListener('mouseleave', () => { hideSideTip(); if (sideHover !== null) { sideHover = null; renderSideView(); } });
+  c.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const r = c.getBoundingClientRect();
+    const bx = (e.clientX - r.left - sideV.tx) / sideV.z, by = (e.clientY - r.top - sideV.ty) / sideV.z;
+    const f = e.deltaY < 0 ? 1.1 : 0.9;
+    sideV.z = Math.max(0.25, Math.min(2.8, sideV.z * f));
+    sideV.tx = e.clientX - r.left - bx * sideV.z;
+    sideV.ty = e.clientY - r.top - by * sideV.z;
+    applySideView();
+  }, { passive: false });
+}
+function enterLayer(L) {
+  if (!comparable()) return;
+  viewLayer = (typeof L === 'number') ? L : layerFirstBad();
+  mainView = 'graph';
+  syncViewDom();
+  renderActiveGraph({ preserveView: false });
+  requestAnimationFrame(fit);
+  if (els.stage) { els.stage.classList.remove('enter'); void els.stage.offsetWidth; els.stage.classList.add('enter'); }   /* 展开进入动效 */
+}
+/* 层内计算图的精度：首错层→完整分析；达标层→全绿；传播层→全 amber（误差自首错传入） */
+function currentGraphPrec() {
+  const fb = layerFirstBad();
+  if (viewLayer === null || fb < 0 || viewLayer === fb) return computePrecision();
+  const order = spineOrder();
+  const clean = viewLayer < fb;
+  const statusById = {}; order.forEach((id) => { statusById[id] = clean ? 'ok' : 'high'; });
+  const cos = clean ? 0.99998 : 0.99610, rel = clean ? 2.0e-4 : 1.5e-2;
+  const path = order.map((id) => ({ id, label: NODE_LABEL[id] || id, cos, rel, status: statusById[id] }));
+  return { statusById, badIds: clean ? [] : order.slice(), rootId: null, path };
+}
+function frameBack() { if (mainView === 'graph') setMainView('side'); }
+function setMainView(v) {
+  mainView = v;
+  syncViewDom();
+  if (v === 'side') { if (side3d) { render3D(); requestAnimationFrame(fitOrbit); } else { renderSideView(); requestAnimationFrame(fitSide); } hideSideTip(); }
+  else { renderActiveGraph({ preserveView: false }); requestAnimationFrame(fit); }
+}
+function syncViewDom() {
+  const side = mainView === 'side';
+  if (els.stage) els.stage.style.display = side ? 'none' : '';
+  if (els.sideWrap) els.sideWrap.hidden = !side;
+  const got = document.getElementById('graphOnlyTools'); if (got) got.style.display = side ? 'none' : 'inline-flex';
+  const sot = document.getElementById('sideOnlyTools'); if (sot) sot.style.display = side ? 'inline-flex' : 'none';
+  const back = document.getElementById('backToSide'); if (back) back.hidden = side;
+  const pane = els.gsvg && els.gsvg.closest('.graph-pane');
+  if (pane) { const cz = pane.querySelector(':scope > .canvas-zoom'); if (cz) cz.style.display = side ? 'none' : ''; }
+  updateCenterHead();
+  renderLegend();
+}
+function updateCenterHead() {
+  const fb = comparable() ? layerFirstBad() : -1;
+  const L = viewLayer !== null ? viewLayer : (fb >= 0 ? fb : 0);
+  const tag = fb < 0 ? '' : L === fb ? ' 首错层' : L < fb ? ' 达标层' : ' 传播层';
+  if (els.centerTitle) els.centerTitle.textContent = mainView === 'side'
+    ? `整网逐层 · ${SPEC.name} ×${SPEC.layers} 层`
+    : `层内计算图 · layer.${L}${tag}`;
+  if (els.graphMeta) els.graphMeta.textContent = mainView === 'side'
+    ? `Decoder ×${SPEC.layers} · 逐层精度总览 · 点任意层进入层内计算图`
+    : `${SPEC.name} · layer.${L} · GQA ${SPEC.qh}:${SPEC.kvh} · head_dim ${SPEC.headDim}`;
 }
 
 /* 可比性控制现驻留在左侧「状态」面板（与状态芯片同处），右侧详情面板只读引用 */
@@ -2509,7 +3042,6 @@ function renderInspector(id) {
     html += `<div class="isec"><div class="ikick">修复前后（validate-fix 预期）</div><div class="icard">
       <div class="krow"><span class="kk">指标</span><span class="kv">before → after</span></div>
       ${info.before.map((b, i) => `<div class="krow"><span class="kk">${esc(b[0])}</span><span class="kv">${esc(b[1])} → ${esc(info.after[i][1])}</span></div>`).join('')}</div></div>`;
-    html += `<div class="isec"><button class="btn btn-solid" style="width:100%;justify-content:center" onclick="exportRepro()">导出融合子图真实输入 → 交接 PyPTO</button></div>`;
   } else if (st && st.s === 'high') {
     const rl = NODE_LABEL[prec.rootId] || prec.rootId;
     html += `<div class="isec"><div class="icard high"><div class="fix"><b>传播异常</b>：该算子输入已越界，非根因起点。误差自 <span class="ilink" onclick="jumpTo('${prec.rootId}')">${esc(rl)}（首错）</span> 逐级传播而来。修复首错后本节点应恢复。</div></div></div>`;
@@ -2822,7 +3354,7 @@ function bindDrillCanvas() {
 function showDrillTip(n, event, c) {
   const tip = document.getElementById('drilltip'); if (!tip) return;
   const g = n.dataset;
-  const dot = g.anom === 'crit' ? 'var(--danger)' : g.anom === 'high' ? 'var(--warning)' : 'var(--success)';
+  const dot = g.anom === 'crit' ? 'var(--danger)' : g.anom === 'high' ? 'var(--warning)' : 'var(--c-pass)';
   tip.innerHTML = `
     <div class="dtip-h"><span class="dtip-dot" style="background:${dot}"></span><span class="dtip-title">${g.op}</span><span class="dtip-badge dtip-${g.anom}">${g.anomlbl}</span></div>
     <div class="dtip-sub">${g.sym} · ${g.mem} · #${g.mag} · ${g.type}</div>
@@ -3230,8 +3762,7 @@ function drillEvidence(o) {
   return `${kick('根因链 · 现象 → 机理 → 根因')}${chain}
     ${kick('证据（5 源交叉）')}${ev}
     ${kick('多 run 漂移矩阵 · 5 run / 2 seed')}${drift}
-    ${kick('Pass Diff · candidate vs golden')}${diff}${conf}
-    <div style="margin-top:8px"><button class="btn btn-solid" style="width:100%;justify-content:center" onclick="exportRepro()">导出复现包 + 证据链 → 交接 PyPTO</button></div>`;
+    ${kick('Pass Diff · candidate vs golden')}${diff}${conf}`;
 }
 
 /* ===================== init ===================== */
@@ -3241,6 +3772,10 @@ function init() {
     gsvg: document.getElementById('gsvg'),
     gtip: document.getElementById('gtip'),
     graphMeta: document.getElementById('graphMeta'),
+    centerTitle: document.getElementById('centerTitle'),
+    sideWrap: document.getElementById('sideWrap'),
+    sideSvg: document.getElementById('sideSvg'),
+    sideTip: document.getElementById('sideTip'),
     inspTitle: document.getElementById('inspTitle'),
     inspMeta: document.getElementById('inspMeta'),
     inspBody: document.getElementById('inspBody'),
@@ -3291,7 +3826,6 @@ function init() {
   document.addEventListener('click', (e) => { if (!e.target.closest('.gsearch-wrap')) els.gsearchMenu.hidden = true; });
   document.addEventListener('click', (e) => { const h = e.target.closest('.help'); if (h) { e.stopPropagation(); showHelp(h); } else hideHelp(); });
   els.fbChip.addEventListener('click', revealRoot);
-  document.getElementById('exportBtn').addEventListener('click', exportRepro);
   document.getElementById('zin').addEventListener('click', () => { view.z = Math.min(2.4, view.z * 1.18); applyTransform(); });
   document.getElementById('zout').addEventListener('click', () => { view.z = Math.max(0.2, view.z / 1.18); applyTransform(); });
   document.getElementById('zfit').addEventListener('click', fit);
@@ -3325,11 +3859,17 @@ function init() {
   }, { passive: false });
   els.stage.addEventListener('click', (e) => { if (!e.target.closest('.nd')) clearSelection(); });
 
-  if ('ResizeObserver' in window) new ResizeObserver(() => fit()).observe(els.stage);
-  window.addEventListener('resize', fit);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (els.reportBack && !els.reportBack.hidden) { closeReport(); return; } if (els.reproBack && !els.reproBack.hidden) { closeRepro(); return; } if (drillId) { closeDrill(); return; } els.legend.hidden = true; clearSelection(); } });
+  if ('ResizeObserver' in window) new ResizeObserver(() => { fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.stage);
+  if ('ResizeObserver' in window && els.sideWrap) new ResizeObserver(() => { if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.sideWrap);
+  window.addEventListener('resize', () => { fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (els.reportBack && !els.reportBack.hidden) { closeReport(); return; } if (els.reproBack && !els.reproBack.hidden) { closeRepro(); return; } if (drillId) { closeDrill(); return; } if (mainView === 'graph') { setMainView('side'); return; } els.legend.hidden = true; clearSelection(); } });
 
+  bindSideView();
+  bindSide3D();
+  renderLegend();
+  syncViewDom();          /* default mainView = 'side' */
   renderActiveGraph();
+  requestAnimationFrame(fitSide);
   updateFbChip();
   renderSummary();
 }
