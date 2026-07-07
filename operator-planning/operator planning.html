@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ascend C Puzzles IDE Demo</title>
+  <title>Ascend C Operator Design IDE Demo</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
   <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
@@ -68,15 +68,19 @@
         radial-gradient(circle at 72% 86%, rgb(var(--ide-glow-bottom) / var(--ide-aura-bottom-alpha)), transparent 0 18rem);
       --ide-frame-page-bg: #101114;
       --ide-frame-bg: #101114;
-      --puzzle-blue: #5a92e6;
-      --puzzle-cyan: #19cca8;
-      --puzzle-amber: #ffaa3b;
-      --puzzle-red: #ff4b7b;
-      --puzzle-purple: #9b7cff;
+      --operator-blue: #5a92e6;
+      --operator-cyan: #19cca8;
+      --operator-amber: #ffaa3b;
+      --operator-red: #ff4b7b;
+      --operator-purple: #9b7cff;
+      --info: var(--operator-blue);
+      --aic: var(--operator-purple);
+      --aiv: var(--operator-cyan);
+      --mte: var(--operator-amber);
       --viz-grid: color-mix(in srgb, var(--foreground) 13%, transparent);
-      --viz-cell: color-mix(in srgb, var(--puzzle-blue) 20%, transparent);
-      --viz-cell-strong: color-mix(in srgb, var(--puzzle-blue) 42%, transparent);
-      --viz-active: color-mix(in srgb, var(--puzzle-red) 72%, transparent);
+      --viz-cell: color-mix(in srgb, var(--operator-blue) 20%, transparent);
+      --viz-cell-strong: color-mix(in srgb, var(--operator-blue) 42%, transparent);
+      --viz-active: color-mix(in srgb, var(--operator-red) 72%, transparent);
       --viz-pad: color-mix(in srgb, var(--foreground) 9%, transparent);
     }
 
@@ -151,7 +155,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-    .puzzle-card {
+    .operator-card {
       width: 100%;
       padding: 10px;
       border: 1px solid transparent;
@@ -161,29 +165,29 @@
       text-align: left;
       cursor: pointer;
     }
-    .puzzle-card:hover,
-    .puzzle-card.is-active {
+    .operator-card:hover,
+    .operator-card.is-active {
       background: var(--state-selected);
       border-color: color-mix(in srgb, var(--foreground) 10%, transparent);
       color: var(--foreground);
     }
-    .puzzle-card__top {
+    .operator-card__top {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
       margin-bottom: 7px;
     }
-    .puzzle-card__id {
+    .operator-card__id {
       color: var(--foreground-muted);
       font: var(--text-mono);
     }
-    .puzzle-card__title {
+    .operator-card__title {
       margin: 0 0 6px;
       color: var(--foreground);
       font: 700 12.5px / 1.25 var(--font-sans);
     }
-    .puzzle-card__desc {
+    .operator-card__desc {
       margin: 0;
       color: var(--foreground-muted);
       font: var(--text-body-sm);
@@ -201,7 +205,7 @@
     }
     .status-badge.is-ready { color: var(--success); }
     .status-badge.is-designing { color: var(--warning); }
-    .status-badge.is-compared { color: var(--puzzle-cyan); }
+    .status-badge.is-compared { color: var(--operator-cyan); }
 
     .tab-strip {
       display: flex;
@@ -345,10 +349,10 @@
       justify-content: space-between;
       gap: 10px;
       padding: 10px 12px;
-      border: 1px solid color-mix(in srgb, var(--puzzle-blue) 34%, var(--foreground) 8%);
+      border: 1px solid color-mix(in srgb, var(--operator-blue) 34%, var(--foreground) 8%);
       border-radius: var(--radius-md);
       background:
-        linear-gradient(135deg, color-mix(in srgb, var(--puzzle-blue) 18%, transparent), color-mix(in srgb, var(--puzzle-cyan) 10%, transparent)),
+        linear-gradient(135deg, color-mix(in srgb, var(--operator-blue) 18%, transparent), color-mix(in srgb, var(--operator-cyan) 10%, transparent)),
         color-mix(in srgb, var(--foreground) 5%, transparent);
       color: var(--foreground);
       font: 700 13px / 1.2 var(--font-sans);
@@ -360,20 +364,20 @@
       flex: 0 0 auto;
       padding: 3px 7px;
       border-radius: 999px;
-      background: color-mix(in srgb, var(--puzzle-cyan) 20%, transparent);
-      color: var(--puzzle-cyan);
+      background: color-mix(in srgb, var(--operator-cyan) 20%, transparent);
+      color: var(--operator-cyan);
       font: 700 10px / 1 var(--font-sans);
       letter-spacing: 0;
     }
     .api-jump:hover,
     .api-jump.is-active {
-      border-color: color-mix(in srgb, var(--puzzle-cyan) 58%, var(--foreground) 10%);
+      border-color: color-mix(in srgb, var(--operator-cyan) 58%, var(--foreground) 10%);
       background:
-        linear-gradient(135deg, color-mix(in srgb, var(--puzzle-blue) 28%, transparent), color-mix(in srgb, var(--puzzle-cyan) 16%, transparent)),
+        linear-gradient(135deg, color-mix(in srgb, var(--operator-blue) 28%, transparent), color-mix(in srgb, var(--operator-cyan) 16%, transparent)),
         color-mix(in srgb, var(--foreground) 6%, transparent);
     }
     .api-jump:focus-visible {
-      outline: 2px solid var(--puzzle-blue);
+      outline: 2px solid var(--operator-blue);
       outline-offset: 2px;
     }
     .api-note {
@@ -415,19 +419,71 @@
       gap: 6px;
     }
     .control-field label {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
+      display: block;
       color: var(--foreground-secondary);
       font: var(--text-label);
     }
     .control-field output {
+      display: none;
       color: var(--foreground);
       font: var(--text-mono);
     }
     .control-field input[type="range"] {
       width: 100%;
       accent-color: var(--primary);
+    }
+    .number-control,
+    .stepper-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+    }
+    .number-control input,
+    .stepper-control input {
+      width: 100%;
+      height: 32px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground);
+      font: var(--text-mono);
+    }
+    .number-control input {
+      padding: 0 10px;
+    }
+    .number-control--with-slider {
+      grid-template-columns: minmax(0, 1fr) 112px;
+      align-items: center;
+      column-gap: 10px;
+    }
+    .stepper-pair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .stepper-control {
+      grid-template-columns: 32px 54px 32px;
+      align-items: center;
+      justify-content: start;
+    }
+    .stepper-control button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground-secondary);
+      font: 700 15px / 1 var(--font-sans);
+      cursor: pointer;
+    }
+    .stepper-control button:hover {
+      background: var(--state-selected);
+      color: var(--foreground);
+    }
+    .stepper-control input {
+      padding: 0;
+      text-align: center;
     }
     .control-field select {
       width: 100%;
@@ -455,6 +511,13 @@
     .check-row.is-warning b { color: var(--warning); }
     .check-row.is-danger b { color: var(--danger); }
     .check-row.is-ok b { color: var(--success); }
+    .check-action {
+      display: block;
+      margin-top: 2px;
+      color: var(--foreground-muted);
+      font: var(--text-caption);
+      text-align: right;
+    }
 
     .tiling-map {
       display: grid;
@@ -464,11 +527,83 @@
       display: grid;
       grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
       gap: 12px;
-      align-items: start;
+      align-items: stretch;
     }
     .input-cluster {
       display: grid;
       gap: 12px;
+    }
+    .tiling-input-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .tiling-group {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 4%, transparent);
+    }
+    .tiling-group__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .tiling-group__head h4 {
+      margin: 0;
+      color: var(--foreground);
+      font: 700 12px / 1.25 var(--font-sans);
+    }
+    .tiling-group__head span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+    .tiling-fact-grid {
+      display: grid;
+      gap: 7px;
+    }
+    .tiling-fact {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
+      gap: 8px;
+      align-items: baseline;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+    .tiling-fact span {
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      white-space: nowrap;
+    }
+    .tiling-fact b {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--foreground);
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tiling-derived {
+      display: grid;
+      gap: 6px;
+      padding: 9px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--operator-cyan) 10%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-caption);
+    }
+    .tiling-derived code {
+      color: var(--foreground);
+      font: var(--text-mono);
+      white-space: normal;
+    }
+    .control-hint {
+      margin-top: -2px;
+      color: var(--foreground-muted);
+      font: var(--text-caption);
     }
     .seg-control {
       display: flex;
@@ -499,6 +634,148 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
+    .scheme-picker {
+      display: grid;
+      gap: 12px;
+    }
+    .scheme-picker__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .scheme-picker__head h3 {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+    }
+    .scheme-card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .scheme-option {
+      min-width: 0;
+      min-height: 124px;
+      padding: 10px 9px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 8px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 5%, transparent);
+      color: var(--foreground-secondary);
+      text-align: left;
+      cursor: pointer;
+    }
+    .scheme-option:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--operator-blue) 76%, transparent);
+      outline-offset: 2px;
+    }
+    .scheme-option.is-active {
+      border-color: color-mix(in srgb, var(--operator-blue) 64%, transparent);
+      background: color-mix(in srgb, var(--operator-blue) 16%, transparent);
+      color: var(--foreground);
+    }
+    .scheme-option__top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .scheme-option__top h4 {
+      margin: 0;
+      overflow: hidden;
+      color: var(--foreground);
+      font: 800 12px / 1.25 var(--font-sans);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scheme-option__actions {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .scheme-option__badge {
+      flex: 0 0 auto;
+      min-width: 38px;
+      height: 22px;
+      padding: 0 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground) 7%, transparent);
+      color: var(--foreground-secondary);
+      font: 700 11px / 1 var(--font-sans);
+    }
+    .scheme-option__delete {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--danger) 10%, transparent);
+      color: var(--foreground-secondary);
+      font: 800 14px / 1 var(--font-sans);
+      cursor: pointer;
+    }
+    .scheme-option__delete:hover {
+      color: var(--danger);
+      background: color-mix(in srgb, var(--danger) 16%, transparent);
+    }
+    .scheme-option__facts {
+      display: grid;
+      gap: 5px;
+    }
+    .scheme-option__row {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      gap: 6px;
+      align-items: baseline;
+      color: var(--foreground-secondary);
+      font: var(--text-caption);
+    }
+    .scheme-option__row span {
+      overflow: hidden;
+      color: var(--foreground-muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scheme-option__row b {
+      overflow: hidden;
+      color: var(--foreground);
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scheme-option__row b.is-ok { color: var(--success); }
+    .scheme-option__row b.is-warning { color: var(--warning); }
+    .scheme-option__note {
+      margin: 0;
+      color: var(--foreground-muted);
+      font: var(--text-caption);
+      line-height: 1.45;
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .hardware-target-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .hardware-target-controls,
+    .hardware-target-summary {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
     .outcome-stat {
       padding: 10px;
       border-radius: var(--radius-md);
@@ -514,6 +791,34 @@
       margin-top: 6px;
       color: var(--foreground);
       font: 800 16px / 1.15 var(--font-mono);
+    }
+    .outcome-stat small {
+      display: block;
+      margin-top: 5px;
+      color: var(--foreground-muted);
+      font: var(--text-caption);
+      line-height: 1.35;
+    }
+    .intra-core-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 54px);
+      gap: 6px;
+    }
+    .intra-tile {
+      width: 54px;
+      min-height: 34px;
+      padding: 6px;
+      display: grid;
+      gap: 3px;
+      border: 1px solid color-mix(in srgb, var(--operator-cyan) 28%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--operator-cyan) 10%, transparent);
+      color: var(--foreground);
+      font: 700 10px / 1 var(--font-mono);
+    }
+    .intra-tile span {
+      color: var(--foreground-muted);
+      font: 700 9px / 1 var(--font-sans);
     }
     .scheme-summary {
       display: grid;
@@ -571,12 +876,12 @@
       background: color-mix(in srgb, var(--foreground) 4%, transparent);
     }
     .scheme-lane.is-former {
-      border-color: color-mix(in srgb, var(--puzzle-blue) 34%, transparent);
-      background: color-mix(in srgb, var(--puzzle-blue) 12%, transparent);
+      border-color: color-mix(in srgb, var(--operator-blue) 34%, transparent);
+      background: color-mix(in srgb, var(--operator-blue) 12%, transparent);
     }
     .scheme-lane.is-tail {
-      border-color: color-mix(in srgb, var(--puzzle-amber) 34%, transparent);
-      background: color-mix(in srgb, var(--puzzle-amber) 10%, transparent);
+      border-color: color-mix(in srgb, var(--operator-amber) 34%, transparent);
+      background: color-mix(in srgb, var(--operator-amber) 10%, transparent);
     }
     .scheme-lane__top {
       display: flex;
@@ -599,8 +904,8 @@
       border-radius: inherit;
       background: currentColor;
     }
-    .scheme-lane.is-former .scheme-lane__bar { color: var(--puzzle-blue); }
-    .scheme-lane.is-tail .scheme-lane__bar { color: var(--puzzle-amber); }
+    .scheme-lane.is-former .scheme-lane__bar { color: var(--operator-blue); }
+    .scheme-lane.is-tail .scheme-lane__bar { color: var(--operator-amber); }
     .scheme-mini-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -634,15 +939,16 @@
       color: var(--foreground-secondary);
       font: 700 10px / 1 var(--font-mono);
     }
-    .tensor-cell.is-core { background: color-mix(in srgb, var(--puzzle-cyan) 24%, transparent); }
-    .tensor-cell.is-tail { background: color-mix(in srgb, var(--puzzle-amber) 42%, transparent); color: var(--foreground); }
+    .tensor-cell.is-core { background: color-mix(in srgb, var(--operator-cyan) 24%, transparent); }
+    .tensor-cell.is-tail { background: color-mix(in srgb, var(--operator-amber) 42%, transparent); color: var(--foreground); }
     .tensor-cell.is-active { background: var(--viz-active); color: white; }
     .core-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
-      gap: 5px;
+      grid-template-columns: repeat(auto-fill, 54px);
+      gap: 6px;
     }
     .core-card {
+      width: 54px;
       min-height: 34px;
       padding: 5px;
       display: grid;
@@ -653,7 +959,7 @@
       color: var(--foreground-muted);
       font: 700 9px / 1 var(--font-mono);
     }
-    .core-card.is-active { background: color-mix(in srgb, var(--puzzle-blue) 20%, transparent); color: var(--puzzle-blue); }
+    .core-card.is-active { background: color-mix(in srgb, var(--operator-blue) 20%, transparent); color: var(--operator-blue); }
     .core-card.is-former { background: color-mix(in srgb, var(--warning) 25%, transparent); color: var(--warning); }
     .tile-bar {
       height: 12px;
@@ -665,7 +971,7 @@
       display: block;
       height: 100%;
       width: var(--w);
-      background: linear-gradient(90deg, var(--puzzle-blue), var(--puzzle-cyan));
+      background: linear-gradient(90deg, var(--operator-blue), var(--operator-cyan));
     }
     .ub-meter {
       position: relative;
@@ -674,15 +980,27 @@
       border-radius: var(--radius-md);
       background: color-mix(in srgb, var(--foreground) 8%, transparent);
     }
-    .ub-meter > span {
-      display: block;
+    .ub-segments {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      overflow: hidden;
+    }
+    .ub-segment {
+      flex: 0 0 var(--usage);
       height: 100%;
-      width: var(--usage);
-      background: linear-gradient(90deg, var(--success), var(--warning));
+      max-width: var(--remaining);
+      border-right: 1px solid color-mix(in srgb, var(--surface-1) 55%, transparent);
+      background: var(--segment-color);
+      opacity: 0.35;
+    }
+    .ub-segment:last-child {
+      border-right: 0;
     }
     .ub-meter-label {
       position: absolute;
       inset: 0;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -751,12 +1069,12 @@
     }
     .feature-cell.is-pad,
     .matrix-cell.is-pad { background: var(--viz-pad); color: var(--foreground-muted); }
-    .feature-cell.is-window { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--puzzle-red) 70%, transparent); }
+    .feature-cell.is-window { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--operator-red) 70%, transparent); }
     .feature-cell.is-sampled,
     .matrix-cell.is-filled { background: var(--viz-active); color: white; }
     .feature-cell.is-selected,
     .matrix-cell.is-selected {
-      outline: 2px solid var(--puzzle-amber);
+      outline: 2px solid var(--operator-amber);
       outline-offset: 2px;
     }
     .matrix-grid {
@@ -784,12 +1102,12 @@
       place-items: center;
       border: 1px solid var(--viz-grid);
       border-radius: 7px;
-      background: color-mix(in srgb, var(--puzzle-red) 18%, transparent);
+      background: color-mix(in srgb, var(--operator-red) 18%, transparent);
       color: var(--foreground-secondary);
       font: var(--text-mono);
     }
     .filter-cell.is-sampled {
-      background: color-mix(in srgb, var(--puzzle-red) 68%, transparent);
+      background: color-mix(in srgb, var(--operator-red) 68%, transparent);
       color: white;
     }
     .mapping-text {
@@ -954,7 +1272,7 @@
     .format-cell:hover {
       background: var(--viz-active);
       color: white;
-      border-color: color-mix(in srgb, var(--puzzle-red) 70%, transparent);
+      border-color: color-mix(in srgb, var(--operator-red) 70%, transparent);
     }
     .format-cell.is-pad {
       background:
@@ -1018,6 +1336,7 @@
       .tiling-layout {
         grid-template-columns: 1fr;
       }
+      .hardware-target-grid { grid-template-columns: 1fr; }
       .view { min-height: auto; }
       .api-canvas { grid-template-rows: auto; }
       .compare-grid { grid-template-columns: 1fr; }
@@ -1025,7 +1344,7 @@
   </style>
 </head>
 <body>
-  <section class="pto-ide-frame asc-demo-frame" data-ide-frame data-host="standalone" data-inspector-open="false" aria-label="Ascend C Puzzles IDE Demo">
+  <section class="pto-ide-frame asc-demo-frame" data-ide-frame data-host="standalone" data-inspector-open="false" aria-label="Ascend C Operator Design IDE Demo">
     <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
       <div class="pto-ide-frame__topbar-left">
         <div class="pto-ide-frame__host-chip">
@@ -1034,11 +1353,11 @@
             <path d="m7 9 3 3-3 3"></path>
             <path d="M12 15h5"></path>
           </svg>
-          <span>Ascend C Puzzles · <b>UX prototype</b></span>
+          <span>Ascend C 算子设计 · <b>UX 原型</b></span>
         </div>
         <div class="pto-ide-frame__workspace" data-ide-slot="workspace-switcher">
           <span>operator-design-lab</span>
-          <span class="pto-ide-frame__crumbs" id="topCrumb">PZ-003 / API Visualizer</span>
+          <span class="pto-ide-frame__crumbs" id="topCrumb">OP-003 / API 可视化</span>
         </div>
       </div>
       <div class="pto-ide-frame__topbar-center"></div>
@@ -1054,7 +1373,7 @@
 
     <div class="pto-ide-frame__body">
       <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
-        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle puzzle explorer" aria-controls="puzzleExplorer" aria-expanded="true" aria-pressed="true" title="Explorer">
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle operator design explorer" aria-controls="operatorDesignExplorer" aria-expanded="true" aria-pressed="true" title="算子设计">
           <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
         </button>
         <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
@@ -1069,27 +1388,27 @@
       </nav>
 
       <div class="pto-ide-frame__workarea">
-        <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-storage-key="ascend-c-puzzles-main-v2" data-split-direction="horizontal" data-sizes="24,76" data-pixel-sizes="310" data-min-size="260,520">
-          <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="puzzleExplorer">
+        <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-storage-key="ascend-c-operators-main-v2" data-split-direction="horizontal" data-sizes="24,76" data-pixel-sizes="310" data-min-size="260,520">
+          <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="operatorDesignExplorer">
             <header class="pto-ide-frame__pane-header">
-              <h2 class="pto-ide-frame__pane-title">Puzzle Explorer</h2>
-              <span class="pto-ide-frame__pane-meta">4 puzzles</span>
+              <h2 class="pto-ide-frame__pane-title">算子设计</h2>
+              <span class="pto-ide-frame__pane-meta">4 个算子</span>
             </header>
-            <div class="pto-ide-frame__pane-body explorer-body" id="puzzleList"></div>
+            <div class="pto-ide-frame__pane-body explorer-body" id="operatorList"></div>
           </aside>
 
           <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
-            <div class="tab-strip" role="tablist" aria-label="Puzzle views">
-              <button class="tab-btn" type="button" data-view-tab="overview">Overview</button>
-              <button class="tab-btn" type="button" data-view-tab="tiling">Tiling</button>
-              <button class="tab-btn" type="button" data-view-tab="api">API Visualizer</button>
-              <button class="tab-btn" type="button" data-view-tab="pipeline">Pipeline</button>
-              <button class="tab-btn" type="button" data-view-tab="format">Format Lab</button>
-            </div>
             <header class="pto-ide-frame__pane-header">
               <h2 class="pto-ide-frame__pane-title" id="mainTitle">Load3D Im2col</h2>
-              <span class="pto-ide-frame__pane-meta" id="mainMeta">PZ-003 · mock mode</span>
+              <span class="pto-ide-frame__pane-meta" id="mainMeta">OP-003 · mock 模式</span>
             </header>
+            <div class="tab-strip" role="tablist" aria-label="Operator design views">
+              <button class="tab-btn" type="button" data-view-tab="overview">概览</button>
+              <button class="tab-btn" type="button" data-view-tab="tiling">Tiling</button>
+              <button class="tab-btn" type="button" data-view-tab="api">API 可视化</button>
+              <button class="tab-btn" type="button" data-view-tab="pipeline">Pipeline</button>
+              <button class="tab-btn" type="button" data-view-tab="format">Format 实验室</button>
+            </div>
             <div class="pto-ide-frame__pane-body workbench">
               <section class="view" data-view="overview" id="overviewView"></section>
               <section class="view" data-view="tiling" id="tilingView"></section>
@@ -1103,24 +1422,24 @@
 
         <div class="pto-ide-frame__bottom-dock">
           <section class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization" aria-label="Mock log">
-            <div class="terminal-lines" id="mockLog">mock-check: Load3D mapping uses preset data; no CANN backend is attached.</div>
+            <div class="terminal-lines" id="mockLog">mock-check: Load3D 映射使用预置数据；当前未接入 CANN 后端。</div>
           </section>
           <section class="pto-ide-frame__bottom-view" data-ide-bottom-panel="terminal" id="bottomTerminal" hidden aria-label="Terminal">
-            <div class="terminal-lines">ascend-puzzles % export --review-snapshot PZ-003<br>snapshot: overview + tiling + Load3D map + pipeline compare</div>
+            <div class="terminal-lines">ascend-operators % export --review-snapshot OP-003<br>snapshot: overview + tiling + Load3D map + pipeline compare</div>
           </section>
         </div>
 
         <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" data-ide-slot="status" aria-label="IDE status">
           <div class="ide-status">
             <div class="ide-status__group ide-status__group--left">
-              <span class="ide-status__item">Mock mode</span>
-              <span class="ide-status__item">No CANN backend</span>
-              <span class="ide-status__item" id="statusPuzzle">PZ-003</span>
+              <span class="ide-status__item">mock 模式</span>
+              <span class="ide-status__item">未接入 CANN 后端</span>
+              <span class="ide-status__item" id="statusOperator">OP-003</span>
             </div>
             <div class="ide-status__group ide-status__group--right">
-              <span class="ide-status__item" id="statusView">API Visualizer</span>
+              <span class="ide-status__item" id="statusView">API 可视化</span>
               <span class="ide-status__item">UTF-8</span>
-              <span class="ide-status__item">UX prototype</span>
+              <span class="ide-status__item">UX 原型</span>
             </div>
           </div>
         </footer>
@@ -1132,58 +1451,58 @@
   <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
   <script>
     (() => {
-      const puzzles = [
+      const operators = [
         {
-          id: 'PZ-001',
+          id: 'OP-001',
           title: 'Elementwise Add',
-          status: 'Not started',
-          type: 'Warmup',
-          requirement: 'Create a minimal operator design for C = A + B and reason about shape, dtype, and a first tiling pass.',
-          performanceGoal: 'Keep the first puzzle focused on complete coverage and simple vector-friendly tiles.',
+          status: '未开始',
+          type: '入门算子',
+          requirement: '为 C = A + B 创建一个最小算子设计，并说明 shape、dtype 和第一版 tiling 如何确定。',
+          performanceGoal: '第一版设计优先保证覆盖完整、tile 简单且适合 vector 处理。',
           formula: 'C[i] = A[i] + B[i]',
           inputs: [['A', '1024 x 1024', 'half / ND'], ['B', '1024 x 1024', 'half / ND']],
           outputs: [['C', '1024 x 1024', 'half / ND']],
           apis: ['DataCopy', 'Add', 'DataCopy'],
-          tiling: 'Split linear elements across cores; align tile length to 32B.'
+          tiling: '将线性元素按核切分；tile 长度按 32B 对齐。'
         },
         {
-          id: 'PZ-002',
+          id: 'OP-002',
           title: 'Copy & Alignment',
-          status: 'Designing',
-          type: 'Memory movement',
-          requirement: 'Move a strided tensor slice while preserving alignment and explaining tail handling.',
-          performanceGoal: 'Minimize unaligned copy fragments and surface tail policy decisions.',
+          status: '设计中',
+          type: '数据搬运',
+          requirement: '搬运带 stride 的 tensor 切片，同时保持对齐，并解释 tail 处理方式。',
+          performanceGoal: '减少非对齐 DataCopy 片段，并显式暴露 tail 策略决策。',
           formula: 'Y[n] = X[n * stride]',
           inputs: [['X', '4096 x 64', 'int8 / ND']],
           outputs: [['Y', '2048 x 64', 'int8 / ND']],
           apis: ['DataCopy', 'SetLoadDataPaddingValue'],
-          tiling: 'Prefer 32B aligned chunks; pad tail when the slice is short.'
+          tiling: '优先使用 32B 对齐分块；切片不足时对 tail 做 padding。'
         },
         {
-          id: 'PZ-003',
+          id: 'OP-003',
           title: 'Load3D Im2col',
-          status: 'Compared',
-          type: 'API data transform',
-          requirement: 'Use Load3D to prepare feature map tiles for cube computation, then explain how each window becomes matrix data.',
-          performanceGoal: 'Expose data movement, repeatMode, and layout decisions before pipeline planning.',
+          status: '已对比',
+          type: 'API 数据变换',
+          requirement: '使用 Load3D 为 Cube 计算准备 feature map tile，并解释每个滑窗如何变成矩阵数据。',
+          performanceGoal: '在规划 pipeline 之前，先暴露数据搬运、repeatMode 和 layout 决策。',
           formula: 'Y = Conv2D(X, W)',
           inputs: [['x', 'NC1HWC0 = 1 x 2 x 4 x 4 x 16', 'half / NC1HWC0']],
-          outputs: [['im2col', 'HoWo x HkWkCi', 'half / NZ-like matrix']],
+          outputs: [['img2col', 'HoWo x HkWkCi', 'half / NZ-like matrix']],
           apis: ['Load3D', 'DataCopy', 'Mmad'],
-          tiling: 'Split Ho*Wo across cores; align C0 to 16; keep Load3D windows repeatable.'
+          tiling: '按核切分 Ho*Wo；C0 对齐到 16；保持 Load3D 滑窗可重复。'
         },
         {
-          id: 'PZ-004',
+          id: 'OP-004',
           title: 'Cube + Vector Fusion',
-          status: 'Ready for review',
+          status: '待评审',
           type: 'Pipeline',
-          requirement: 'Compare cube-heavy and vector post-process scheduling under the same tiling strategy.',
-          performanceGoal: 'Reduce idle gaps between Cube Compute and Vector Compute while keeping buffer pressure visible.',
+          requirement: '在同一 tiling 策略下，对比偏 Cube 的调度和 Vector 后处理调度。',
+          performanceGoal: '减少 Cube Compute 与 Vector Compute 之间的空闲间隙，同时保持 buffer 压力可见。',
           formula: 'Z = activation(Mmad(A, B) + bias)',
           inputs: [['A', '128 x 64', 'half / NZ'], ['B', '64 x 128', 'half / NZ']],
           outputs: [['Z', '128 x 128', 'half / ND']],
           apis: ['Load3D', 'Mmad', 'Add', 'Relu', 'DataCopy'],
-          tiling: 'Double-buffer friendly BLOCK_DIM=12, TILE_NUM=4, BUFFER_NUM=2.'
+          tiling: '面向 Double Buffer：BLOCK_DIM=12，TILE_NUM=4，BUFFER_NUM=2。'
         }
       ];
 
@@ -1196,9 +1515,9 @@
       const dtypeSize = { half: 2, bf16: 2, float: 4, int8: 1 };
 
       const tilingSchemes = [
-        { name: 'Baseline', soc: '910b', dtype: 'half', inputs: 2, total: 16384, blockDim: 8, tileNum: 8, bufferNum: 2, tailPolicy: 'branch', note: 'Readable default with even split for the first pass.' },
-        { name: 'Aligned tail case', soc: '910b', dtype: 'half', inputs: 2, total: 16448, blockDim: 7, tileNum: 8, bufferNum: 2, tailPolicy: 'former/tail', note: 'Creates former/tail core split so tail alignment is visible.' },
-        { name: 'Double-buffer friendly', soc: '910b', dtype: 'half', inputs: 3, total: 32768, blockDim: 12, tileNum: 4, bufferNum: 2, tailPolicy: 'pad', note: 'Fewer tiles, double buffer enabled, higher UB pressure.' }
+        { name: '基线方案', soc: '910b', dtype: 'half', inputs: 2, total: 16384, blockDim: 8, tileNum: 8, bufferNum: 2, tailPolicy: 'branch', paddingPolicy: 'mask', tilingMode: 'auto', note: '第一版均分方案，便于阅读和解释。' },
+        { name: '对齐 tail 场景', soc: '910b', dtype: 'half', inputs: 2, total: 16448, blockDim: 7, tileNum: 8, bufferNum: 2, tailPolicy: 'former/tail', paddingPolicy: 'padding', tilingMode: 'auto', note: '刻意制造 former/tail 核切分，让 tail 对齐更可见。' },
+        { name: 'Double Buffer 友好', soc: '910b', dtype: 'half', inputs: 3, total: 32768, blockDim: 12, tileNum: 4, bufferNum: 2, tailPolicy: 'pad', paddingPolicy: 'padding', tilingMode: 'auto', note: 'tile 数更少，启用 Double Buffer，UB 压力更高。' }
       ];
 
       const pipelineSchemes = {
@@ -1210,10 +1529,10 @@
           sync: 5,
           note: 'Readable but cube/vector lanes wait for each other.',
           stages: [
-            ['CopyIn', 2, 16, 'Load A/B tile', '--puzzle-blue'],
-            ['Cube Compute', 22, 22, 'Mmad tile', '--puzzle-purple'],
-            ['Vector Compute', 50, 18, 'Bias + activation', '--puzzle-cyan'],
-            ['CopyOut', 74, 16, 'Store result tile', '--puzzle-amber'],
+            ['CopyIn', 2, 16, 'Load A/B tile', '--operator-blue'],
+            ['Cube Compute', 22, 22, 'Mmad tile', '--operator-purple'],
+            ['Vector Compute', 50, 18, 'Bias + activation', '--operator-cyan'],
+            ['CopyOut', 74, 16, 'Store result tile', '--operator-amber'],
             ['Sync / Buffer', 18, 6, 'wait', '--warning']
           ]
         },
@@ -1225,10 +1544,10 @@
           sync: 3,
           note: 'CopyIn for tile n+1 overlaps cube compute for tile n.',
           stages: [
-            ['CopyIn', 2, 24, 'Load tile n/n+1', '--puzzle-blue'],
-            ['Cube Compute', 18, 30, 'Mmad tile n', '--puzzle-purple'],
-            ['Vector Compute', 42, 22, 'Post-process tile n-1', '--puzzle-cyan'],
-            ['CopyOut', 62, 24, 'Store tile n-1', '--puzzle-amber'],
+            ['CopyIn', 2, 24, 'Load tile n/n+1', '--operator-blue'],
+            ['Cube Compute', 18, 30, 'Mmad tile n', '--operator-purple'],
+            ['Vector Compute', 42, 22, 'Post-process tile n-1', '--operator-cyan'],
+            ['CopyOut', 62, 24, 'Store tile n-1', '--operator-amber'],
             ['Sync / Buffer', 35, 10, 'buffer handoff', '--warning']
           ]
         },
@@ -1240,19 +1559,19 @@
           sync: 2,
           note: 'Vector lane is pulled earlier; buffer pressure increases but idle gaps shrink.',
           stages: [
-            ['CopyIn', 2, 26, 'Load tile n/n+1', '--puzzle-blue'],
-            ['Cube Compute', 16, 31, 'Mmad tile n', '--puzzle-purple'],
-            ['Vector Compute', 36, 25, 'Bias + activation', '--puzzle-cyan'],
-            ['CopyOut', 58, 26, 'Store result', '--puzzle-amber'],
+            ['CopyIn', 2, 26, 'Load tile n/n+1', '--operator-blue'],
+            ['Cube Compute', 16, 31, 'Mmad tile n', '--operator-purple'],
+            ['Vector Compute', 36, 25, 'Bias + activation', '--operator-cyan'],
+            ['CopyOut', 58, 26, 'Store result', '--operator-amber'],
             ['Sync / Buffer', 28, 12, 'double buffer', '--warning']
           ]
         }
       };
 
       const state = {
-        puzzleId: 'PZ-003',
+        operatorId: 'OP-003',
         view: 'api',
-        tilingScheme: 'Aligned tail case',
+        tilingScheme: '对齐 tail 场景',
         customSchemeCount: 0,
         soc: '910b',
         dtype: 'half',
@@ -1261,6 +1580,9 @@
         blockDim: 7,
         tileNum: 8,
         bufferNum: 2,
+        tailPolicy: 'former/tail',
+        paddingPolicy: 'padding',
+        tilingMode: 'auto',
         apiStep: 3,
         selectedApi: 'Load3D',
         selectedSource: '1,1',
@@ -1285,29 +1607,34 @@
 
       const $ = (sel, root = document) => root.querySelector(sel);
       const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-      const puzzle = () => puzzles.find((item) => item.id === state.puzzleId) || puzzles[0];
-      const statusClass = (status) => status === 'Ready for review' ? 'is-ready' : status === 'Compared' ? 'is-compared' : status === 'Designing' ? 'is-designing' : '';
+      const currentOperator = () => operators.find((item) => item.id === state.operatorId) || operators[0];
+      const statusClass = (status) => status === '待评审' ? 'is-ready' : status === '已对比' ? 'is-compared' : status === '设计中' ? 'is-designing' : '';
+      const viewLabel = (view) => ({
+        overview: '概览',
+        tiling: 'Tiling',
+        api: 'API 可视化',
+        pipeline: 'Pipeline',
+        format: 'Format 实验室'
+      }[view] || view);
 
-      function renderPuzzles() {
-        $('#puzzleList').innerHTML = `
-          <div class="explorer-title">Ascend C Operator Puzzles</div>
-          ${puzzles.map((item) => `
-            <button class="puzzle-card ${item.id === state.puzzleId ? 'is-active' : ''}" type="button" data-puzzle="${item.id}">
-              <div class="puzzle-card__top">
-                <span class="puzzle-card__id">${item.id}</span>
+      function renderOperators() {
+        $('#operatorList').innerHTML = `
+          ${operators.map((item) => `
+            <button class="operator-card ${item.id === state.operatorId ? 'is-active' : ''}" type="button" data-operator="${item.id}">
+              <div class="operator-card__top">
+                <span class="operator-card__id">${item.id}</span>
                 <span class="status-badge ${statusClass(item.status)}">${item.status}</span>
               </div>
-              <h3 class="puzzle-card__title">${item.title}</h3>
-              <p class="puzzle-card__desc">${item.type}</p>
+              <h3 class="operator-card__title">${item.title}</h3>
+              <p class="operator-card__desc">${item.type}</p>
             </button>
           `).join('')}
-          <div class="soft-note">Inspired by puzzle-based accelerator learning. All checks and mappings are mock UX data.</div>
         `;
-        $$('[data-puzzle]').forEach((btn) => {
+        $$('[data-operator]').forEach((btn) => {
           btn.addEventListener('click', () => {
-            state.puzzleId = btn.dataset.puzzle;
-            state.selectedApi = puzzle().apis[0] || 'Load3D';
-            if (state.puzzleId === 'PZ-003') state.view = 'api';
+            state.operatorId = btn.dataset.operator;
+            state.selectedApi = currentOperator().apis[0] || 'Load3D';
+            if (state.operatorId === 'OP-003') state.view = 'api';
             else state.view = 'overview';
             renderAll();
           });
@@ -1315,7 +1642,7 @@
       }
 
       function renderOverview() {
-        const p = puzzle();
+        const p = currentOperator();
         $('#overviewView').innerHTML = `
           <div class="overview-grid">
             <section class="view-main">
@@ -1337,10 +1664,10 @@
                   <p>${p.tiling}</p>
                 </section>
                 <div class="action-row">
-                  <button class="btn btn-sm" type="button" data-open-view="tiling">Open Tiling</button>
-                  <button class="btn btn-sm" type="button" data-open-view="api">Open API Visualizer</button>
-                  <button class="btn btn-sm" type="button" data-open-view="pipeline">Open Pipeline</button>
-                  <button class="btn btn-solid btn-sm" type="button" data-open-view="format">Open Format Lab</button>
+                  <button class="btn btn-sm" type="button" data-open-view="tiling">打开 Tiling</button>
+                  <button class="btn btn-sm" type="button" data-open-view="api">打开 API 可视化</button>
+                  <button class="btn btn-sm" type="button" data-open-view="pipeline">打开 Pipeline</button>
+                  <button class="btn btn-solid btn-sm" type="button" data-open-view="format">打开 Format 实验室</button>
                 </div>
               </div>
             </section>
@@ -1353,7 +1680,7 @@
                 ${renderTensorTable(p.outputs)}
                 <h3 class="side-title" style="margin-top:14px">需要使用的接口</h3>
                 <div class="api-actions">
-                  ${p.apis.map((api) => `<button class="api-jump ${api === state.selectedApi ? 'is-active' : ''}" type="button" data-api-jump="${api}" aria-label="Open ${api} in API Visualizer">${api}</button>`).join('')}
+                  ${p.apis.map((api) => `<button class="api-jump ${api === state.selectedApi ? 'is-active' : ''}" type="button" data-api-jump="${api}" aria-label="在 API 可视化中打开 ${api}">${api}</button>`).join('')}
                 </div>
               </div>
             </section>
@@ -1377,7 +1704,7 @@
 
       function renderTensorTable(rows) {
         return `<div class="table-like">
-          <div class="head"><span>Name</span><span>Shape</span><span>DType / Format</span></div>
+          <div class="head"><span>名称</span><span>Shape</span><span>dtype / format</span></div>
           ${rows.map((row) => `<div><span>${row[0]}</span><span>${row[1]}</span><span>${row[2]}</span></div>`).join('')}
         </div>`;
       }
@@ -1403,7 +1730,10 @@
           total: state.totalLen,
           blockDim: state.blockDim,
           tileNum: state.tileNum,
-          bufferNum: state.bufferNum
+          bufferNum: state.bufferNum,
+          tailPolicy: state.tailPolicy,
+          paddingPolicy: state.paddingPolicy,
+          tilingMode: state.tilingMode
         };
       }
 
@@ -1416,6 +1746,9 @@
         state.blockDim = scheme.blockDim;
         state.tileNum = scheme.tileNum;
         state.bufferNum = scheme.bufferNum;
+        state.tailPolicy = scheme.tailPolicy || 'former/tail';
+        state.paddingPolicy = scheme.paddingPolicy || 'padding';
+        state.tilingMode = scheme.tilingMode || 'manual';
       }
 
       function computeTilingOutcome(scheme) {
@@ -1436,24 +1769,41 @@
         const loopCount = tileNum * bufferNum;
         const tileLen = Math.max(1, Math.floor(perCoreDisplay / loopCount));
         const queueCount = scheme.inputs + 1;
-        const ubUsed = queueCount * bufferNum * tileLen * dtypeBytes;
+        const queueBytes = bufferNum * tileLen * dtypeBytes;
+        const ubUsed = queueCount * queueBytes;
         const ubCap = soc.ubKB * 1024;
         const ubPct = ubUsed / ubCap * 100;
+        const queuePct = queueBytes / ubCap * 100;
+        const queueNames = Array.from({ length: scheme.inputs }, (_, idx) => `GM stream ${idx + 1}`).concat('输出 z');
+        const queueColors = ['var(--info)', 'var(--aic)', 'var(--aiv)', 'var(--mte)'];
+        let consumedPct = 0;
+        const ubSegments = queueNames.map((name, idx) => {
+          const widthPct = Math.max(0, Math.min(100 - consumedPct, queuePct));
+          const segment = {
+            name,
+            bytes: queueBytes,
+            pct: widthPct,
+            color: queueColors[idx % queueColors.length],
+            remainingPct: Math.max(0, 100 - consumedPct)
+          };
+          consumedPct += queuePct;
+          return segment;
+        });
         const tileBytes = tileLen * dtypeBytes;
         const tileAligned = tileLen % alignElems === 0;
         const queueLimitOk = scheme.inputs * bufferNum <= soc.maxQueuePerPos * 2;
         const tileBigEnough = tileLen >= soc.vectorWidthBytes / dtypeBytes;
         const wasteElems = total - totalAligned;
         const splitMsg = formerNum === 0
-          ? `Even split — every active core processes ${fmt(tailLength)} elements`
-          : `${formerNum} former cores get ${fmt(formerLength)} each, ${tailNum} tail cores get ${fmt(tailLength)} each (diff: ${alignElems} elements)`;
+          ? `均分：每个激活核处理 ${fmt(tailLength)} 个元素`
+          : `${formerNum} 个 former 核各处理 ${fmt(formerLength)} 个元素，${tailNum} 个 tail 核各处理 ${fmt(tailLength)} 个元素（差值 ${alignElems} 个元素）`;
         const checksList = [
-          ['UB fits', ubUsed <= ubCap ? `${bytesFmt(ubUsed)} / ${soc.ubKB} KB` : `overflow: ${bytesFmt(ubUsed)}`, ubUsed <= ubCap ? 'is-ok' : 'is-danger'],
-          ['TILE_LENGTH alignment', tileAligned ? `${soc.alignBytes}B aligned (${tileBytes}B)` : `not ${soc.alignBytes}B aligned`, tileAligned ? 'is-ok' : 'is-warning'],
-          ['Queue pressure', queueLimitOk ? `${scheme.inputs * bufferNum} queues within limit` : `${scheme.inputs * bufferNum} queues exceeds limit`, queueLimitOk ? 'is-ok' : 'is-warning'],
-          ['Tail-core handling', formerNum === 0 ? 'no tail branch' : `${formerNum} former + ${tailNum} tail`, formerNum === 0 ? 'is-ok' : 'is-warning'],
-          ['SIMD saturation', tileBigEnough ? `tile ${tileLen} >= ${soc.vectorWidthBytes / dtypeBytes}` : `tile ${tileLen} below SIMD width`, tileBigEnough ? 'is-ok' : 'is-warning'],
-          ['Trailing waste', wasteElems === 0 ? 'none' : `${wasteElems} elems ignored / padded`, wasteElems === 0 ? 'is-ok' : 'is-warning']
+          ['UB 容量', ubUsed <= ubCap ? `${bytesFmt(ubUsed)} / ${soc.ubKB} KB` : `溢出：${bytesFmt(ubUsed)}`, ubUsed <= ubCap ? 'is-ok' : 'is-danger', ubUsed <= ubCap ? '' : '减小 TILE_NUM、BUFFER_NUM 或 GM 输入流数量'],
+          ['TILE_LENGTH 对齐', tileAligned ? `${soc.alignBytes}B 已对齐（${tileBytes}B）` : `未按 ${soc.alignBytes}B 对齐`, tileAligned ? 'is-ok' : 'is-warning', tileAligned ? '' : '调整 BLOCK_DIM 或 TILE_NUM，让 tile 长度落到对齐单元'],
+          ['GM 输入流压力', queueLimitOk ? `${scheme.inputs * bufferNum} 个队列，未超过限制` : `${scheme.inputs * bufferNum} 个队列，超过限制`, queueLimitOk ? 'is-ok' : 'is-warning', queueLimitOk ? '' : '减少输入流或关闭 Double Buffer'],
+          ['Tail 核处理', formerNum === 0 ? '没有 tail 分支' : `${formerNum} former + ${tailNum} tail`, formerNum === 0 ? 'is-ok' : 'is-warning', formerNum === 0 ? '' : '确认 tail policy 使用 former/tail 或 padding'],
+          ['Vector 宽度', tileBigEnough ? `tile ${tileLen} >= ${soc.vectorWidthBytes / dtypeBytes}` : `tile ${tileLen} 低于 ${soc.vectorWidthBytes / dtypeBytes} 元素`, tileBigEnough ? 'is-ok' : 'is-warning', tileBigEnough ? '' : '增大 TILE_LENGTH：减少 TILE_NUM 或减少 BLOCK_DIM'],
+          ['末尾覆盖', wasteElems === 0 ? '无遗漏' : `${wasteElems} 个元素需要 mask 或 padding`, wasteElems === 0 ? 'is-ok' : 'is-warning', wasteElems === 0 ? '' : '选择 padding policy，并在 kernel tail 分支中验证']
         ];
         return {
           soc,
@@ -1473,25 +1823,170 @@
           tileLen,
           ubUsed,
           ubPct,
+          queueBytes,
+          queuePct,
+          ubSegments,
           tileAligned,
           splitMsg,
           checks: checksList,
-          queueNames: Array.from({ length: scheme.inputs }, (_, idx) => `input ${String.fromCharCode(120 + idx)}`).concat('output z')
+          queueNames
         };
       }
 
+      function operatorWorkloadText(operator, outcome) {
+        if (operator.id === 'OP-003') return 'Ho * Wo * C0 滑窗展开';
+        if (operator.id === 'OP-004') return 'M * N 输出 tile 元素';
+        return '线性展开后的逻辑元素';
+      }
+
+      function operatorDerivationText(operator, outcome) {
+        const input = operator.inputs[0] || ['input', '-', '-'];
+        if (operator.id === 'OP-003') {
+          return `Load3D 读取 ${input[0]}（${input[1]}），先把滑窗展开成 img2col 行，再进入 tile 调度。`;
+        }
+        if (operator.id === 'OP-004') {
+          return '融合算子的 tiling 需要把 Cube 输出分区和 Vector 后处理流放在同一套 buffer 预算下评估。';
+        }
+        return `Tiling 从 ${input[0]} 的 shape 出发，先线性化有效逻辑范围，再按 ${outcome.soc.alignBytes}B 粒度对齐。`;
+      }
+
+      function splitDtypeFormat(spec) {
+        const [dtype = '-', format = '-'] = String(spec || '- / -').split('/').map((item) => item.trim());
+        return { dtype, format };
+      }
+
+      function operatorWorkloadFormula(operator, outcome) {
+        if (operator.id === 'OP-003') return 'Ho * Wo * C0 → img2col rows → tile workload seed';
+        if (operator.id === 'OP-004') return 'M * N output tile elements → Cube result → Vector postprocess';
+        return 'flatten(shape) → linear elements';
+      }
+
+      function renderHardwareFacts(outcome) {
+        const vectorElems = Math.floor(outcome.soc.vectorWidthBytes / outcome.dtypeBytes);
+        return `
+          <div class="tiling-fact-grid">
+            <div class="tiling-fact"><span>SOC</span><b>${outcome.soc.name}</b></div>
+            <div class="tiling-fact"><span>Core</span><b>${outcome.soc.cores} ${outcome.soc.coreLabel}</b></div>
+            <div class="tiling-fact"><span>UB</span><b>${outcome.soc.ubKB} KB / core</b></div>
+            <div class="tiling-fact"><span>Alignment</span><b>${outcome.soc.alignBytes}B = ${outcome.alignElems} elems</b></div>
+            <div class="tiling-fact"><span>Vector</span><b>${outcome.soc.vectorWidthBytes}B = ${vectorElems} elems</b></div>
+          </div>
+        `;
+      }
+
+      function renderWorkloadSummary(operator, outcome) {
+        const input = operator.inputs[0] || ['input', '-', '-'];
+        return `
+          <div class="tiling-fact-grid">
+            <div class="tiling-fact"><span>Input shape</span><b title="${input[1]}">${input[1]}</b></div>
+            <div class="tiling-fact"><span>Total length</span><b>${fmt(outcome.total)}</b></div>
+            <div class="tiling-fact"><span>Aligned</span><b>${fmt(outcome.totalAligned)} (${outcome.alignElems} elems/unit)</b></div>
+          </div>
+        `;
+      }
+
+      function blockLengthFormula(outcome, selected) {
+        if (outcome.formerNum > 0) return `former core: ${fmt(outcome.tailLength)} + ${outcome.alignElems}`;
+        return `${fmt(outcome.totalAligned)} / ${selected.blockDim}`;
+      }
+
+      function tileLengthFormula(outcome, selected) {
+        return `floor(${fmt(outcome.perCoreDisplay)} / ${selected.tileNum} / ${selected.bufferNum})`;
+      }
+
+      function schemeTailText(scheme, outcome) {
+        if (outcome.formerNum === 0) return `${scheme.tailPolicy || 'branch'}, no tail`;
+        return `${outcome.formerNum} + ${outcome.tailNum}, ${scheme.paddingPolicy || 'padding'}`;
+      }
+
+      function renderSchemePicker() {
+        return `
+          <section class="viz-panel scheme-picker">
+            <header class="section-head">
+              <h3>Tiling Scheme</h3>
+              <button class="btn btn-sm" type="button" id="addTilingScheme">Add New</button>
+            </header>
+            <div class="section-body">
+              <div class="scheme-card-grid">
+                ${tilingSchemes.map((scheme) => {
+                  const s = computeTilingOutcome(scheme);
+                  const queueCount = scheme.inputs * scheme.bufferNum;
+                  const queueLimit = s.soc.maxQueuePerPos * 2;
+                  const selectedScheme = scheme.name === state.tilingScheme;
+                  return `
+                    <article class="scheme-option ${selectedScheme ? 'is-active' : ''}" role="button" tabindex="0" data-tiling-scheme="${scheme.name}">
+                      <div class="scheme-option__top">
+                        <h4>${scheme.name}</h4>
+                        <div class="scheme-option__actions">
+                          <span class="scheme-option__badge">${scheme.tilingMode === 'manual' ? 'Manual' : 'Auto'}</span>
+                          ${scheme.custom ? `<button class="scheme-option__delete" type="button" data-delete-tiling-scheme="${scheme.name}" aria-label="删除 ${scheme.name}" title="删除">×</button>` : ''}
+                        </div>
+                      </div>
+                      <div class="scheme-option__facts">
+                        <div class="scheme-option__row"><span>UB</span><b>${s.ubPct.toFixed(0)}%</b></div>
+                        <div class="scheme-option__row"><span>Alignment</span><b class="${s.tileAligned ? 'is-ok' : 'is-warning'}">${s.tileAligned ? `${s.soc.alignBytes}B aligned` : `Not aligned to ${s.soc.alignBytes}B`}</b></div>
+                        <div class="scheme-option__row"><span>Queue</span><b class="${queueCount <= queueLimit ? 'is-ok' : 'is-warning'}">${queueCount} <= ${queueLimit}</b></div>
+                        <div class="scheme-option__row"><span>尾块方案</span><b>${schemeTailText(scheme, s)}</b></div>
+                      </div>
+                      <p class="scheme-option__note">${scheme.note}</p>
+                    </article>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderOperatorShapeFacts(operator, outcome) {
+        const input = operator.inputs[0] || ['input', '-', '-'];
+        const output = operator.outputs[0] || ['output', '-', '-'];
+        const inputMeta = splitDtypeFormat(input[2]);
+        const outputMeta = splitDtypeFormat(output[2]);
+        return `
+          <div class="tiling-fact-grid">
+            <div class="tiling-fact"><span>Tensor</span><b title="${input[0]}">${input[0]}</b></div>
+            <div class="tiling-fact"><span>Shape</span><b title="${input[1]}">${input[1]}</b></div>
+            <div class="tiling-fact"><span>dtype</span><b>${inputMeta.dtype}</b></div>
+            <div class="tiling-fact"><span>format</span><b>${inputMeta.format}</b></div>
+            <div class="tiling-fact"><span>Output</span><b title="${output[0]} · ${output[1]}">${output[0]} · ${output[1]}</b></div>
+            <div class="tiling-fact"><span>out fmt</span><b>${outputMeta.format}</b></div>
+            <div class="tiling-fact"><span>Workload</span><b>${operatorWorkloadText(operator, outcome)}</b></div>
+          </div>
+          <div class="tiling-derived">
+            <span>推导出的 tiling 输入</span>
+            <code>${operatorDerivationText(operator, outcome)}</code>
+          </div>
+        `;
+      }
+
       function bindTilingControls() {
-        [
-          ['totalLen', 'total'],
-          ['blockDim', 'blockDim'],
-          ['tileNum', 'tileNum']
-        ].forEach(([id, key]) => {
-          const input = document.getElementById(id);
-          if (!input) return;
-          input.addEventListener('input', () => {
-            state[key === 'total' ? 'totalLen' : key] = Number(input.value);
-            const out = document.getElementById(`${id}Out`);
-            if (out) out.textContent = fmt(input.value);
+        $$('[data-number-field]').forEach((input) => {
+          const commitNumber = () => {
+            const key = input.dataset.numberField;
+            const min = Number(input.min) || 1;
+            const max = Number(input.max) || Number.MAX_SAFE_INTEGER;
+            const step = Number(input.step) || 1;
+            const raw = Number(input.value);
+            const value = Number.isFinite(raw) ? raw : state[key];
+            state[key] = clampToStep(value, min, max, step);
+            renderTiling();
+            renderInspector();
+          };
+          const eventName = input.type === 'range' ? 'input' : 'change';
+          input.addEventListener(eventName, commitNumber);
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') input.blur();
+          });
+        });
+        $$('[data-stepper-target]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const key = btn.dataset.stepperTarget;
+            const min = Number(btn.dataset.min) || 1;
+            const max = Number(btn.dataset.max) || Number.MAX_SAFE_INTEGER;
+            const step = Number(btn.dataset.step) || 1;
+            const delta = Number(btn.dataset.delta) || 0;
+            state[key] = clampToStep(Number(state[key]) + delta, min, max, step);
             renderTiling();
             renderInspector();
           });
@@ -1514,164 +2009,161 @@
           state.bufferNum = Number(btn.dataset.setBufferNum);
           renderAll();
         }));
+        $$('[data-set-tail-policy]').forEach((btn) => btn.addEventListener('click', () => {
+          state.tailPolicy = btn.dataset.setTailPolicy;
+          renderAll();
+        }));
+        $$('[data-set-padding-policy]').forEach((btn) => btn.addEventListener('click', () => {
+          state.paddingPolicy = btn.dataset.setPaddingPolicy;
+          renderAll();
+        }));
       }
 
       function renderTiling() {
+        const p = currentOperator();
         const selected = currentTilingScheme();
         const outcome = computeTilingOutcome(selected);
         $('#tilingView').innerHTML = `
-          <div>
-            <section class="view-main">
-              <div class="tiling-map">
-                <div class="tiling-layout">
-                  <section class="viz-panel">
-                    <header class="section-head"><h3>Inputs</h3><span class="section-meta">${outcome.soc.name} · ${outcome.dtypeBytes}B</span></header>
-                    <div class="section-body input-cluster">
-                      <div class="control-field">
-                        <label>SOC <output>${outcome.soc.name} (${outcome.soc.cores} ${outcome.soc.coreLabel})</output></label>
-                        <div class="seg-control" data-seg="soc">
-                          ${Object.entries(socProfiles).map(([key, soc]) => `<button type="button" class="${selected.soc === key ? 'is-active' : ''}" data-set-soc="${key}">${soc.name}</button>`).join('')}
+          <div class="tiling-map">
+            ${renderSchemePicker()}
+            <div class="tiling-layout">
+              <section class="viz-panel">
+                    <header class="section-head"><h3>Tiling Inputs</h3><span class="section-meta">事实 → 约束 → 决策</span></header>
+                    <div class="section-body tiling-input-stack">
+                      <section class="tiling-group">
+                        <div class="tiling-group__head"><h4>Operator Shape</h4><span>read from operator</span></div>
+                        ${renderOperatorShapeFacts(p, outcome)}
+                      </section>
+                      <section class="tiling-group">
+                        <div class="tiling-group__head"><h4>Hardware Target</h4><span>${outcome.soc.name} · ${outcome.soc.coreLabel}</span></div>
+                        <div class="hardware-target-grid">
+                          <div class="hardware-target-controls">
+                            <div class="control-field">
+                              <label>SOC <output>${outcome.soc.name} (${outcome.soc.cores} ${outcome.soc.coreLabel})</output></label>
+                              <div class="seg-control" data-seg="soc">
+                                ${Object.entries(socProfiles).map(([key, soc]) => `<button type="button" class="${selected.soc === key ? 'is-active' : ''}" data-set-soc="${key}">${soc.name}</button>`).join('')}
+                              </div>
+                              <div class="control-hint">决定可用核数上限、UB 容量、对齐粒度和 vector width 检查。</div>
+                            </div>
+                            <div class="control-field">
+                              <label>dtype <output>${selected.dtype} (${outcome.dtypeBytes}B)</output></label>
+                              <div class="seg-control" data-seg="dtype">
+                                ${Object.keys(dtypeSize).map((key) => `<button type="button" class="${selected.dtype === key ? 'is-active' : ''}" data-set-dtype="${key}">${key}</button>`).join('')}
+                              </div>
+                              <div class="control-hint">影响每个元素的字节数，以及 ${outcome.soc.alignBytes}B 对齐单元对应的元素数。</div>
+                            </div>
+                          </div>
+                          <div class="hardware-target-summary">
+                            ${renderHardwareFacts(outcome)}
+                          </div>
                         </div>
-                      </div>
-                      <div class="control-field">
-                        <label>dtype <output>${selected.dtype} (${outcome.dtypeBytes}B)</output></label>
-                        <div class="seg-control" data-seg="dtype">
-                          ${Object.keys(dtypeSize).map((key) => `<button type="button" class="${selected.dtype === key ? 'is-active' : ''}" data-set-dtype="${key}">${key}</button>`).join('')}
+                      </section>
+                      <section class="tiling-group">
+                        <div class="tiling-group__head"><h4>Tiling Knobs</h4><span>可调项</span></div>
+                        ${renderWorkloadSummary(p, outcome)}
+                        <div class="stepper-pair">
+                          ${stepperField('blockDim', 'BLOCK_DIM', 1, outcome.soc.cores, selected.blockDim, 1)}
+                          ${stepperField('tileNum', 'TILE_NUM', 1, 32, selected.tileNum, 1)}
                         </div>
-                      </div>
-                      <div class="control-field">
-                        <label>Inputs <output>${selected.inputs} input queues</output></label>
-                        <div class="seg-control" data-seg="inputs">
-                          ${[1, 2, 3].map((num) => `<button type="button" class="${selected.inputs === num ? 'is-active' : ''}" data-set-inputs="${num}">${num} input${num > 1 ? 's' : ''}</button>`).join('')}
+                        <div class="control-hint">BLOCK_DIM → active cores / per-core workload；TILE_NUM → tile length / loop count。</div>
+                        <div class="control-field">
+                          <label>BUFFER_NUM <output>${selected.bufferNum}</output></label>
+                          <div class="seg-control" data-seg="bufferNum">
+                            ${[1, 2].map((num) => `<button type="button" class="${selected.bufferNum === num ? 'is-active' : ''}" data-set-buffer-num="${num}">${num} ${num === 2 ? '(double)' : '(single)'}</button>`).join('')}
+                          </div>
+                          <div class="control-hint">BUFFER_NUM → UB pressure / overlap readiness；Double Buffer 会成倍增加队列占用。</div>
                         </div>
-                      </div>
-                      ${rangeField('totalLen', 'Total len', 1024, 524288, selected.total, 32)}
-                      ${rangeField('blockDim', 'BLOCK_DIM', 1, outcome.soc.cores, selected.blockDim, 1)}
-                      ${rangeField('tileNum', 'TILE_NUM', 1, 32, selected.tileNum, 1)}
-                      <div class="control-field">
-                        <label>BUFFER_NUM <output>${selected.bufferNum}</output></label>
-                        <div class="seg-control" data-seg="bufferNum">
-                          ${[1, 2].map((num) => `<button type="button" class="${selected.bufferNum === num ? 'is-active' : ''}" data-set-buffer-num="${num}">${num} ${num === 2 ? '(double)' : '(single)'}</button>`).join('')}
+                        <div class="control-field">
+                          <label>Tail policy <output>${selected.tailPolicy}</output></label>
+                          <div class="seg-control" data-seg="tailPolicy">
+                            ${['former/tail', 'branch', 'pad'].map((policy) => `<button type="button" class="${selected.tailPolicy === policy ? 'is-active' : ''}" data-set-tail-policy="${policy}">${policy}</button>`).join('')}
+                          </div>
+                          <div class="control-hint">决定 totalAligned 之后不均分时，kernel 用分支、former/tail 还是 padding 承接尾块。</div>
                         </div>
-                      </div>
+                        <div class="control-field">
+                          <label>Padding policy <output>${selected.paddingPolicy}</output></label>
+                          <div class="seg-control" data-seg="paddingPolicy">
+                            ${['mask', 'padding', 'drop'].map((policy) => `<button type="button" class="${selected.paddingPolicy === policy ? 'is-active' : ''}" data-set-padding-policy="${policy}">${policy}</button>`).join('')}
+                          </div>
+                          <div class="control-hint">决定未覆盖元素是用 mask 保护、补齐计算，还是显式标记为不可接受。</div>
+                        </div>
+                      </section>
                     </div>
-                  </section>
+              </section>
 
-                  <section class="viz-panel">
-                    <header class="section-head"><h3>Tiling outcome</h3><span class="section-meta">no pipeline metrics</span></header>
+              <section class="viz-panel">
+                    <header class="section-head"><h3>Tiling Outcome</h3><span class="section-meta">shape → hardware → knobs</span></header>
                     <div class="section-body input-cluster">
                       <div class="outcome-stats">
-                        <div class="outcome-stat"><span>BLOCK_LENGTH</span><b>${fmt(outcome.perCoreDisplay)}</b></div>
-                        <div class="outcome-stat"><span>TILE_LENGTH</span><b>${fmt(outcome.tileLen)}</b></div>
-                        <div class="outcome-stat"><span>loop count</span><b>${fmt(outcome.loopCount)}</b></div>
+                        <div class="outcome-stat"><span>BLOCK_LENGTH</span><b>${fmt(outcome.perCoreDisplay)}</b><small>${blockLengthFormula(outcome, selected)}</small></div>
+                        <div class="outcome-stat"><span>TILE_LENGTH</span><b>${fmt(outcome.tileLen)}</b><small>${tileLengthFormula(outcome, selected)}</small></div>
+                        <div class="outcome-stat"><span>循环次数</span><b>${fmt(outcome.loopCount)}</b><small>${selected.tileNum} × ${selected.bufferNum}</small></div>
                       </div>
                       <div class="split-note">${outcome.splitMsg}</div>
                       <div>
-                        <div class="section-head" style="padding-left:0;padding-right:0;background:transparent;border-bottom:0;border:none"><h3>Hardware utilisation</h3><span class="section-meta">${selected.blockDim} / ${outcome.soc.cores} active</span></div>
+                        <div class="section-head" style="padding-left:0;padding-right:0;background:transparent;border-bottom:0;border:none"><h3>硬件利用 · 核间</h3><span class="section-meta">${selected.blockDim} / ${outcome.soc.cores} 个核激活</span></div>
                         <div class="core-grid">
                           ${Array.from({ length: outcome.soc.cores }, (_, i) => {
                             const active = i < selected.blockDim;
                             const former = active && outcome.formerNum > 0 && i < outcome.formerNum;
                             const len = former ? outcome.formerLength : outcome.tailLength;
-                            return `<div class="core-card ${active ? 'is-active' : ''} ${former ? 'is-former' : ''}" title="core ${i} · ${active ? len + ' elems' : 'idle'}">${active ? fmt(len) : ''}</div>`;
+                            return `<div class="core-card ${active ? 'is-active' : ''} ${former ? 'is-former' : ''}" title="core ${i} · ${active ? len + ' 个元素' : '空闲'}">${active ? fmt(len) : ''}</div>`;
                           }).join('')}
                         </div>
+                        <div class="section-head" style="margin-top:10px;padding-left:0;padding-right:0;background:transparent;border-bottom:0;border:none"><h3>硬件利用 · 核内</h3><span class="section-meta">${selected.tileNum} tiles × ${selected.bufferNum} buffers</span></div>
+                        <div class="intra-core-grid" aria-label="单核内部 tile 切分">
+                          ${Array.from({ length: outcome.loopCount }, (_, i) => `<div class="intra-tile" title="loop ${i + 1} · ${outcome.tileLen} elements"><span>loop ${i + 1}</span>${fmt(outcome.tileLen)}</div>`).join('')}
+                        </div>
                       </div>
                       <div>
-                        <div class="section-head" style="padding-left:0;padding-right:0;background:transparent;border-bottom:0;border:none"><h3>UB occupancy</h3><span class="section-meta">${outcome.soc.ubKB} KB per core</span></div>
-                        <div class="ub-meter" title="UB usage">
-                          <span style="--usage:${Math.min(100, outcome.ubPct)}%"></span>
+                        <div class="section-head" style="padding-left:0;padding-right:0;background:transparent;border-bottom:0;border:none"><h3>UB 占用</h3><span class="section-meta">每核 ${outcome.soc.ubKB} KB</span></div>
+                        <div class="ub-meter" title="UB 占用">
+                          <div class="ub-segments">
+                            ${outcome.ubSegments.map((seg) => `<span class="ub-segment" style="--usage:${seg.pct}%;--remaining:${seg.remainingPct}%;--segment-color:${seg.color}" title="${seg.name} 队列 — ${bytesFmt(seg.bytes)}"></span>`).join('')}
+                          </div>
                           <div class="ub-meter-label"><span>${bytesFmt(outcome.ubUsed)}</span><span>${outcome.ubPct.toFixed(0)}%</span></div>
                         </div>
-                        <div class="ub-legend" style="margin-top:8px">${outcome.queueNames.map((name, idx) => `<span style="color:${['var(--puzzle-blue)', 'var(--puzzle-purple)', 'var(--puzzle-cyan)', 'var(--puzzle-amber)'][idx % 4]}">${name} x ${selected.bufferNum}</span>`).join('')}</div>
+                        <div class="ub-legend" style="margin-top:8px">${outcome.ubSegments.map((seg) => `<span style="color:${seg.color}">${seg.name} x ${selected.bufferNum}</span>`).join('')}</div>
                       </div>
                       <div>
-                        <h3 class="side-title">Constraint checks</h3>
+                        <h3 class="side-title">约束检查</h3>
                         ${checks(outcome.checks)}
                       </div>
                     </div>
-                  </section>
-                </div>
-                <section class="viz-panel">
-                  <header class="section-head">
-                    <h3>Tiling Scheme</h3>
-                    <button class="btn btn-sm" type="button" id="addTilingScheme">New scheme from current</button>
-                  </header>
-                  <div class="section-body input-cluster">
-                    <div class="scheme-summary">
-                      <div class="scheme-flow" aria-label="Tiling scheme relationship">
-                        <div class="scheme-node">
-                          <span>1. Input elements</span>
-                          <b>${fmt(outcome.total)}</b>
-                          <p>raw total len</p>
-                        </div>
-                        <div class="scheme-arrow">→</div>
-                        <div class="scheme-node">
-                          <span>2. Aligned workload</span>
-                          <b>${fmt(outcome.totalAligned)}</b>
-                          <p>${outcome.alignElems} elems / ${outcome.soc.alignBytes}B unit</p>
-                        </div>
-                        <div class="scheme-arrow">→</div>
-                        <div class="scheme-node">
-                          <span>3. Active cores</span>
-                          <b>${selected.blockDim}</b>
-                          <p>${outcome.soc.name} provides ${outcome.soc.cores} ${outcome.soc.coreLabel}</p>
-                        </div>
-                      </div>
-                      <div class="scheme-split">
-                        <div class="scheme-lane is-former">
-                          <div class="scheme-lane__top"><span>${outcome.formerNum > 0 ? 'Former cores' : 'Even cores'}</span><b>${outcome.formerNum > 0 ? outcome.formerNum : selected.blockDim}</b></div>
-                          <div class="scheme-lane__top"><span>elements / core</span><b>${fmt(outcome.formerNum > 0 ? outcome.formerLength : outcome.tailLength)}</b></div>
-                          <div class="scheme-lane__bar"><span style="--share:${outcome.formerNum > 0 ? (outcome.formerNum / selected.blockDim * 100).toFixed(0) : 100}%"></span></div>
-                        </div>
-                        <div class="scheme-lane is-tail">
-                          <div class="scheme-lane__top"><span>${outcome.formerNum > 0 ? 'Tail cores' : 'Tail branch'}</span><b>${outcome.formerNum > 0 ? outcome.tailNum : 'none'}</b></div>
-                          <div class="scheme-lane__top"><span>elements / core</span><b>${outcome.formerNum > 0 ? fmt(outcome.tailLength) : 'same'}</b></div>
-                          <div class="scheme-lane__bar"><span style="--share:${outcome.formerNum > 0 ? (outcome.tailNum / selected.blockDim * 100).toFixed(0) : 0}%"></span></div>
-                        </div>
-                      </div>
-                      <div class="scheme-mini-grid">
-                        <div class="scheme-mini"><span>SOC</span><b>${outcome.soc.name}</b></div>
-                        <div class="scheme-mini"><span>tail policy</span><b>${selected.tailPolicy}</b></div>
-                        <div class="scheme-mini"><span>tile length</span><b>${fmt(outcome.tileLen)}</b></div>
-                      </div>
-                    </div>
-                    <div class="soft-note">Scheme uses the same simplified former/tail split model as the reference planner. Pipeline metrics are intentionally excluded here.</div>
-                    <div class="compare-grid">
-                      ${tilingSchemes.map((scheme) => `
-                        <button class="compare-card puzzle-card ${scheme.name === state.tilingScheme ? 'is-active' : ''}" type="button" data-tiling-scheme="${scheme.name}">
-                          <h4>${scheme.name}</h4>
-                          ${(() => {
-                            const s = computeTilingOutcome(scheme);
-                            return `
-                              <div class="scheme-row"><span>TILE_LENGTH</span><b>${fmt(s.tileLen)}</b></div>
-                              <div class="scheme-row"><span>former/tail</span><b>${s.formerNum}/${s.tailNum}</b></div>
-                              <div class="scheme-row"><span>UB</span><b>${s.ubPct.toFixed(0)}%</b></div>
-                              <div class="scheme-row"><span>align</span><b>${s.tileAligned ? 'ok' : 'check'}</b></div>
-                            `;
-                          })()}
-                          <p class="puzzle-card__desc">${scheme.note}</p>
-                        </button>
-                      `).join('')}
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </section>
+              </section>
+            </div>
           </div>
         `;
         bindTilingControls();
-        $$('[data-tiling-scheme]').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const scheme = tilingSchemes.find((s) => s.name === btn.dataset.tilingScheme);
+        $$('[data-delete-tiling-scheme]').forEach((btn) => {
+          btn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const name = btn.dataset.deleteTilingScheme;
+            const index = tilingSchemes.findIndex((scheme) => scheme.name === name && scheme.custom);
+            if (index < 0) return;
+            const wasSelected = state.tilingScheme === name;
+            tilingSchemes.splice(index, 1);
+            if (wasSelected) applyTilingScheme(tilingSchemes[0]);
+            renderAll();
+          });
+        });
+        $$('[data-tiling-scheme]').forEach((card) => {
+          const selectScheme = () => {
+            const scheme = tilingSchemes.find((s) => s.name === card.dataset.tilingScheme);
             applyTilingScheme(scheme);
             renderAll();
+          };
+          card.addEventListener('click', selectScheme);
+          card.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            selectScheme();
           });
         });
         $('#addTilingScheme')?.addEventListener('click', () => {
           state.customSchemeCount += 1;
           const next = {
-            name: `User scheme ${state.customSchemeCount}`,
+            name: `用户方案 ${state.customSchemeCount}`,
             soc: state.soc,
             dtype: state.dtype,
             inputs: state.inputCount,
@@ -1679,8 +2171,11 @@
             blockDim: state.blockDim,
             tileNum: state.tileNum,
             bufferNum: state.bufferNum,
-            tailPolicy: computeTilingOutcome(currentTilingScheme()).formerNum > 0 ? 'former/tail' : 'even',
-            note: 'User-created scheme from current controls.'
+            tailPolicy: computeTilingOutcome(currentTilingScheme()).formerNum > 0 ? 'former/tail' : 'branch',
+            paddingPolicy: state.paddingPolicy,
+            tilingMode: 'manual',
+            custom: true,
+            note: '手动保存的当前参数快照，可继续比较或删除。'
           };
           tilingSchemes.push(next);
           state.tilingScheme = next.name;
@@ -1690,6 +2185,19 @@
 
       function rangeField(id, label, min, max, value, step) {
         return `<div class="control-field"><label for="${id}">${label}<output id="${id}Out">${value}</output></label><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${value}"></div>`;
+      }
+
+      function totalInputField(key, label, min, max, value, step) {
+        return `<div class="control-field"><label for="${key}">${label}<output>${fmt(value)}</output></label><div class="number-control number-control--with-slider"><input id="${key}Range" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-number-field="${key}"><input id="${key}" type="number" min="${min}" max="${max}" step="${step}" value="${value}" data-number-field="${key}" inputmode="numeric"></div></div>`;
+      }
+
+      function stepperField(key, label, min, max, value, step) {
+        return `<div class="control-field"><label for="${key}">${label}<output>${value}</output></label><div class="stepper-control"><button type="button" aria-label="Decrease ${label}" data-stepper-target="${key}" data-delta="${-step}" data-min="${min}" data-max="${max}" data-step="${step}">-</button><input id="${key}" type="number" min="${min}" max="${max}" step="${step}" value="${value}" readonly tabindex="-1"><button type="button" aria-label="Increase ${label}" data-stepper-target="${key}" data-delta="${step}" data-min="${min}" data-max="${max}" data-step="${step}">+</button></div></div>`;
+      }
+
+      function clampToStep(value, min, max, step) {
+        const bounded = Math.max(min, Math.min(max, value));
+        return Math.round(bounded / step) * step;
       }
 
       function bindRange(id) {
@@ -1705,22 +2213,22 @@
       }
 
       function checks(rows) {
-        return `<div>${rows.map(([label, value, cls]) => `<div class="check-row ${cls}"><span>${label}</span><b>${value}</b></div>`).join('')}</div>`;
+        return `<div>${rows.map(([label, value, cls, action]) => `<div class="check-row ${cls}"><span>${label}</span><span><b>${value}</b>${action ? `<small class="check-action">${action}</small>` : ''}</span></div>`).join('')}</div>`;
       }
 
       function renderApi() {
-        const p = puzzle();
+        const p = currentOperator();
         if (!p.apis.includes(state.selectedApi)) state.selectedApi = p.apis[0] || 'Load3D';
         const isLoad3D = state.selectedApi === 'Load3D';
         $('#apiView').innerHTML = `
           <div class="api-layout">
             <aside class="view-side">
-              <header class="section-head"><h3>API Visualizer</h3><span class="section-meta">${state.selectedApi}</span></header>
+              <header class="section-head"><h3>API 可视化</h3><span class="section-meta">${state.selectedApi}</span></header>
               <div class="section-body control-stack">
                 <div class="api-actions">
                   ${p.apis.map((api) => `<button class="api-jump ${api === state.selectedApi ? 'is-active' : ''}" type="button" data-api-select="${api}" aria-label="Show ${api}">${api}</button>`).join('')}
                 </div>
-                <p class="api-note">${isLoad3D ? 'Load3D is the detailed mapping demo for this puzzle.' : `${state.selectedApi} is selected. This UX demo currently keeps the detailed element mapping on Load3D.`}</p>
+                <p class="api-note">${isLoad3D ? 'Load3D is the detailed mapping demo for this operator.' : `${state.selectedApi} is selected. This UX demo currently keeps the detailed element mapping on Load3D.`}</p>
                 <div class="control-stack" id="apiControls"></div>
               </div>
             </aside>
@@ -1868,7 +2376,7 @@
         const matrix = state.selectedMatrix || 'auto';
         $('#mappingText').innerHTML = `
           <p>当前选择把一个 feature map 位置解释为 Load3D 的滑窗取样，再展开到目标矩阵。</p>
-          <code>${isPad ? `padding(${p.padValue})` : `source[h=${h}, w=${w}, c0=0..15]`} -> filter window -> im2col[cell=${matrix}]</code>
+          <code>${isPad ? `padding(${p.padValue})` : `source[h=${h}, w=${w}, c0=0..15]`} -> filter window -> img2col[cell=${matrix}]</code>
           <p>repeatMode=${p.repeatMode} 改变下一次 repeat 写入矩阵的位置：mode 0 偏向窗口位置移动，mode 1 偏向在 feature map 上推进 C0/窗口序列。</p>
         `;
       }
@@ -1896,12 +2404,12 @@
                   <header class="section-head"><h3>方案对比</h3><span class="section-meta">mock structure score</span></header>
                   <div class="section-body compare-grid">
                     ${Object.entries(pipelineSchemes).map(([key, item]) => `
-                      <button class="compare-card puzzle-card ${key === state.pipeline ? 'is-active' : ''}" type="button" data-pipeline="${key}">
+                      <button class="compare-card operator-card ${key === state.pipeline ? 'is-active' : ''}" type="button" data-pipeline="${key}">
                         <h4>${item.name}</h4>
                         <div class="scheme-row"><span>Overlap</span><b>${item.score}</b></div>
                         <div class="scheme-row"><span>Idle gaps</span><b>${item.gaps}</b></div>
                         <div class="scheme-row"><span>Peak buffer</span><b>${item.buffer}</b></div>
-                        <p class="puzzle-card__desc">${item.note}</p>
+                        <p class="operator-card__desc">${item.note}</p>
                       </button>
                     `).join('')}
                   </div>
@@ -1944,7 +2452,7 @@
         $('#formatView').innerHTML = `
           <div class="view-grid">
             <section class="view-main">
-              <header class="section-head"><h3>Format Lab · data layout calculator</h3><span class="section-meta">${state.format.layout} / ${state.format.dtype}</span></header>
+              <header class="section-head"><h3>Format 实验室 · 数据布局计算器</h3><span class="section-meta">${state.format.layout} / ${state.format.dtype}</span></header>
               <div class="section-body format-layout">
                 <div class="control-stack">
                   <article class="viz-panel">
@@ -2273,8 +2781,8 @@
       }
 
       function renderAll() {
-        const p = puzzle();
-        renderPuzzles();
+        const p = currentOperator();
+        renderOperators();
         renderOverview();
         renderTiling();
         renderApi();
@@ -2285,10 +2793,10 @@
         $$('[data-view-tab]').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.viewTab === state.view));
         $('#mainTitle').textContent = p.title;
         $('#mainMeta').textContent = `${p.id} · ${p.type}`;
-        $('#topCrumb').textContent = `${p.id} / ${state.view}`;
-        $('#statusPuzzle').textContent = p.id;
-        $('#statusView').textContent = state.view === 'api' ? 'API Visualizer' : state.view;
-        $('#mockLog').textContent = `mock-check: ${p.id} ${p.title} / ${state.view}; checks are UX demo rules, not compiler diagnostics.`;
+        $('#topCrumb').textContent = `${p.id} / ${viewLabel(state.view)}`;
+        $('#statusOperator').textContent = p.id;
+        $('#statusView').textContent = viewLabel(state.view);
+        $('#mockLog').textContent = `mock-check: ${p.id} ${p.title} / ${viewLabel(state.view)}；当前检查是 UX demo 规则，不是编译器诊断。`;
       }
 
       function initTabs() {
@@ -2307,7 +2815,7 @@
           root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
         });
         $('#exportBtn').addEventListener('click', () => {
-          $('#mockLog').textContent = `snapshot: ${puzzle().id} exported overview + tiling + API mapping + pipeline compare (mock).`;
+          $('#mockLog').textContent = `snapshot: ${currentOperator().id} 已导出概览、Tiling、API 映射和 Pipeline 对比（mock）。`;
         });
       }
 
