@@ -32,8 +32,8 @@
   <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css?v=2412220">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css?v=2412220">
-  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css?v=ub-reuse-panel-v5">
-  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.css?v=ub-reuse-panel-v5">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css?v=ub-reuse-split-v6">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.css?v=ub-reuse-split-v6">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.css?v=2412220">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css?v=2412220">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css?v=2412220">
@@ -72,8 +72,17 @@
       white-space: nowrap;
     }
 
-    .hardware-map-split {
+    .hardware-map-split,
+    .hardware-analysis-split {
       min-height: 0;
+    }
+
+    .hardware-analysis-split {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      flex: 1 1 auto;
+      background: transparent;
     }
 
     .hardware-map-topbar .pto-ide-frame__topbar-left {
@@ -143,10 +152,23 @@
 
     .sidebar,
     .detail-panel,
-    .main-stage {
+    .main-workspace,
+    .main-stage,
+    .source-pane,
+    .memory-reuse-pane {
       min-width: 0;
       min-height: 0;
       overflow: hidden;
+    }
+
+    .main-workspace {
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
     }
 
     .sidebar {
@@ -368,28 +390,6 @@
 
     .architecture-scroll.is-ub-hovered:not(.is-panning) {
       cursor: pointer;
-    }
-
-    .architecture-floating-tools {
-      position: absolute;
-      top: var(--space-3);
-      right: var(--space-3);
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      gap: var(--space-1);
-      padding: 4px;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--background-elevated) 88%, transparent);
-      box-shadow: var(--shadow-md);
-      pointer-events: auto;
-      backdrop-filter: var(--surface-backdrop-filter-soft, none);
-      -webkit-backdrop-filter: var(--surface-backdrop-filter-soft, none);
-    }
-
-    .architecture-floating-tools .pto-hw-viewport__tool {
-      min-width: 48px;
     }
 
     .architecture-canvas {
@@ -913,95 +913,239 @@
       padding: 0;
     }
 
-    .memory-reuse-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: var(--z-modal, 300);
-      display: grid;
-      pointer-events: none;
-    }
-
-    .memory-reuse-overlay[hidden] {
-      display: none;
-    }
-
-    .memory-reuse-scrim {
-      position: absolute;
-      inset: 0;
-      background: color-mix(in srgb, var(--background) 58%, transparent);
-      pointer-events: auto;
-    }
-
-    .memory-reuse-drawer {
-      position: absolute;
-      top: 56px;
-      right: 18px;
-      bottom: 28px;
-      width: min(1120px, calc(100vw - 72px));
-      min-width: min(760px, calc(100vw - 32px));
+    .source-pane,
+    .memory-reuse-pane {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
-      overflow: hidden;
       border: 1px solid var(--panel-shell-border);
-      border-radius: var(--panel-shell-radius);
-      background: var(--panel-shell-bg);
-      box-shadow: var(--panel-shell-shadow);
-      backdrop-filter: var(--panel-shell-backdrop-filter);
-      pointer-events: auto;
+      border-radius: var(--radius-lg);
+      background: transparent;
     }
 
+    .source-pane[hidden],
+    .memory-reuse-pane[hidden] {
+      display: none !important;
+    }
+
+    .source-pane-head,
     .memory-reuse-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: var(--space-3);
       min-width: 0;
-      padding: 10px 14px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--panel-shell-border);
       background: color-mix(in srgb, var(--background-elevated) 92%, transparent);
     }
 
+    .source-pane-title,
     .memory-reuse-title {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      grid-template-areas: "title sub";
-      align-items: baseline;
-      column-gap: 10px;
+      gap: 2px;
       min-width: 0;
     }
 
+    .source-pane-title strong,
     .memory-reuse-title strong {
-      grid-area: title;
       min-width: 0;
       color: var(--foreground);
-      font: var(--text-title-3);
+      font: var(--text-title-2);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
+    .source-pane-title span,
     .memory-reuse-title span {
-      grid-area: sub;
       min-width: 0;
       color: var(--foreground-secondary);
       font: var(--text-label);
+      letter-spacing: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .memory-reuse-close {
+    .source-pane-actions,
+    .memory-reuse-actions {
       flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+
+    .source-pane-close,
+    .memory-reuse-info,
+    .memory-reuse-close {
       width: 30px;
       height: 30px;
       padding: 0;
       border-radius: var(--radius-sm);
     }
 
+    .memory-reuse-axis-popover {
+      position: absolute;
+      top: 48px;
+      right: 12px;
+      z-index: var(--z-dropdown);
+      width: min(360px, calc(100% - 24px));
+      padding: 12px 14px;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--background-elevated) 97%, transparent);
+      box-shadow: var(--shadow-lg);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .memory-reuse-axis-popover[hidden] {
+      display: none;
+    }
+
+    .memory-reuse-axis-popover strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--foreground);
+      font: var(--text-title-2);
+    }
+
+    .memory-reuse-axis-popover p {
+      margin: 0;
+    }
+
+    .memory-reuse-axis-popover p + p {
+      margin-top: 8px;
+    }
+
     .memory-reuse-host {
       min-width: 0;
       min-height: 0;
       overflow: hidden;
+    }
+
+    .memory-reuse-pane {
+      position: relative;
+    }
+
+    .memory-reuse-pane .pto-memory-reuse-viewer__toolbar {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .memory-reuse-pane .pto-memory-reuse-viewer__title,
+    .memory-reuse-pane .pto-memory-reuse-viewer__icon-button[data-reuse-info],
+    .memory-reuse-pane .pto-memory-reuse-viewer__info-popover {
+      display: none;
+    }
+
+    .memory-reuse-pane .pto-memory-reuse-viewer__controls {
+      justify-self: start;
+    }
+
+    .source-code-body {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      padding: var(--space-3) 0;
+      background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+    }
+
+    .source-code-line {
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(max-content, 1fr) auto;
+      align-items: baseline;
+      gap: var(--space-3);
+      width: max-content;
+      min-width: 100%;
+      padding: 1px var(--space-3) 1px 0;
+    }
+
+    .source-code-line.is-key {
+      cursor: pointer;
+    }
+
+    .source-code-line.is-key::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      border-radius: 0 2px 2px 0;
+      background: var(--primary-hover);
+    }
+
+    .source-code-line.is-key:hover {
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+    }
+
+    .source-code-line.is-selected {
+      background: color-mix(in srgb, var(--primary) 15%, transparent);
+    }
+
+    .source-code-line.is-hot .source-code-text {
+      color: var(--foreground);
+    }
+
+    .source-code-no {
+      padding-right: var(--space-2);
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      text-align: right;
+      user-select: none;
+      opacity: 0.58;
+    }
+
+    .source-code-line.is-key .source-code-no {
+      color: var(--foreground-secondary);
+      opacity: 1;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .source-code-text {
+      min-width: 0;
+      color: color-mix(in srgb, var(--foreground) 86%, transparent);
+      font: 500 12px/1.55 var(--font-mono);
+      white-space: pre;
+    }
+
+    .source-code-tag {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 var(--space-2);
+      border-radius: var(--radius-pill);
+      border: 1px solid color-mix(in srgb, var(--primary-hover) 32%, transparent);
+      color: var(--primary-hover);
+      background: var(--comp-tag-bg);
+      font: var(--text-label);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .source-code-tag.is-empty {
+      visibility: hidden;
+    }
+
+    .source-code-empty {
+      padding: var(--space-4);
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+    }
+
+    .tk-comment { color: var(--foreground-muted); font-style: italic; }
+    .tk-keyword { color: var(--primary-hover); }
+    .tk-type { color: var(--success); }
+    .tk-fn { color: var(--warning); }
+    .tk-number { color: var(--danger); }
+
+    :root[data-theme='light'] .main-stage.pto-hw-viewport,
+    :root[data-theme='light'] .main-stage.pto-hw-viewport .architecture-scroll.pto-hw-viewport__stage {
+      --pto-hw-viewport-bg: #ffffff;
+      background: #ffffff !important;
     }
 
     @media (max-width: 1240px) {
@@ -1073,7 +1217,7 @@
     html.preview .pto-ide-frame__status-strip,
     html.preview .sidebar,
     html.preview .detail-panel,
-    html.preview .memory-reuse-overlay,
+    html.preview .memory-reuse-pane,
     html.preview .floating-bar,
     html.preview .stage-head {
       display: none;
@@ -1115,6 +1259,19 @@
       </div>
       <div class="pto-ide-frame__topbar-right">
         <div class="pto-ide-frame__window-actions">
+          <button class="pto-ide-frame__window-action" id="architectureThemeToggle" type="button" aria-label="切换到浅色模式" aria-pressed="false" title="切换到浅色模式">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2"></path>
+              <path d="M12 20v2"></path>
+              <path d="m4.93 4.93 1.41 1.41"></path>
+              <path d="m17.66 17.66 1.41 1.41"></path>
+              <path d="M2 12h2"></path>
+              <path d="M20 12h2"></path>
+              <path d="m6.34 17.66-1.41 1.41"></path>
+              <path d="m19.07 4.93-1.41 1.41"></path>
+            </svg>
+          </button>
           <button class="pto-ide-frame__window-action is-selected" id="toggleInspectorBtn" type="button" aria-label="Hide inspector" aria-pressed="true" title="Hide inspector">
             <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
               <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -1157,7 +1314,7 @@
       </nav>
 
       <div class="pto-ide-frame__workarea">
-        <main class="pto-ide-frame__split hardware-map-split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="23,52,25" data-min-size="260,520,300" data-gutter-size="7">
+        <main class="pto-ide-frame__split hardware-map-split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="18,57,25" data-default-pixels="300,0,0" data-storage-key="pto-ascend-hardware-map-standalone-v4" data-min-size="260,520,300" data-gutter-size="7">
 
     <aside class="sidebar pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer">
       <div class="panel-head">
@@ -1173,7 +1330,22 @@
       </div>
     </aside>
 
-    <main class="main-stage pto-hw-viewport pto-ide-frame__pane" data-ide-pane="editor-preview">
+    <main class="main-workspace pto-ide-frame__pane" data-ide-pane="editor-preview">
+      <div class="pto-ide-frame__split hardware-analysis-split" id="analysisSplit" data-ide-split="analysis-main" data-split-direction="horizontal" data-sizes="1,49.5,49.5" data-storage-key="pto-ascend-hardware-map-analysis-v4" data-min-size="280,420,360" data-gutter-size="7">
+        <aside class="source-pane pto-ide-frame__pane" data-ide-pane="source" id="sourcePane" aria-label="Kernel source" aria-hidden="true" hidden>
+          <header class="source-pane-head">
+            <div class="source-pane-title">
+              <strong id="sourcePaneTitle">源码</strong>
+              <span id="sourcePaneSub">点击 Tensor 查看对应源码行。</span>
+            </div>
+            <div class="source-pane-actions">
+              <button class="btn btn-icon btn-ghost source-pane-close" id="sourcePaneClose" type="button" aria-label="关闭源码面板">×</button>
+            </div>
+          </header>
+          <div class="source-code-body" id="sourceCodeBody"></div>
+        </aside>
+
+    <main class="main-stage pto-hw-viewport pto-ide-frame__pane" data-ide-pane="architecture-stage">
       <div class="stage-head pto-hw-viewport__toolbar">
         <div class="stage-title">
           <strong>Ascend 950B Memory Architecture Pattern</strong>
@@ -1182,7 +1354,6 @@
         <div class="stage-meta pto-hw-viewport__controls">
           <div class="pto-hw-viewport__tools" aria-label="架构图显示控制">
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureDetailToggle" aria-pressed="true">细节开</button>
-            <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureThemeToggle" aria-pressed="false">浅色</button>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureZoomOut" aria-label="缩小架构图">−</button>
             <span class="pto-hw-viewport__readout" id="architectureZoomReadout">55%</span>
             <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureZoomIn" aria-label="放大架构图">+</button>
@@ -1190,9 +1361,6 @@
         </div>
       </div>
       <section class="architecture-scroll pto-hw-viewport__stage" id="architectureScroll">
-        <div class="architecture-floating-tools" aria-label="架构图快捷控制">
-          <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="architectureFloatingThemeToggle" aria-pressed="false">浅色</button>
-        </div>
         <div class="architecture-canvas">
           <div class="arch-frame" id="architectureFrame">
             <div class="pattern-iframe-shell pto-hw-viewport__scale">
@@ -1200,7 +1368,7 @@
                 class="pattern-iframe pto-hw-viewport__frame"
                 id="architectureFrameEl"
                 title="Ascend 950B Memory Architecture Pattern"
-                src="../ascend-950-workbench-demo/hardware-frame.html?preset=ascend950b&theme=dark&v=ub-reuse-panel-v5"></iframe>
+                src="../ascend-950-workbench-demo/hardware-frame.html?preset=ascend950b&theme=dark&v=ub-reuse-split-v6"></iframe>
             </div>
           </div>
           <section class="engine-map" aria-label="950 communication subsystem">
@@ -1225,6 +1393,28 @@
           </section>
         </div>
       </section>
+    </main>
+
+        <aside class="memory-reuse-pane pto-ide-frame__pane" data-ide-pane="memory-reuse" id="memoryReusePanel" aria-label="UB memory reuse analysis" aria-hidden="true" hidden>
+          <header class="memory-reuse-head">
+            <div class="memory-reuse-title">
+              <strong id="memoryReuseTitle">UB 内存复用分析</strong>
+              <span id="memoryReuseSub">AIV 1 · MatMulAddRelu_mix_aic__kernel0</span>
+            </div>
+            <div class="memory-reuse-actions">
+              <button class="btn btn-icon btn-ghost memory-reuse-info" id="memoryReuseInfo" type="button" aria-label="图表坐标说明" aria-expanded="false" title="图表坐标说明">i</button>
+              <button class="btn btn-icon btn-ghost memory-reuse-close" id="memoryReuseClose" type="button" aria-label="关闭内存复用面板">×</button>
+            </div>
+          </header>
+          <div class="memory-reuse-axis-popover" id="memoryReuseAxisPopover" hidden>
+            <strong>图表坐标说明</strong>
+            <p>横轴是当前 buffer 的地址 offset / 容量范围，Tensor 矩形宽度表示占用的地址区间和大小。</p>
+            <p>纵轴是 kernel 生命周期 tick，时间从上到下推进，Tensor 矩形高度表示 alloc 到 free 的存活区间。</p>
+            <p>红色峰值曲线表示每个 tick 的 live usage，并映射回横轴容量刻度。</p>
+          </div>
+          <div class="memory-reuse-host" id="memoryReuseHost"></div>
+        </aside>
+      </div>
     </main>
 
     <aside class="detail-panel pto-ide-frame__pane" data-ide-pane="inspector">
@@ -1266,20 +1456,6 @@
           </div>
         </footer>
 
-    <section class="memory-reuse-overlay" id="memoryReusePanel" aria-hidden="true" hidden>
-      <div class="memory-reuse-scrim" data-memory-reuse-close></div>
-      <section class="memory-reuse-drawer" role="dialog" aria-labelledby="memoryReuseTitle">
-        <header class="memory-reuse-head">
-          <div class="memory-reuse-title">
-            <strong id="memoryReuseTitle">UB 内存复用分析</strong>
-            <span id="memoryReuseSub">点击 AIV 的 UB 打开对应 buffer 生命周期视图。</span>
-          </div>
-          <button class="btn btn-icon btn-ghost memory-reuse-close" id="memoryReuseClose" type="button" aria-label="Close memory reuse panel">×</button>
-        </header>
-        <div class="memory-reuse-host" id="memoryReuseHost"></div>
-      </section>
-    </section>
-
     <div class="floating-bar">
       <div class="floating-shell is-expanded" id="floatingShell">
         <button class="floating-toggle" id="floatingToggle" type="button" aria-label="Collapse playback toolbar" aria-expanded="true">⌄</button>
@@ -1313,7 +1489,7 @@
   <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js?v=2412220"></script>
   <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js?v=2412220"></script>
   <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js?v=2412220"></script>
-  <script src="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.js?v=ub-reuse-panel-v5"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.js?v=ub-reuse-split-v6"></script>
   <script>
     "use strict";
 
@@ -1559,18 +1735,25 @@
       archScale: 0.55,
       archPanX: 0,
       archPanY: 0,
+      archContentWidth: 0,
+      archContentHeight: 0,
       architectureUserPanned: false,
+      architectureUserZoomed: false,
       inspectorOpen: true,
       timelineOpen: false,
       viewMode: 'architecture',
       memoryReuseViewer: null,
       memoryReuseOpen: false,
+      memoryReuseData: null,
+      sourceOpen: false,
+      sourceFile: null,
+      sourceTensorId: null,
       architectureHoverTarget: null,
       theme: window.__PTO_HARDWARE_MAP_INITIAL_THEME__ || document.documentElement.dataset.theme || 'dark',
     };
     const ARCH_ZOOM_LEVELS = [0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
     const THEME_STORAGE_KEY = 'pto.ascendHardwareMap.theme';
-    const HARDWARE_FRAME_VERSION = 'ub-reuse-panel-v5';
+    const HARDWARE_FRAME_VERSION = 'ub-reuse-split-v6';
 
     function getFlow() {
       return FLOWS.find((flow) => flow.id === state.flowId) || null;
@@ -1588,6 +1771,23 @@
       return el;
     }
 
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function highlightSourceLine(line) {
+      return escapeHtml(line)
+        .replace(/\b(template|typename|const|for|if|else|return|auto|int|uint32_t|float|half|void)\b/g, '<span class="tk-keyword">$1</span>')
+        .replace(/\b(LocalTensor|GlobalTensor|TPipe|TQue|TBuf)\b/g, '<span class="tk-type">$1</span>')
+        .replace(/\b(DataCopy|Mmad|Add|Relu|Cast|Muls|EnQue|DeQue|AllocTensor|FreeTensor|SetGlobalBuffer)\b/g, '<span class="tk-fn">$1</span>')
+        .replace(/\b(\d+)\b/g, '<span class="tk-number">$1</span>')
+        .replace(/(\/\/.*)$/g, '<span class="tk-comment">$1</span>');
+    }
+
     function normalizeTheme(value) {
       return value === 'light' ? 'light' : 'dark';
     }
@@ -1602,11 +1802,11 @@
 
     function syncThemeToggle() {
       const isLight = normalizeTheme(state.theme) === 'light';
-      document.querySelectorAll('[data-architecture-theme-toggle], #architectureThemeToggle, #architectureFloatingThemeToggle').forEach((button) => {
-        button.textContent = isLight ? '深色' : '浅色';
+      document.querySelectorAll('#architectureThemeToggle').forEach((button) => {
         button.title = isLight ? '切换到深色模式' : '切换到浅色模式';
         button.setAttribute('aria-label', button.title);
         button.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+        button.classList.toggle('is-selected', isLight);
       });
     }
 
@@ -1682,12 +1882,25 @@
       const zoomOut = document.getElementById('architectureZoomOut');
       const zoomIn = document.getElementById('architectureZoomIn');
       if (frame) {
-        const inverse = 100 / scale;
-        frame.style.width = `${inverse}%`;
-        frame.style.minWidth = `${inverse}%`;
-        frame.style.height = `${inverse}%`;
-        frame.style.minHeight = `${inverse}%`;
+        if (state.archContentWidth > 0 && state.archContentHeight > 0) {
+          frame.style.width = `${state.archContentWidth}px`;
+          frame.style.minWidth = `${state.archContentWidth}px`;
+          frame.style.height = `${state.archContentHeight}px`;
+          frame.style.minHeight = `${state.archContentHeight}px`;
+        } else {
+          const inverse = 100 / scale;
+          frame.style.width = `${inverse}%`;
+          frame.style.minWidth = `${inverse}%`;
+          frame.style.height = `${inverse}%`;
+          frame.style.minHeight = `${inverse}%`;
+        }
         frame.style.transform = `translate(${state.archPanX}px, ${state.archPanY}px) scale(${scale})`;
+        if (state.iframeReady && frame.contentWindow) {
+          frame.contentWindow.postMessage({
+            type: 'hardware-scale',
+            scale,
+          }, '*');
+        }
       }
       if (readout) readout.textContent = `${Math.round(scale * 100)}%`;
       if (status) status.textContent = `zoom ${Math.round(scale * 100)}%`;
@@ -1712,7 +1925,29 @@
       return bestIndex;
     }
 
-    function setArchitectureScale(scale) {
+    function fitArchitectureView() {
+      const shell = document.querySelector('.pattern-iframe-shell');
+      if (!shell || state.archContentWidth <= 0 || state.archContentHeight <= 0) return false;
+      const rect = shell.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const nextScale = clampArchitectureScale(Math.min(
+        rect.width / state.archContentWidth,
+        rect.height / state.archContentHeight,
+      ) * 0.98);
+      state.archScale = nextScale;
+      state.archPanX = 0;
+      state.archPanY = 0;
+      syncArchitectureZoom();
+      return true;
+    }
+
+    function maybeFitArchitectureView() {
+      if (state.architectureUserPanned || state.architectureUserZoomed) return false;
+      return fitArchitectureView();
+    }
+
+    function setArchitectureScale(scale, options = {}) {
+      if (options.user !== false) state.architectureUserZoomed = true;
       state.archScale = clampArchitectureScale(scale);
       syncArchitectureZoom();
     }
@@ -1739,16 +1974,187 @@
       }, '*');
     }
 
+    function directIdePanes(split) {
+      return Array.from(split?.children || []).filter((child) => child.matches?.('[data-ide-pane]'));
+    }
+
+    function updateSplitGutters(split) {
+      if (!split) return;
+      Array.from(split.children).forEach((child) => {
+        if (!child.matches?.('.pto-workbench-shell__split-gutter')) return;
+        const previousPane = child.previousElementSibling?.matches?.('[data-ide-pane]') ? child.previousElementSibling : null;
+        const nextPane = child.nextElementSibling?.matches?.('[data-ide-pane]') ? child.nextElementSibling : null;
+        child.hidden = !!previousPane?.hidden || !!nextPane?.hidden;
+      });
+    }
+
+    function setSplitPaneHidden(pane, hidden) {
+      if (!pane) return;
+      pane.hidden = hidden;
+      pane.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+      updateSplitGutters(pane.parentElement);
+    }
+
+    function resizeInstanceForSplit(splitId) {
+      const frame = document.getElementById('hardwareMapFrame');
+      const splits = Array.from(frame?.querySelectorAll('[data-ide-split]') || []);
+      const index = splits.findIndex((split) => split.dataset.ideSplit === splitId);
+      return index >= 0 ? ideFrameInstance?.resizeInstances?.[index] || null : null;
+    }
+
+    function setStandaloneSidebarWidth(width = 300) {
+      const split = document.querySelector('[data-ide-split="standalone-main"]');
+      const panes = directIdePanes(split);
+      const explorer = panes.find((pane) => pane.dataset.idePane === 'explorer');
+      const editor = panes.find((pane) => pane.dataset.idePane === 'editor-preview');
+      const inspector = panes.find((pane) => pane.dataset.idePane === 'inspector');
+      if (!split || !explorer || !editor || !inspector) return;
+      explorer.style.flex = `0 0 ${width}px`;
+      explorer.style.flexBasis = `${width}px`;
+      explorer.style.width = `${width}px`;
+      editor.style.flex = '57 1 0%';
+      editor.style.flexBasis = '0%';
+      editor.style.width = 'auto';
+      inspector.style.flex = '25 1 0%';
+      inspector.style.flexBasis = '0%';
+      inspector.style.width = 'auto';
+      updateSplitGutters(split);
+    }
+
+    function syncAnalysisPaneLayout() {
+      const frame = document.getElementById('hardwareMapFrame');
+      const sourcePane = document.getElementById('sourcePane');
+      const memoryPane = document.getElementById('memoryReusePanel');
+      setSplitPaneHidden(sourcePane, !state.sourceOpen);
+      setSplitPaneHidden(memoryPane, !state.memoryReuseOpen);
+      frame?.classList.toggle('is-source-open', state.sourceOpen);
+      frame?.classList.toggle('is-memory-reuse-open', state.memoryReuseOpen);
+      const instance = resizeInstanceForSplit('analysis-main');
+      if (instance?.setSizes) {
+        if (state.sourceOpen && state.memoryReuseOpen) instance.setSizes([28, 36, 36]);
+        else if (state.memoryReuseOpen) instance.setSizes([1, 49.5, 49.5]);
+        else if (state.sourceOpen) instance.setSizes([32, 67, 1]);
+        else instance.setSizes([1, 98, 1]);
+      }
+      window.requestAnimationFrame(() => {
+        ideFrameInstance?.refresh?.();
+        syncArchitectureZoom();
+        if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
+        state.memoryReuseViewer?.resize?.();
+      });
+    }
+
+    function currentMemoryReuseData() {
+      return state.memoryReuseData || state.memoryReuseViewer?.data || null;
+    }
+
+    function sourceFilesForData(data = currentMemoryReuseData()) {
+      return Array.isArray(data?.sourceFiles) ? data.sourceFiles : [];
+    }
+
+    function currentSourceFile() {
+      const files = sourceFilesForData();
+      return files.find((file) => file.path === state.sourceFile) || files[0] || null;
+    }
+
+    function sourceFileForTensor(tensor) {
+      if (!tensor) return currentSourceFile();
+      return sourceFilesForData().find((file) => file.path === tensor.srcFile) || currentSourceFile();
+    }
+
+    function tensorById(tensorId) {
+      return currentMemoryReuseData()?.tensors?.find((tensor) => tensor.id === tensorId) || null;
+    }
+
+    function tensorsForSourceLine(sourceFile, lineNo) {
+      const data = currentMemoryReuseData();
+      if (!data || !sourceFile) return [];
+      return data.tensors.filter((tensor) => (
+        tensor.srcFile === sourceFile.path
+        && lineNo >= Number(tensor.srcLineStart || 0)
+        && lineNo <= Number(tensor.srcLineEnd || 0)
+      ));
+    }
+
+    function renderSourcePane() {
+      const body = document.getElementById('sourceCodeBody');
+      const title = document.getElementById('sourcePaneTitle');
+      const sub = document.getElementById('sourcePaneSub');
+      const sourceFile = currentSourceFile();
+      if (!body) return;
+      if (!sourceFile) {
+        body.innerHTML = '<div class="source-code-empty">暂无源码映射。</div>';
+        return;
+      }
+      state.sourceFile = sourceFile.path;
+      if (title) title.textContent = sourceFile.path;
+      if (sub) sub.textContent = state.sourceTensorId ? `Tensor ${tensorById(state.sourceTensorId)?.name || state.sourceTensorId}` : '点击源码行或 Tensor 查看对应关系。';
+      const lines = String(sourceFile.text || '').replace(/\n$/, '').split('\n');
+      body.innerHTML = lines.map((line, index) => {
+        const lineNo = index + 1;
+        const tensors = tensorsForSourceLine(sourceFile, lineNo);
+        const selected = tensors.some((tensor) => tensor.id === state.sourceTensorId);
+        const hot = tensors.some((tensor) => Number(tensor.srcHotLine || 0) === lineNo);
+        const tag = tensors[0]?.name || '';
+        return `
+          <div class="source-code-line${tensors.length ? ' is-key' : ''}${selected ? ' is-selected' : ''}${hot ? ' is-hot' : ''}" data-source-line="${lineNo}" data-source-tensor-id="${escapeHtml(tensors[0]?.id || '')}">
+            <span class="source-code-no">${lineNo}</span>
+            <code class="source-code-text">${highlightSourceLine(line)}</code>
+            <span class="source-code-tag${tag ? '' : ' is-empty'}">${escapeHtml(tag || '--')}</span>
+          </div>`;
+      }).join('');
+      body.querySelectorAll('.source-code-line.is-key').forEach((row) => {
+        row.addEventListener('click', () => {
+          const tensor = tensorById(row.dataset.sourceTensorId);
+          if (!tensor) return;
+          state.sourceTensorId = tensor.id;
+          state.memoryReuseViewer?.selectTensor?.(tensor.id);
+          renderSourcePane();
+        });
+      });
+      window.requestAnimationFrame(() => {
+        body.querySelector('.source-code-line.is-selected')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+      });
+    }
+
+    function selectSourceTensor(tensor) {
+      if (!tensor) return;
+      state.sourceTensorId = tensor.id;
+      const sourceFile = sourceFileForTensor(tensor);
+      if (sourceFile) state.sourceFile = sourceFile.path;
+      if (state.sourceOpen) renderSourcePane();
+    }
+
+    function openSourcePane(tensor = null) {
+      if (tensor) selectSourceTensor(tensor);
+      else if (!state.sourceFile) state.sourceFile = currentSourceFile()?.path || null;
+      state.sourceOpen = true;
+      syncAnalysisPaneLayout();
+      renderSourcePane();
+    }
+
+    function closeSourcePane() {
+      state.sourceOpen = false;
+      syncAnalysisPaneLayout();
+    }
+
+    function toggleMemoryReuseAxisPopover(force) {
+      const button = document.getElementById('memoryReuseInfo');
+      const popover = document.getElementById('memoryReuseAxisPopover');
+      if (!button || !popover) return;
+      const open = typeof force === 'boolean' ? force : popover.hidden;
+      popover.hidden = !open;
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
     function closeMemoryReusePanel() {
       const panel = document.getElementById('memoryReusePanel');
-      const frame = document.getElementById('hardwareMapFrame');
       if (!panel) return;
       state.memoryReuseOpen = false;
       state.memoryReuseViewer?.destroy?.();
       state.memoryReuseViewer = null;
-      panel.hidden = true;
-      panel.setAttribute('aria-hidden', 'true');
-      frame?.classList.remove('is-memory-reuse-open');
+      toggleMemoryReuseAxisPopover(false);
+      syncAnalysisPaneLayout();
     }
 
     function openMemoryReusePanel(detail = {}) {
@@ -1756,23 +2162,37 @@
       const helper = window.PtoMemoryReuseViewer;
       const panel = document.getElementById('memoryReusePanel');
       const host = document.getElementById('memoryReuseHost');
-      const frame = document.getElementById('hardwareMapFrame');
       if (!helper || !panel || !host) return;
       const coreLabel = detail.coreTitle || detail.coreId || 'AIV';
       const bufferLabel = detail.buffer || 'UB';
-      setText('memoryReuseTitle', `${coreLabel} · ${bufferLabel} 内存复用分析`);
-      setText('memoryReuseSub', `${detail.preset || 'ascend950b'} / ${detail.coreId || 'selected core'} / ${bufferLabel}`);
+      setText('memoryReuseTitle', `${bufferLabel} 内存复用分析`);
       state.memoryReuseViewer?.destroy?.();
-      panel.hidden = false;
-      panel.setAttribute('aria-hidden', 'false');
-      frame?.classList.add('is-memory-reuse-open');
       state.memoryReuseOpen = true;
       const data = helper.createDemoData({
         coreId: detail.coreId,
         coreTitle: coreLabel,
       });
+      state.memoryReuseData = data;
+      setText('memoryReuseSub', data.kernel || `${coreLabel} · MatMulAddRelu_mix_aic__kernel0`);
+      if (!state.sourceFile && data.sourceFiles?.[0]?.path) state.sourceFile = data.sourceFiles[0].path;
+      syncAnalysisPaneLayout();
       state.memoryReuseViewer = helper.render(host, data, { initialBuffer: bufferLabel });
-      window.requestAnimationFrame(() => state.memoryReuseViewer?.resize?.());
+      renderSourcePane();
+      window.requestAnimationFrame(() => {
+        state.memoryReuseViewer?.resize?.();
+        if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
+      });
+    }
+
+    function openDefaultMemoryReusePanel() {
+      openMemoryReusePanel({
+        node: 'buffer:UB',
+        buffer: 'UB',
+        coreId: 'mem950-aiv1',
+        coreKind: 'aiv',
+        coreTitle: 'AIV 1',
+        preset: 'ascend950b',
+      });
     }
 
     function renderScenarioList() {
@@ -2039,7 +2459,7 @@
       button.title = state.inspectorOpen ? 'Hide inspector' : 'Show inspector';
       window.requestAnimationFrame(() => {
         ideFrameInstance?.refresh?.();
-        if (!state.architectureUserPanned) centerArchitectureView();
+        if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
       });
     }
 
@@ -2232,8 +2652,17 @@
         openMemoryReusePanel(event.data);
         return;
       }
+      if (event.data.type === 'hardware-ready') state.iframeReady = true;
+      if (event.data.type === 'hardware-size' || event.data.type === 'hardware-ready') {
+        const width = Number(event.data.width);
+        const height = Number(event.data.height);
+        if (Number.isFinite(width) && width > 0) state.archContentWidth = width;
+        if (Number.isFinite(height) && height > 0) state.archContentHeight = height;
+        window.requestAnimationFrame(() => {
+          if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
+        });
+      }
       if (event.data.type !== 'hardware-ready') return;
-      state.iframeReady = true;
       postArchitectureDetails();
       applyHighlights();
     }
@@ -2246,7 +2675,17 @@
             onResize: () => {
               window.requestAnimationFrame(() => {
                 syncArchitectureZoom();
-                if (!state.architectureUserPanned) centerArchitectureView();
+                if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
+                state.memoryReuseViewer?.resize?.();
+              });
+            },
+          },
+          'analysis-main': {
+            onResize: () => {
+              window.requestAnimationFrame(() => {
+                syncArchitectureZoom();
+                if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
+                state.memoryReuseViewer?.resize?.();
               });
             },
           },
@@ -2265,6 +2704,10 @@
       syncTimelineToggle();
       initIdeCursorTracking();
       initArchitecturePan();
+      window.requestAnimationFrame(() => {
+        setStandaloneSidebarWidth(300);
+        openDefaultMemoryReusePanel();
+      });
       window.setTimeout(applyHighlights, 80);
       window.setTimeout(applyHighlights, 260);
 
@@ -2276,7 +2719,6 @@
       document.getElementById('stepForwardButton')?.addEventListener('click', () => stepBy(1));
       document.getElementById('replayButton')?.addEventListener('click', replayFlow);
       document.getElementById('architectureThemeToggle')?.addEventListener('click', toggleTheme);
-      document.getElementById('architectureFloatingThemeToggle')?.addEventListener('click', toggleTheme);
       document.getElementById('floatingToggle')?.addEventListener('click', () => {
         const shell = document.getElementById('floatingShell');
         setFloatingExpanded(!shell?.classList.contains('is-expanded'));
@@ -2311,16 +2753,36 @@
         state.timelineOpen = !state.timelineOpen;
         syncTimelineToggle();
       });
+      document.getElementById('sourcePaneClose')?.addEventListener('click', closeSourcePane);
       document.getElementById('memoryReuseClose')?.addEventListener('click', closeMemoryReusePanel);
-      document.querySelectorAll('[data-memory-reuse-close]').forEach((target) => {
-        target.addEventListener('click', closeMemoryReusePanel);
+      document.getElementById('memoryReuseInfo')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleMemoryReuseAxisPopover();
+      });
+      document.addEventListener('click', (event) => {
+        const popover = document.getElementById('memoryReuseAxisPopover');
+        const button = document.getElementById('memoryReuseInfo');
+        if (!popover || popover.hidden) return;
+        if (popover.contains(event.target) || button?.contains(event.target)) return;
+        toggleMemoryReuseAxisPopover(false);
+      });
+      document.getElementById('memoryReuseHost')?.addEventListener('pto-memory-reuse-open-source', (event) => {
+        openSourcePane(event.detail?.tensor || null);
+      });
+      document.getElementById('memoryReuseHost')?.addEventListener('pto-memory-reuse-tensor-select', (event) => {
+        selectSourceTensor(event.detail?.tensor || null);
       });
       window.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && state.memoryReuseOpen) closeMemoryReusePanel();
+        if (event.key !== 'Escape') return;
+        if (!document.getElementById('memoryReuseAxisPopover')?.hidden) {
+          toggleMemoryReuseAxisPopover(false);
+          return;
+        }
+        if (state.sourceOpen) closeSourcePane();
       });
       window.addEventListener('resize', () => {
         syncArchitectureZoom();
-        if (!state.architectureUserPanned) centerArchitectureView();
+        if (!maybeFitArchitectureView() && !state.architectureUserPanned) centerArchitectureView();
         state.memoryReuseViewer?.resize?.();
       });
     }
