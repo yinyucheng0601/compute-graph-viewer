@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Reuse Analysis</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css">
+  <style>
+    :root {
+      --reuse-blue: var(--highlight-copy-blue-source);
+      --reuse-green: var(--highlight-ub-green-source);
+      --reuse-orange: var(--highlight-accum-orange-source);
+      --reuse-violet: var(--highlight-l0a-violet-source);
+      --reuse-amber: var(--highlight-mte-amber-source);
+      --reuse-red: var(--danger);
+      --reuse-stage-bg: var(--ide-frame-pane-bg);
+      --reuse-stage-grid: color-mix(in srgb, var(--foreground) 10%, transparent);
+      --reuse-code-hot: color-mix(in srgb, var(--primary) 12%, transparent);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      min-width: 1360px;
+      color: var(--foreground);
+      background: var(--ide-frame-page-bg);
+    }
+
+    .reuse-page.pto-ide-frame {
+      width: 100vw;
+      height: 100vh;
+      aspect-ratio: auto;
+      border-radius: 0;
+      box-shadow: none;
+      background: var(--ide-frame-bg);
+    }
+
+    .reuse-page .pto-ide-frame__topbar {
+      min-height: 48px;
+      border-bottom: 0;
+      background: transparent;
+    }
+
+    .reuse-toolbar.toolbar {
+      height: auto;
+      padding-inline: 12px;
+      border-bottom: 0;
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    .reuse-toolbar .toolbar-l {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .reuse-toolbar .toolbar-r {
+      flex: 0 0 auto;
+      min-width: 0;
+    }
+
+    .reuse-brand {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 2px;
+      padding-right: 14px;
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .reuse-brand strong {
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+      white-space: nowrap;
+    }
+
+    .reuse-brand span {
+      max-width: 620px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--foreground-secondary);
+      font: var(--ide-frame-meta-font);
+      white-space: nowrap;
+    }
+
+    .reuse-source-note {
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 36%, transparent);
+      background: color-mix(in srgb, var(--warning) 10%, transparent);
+    }
+
+    .reuse-hazard-chip {
+      color: var(--danger);
+      border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+      background: color-mix(in srgb, var(--danger) 10%, transparent);
+    }
+
+    .reuse-select {
+      height: var(--input-height-md);
+      min-width: 250px;
+      color: var(--foreground);
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: var(--input-radius);
+      padding: 0 34px 0 12px;
+      font: var(--text-body-sm);
+      appearance: none;
+    }
+
+    .reuse-shell {
+      min-height: 0;
+      height: 100%;
+      padding: 0 12px 10px 0;
+      display: grid;
+      grid-template-columns: minmax(300px, 360px) minmax(420px, 1fr) minmax(560px, 1.25fr);
+      gap: 12px;
+    }
+
+    .reuse-workarea {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .reuse-pane {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--ide-frame-pane-fill);
+      border: 1px solid var(--ide-frame-pane-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--ide-frame-pane-shadow);
+      backdrop-filter: var(--ide-frame-pane-backdrop-filter);
+      -webkit-backdrop-filter: var(--ide-frame-pane-backdrop-filter);
+    }
+
+    .reuse-pane__head {
+      min-height: 46px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--ide-frame-pane-header-fill);
+    }
+
+    .reuse-pane__title {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .reuse-pane__title strong {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+      white-space: nowrap;
+    }
+
+    .reuse-pane__title span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--foreground-muted);
+      font: var(--ide-frame-meta-font);
+      white-space: nowrap;
+    }
+
+    .reuse-pane__body {
+      position: relative;
+      min-height: 0;
+      flex: 1;
+      overflow: hidden;
+      background: var(--reuse-stage-bg);
+    }
+
+    .code-view {
+      height: 100%;
+      overflow: auto;
+      padding: 10px 0 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto;
+      gap: 10px;
+      min-height: 23px;
+      padding: 0 12px 0 0;
+      color: var(--foreground-secondary);
+      cursor: pointer;
+    }
+
+    .code-line:hover,
+    .code-line.is-active,
+    .code-line.is-hot {
+      background: var(--reuse-code-hot);
+      color: var(--foreground);
+    }
+
+    .code-line__no {
+      padding-left: 12px;
+      color: var(--foreground-muted);
+      text-align: right;
+      user-select: none;
+    }
+
+    .code-line__text {
+      min-width: 0;
+      overflow: hidden;
+      white-space: pre;
+    }
+
+    .code-line__badges {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .event-badge {
+      height: 18px;
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--comp-tag-border);
+      border-radius: var(--radius-pill);
+      background: var(--comp-tag-bg);
+      color: var(--foreground-secondary);
+      font: 500 10px / 1 var(--font-mono);
+    }
+
+    .event-badge[data-lane="MTE2"] { color: var(--reuse-amber); }
+    .event-badge[data-lane="Vector"] { color: var(--reuse-green); }
+    .event-badge[data-lane="MTE3"] { color: var(--reuse-blue); }
+
+    .arch-stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .arch-stage .pto-memory-architecture-viewport {
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle, var(--reuse-stage-grid) 1px, transparent 1.2px);
+      background-size: 24px 24px;
+      background-position: 8px 8px;
+    }
+
+    html[data-theme='light'] .arch-stage .pto-memory-architecture-viewport {
+      background-color: #fff;
+      --reuse-stage-grid: rgba(0, 0, 0, 0.10);
+    }
+
+    .arch-stage .pto-memory-architecture-canvas {
+      padding: 18px;
+    }
+
+    .arch-stage [data-aiv-node="buffer:UB"] {
+      outline: 2px solid color-mix(in srgb, var(--reuse-green) 76%, transparent);
+      outline-offset: 3px;
+    }
+
+    .arch-stage .pto-aiv-core__cell.is-buffer-block {
+      background: color-mix(in srgb, var(--reuse-green) 68%, var(--surface-1));
+      border-color: color-mix(in srgb, var(--reuse-green) 80%, transparent);
+      opacity: 0.95;
+    }
+
+    .arch-stage .pto-aiv-core__cell.is-buffer-block-tone-load {
+      background: color-mix(in srgb, var(--reuse-amber) 75%, var(--surface-1));
+    }
+
+    .arch-stage .pto-aiv-core__cell.is-buffer-block-tone-compute {
+      background: color-mix(in srgb, var(--reuse-green) 74%, var(--surface-1));
+    }
+
+    .arch-stage .pto-aiv-core__cell.is-buffer-block-tone-store {
+      background: color-mix(in srgb, var(--reuse-blue) 72%, var(--surface-1));
+    }
+
+    .reuse-arch-overlay {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, auto));
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .reuse-viz {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 164px;
+      min-height: 0;
+    }
+
+    .reuse-chart-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background-color: var(--reuse-stage-bg);
+    }
+
+    html[data-theme='light'] .reuse-chart-wrap,
+    html[data-theme='light'] .reuse-stage-bg {
+      background-color: #fff;
+    }
+
+    .reuse-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .reuse-svg.is-panning {
+      cursor: grabbing;
+    }
+
+    .axis-label,
+    .axis-tick,
+    .lane-label {
+      fill: var(--foreground-muted);
+      font: 500 11px / 1 var(--font-mono);
+      letter-spacing: 0;
+    }
+
+    .axis-line {
+      stroke: var(--border-default);
+      stroke-width: 1;
+    }
+
+    .grid-line {
+      stroke: var(--border-subtle);
+      stroke-width: 1;
+      opacity: 0.58;
+    }
+
+    .address-row-line {
+      stroke: var(--border-subtle);
+      stroke-width: 1;
+      opacity: 0.42;
+    }
+
+    .buffer-band-label {
+      fill: var(--foreground-muted);
+      font: 700 11px / 1 var(--font-mono);
+      letter-spacing: 0;
+    }
+
+    .tensor-rect {
+      stroke: none;
+      stroke-width: 0;
+      cursor: pointer;
+      transition:
+        opacity var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default);
+    }
+
+    .tensor-rect.is-muted {
+      opacity: 1;
+    }
+
+    .tensor-rect.is-active,
+    .tensor-rect.is-hover {
+      opacity: 1;
+      filter: drop-shadow(0 0 10px color-mix(in srgb, var(--foreground) 26%, transparent));
+    }
+
+    .tensor-label {
+      fill: #101010;
+      font: 700 11px / 1 var(--font-mono);
+      letter-spacing: 0;
+      opacity: 0.72;
+      pointer-events: none;
+    }
+
+    .reuse-chain-line {
+      fill: none;
+      stroke: color-mix(in srgb, var(--foreground) 42%, transparent);
+      stroke-width: 1.2;
+      stroke-dasharray: 3 5;
+      opacity: 0.78;
+      pointer-events: none;
+    }
+
+    .reuse-chain-label {
+      fill: var(--foreground-muted);
+      font: 700 10px / 1 var(--font-mono);
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .peak-line {
+      stroke: var(--primary);
+      stroke-width: 1.5;
+      stroke-dasharray: 6 4;
+      opacity: 0.95;
+      pointer-events: none;
+    }
+
+    .order-label {
+      fill: var(--primary);
+      font: 700 10px / 1 var(--font-mono);
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .event-pill {
+      cursor: pointer;
+    }
+
+    .event-pill rect {
+      stroke-width: 1;
+      opacity: 0.92;
+    }
+
+    .event-pill text {
+      fill: #101010;
+      font: 700 10px / 1 var(--font-mono);
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .hazard-rect {
+      fill: color-mix(in srgb, var(--danger) 26%, transparent);
+      stroke: var(--danger);
+      stroke-width: 1.4;
+      stroke-dasharray: 5 4;
+      pointer-events: none;
+    }
+
+    .hazard-label {
+      fill: var(--danger);
+      font: 700 10px / 1 var(--font-mono);
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .boundary-line {
+      stroke: color-mix(in srgb, var(--foreground) 54%, transparent);
+      stroke-width: 1.2;
+      stroke-dasharray: 2 5;
+      pointer-events: none;
+    }
+
+    .boundary-label {
+      fill: var(--foreground-muted);
+      font: 700 10px / 1 var(--font-mono);
+      letter-spacing: 0;
+      pointer-events: none;
+    }
+
+    .active-row.is-hazard {
+      color: var(--danger);
+      background: color-mix(in srgb, var(--danger) 9%, transparent);
+    }
+
+    .reuse-tooltip {
+      position: absolute;
+      z-index: var(--z-overlay);
+      width: 270px;
+      display: none;
+      padding: 10px;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--background) 96%, black);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+    }
+
+    html[data-theme='light'] .reuse-tooltip {
+      background: #fff;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
+    }
+
+    .reuse-tooltip strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--foreground);
+      font: var(--text-body);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .reuse-inspector {
+      min-height: 0;
+      border-top: 1px solid var(--border-subtle);
+      background: var(--ide-frame-pane-bg);
+      overflow: auto;
+    }
+
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: minmax(180px, 0.85fr) minmax(240px, 1.15fr);
+      gap: 0;
+      min-height: 100%;
+    }
+
+    .active-set,
+    .tensor-detail {
+      min-width: 0;
+      padding: 12px;
+    }
+
+    .active-set {
+      border-right: 1px solid var(--border-subtle);
+    }
+
+    .section-kicker {
+      margin-bottom: 8px;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .active-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 26px;
+      border-radius: var(--radius-sm);
+      padding: 0 7px;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      cursor: pointer;
+    }
+
+    .active-row:hover,
+    .active-row.is-active {
+      background: var(--state-hover);
+      color: var(--foreground);
+    }
+
+    .active-row span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tensor-detail__title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .tensor-detail__title strong {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--foreground);
+      font: var(--text-body);
+      font-weight: var(--font-weight-semibold);
+      white-space: nowrap;
+    }
+
+    .kv-grid {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr);
+      gap: 5px 10px;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .kv-grid dt {
+      color: var(--foreground-muted);
+    }
+
+    .kv-grid dd {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .hazard-panel {
+      margin-top: 10px;
+      padding: 9px;
+      border: 1px solid color-mix(in srgb, var(--danger) 36%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--danger) 8%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .hazard-panel strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--danger);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .hazard-panel div {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .boundary-panel {
+      margin-top: 10px;
+      padding: 9px;
+      border: 1px solid color-mix(in srgb, var(--foreground) 18%, transparent);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 6%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+
+    .boundary-panel strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--foreground);
+      font: var(--text-body-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .boundary-panel div {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .info-popover {
+      position: absolute;
+      right: 12px;
+      top: 54px;
+      z-index: var(--z-dropdown);
+      width: 340px;
+      display: none;
+      padding: 12px;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      background: var(--background-elevated);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      box-shadow: var(--shadow-md);
+    }
+
+    html[data-theme='light'] .info-popover {
+      background: #fff;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
+    }
+
+    .info-popover.is-open {
+      display: block;
+    }
+
+    .info-popover strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .info-popover p {
+      margin: 0 0 8px;
+    }
+
+    .info-popover p:last-child {
+      margin-bottom: 0;
+    }
+
+    .empty-state {
+      color: var(--foreground-muted);
+      font: var(--text-body-sm);
+    }
+
+    .reuse-status-group {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .reuse-status-item {
+      min-width: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .reuse-status-item.is-danger {
+      color: var(--danger);
+    }
+
+    .reuse-status-icon {
+      width: 14px;
+      height: 14px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.82;
+    }
+
+    @media (max-width: 1380px) {
+      body {
+        min-width: 1180px;
+      }
+
+      .reuse-shell {
+        grid-template-columns: 320px minmax(360px, 0.9fr) minmax(500px, 1.1fr);
+      }
+    }
+
+    body.is-preview {
+      min-width: 0;
+      background: var(--ide-frame-bg);
+    }
+
+    body.is-preview .reuse-page.pto-ide-frame {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body.is-preview .pto-ide-frame__topbar,
+    body.is-preview .pto-ide-frame__activity-rail,
+    body.is-preview .pto-ide-frame__status-strip {
+      display: none;
+    }
+
+    body.is-preview .pto-ide-frame__body,
+    body.is-preview .pto-ide-frame__workarea {
+      height: 100%;
+      min-height: 0;
+    }
+
+    body.is-preview .reuse-shell {
+      height: 100%;
+      padding: 6px;
+      gap: 6px;
+      grid-template-columns: minmax(0, 0.74fr) minmax(0, 0.9fr) minmax(0, 1.36fr);
+    }
+
+    body.is-preview .reuse-pane {
+      border-radius: 6px;
+    }
+
+    body.is-preview .reuse-pane__head {
+      min-height: 30px;
+      padding: 5px 7px;
+    }
+
+    body.is-preview .reuse-pane__title {
+      gap: 0;
+    }
+
+    body.is-preview .reuse-pane__title strong {
+      font-size: 10px;
+      line-height: 1.2;
+    }
+
+    body.is-preview .reuse-pane__title span,
+    body.is-preview .zoom-control-group,
+    body.is-preview [data-code-line] {
+      display: none;
+    }
+
+    body.is-preview .code-view {
+      padding-top: 6px;
+      font-size: 8px;
+      line-height: 1.35;
+    }
+
+    body.is-preview .code-line {
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 5px;
+      min-height: 15px;
+      padding-right: 5px;
+    }
+
+    body.is-preview .code-line__no {
+      padding-left: 4px;
+    }
+
+    body.is-preview .code-line__badges,
+    body.is-preview .reuse-inspector {
+      display: none;
+    }
+
+    body.is-preview .reuse-viz {
+      grid-template-rows: minmax(0, 1fr);
+    }
+  </style>
+</head>
+<body>
+  <section class="pto-ide-frame reuse-page" data-ide-frame data-host="standalone" data-cursor-dots="true" aria-label="Memory reuse analysis IDE frame">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome toolbar reuse-toolbar">
+      <div class="toolbar-l">
+        <div class="pto-ide-frame__host-chip" aria-label="PTO memory analysis">
+          <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+            <path d="M9 4v16"></path>
+            <path d="M15 4v16"></path>
+            <path d="M4 10h16"></path>
+            <path d="M4 15h16"></path>
+          </svg>
+        </div>
+        <div class="reuse-brand">
+          <strong>Memory Reuse Analysis</strong>
+          <span>AIV 1 · MatMulAddRelu_mix_aic__kernel0 · previous mem-conflicts source</span>
+        </div>
+        <select class="reuse-select" aria-label="Kernel selector">
+          <option>MatMulAddRelu_mix_aic__kernel0</option>
+        </select>
+        <div class="graph-stats" aria-label="Memory summary">
+          <span class="stat-chip reuse-source-note">Demo</span>
+          <span class="stat-chip" data-stat-capacity>ALL 924KB</span>
+          <span class="stat-chip" data-stat-peak>Peak 0KB</span>
+          <span class="stat-chip" data-stat-util>Util 0%</span>
+          <span class="stat-chip" data-stat-tensors>Tensors 0</span>
+          <span class="stat-chip reuse-hazard-chip" data-stat-hazards>Hazards 0</span>
+        </div>
+      </div>
+      <div class="toolbar-r">
+        <div class="segmented-control segmented-control-muted" role="group" aria-label="View mode">
+          <button class="btn btn-sm is-selected" type="button" data-view-mode="lifecycle">Lifecycle</button>
+          <button class="btn btn-sm" type="button" data-view-mode="address">Address Map</button>
+        </div>
+        <button class="btn btn-icon btn-ghost" type="button" data-info-toggle aria-label="图表说明">i</button>
+        <button class="btn btn-icon btn-ghost" type="button" data-theme-toggle aria-label="切换深浅主题">◐</button>
+        <button class="btn btn-sm" type="button" data-reset-view>Reset</button>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" aria-label="Memory reuse workspace" title="Memory reuse workspace">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+            <path d="M9 4v16"></path>
+            <path d="M15 4v16"></path>
+            <path d="M4 10h16"></path>
+            <path d="M4 15h16"></path>
+          </svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Source code" title="Source code">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <path d="M14 2v6h6"></path>
+            <path d="m10 13-2 2 2 2"></path>
+            <path d="m14 17 2-2-2-2"></path>
+          </svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Architecture" title="Architecture">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            <path d="M10 6.5h4"></path>
+            <path d="M17.5 10v4"></path>
+          </svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Hazards" title="Hazards">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path>
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+          </svg>
+        </button>
+      </nav>
+
+      <div class="pto-ide-frame__workarea reuse-workarea">
+    <section class="reuse-shell">
+      <section class="reuse-pane" aria-label="Code pane">
+        <header class="reuse-pane__head">
+          <div class="reuse-pane__title">
+            <strong>Code</strong>
+            <span>matmul_add_relu.cce · from previous mem-conflicts view</span>
+          </div>
+          <span class="stat-chip" data-code-line>line -</span>
+        </header>
+        <div class="reuse-pane__body">
+          <div class="code-view" data-code-view></div>
+        </div>
+      </section>
+
+      <section class="reuse-pane" aria-label="Memory architecture pane">
+        <header class="reuse-pane__head">
+          <div class="reuse-pane__title">
+            <strong>内存架构图</strong>
+            <span>UB focus · AIV 1 / MTE2 / Vector / MTE3</span>
+          </div>
+          <div class="zoom-control-group">
+            <button class="btn btn-icon btn-ghost" type="button" data-arch-zoom="out" aria-label="缩小架构图">−</button>
+            <span class="zoom-control-readout" data-arch-zoom-readout>58%</span>
+            <button class="btn btn-icon btn-ghost" type="button" data-arch-zoom="in" aria-label="放大架构图">+</button>
+          </div>
+        </header>
+        <div class="reuse-pane__body reuse-stage-bg">
+          <div class="arch-stage">
+            <div class="pto-memory-architecture-viewport" data-pto-mem-arch-viewport>
+              <div class="pto-memory-architecture-sizer" data-pto-mem-arch-sizer>
+                <div class="pto-memory-architecture-canvas" data-pto-mem-arch-canvas data-default-zoom="0.58">
+                  <div data-arch-mount></div>
+                </div>
+              </div>
+            </div>
+            <div class="reuse-arch-overlay">
+              <span class="stat-chip">Slice <b data-peak-order>#0</b></span>
+              <span class="stat-chip">Active <b data-active-count>0</b></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="reuse-pane" aria-label="UB lifecycle pane">
+        <header class="reuse-pane__head">
+          <div class="reuse-pane__title">
+            <strong>内存生命周期图</strong>
+            <span data-chart-subtitle>x: execution order · y: buffer address</span>
+          </div>
+          <div class="zoom-control-group">
+            <div class="segmented-control segmented-control-muted" role="group" aria-label="选择生命周期图内存空间">
+              <button class="btn btn-sm is-selected" type="button" data-buffer-mode="ALL">ALL</button>
+              <button class="btn btn-sm" type="button" data-buffer-mode="UB">UB</button>
+              <button class="btn btn-sm" type="button" data-buffer-mode="L1">L1</button>
+              <button class="btn btn-sm" type="button" data-buffer-mode="L0C">L0C</button>
+            </div>
+            <button class="btn btn-icon btn-ghost" type="button" data-chart-zoom="out" aria-label="缩小图表">−</button>
+            <span class="zoom-control-readout" data-chart-zoom-readout>100%</span>
+            <button class="btn btn-icon btn-ghost" type="button" data-chart-zoom="in" aria-label="放大图表">+</button>
+          </div>
+        </header>
+        <div class="reuse-pane__body">
+          <div class="reuse-viz">
+            <div class="reuse-chart-wrap" data-chart-wrap>
+              <svg class="reuse-svg" data-reuse-svg role="img" aria-label="UB lifecycle visualization"></svg>
+              <div class="reuse-tooltip" data-tooltip></div>
+              <div class="info-popover" data-info-popover>
+                <strong>图表坐标</strong>
+                <p>Lifecycle 模式：横轴是 kernel 内的虚拟执行顺序，纵轴是 UB 地址；矩形宽度表示生命周期，矩形高度表示占用大小。</p>
+                <p>Address Map 模式：横轴是 UB 地址，纵轴是 tensor/复用槽位；用于检查地址复用、空洞和 bank 风险。</p>
+                <p>当前源码和 block 数据都切回旧版 mem-conflicts view：10 个 block 覆盖 UB、L1、L0C。可以用图表右上角 selector 切换 ALL / UB / L1 / L0C。</p>
+                <p>颜色编码：黄色表示 MTE2 load，绿色表示 Vector compute，蓝色表示 MTE3 store，紫色表示 bias/scalar，橙色表示 scratch/temp。</p>
+                <p>蓝色竖虚线是当前执行 slice；灰色虚线/曲线是解释层：boundary 表示两个 tensor 只贴着同一个地址边界，没有字节重叠；reuse link 表示后一个 tensor 在前一个生命周期结束后复用该地址区间。</p>
+                <p>红色区域只在两个 tensor 的 UB 地址区间和生命周期同时重叠时出现，表示踩踏/别名风险；当前 demo 的 hazard 数为 0。</p>
+                <p>下方 MTE2 / Vector / MTE3 lane 与源码行、tensor 生命周期共享同一执行顺序。</p>
+              </div>
+            </div>
+            <div class="reuse-inspector">
+              <div class="inspector-grid">
+                <section class="active-set">
+                  <div class="section-kicker">Active At Slice</div>
+                  <div data-active-list></div>
+                </section>
+                <section class="tensor-detail">
+                  <div class="section-kicker">Tensor Detail</div>
+                  <div data-detail></div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+        <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" aria-label="Memory reuse status">
+          <span class="reuse-status-group">
+            <span class="reuse-status-item">
+              <svg class="reuse-status-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"></path><path d="M12 4v16"></path></svg>
+              three-pane linked
+            </span>
+            <span class="reuse-status-item" data-status-selected>selected wGm_in</span>
+            <span class="reuse-status-item" data-status-zoom>chart 100%</span>
+          </span>
+          <span class="reuse-status-group">
+            <span class="reuse-status-item">source: previous mem-conflicts view</span>
+            <span class="reuse-status-item is-danger" data-hazard-status>hazards 0</span>
+          </span>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aiv-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-architecture/pattern.js"></script>
+  <script>
+    (() => {
+      const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+      if (isPreview) document.body.classList.add('is-preview');
+
+      const KB = 1024;
+      const previousSource = String.raw`// =====================================================================
+//  matmul_add_relu.cce
+//  Fused kernel:  Y = ReLU( X @ W + bias )   (fp16 in / fp16 out)
+//  Target: Ascend AI Core (Cube + Vector), mix aic/aiv pipeline
+// =====================================================================
+#include "kernel_operator.h"
+using namespace AscendC;
+
+constexpr int M = 256, K = 512, N = 256;
+constexpr int TILE_M = 128, TILE_N = 128, TILE_K = 256;
+
+class KernelMatMulAddRelu {
+public:
+    __aicore__ inline KernelMatMulAddRelu() {}
+
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR w, GM_ADDR bias, GM_ADDR y) {
+        xGm.SetGlobalBuffer((__gm__ half*)x);
+        wGm.SetGlobalBuffer((__gm__ half*)w);
+        biasGm.SetGlobalBuffer((__gm__ float*)bias);
+        yGm.SetGlobalBuffer((__gm__ half*)y);
+        pipe.InitBuffer(inQueueX, 1, TILE_M * TILE_K * sizeof(half));
+        pipe.InitBuffer(inQueueW, 1, TILE_K * TILE_N * sizeof(half));
+        pipe.InitBuffer(l1Buf,    1, TILE_K * TILE_N * sizeof(half));
+    }
+
+    __aicore__ inline void Process() {
+        // -------- stage operands into L1 (reused across loops) --------
+
+            // --- stage weight tile: GM -> L1 (wL1_stage) ---
+            LocalTensor<half> wL1 = l1Buf.AllocTensor<half>();
+            // DMA copy weights into L1 scratch
+            DataCopy(wL1, wGm[wOff], {nBlk, blockLen, 0, 0});   // hot
+            l1Buf.EnQue(wL1);
+            wL1 = l1Buf.DeQue<half>();
+
+            // --- stage next activation into SAME L1 region (aL1_stage) ---
+            DataCopy(aL1, aGm[aOff], {1, blockLen, 0, 0});      // hot
+            l1Buf.EnQue(aL1);
+
+            // ---- load activation tile from GM -> UB (xGm_in) ----
+            LocalTensor<half> xUb = inQueueX.AllocTensor<half>();
+            DataCopy(xUb, xGm[offset], {1, blockLen, 0, 0});
+            inQueueX.EnQue(xUb);                                // hot
+            xUb = inQueueX.DeQue<half>();
+            SetFlag<HardEvent::MTE2_M>(EVENT_ID0);
+            WaitFlag<HardEvent::MTE2_M>(EVENT_ID0);
+
+            // ---- load weight tile GM -> UB (wGm_in) ----
+            LocalTensor<half> wUb = inQueueW.AllocTensor<half>();
+            DataCopy(wUb, wGm[woff], {nBlk, blockLen, 0, 0});   // hot
+            inQueueW.EnQue(wUb);
+            wUb = inQueueW.DeQue<half>();
+
+            // ---- MMAD: accumulate X @ W into L0C (cMatrix) ----
+            MmadParams mmadParams{TILE_M, TILE_K, TILE_N, true};
+            Mmad(cMatrix, xUb, wUb, mmadParams);                // hot
+            inQueueX.FreeTensor(xUb);
+            inQueueW.FreeTensor(wUb);
+
+            // ---- load bias vector into UB (biasUb) ----
+            LocalTensor<float> biasUb = biasBuf.Get<float>();   // hot
+            DataCopy(biasUb, biasGm[nOff], n);
+            PipeBarrier<PIPE_V>();
+
+            // ======== epilogue: bias add + ReLU on Vector unit ========
+            // ---- copy L0C -> UB, then vector Add bias (cUb_fp32) ----
+            LocalTensor<float> cUb = ubBuf.Get<float>();
+            DataCopy(cUb, cMatrix, {TILE_M, TILE_N, 0, 0});     // hot
+            WaitFlag<HardEvent::M_V>(EVENT_ID0);
+            Add(cUb, cUb, biasUb, mask);
+
+            // ---- in-place ReLU (reuses weight region, reluUb) ----
+            Relu(reluUb, cUb);                                  // hot
+            // NOTE: reluUb address reuses wGm_in (freed at tick #58)
+            PipeBarrier<PIPE_V>();
+
+            // ---- cast fp32 -> fp16 and store to GM (yUb_out) ----
+            LocalTensor<half> yUb = outBuf.Get<half>();
+            // yUb_out address reuses xGm_in region
+            Cast(yUb, reluUb, RoundMode::CAST_RINT, len);       // hot
+            DataCopy(yGm[offset], yUb, {1, blockLen, 0, 0});
+            outBuf.FreeTensor(yUb);
+
+            // ---- per-loop scratch scaling (scratchUb, reuses cUb) ----
+            for (int i = 0; i < nLoop; ++i) {                   // hot
+                Muls(scratch, yUb, scaleArr[i]);
+            }
+        }   // end for mb
+    }
+
+private:
+    TPipe pipe;
+    TQue<QuePosition::VECIN, 1> inQueueX, inQueueW;
+    GlobalTensor<half> xGm, wGm, yGm;
+    GlobalTensor<float> biasGm;
+};`;
+      const data = {
+        capacity: 284 * KB,
+        buffers: [
+          { name: 'UB', capacity: 284 * KB },
+          { name: 'L1', capacity: 512 * KB },
+          { name: 'L0C', capacity: 128 * KB },
+        ],
+        ticks: 120,
+        peakOrder: 10,
+        sourceFile: 'matmul_add_relu.cce',
+        source: previousSource.split('\n'),
+        tensors: [
+          {
+            id: 't1',
+            name: 'xGm_in',
+            buffer: 'UB',
+            offset: 0,
+            size: 64 * KB,
+            start: 2,
+            end: 40,
+            kind: 'load',
+            color: 'var(--reuse-amber)',
+            lineStart: 40,
+            lineEnd: 46,
+            hotLine: 43,
+            tags: ['MTE2', 'producer: xGm', 'reused by yUb_out'],
+            reusedBy: ['t7'],
+          },
+          {
+            id: 't2',
+            name: 'wGm_in',
+            buffer: 'UB',
+            offset: 64 * KB,
+            size: 96 * KB,
+            start: 3,
+            end: 58,
+            kind: 'load',
+            color: 'var(--reuse-amber)',
+            lineStart: 48,
+            lineEnd: 52,
+            hotLine: 50,
+            tags: ['MTE2', 'producer: wGm', 'reused by reluUb'],
+            reusedBy: ['t6'],
+          },
+          {
+            id: 't4',
+            name: 'biasUb',
+            buffer: 'UB',
+            offset: 160 * KB,
+            size: 16 * KB,
+            start: 10,
+            end: 30,
+            kind: 'load',
+            color: 'var(--reuse-violet)',
+            lineStart: 60,
+            lineEnd: 63,
+            hotLine: 61,
+            tags: ['scalar bias', 'long idle'],
+          },
+          {
+            id: 't5',
+            name: 'cUb_fp32',
+            buffer: 'UB',
+            offset: 176 * KB,
+            size: 64 * KB,
+            start: 62,
+            end: 92,
+            kind: 'compute',
+            color: 'var(--reuse-green)',
+            lineStart: 66,
+            lineEnd: 70,
+            hotLine: 68,
+            tags: ['Vector', 'peak contributor', 'reused by scratch'],
+            reusedBy: ['t8'],
+          },
+          {
+            id: 't6',
+            name: 'reluUb',
+            buffer: 'UB',
+            offset: 64 * KB,
+            size: 64 * KB,
+            start: 78,
+            end: 104,
+            kind: 'compute',
+            color: 'var(--reuse-green)',
+            lineStart: 72,
+            lineEnd: 75,
+            hotLine: 73,
+            tags: ['Vector', 'reuse: wGm_in'],
+            reuseOf: 't2',
+          },
+          {
+            id: 't7',
+            name: 'yUb_out',
+            buffer: 'UB',
+            offset: 0,
+            size: 64 * KB,
+            start: 94,
+            end: 118,
+            kind: 'store',
+            color: 'var(--reuse-blue)',
+            lineStart: 78,
+            lineEnd: 82,
+            hotLine: 80,
+            tags: ['MTE3', 'reuse: xGm_in'],
+            reuseOf: 't1',
+          },
+          {
+            id: 't8',
+            name: 'scratchUb',
+            buffer: 'UB',
+            offset: 176 * KB,
+            size: 32 * KB,
+            start: 96,
+            end: 112,
+            kind: 'compute',
+            color: 'var(--reuse-orange)',
+            lineStart: 84,
+            lineEnd: 87,
+            hotLine: 85,
+            tags: ['loop temp', 'reuse: cUb_fp32', 'bank risk'],
+            reuseOf: 't5',
+          },
+          {
+            id: 't3',
+            name: 'cMatrix',
+            buffer: 'L0C',
+            offset: 0,
+            size: 128 * KB,
+            start: 6,
+            end: 74,
+            kind: 'compute',
+            color: 'var(--reuse-green)',
+            lineStart: 54,
+            lineEnd: 58,
+            hotLine: 56,
+            tags: ['Cube', 'L0C', 'fp32 partial sums'],
+          },
+          {
+            id: 't9',
+            name: 'wL1_stage',
+            buffer: 'L1',
+            offset: 0,
+            size: 256 * KB,
+            start: 1,
+            end: 60,
+            kind: 'load',
+            color: 'var(--reuse-amber)',
+            lineStart: 30,
+            lineEnd: 34,
+            hotLine: 32,
+            tags: ['L1', 'stage weights', 'reused by aL1_stage'],
+            reusedBy: ['t10'],
+          },
+          {
+            id: 't10',
+            name: 'aL1_stage',
+            buffer: 'L1',
+            offset: 0,
+            size: 256 * KB,
+            start: 64,
+            end: 110,
+            kind: 'load',
+            color: 'var(--reuse-orange)',
+            lineStart: 36,
+            lineEnd: 38,
+            hotLine: 37,
+            tags: ['L1', 'next activation', 'reuse: wL1_stage'],
+            reuseOf: 't9',
+          },
+        ],
+        events: [
+          { id: 'e1', order: 2, lane: 'MTE2', label: 'LD x', tensor: 't1', line: 43 },
+          { id: 'e2', order: 3, lane: 'MTE2', label: 'LD w', tensor: 't2', line: 50 },
+          { id: 'e3', order: 10, lane: 'MTE2', label: 'LD b', tensor: 't4', line: 61 },
+          { id: 'e4', order: 20, lane: 'Vector', label: 'MMAD', tensor: 't1', line: 56 },
+          { id: 'e5', order: 68, lane: 'Vector', label: 'ADD', tensor: 't5', line: 68 },
+          { id: 'e6', order: 80, lane: 'Vector', label: 'RELU', tensor: 't6', line: 73 },
+          { id: 'e7', order: 100, lane: 'MTE3', label: 'ST y', tensor: 't7', line: 80 },
+        ],
+      };
+
+      data.hazards = computeHazards();
+      data.boundaries = computeBoundaryTouches();
+
+      const state = {
+        selectedTensorId: 't2',
+        hoveredTensorId: null,
+        selectedOrder: data.peakOrder,
+        viewMode: 'lifecycle',
+        buffer: 'ALL',
+        chartZoom: 1,
+        panX: 0,
+        panY: 0,
+        activePan: null,
+        archZoomController: null,
+      };
+
+      const svg = document.querySelector('[data-reuse-svg]');
+      const chartWrap = document.querySelector('[data-chart-wrap]');
+      const tooltip = document.querySelector('[data-tooltip]');
+      const codeView = document.querySelector('[data-code-view]');
+      const activeList = document.querySelector('[data-active-list]');
+      const detail = document.querySelector('[data-detail]');
+      const infoPopover = document.querySelector('[data-info-popover]');
+      const chartSubtitle = document.querySelector('[data-chart-subtitle]');
+
+      const fmtKB = (bytes) => `${Math.round(bytes / KB)}KB`;
+      const fmtHex = (bytes) => `0x${Math.max(0, bytes).toString(16).padStart(5, '0')}`;
+      const tensorById = (id) => data.tensors.find((tensor) => tensor.id === id) || null;
+      const bufferByName = (name) => data.buffers.find((buffer) => buffer.name === name) || data.buffers[0];
+      const visibleTensors = () => data.tensors.filter((tensor) => state.buffer === 'ALL' || tensor.buffer === state.buffer);
+      const activeCapacity = () => (
+        state.buffer === 'ALL'
+          ? data.buffers.reduce((sum, buffer) => sum + buffer.capacity, 0)
+          : bufferByName(state.buffer).capacity
+      );
+      const activeAt = (order) => visibleTensors().filter((tensor) => tensor.start <= order && tensor.end >= order);
+      const activeBytesAt = (order) => activeAt(order).reduce((sum, tensor) => sum + tensor.size, 0);
+      const selectedTensor = () => tensorById(state.selectedTensorId) || data.tensors[0];
+
+      function computeHazards() {
+        const hazards = [];
+        for (let i = 0; i < data.tensors.length; i += 1) {
+          for (let j = i + 1; j < data.tensors.length; j += 1) {
+            const a = data.tensors[i];
+            const b = data.tensors[j];
+            if (a.buffer !== b.buffer) continue;
+            const timeStart = Math.max(a.start, b.start);
+            const timeEnd = Math.min(a.end, b.end);
+            const addrStart = Math.max(a.offset, b.offset);
+            const addrEnd = Math.min(a.offset + a.size, b.offset + b.size);
+            if (timeStart <= timeEnd && addrStart < addrEnd) {
+              hazards.push({
+                id: `${a.id}:${b.id}`,
+                tensors: [a.id, b.id],
+                a,
+                b,
+                timeStart,
+                timeEnd,
+                addrStart,
+                addrEnd,
+                bytes: addrEnd - addrStart,
+              });
+            }
+          }
+        }
+        return hazards;
+      }
+
+      function hazardsForTensor(id) {
+        return data.hazards.filter((hazard) => hazard.tensors.includes(id));
+      }
+
+      function hazardsAt(order) {
+        const visibleIds = new Set(visibleTensors().map((tensor) => tensor.id));
+        return data.hazards.filter((hazard) => (
+          hazard.timeStart <= order
+          && hazard.timeEnd >= order
+          && hazard.tensors.every((id) => visibleIds.has(id))
+        ));
+      }
+
+      function computeBoundaryTouches() {
+        const boundaries = [];
+        for (let i = 0; i < data.tensors.length; i += 1) {
+          for (let j = i + 1; j < data.tensors.length; j += 1) {
+            const a = data.tensors[i];
+            const b = data.tensors[j];
+            if (a.buffer !== b.buffer) continue;
+            const timeStart = Math.max(a.start, b.start);
+            const timeEnd = Math.min(a.end, b.end);
+            const aEnd = a.offset + a.size;
+            const bEnd = b.offset + b.size;
+            const sharedAddress = aEnd === b.offset ? aEnd : bEnd === a.offset ? bEnd : null;
+            if (timeStart <= timeEnd && sharedAddress !== null) {
+              boundaries.push({
+                id: `${a.id}|${b.id}`,
+                tensors: [a.id, b.id],
+                a,
+                b,
+                timeStart,
+                timeEnd,
+                address: sharedAddress,
+              });
+            }
+          }
+        }
+        return boundaries;
+      }
+
+      function boundariesForTensor(id) {
+        return data.boundaries.filter((boundary) => boundary.tensors.includes(id));
+      }
+
+      function computePeak() {
+        let peak = 0;
+        let order = 0;
+        for (let tick = 0; tick <= data.ticks; tick += 1) {
+          const bytes = activeBytesAt(tick);
+          if (bytes > peak) {
+            peak = bytes;
+            order = tick;
+          }
+        }
+        return { peak, order };
+      }
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;',
+        })[char]);
+      }
+
+      function initArchitecture() {
+        const mount = document.querySelector('[data-arch-mount]');
+        if (!window.PtoMemoryArchitecturePattern || !mount) return;
+        window.PtoMemoryArchitecturePattern.renderArchitecture(mount, 'ascend950b');
+        window.PtoMemoryArchitecturePattern.createRouteOverlay(mount, 'ascend950b');
+        window.PtoMemoryArchitecturePattern.attachHoverInteractions(mount, 'ascend950b', { viewportScale: 0.58 });
+        state.archZoomController = window.PtoMemoryArchitecturePattern.createZoomController({
+          root: document,
+          viewport: '[data-pto-mem-arch-viewport]',
+          sizer: '[data-pto-mem-arch-sizer]',
+          canvas: '[data-pto-mem-arch-canvas]',
+          readout: '[data-arch-zoom-readout]',
+          inButton: '[data-arch-zoom="in"]',
+          outButton: '[data-arch-zoom="out"]',
+          defaultZoom: 0.58,
+          min: 0.38,
+          max: 1.12,
+          step: 0.06,
+        });
+      }
+
+      function syncStats() {
+        const { peak, order } = computePeak();
+        const capacity = activeCapacity();
+        const util = capacity ? (peak / capacity) * 100 : 0;
+        const visibleHazards = data.hazards.filter((hazard) => hazard.tensors.every((id) => visibleTensors().some((tensor) => tensor.id === id)));
+        document.querySelector('[data-stat-capacity]').textContent = `${state.buffer} ${fmtKB(capacity)}`;
+        document.querySelector('[data-stat-peak]').textContent = `Peak ${fmtKB(peak)}`;
+        document.querySelector('[data-stat-util]').textContent = `Util ${util.toFixed(1)}%`;
+        document.querySelector('[data-stat-tensors]').textContent = `Blocks ${visibleTensors().length}`;
+        document.querySelector('[data-stat-hazards]').textContent = `Hazards ${visibleHazards.length}`;
+        document.querySelector('[data-peak-order]').textContent = `#${state.selectedOrder || order}`;
+        document.querySelector('[data-active-count]').textContent = String(activeAt(state.selectedOrder).length);
+        document.querySelector('[data-status-selected]').textContent = `selected ${selectedTensor().name}`;
+        const hazardStatus = document.querySelector('[data-hazard-status]');
+        hazardStatus.textContent = visibleHazards.length
+          ? `hazards ${visibleHazards.length}: address/lifetime overlap`
+          : 'hazards 0';
+      }
+
+      function syncArchitectureBlocks() {
+        if (!window.PtoMemoryArchitecturePattern) return;
+        const active = data.tensors.filter((tensor) => tensor.buffer === 'UB' && tensor.start <= state.selectedOrder && tensor.end >= state.selectedOrder);
+        const totalCells = 8 * 19;
+        const blocks = active.map((tensor) => {
+          const startCell = Math.floor((tensor.offset / data.capacity) * totalCells);
+          const endCell = Math.max(startCell, Math.floor(((tensor.offset + tensor.size) / data.capacity) * totalCells) - 1);
+          return {
+            core: 'mem950-aiv1',
+            buffer: 'UB',
+            label: tensor.name,
+            cellRange: [startCell, endCell],
+            state: state.selectedTensorId === tensor.id ? 'selected' : 'loaded',
+            tone: tensor.kind,
+          };
+        });
+        window.PtoMemoryArchitecturePattern.setBufferBlocks(document.querySelector('[data-arch-mount]'), blocks);
+      }
+
+      function renderCode() {
+        const selected = selectedTensor();
+        const eventMap = new Map();
+        data.events.forEach((event) => {
+          if (!eventMap.has(event.line)) eventMap.set(event.line, []);
+          eventMap.get(event.line).push(event);
+        });
+        codeView.innerHTML = data.source.map((line, index) => {
+          const lineNo = index + 1;
+          const related = data.tensors.filter((tensor) => lineNo >= tensor.lineStart && lineNo <= tensor.lineEnd);
+          const isSelectedRange = selected && lineNo >= selected.lineStart && lineNo <= selected.lineEnd;
+          const isHot = selected && lineNo === selected.hotLine;
+          const badges = (eventMap.get(lineNo) || []).map((event) =>
+            `<span class="event-badge" data-lane="${escapeHtml(event.lane)}">${escapeHtml(event.lane)}</span>`
+          ).join('');
+          const tensorId = related[0]?.id || '';
+          return `
+            <div class="code-line ${isSelectedRange ? 'is-active' : ''} ${isHot ? 'is-hot' : ''}" data-line="${lineNo}" data-line-tensor="${escapeHtml(tensorId)}">
+              <span class="code-line__no">${lineNo}</span>
+              <span class="code-line__text">${escapeHtml(line)}</span>
+              <span class="code-line__badges">${badges}</span>
+            </div>`;
+        }).join('');
+      }
+
+      function setSelectedTensor(id, order = null) {
+        const tensor = tensorById(id);
+        if (!tensor) return;
+        state.selectedTensorId = id;
+        state.selectedOrder = order == null ? Math.round((tensor.start + tensor.end) / 2) : order;
+        document.querySelector('[data-code-line]').textContent = `line ${tensor.hotLine}`;
+        renderAll();
+        requestAnimationFrame(() => {
+          const row = codeView.querySelector(`[data-line="${tensor.hotLine}"]`);
+          row?.scrollIntoView({ block: 'center' });
+        });
+      }
+
+      function setSelectedOrder(order) {
+        state.selectedOrder = Math.max(0, Math.min(data.ticks, Math.round(order)));
+        renderAll();
+      }
+
+      function colorForLane(lane) {
+        if (lane === 'MTE2') return 'var(--reuse-amber)';
+        if (lane === 'MTE3') return 'var(--reuse-blue)';
+        return 'var(--reuse-green)';
+      }
+
+      function layoutMetrics() {
+        const rect = chartWrap.getBoundingClientRect();
+        const width = Math.max(640, rect.width);
+        const height = Math.max(360, rect.height);
+        return { width, height };
+      }
+
+      function plotBox(width, height) {
+        const isAddress = state.viewMode === 'address';
+        const laneHeight = isAddress ? 0 : 94;
+        const left = isAddress ? 138 : 62;
+        const bottom = isAddress ? 54 : laneHeight + 32;
+        return {
+          left,
+          right: 24,
+          top: 28,
+          bottom,
+          laneHeight,
+          width: width - left - 24,
+          height: height - bottom - 28,
+        };
+      }
+
+      function tx(order, box) {
+        return box.left + state.panX + (order / data.ticks) * box.width * state.chartZoom;
+      }
+
+      function ty(address, box) {
+        return box.top + state.panY + (address / data.capacity) * box.height;
+      }
+
+      function ax(address, box) {
+        return box.left + state.panX + (address / data.capacity) * box.width * state.chartZoom;
+      }
+
+      function visibleBuffers() {
+        return state.buffer === 'ALL' ? data.buffers : [bufferByName(state.buffer)];
+      }
+
+      function bufferBands(box) {
+        const buffers = visibleBuffers();
+        const gap = buffers.length > 1 ? 16 : 0;
+        const bandHeight = (box.height - gap * (buffers.length - 1)) / buffers.length;
+        return buffers.map((buffer, index) => ({
+          ...buffer,
+          top: box.top + state.panY + index * (bandHeight + gap),
+          height: bandHeight,
+        }));
+      }
+
+      function bandForBuffer(name, box) {
+        return bufferBands(box).find((band) => band.name === name) || bufferBands(box)[0];
+      }
+
+      function tensorY(tensor, box) {
+        const band = bandForBuffer(tensor.buffer, box);
+        return band.top + (tensor.offset / band.capacity) * band.height;
+      }
+
+      function tensorHeight(tensor, box) {
+        const band = bandForBuffer(tensor.buffer, box);
+        return (tensor.size / band.capacity) * band.height;
+      }
+
+      function tensorAddressX(tensor, address, box) {
+        const capacity = bufferByName(tensor.buffer).capacity;
+        return box.left + state.panX + (address / capacity) * box.width * state.chartZoom;
+      }
+
+      function renderSvg() {
+        const { width, height } = layoutMetrics();
+        const box = plotBox(width, height);
+        const selected = selectedTensor();
+        const activeIds = new Set(activeAt(state.selectedOrder).map((tensor) => tensor.id));
+        const chainIds = new Set([selected.id, selected.reuseOf, ...(selected.reusedBy || [])].filter(Boolean));
+        const tensors = visibleTensors();
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.innerHTML = state.viewMode === 'address'
+          ? renderAddressSvg(width, height, box, selected, activeIds, chainIds, tensors)
+          : renderLifecycleSvg(width, height, box, selected, activeIds, chainIds, tensors);
+      }
+
+      function renderLifecycleSvg(width, height, box, selected, activeIds, chainIds, tensors) {
+        const parts = [];
+        parts.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="transparent"></rect>`);
+        for (let i = 0; i <= 4; i += 1) {
+          const x = tx((data.ticks / 4) * i, box);
+          parts.push(`<line class="grid-line" x1="${x}" y1="${box.top}" x2="${x}" y2="${box.top + box.height}"></line>`);
+          parts.push(`<text class="axis-tick" x="${x}" y="${box.top + box.height + 18}" text-anchor="middle">#${Math.round((data.ticks / 4) * i)}</text>`);
+        }
+        const bands = bufferBands(box);
+        bands.forEach((band) => {
+          parts.push(`<line class="axis-line" x1="${box.left}" y1="${band.top}" x2="${box.left + box.width * state.chartZoom}" y2="${band.top}"></line>`);
+          parts.push(`<text class="axis-label" x="${box.left - 8}" y="${band.top + 13}" text-anchor="end">${band.name}</text>`);
+          for (let i = 0; i <= 2; i += 1) {
+            const address = (band.capacity / 2) * i;
+            const y = band.top + (address / band.capacity) * band.height;
+            parts.push(`<line class="grid-line" x1="${box.left}" y1="${y}" x2="${box.left + box.width * state.chartZoom}" y2="${y}"></line>`);
+            parts.push(`<text class="axis-tick" x="${box.left - 8}" y="${y + 3}" text-anchor="end">${fmtKB(address)}</text>`);
+          }
+        });
+        parts.push(`<line class="axis-line" x1="${box.left}" y1="${box.top}" x2="${box.left}" y2="${box.top + box.height}"></line>`);
+        parts.push(`<line class="axis-line" x1="${box.left}" y1="${box.top + box.height}" x2="${box.left + box.width * state.chartZoom}" y2="${box.top + box.height}"></line>`);
+        parts.push(`<text class="axis-label" x="${box.left}" y="17">${state.buffer === 'ALL' ? 'buffer address' : `${state.buffer} address`}</text>`);
+        parts.push(`<text class="axis-label" x="${box.left + box.width * state.chartZoom}" y="${box.top + box.height + 35}" text-anchor="end">execution order</text>`);
+        parts.push(`<line class="peak-line" x1="${tx(state.selectedOrder, box)}" y1="${box.top}" x2="${tx(state.selectedOrder, box)}" y2="${box.top + box.height + 84}"></line>`);
+        parts.push(`<text class="order-label" x="${tx(state.selectedOrder, box) + 5}" y="${box.top + 12}">slice #${state.selectedOrder}</text>`);
+
+        tensors.forEach((tensor) => {
+          const x = tx(tensor.start, box);
+          const y = tensorY(tensor, box);
+          const w = Math.max(8, tx(tensor.end, box) - x);
+          const h = Math.max(8, tensorHeight(tensor, box));
+          const drawY = y;
+          const drawH = Math.max(6, h);
+          const muted = state.selectedTensorId && !activeIds.has(tensor.id) && !chainIds.has(tensor.id);
+          parts.push(`
+            <rect class="tensor-rect ${muted ? 'is-muted' : ''} ${tensor.id === selected.id ? 'is-active' : ''} ${tensor.id === state.hoveredTensorId ? 'is-hover' : ''}"
+              x="${x}" y="${drawY}" width="${w}" height="${drawH}" rx="4"
+              fill="${tensor.color}"
+              data-tensor-id="${tensor.id}"></rect>`);
+          if (w > 42 && h > 13) {
+            parts.push(`<text class="tensor-label" x="${x + 6}" y="${drawY + Math.min(drawH - 4, 15)}">${escapeHtml(tensor.name)}</text>`);
+          }
+        });
+
+        const visibleIds = new Set(tensors.map((tensor) => tensor.id));
+        data.boundaries.filter((boundary) => boundary.tensors.every((id) => visibleIds.has(id))).forEach((boundary) => {
+          const x1 = tx(boundary.timeStart, box);
+          const x2 = tx(boundary.timeEnd, box);
+          const y = bandForBuffer(boundary.a.buffer, box).top + (boundary.address / bufferByName(boundary.a.buffer).capacity) * bandForBuffer(boundary.a.buffer, box).height;
+          parts.push(`<line class="boundary-line" x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"></line>`);
+          if (x2 - x1 > 48) {
+            parts.push(`<text class="boundary-label" x="${x1 + 5}" y="${y - 5}">boundary: no byte overlap</text>`);
+          }
+        });
+
+        data.hazards.filter((hazard) => hazard.tensors.every((id) => visibleIds.has(id))).forEach((hazard) => {
+          const x = tx(hazard.timeStart, box);
+          const band = bandForBuffer(hazard.a.buffer, box);
+          const y = band.top + (hazard.addrStart / band.capacity) * band.height;
+          const w = Math.max(6, tx(hazard.timeEnd, box) - x);
+          const h = Math.max(6, ((hazard.addrEnd - hazard.addrStart) / band.capacity) * band.height);
+          parts.push(`<rect class="hazard-rect" x="${x}" y="${y}" width="${w}" height="${h}" rx="3"></rect>`);
+          if (w > 34 && h > 12) {
+            parts.push(`<text class="hazard-label" x="${x + 5}" y="${y + 13}">hazard</text>`);
+          }
+        });
+
+        tensors.forEach((tensor) => {
+          if (!tensor.reuseOf || !chainIds.has(tensor.id)) return;
+          const prev = tensorById(tensor.reuseOf);
+          if (!prev) return;
+          const x1 = tx(prev.end, box);
+          const y1 = tensorY(prev, box) + tensorHeight(prev, box) / 2;
+          const x2 = tx(tensor.start, box);
+          const y2 = tensorY(tensor, box) + tensorHeight(tensor, box) / 2;
+          parts.push(`<path class="reuse-chain-line" d="M ${x1} ${y1} C ${(x1 + x2) / 2} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}"></path>`);
+          if (Math.abs(x2 - x1) > 92) {
+            parts.push(`<text class="reuse-chain-label" x="${(x1 + x2) / 2 - 28}" y="${Math.max(box.top + 14, Math.min(box.top + box.height - 8, (y1 + y2) / 2 - 8))}">reuse link</text>`);
+          }
+        });
+
+        parts.push(renderEventLanes(box, height));
+        return parts.join('');
+      }
+
+      function renderAddressSvg(width, height, box, selected, activeIds, chainIds, tensors) {
+        const parts = [];
+        parts.push(`<rect x="0" y="0" width="${width}" height="${height}" fill="transparent"></rect>`);
+        const maxCapacity = Math.max(...visibleBuffers().map((buffer) => buffer.capacity));
+        const chartBottom = box.top + box.height;
+        const groups = visibleBuffers()
+          .map((buffer) => ({
+            buffer,
+            tensors: tensors.filter((tensor) => tensor.buffer === buffer.name),
+          }))
+          .filter((group) => group.tensors.length);
+        const headerH = state.buffer === 'ALL' ? 24 : 0;
+        const groupGap = state.buffer === 'ALL' ? 10 : 0;
+        const available = Math.max(180, chartBottom - box.top - (groups.length * headerH) - ((groups.length - 1) * groupGap) - 8);
+        const rowH = Math.max(26, Math.min(42, available / Math.max(1, tensors.length)));
+        const rectH = Math.max(20, Math.min(30, rowH - 8));
+        const rowY = new Map();
+        let cursorY = box.top + 6 + state.panY;
+        for (let i = 0; i <= 4; i += 1) {
+          const address = (maxCapacity / 4) * i;
+          const x = box.left + state.panX + (address / maxCapacity) * box.width * state.chartZoom;
+          parts.push(`<line class="grid-line" x1="${x}" y1="${box.top}" x2="${x}" y2="${chartBottom}"></line>`);
+          parts.push(`<text class="axis-tick" x="${x}" y="${chartBottom + 18}" text-anchor="middle">${fmtKB(address)}</text>`);
+        }
+        parts.push(`<line class="axis-line" x1="${box.left}" y1="${box.top}" x2="${box.left}" y2="${chartBottom}"></line>`);
+        parts.push(`<line class="axis-line" x1="${box.left}" y1="${chartBottom}" x2="${box.left + box.width * state.chartZoom}" y2="${chartBottom}"></line>`);
+        parts.push(`<text class="axis-label" x="${box.left}" y="17">buffer / tensor</text>`);
+        parts.push(`<text class="axis-label" x="${box.left + box.width * state.chartZoom}" y="${chartBottom + 35}" text-anchor="end">${state.buffer === 'ALL' ? 'relative buffer address' : `${state.buffer} address`}</text>`);
+
+        groups.forEach((group, groupIndex) => {
+          if (headerH) {
+            parts.push(`<text class="buffer-band-label" x="${box.left - 10}" y="${cursorY + 14}" text-anchor="end">${group.buffer.name} · ${fmtKB(group.buffer.capacity)}</text>`);
+            parts.push(`<line class="address-row-line" x1="${box.left}" y1="${cursorY + 6}" x2="${box.left + box.width * state.chartZoom}" y2="${cursorY + 6}"></line>`);
+            cursorY += headerH;
+          }
+          group.tensors.forEach((tensor) => {
+          const y = cursorY;
+          const x = box.left + state.panX + (tensor.offset / maxCapacity) * box.width * state.chartZoom;
+          const w = Math.max(8, (tensor.size / maxCapacity) * box.width * state.chartZoom);
+          const muted = state.selectedTensorId && !activeIds.has(tensor.id) && !chainIds.has(tensor.id);
+          rowY.set(tensor.id, y);
+          parts.push(`<line class="address-row-line" x1="${box.left}" y1="${y + rowH}" x2="${box.left + box.width * state.chartZoom}" y2="${y + rowH}"></line>`);
+          parts.push(`<text class="axis-tick" x="${box.left - 10}" y="${y + rowH / 2 + 4}" text-anchor="end">${escapeHtml(tensor.name)}</text>`);
+          parts.push(`
+            <rect class="tensor-rect ${muted ? 'is-muted' : ''} ${tensor.id === selected.id ? 'is-active' : ''} ${tensor.id === state.hoveredTensorId ? 'is-hover' : ''}"
+              x="${x}" y="${y + (rowH - rectH) / 2}" width="${w}" height="${rectH}" rx="4"
+              fill="${tensor.color}"
+              data-tensor-id="${tensor.id}"></rect>`);
+          const labelInside = w > 58;
+          parts.push(`<text class="${labelInside ? 'tensor-label' : 'axis-tick'}" x="${labelInside ? x + 8 : x + w + 6}" y="${y + rowH / 2 + 4}">#${tensor.start}-#${tensor.end}</text>`);
+          cursorY += rowH;
+          });
+          if (groupIndex < groups.length - 1) cursorY += groupGap;
+        });
+        const visibleIds = new Set(tensors.map((tensor) => tensor.id));
+        data.hazards.filter((hazard) => hazard.tensors.every((id) => visibleIds.has(id))).forEach((hazard) => {
+          const firstY = rowY.get(hazard.tensors[0]);
+          const secondY = rowY.get(hazard.tensors[1]);
+          if (!Number.isFinite(firstY) || !Number.isFinite(secondY)) return;
+          const x = box.left + state.panX + (hazard.addrStart / maxCapacity) * box.width * state.chartZoom;
+          const w = Math.max(6, ((hazard.addrEnd - hazard.addrStart) / maxCapacity) * box.width * state.chartZoom);
+          const y = Math.min(firstY, secondY) - 3;
+          const h = Math.abs(firstY - secondY) + rowH + 6;
+          parts.push(`<rect class="hazard-rect" x="${x}" y="${y}" width="${w}" height="${h}" rx="4"></rect>`);
+          parts.push(`<text class="hazard-label" x="${x + 5}" y="${y + 13}">overlap</text>`);
+        });
+        return parts.join('');
+      }
+
+      function renderEventLanes(box, height) {
+        const lanes = ['MTE2', 'Vector', 'MTE3'];
+        const laneTop = height - 104;
+        const laneGap = 27;
+        const parts = [];
+        lanes.forEach((lane, index) => {
+          const y = laneTop + index * laneGap;
+          parts.push(`<text class="lane-label" x="14" y="${y + 16}">${lane}</text>`);
+          parts.push(`<line class="axis-line" x1="${box.left}" y1="${y + 11}" x2="${box.left + box.width * state.chartZoom}" y2="${y + 11}"></line>`);
+          data.events.filter((event) => event.lane === lane).forEach((event) => {
+            const x = tx(event.order, box) - 20;
+            const color = colorForLane(lane);
+            parts.push(`
+              <g class="event-pill" data-event-id="${event.id}" data-tensor-id="${event.tensor}">
+                <rect x="${x}" y="${y}" width="42" height="20" rx="10" fill="${color}" stroke="${color}"></rect>
+                <text x="${x + 21}" y="${y + 14}" text-anchor="middle">${escapeHtml(event.label)}</text>
+              </g>`);
+          });
+        });
+        return parts.join('');
+      }
+
+      function renderActiveList() {
+        const active = activeAt(state.selectedOrder).sort((a, b) => b.size - a.size);
+        const hazardIds = new Set(hazardsAt(state.selectedOrder).flatMap((hazard) => hazard.tensors));
+        if (!active.length) {
+          activeList.innerHTML = '<p class="empty-state">No active tensor at this slice.</p>';
+          return;
+        }
+        activeList.innerHTML = active.map((tensor) => `
+          <div class="active-row ${tensor.id === state.selectedTensorId ? 'is-active' : ''} ${hazardIds.has(tensor.id) ? 'is-hazard' : ''}" data-active-tensor="${tensor.id}">
+            <span>${escapeHtml(tensor.name)}</span>
+            <span>${hazardIds.has(tensor.id) ? 'hazard' : fmtKB(tensor.size)}</span>
+          </div>
+        `).join('');
+      }
+
+      function renderDetail() {
+        const tensor = selectedTensor();
+        if (!tensor) {
+          detail.innerHTML = '<p class="empty-state">Select a tensor.</p>';
+          return;
+        }
+        const reuseText = tensor.reuseOf
+          ? `reuse of ${tensorById(tensor.reuseOf)?.name || tensor.reuseOf}`
+          : tensor.reusedBy?.length
+            ? `reused by ${tensor.reusedBy.map((id) => tensorById(id)?.name || id).join(', ')}`
+            : 'unique span';
+        const tensorHazards = hazardsForTensor(tensor.id);
+        const tensorBoundaries = boundariesForTensor(tensor.id);
+        const hazardHtml = tensorHazards.length
+          ? `<div class="hazard-panel">
+              <strong>Conflict / overwrite risk</strong>
+              ${tensorHazards.map((hazard) => {
+                const otherId = hazard.tensors.find((id) => id !== tensor.id);
+                const other = tensorById(otherId);
+                return `<div>${escapeHtml(other?.name || otherId)} · ${fmtKB(hazard.bytes)} · ${fmtHex(hazard.addrStart)}-${fmtHex(hazard.addrEnd)} · #${hazard.timeStart}-#${hazard.timeEnd}</div>`;
+              }).join('')}
+            </div>`
+          : '';
+        const boundaryHtml = tensorBoundaries.length
+          ? `<div class="boundary-panel">
+              <strong>Boundary touch / no byte overlap</strong>
+              ${tensorBoundaries.map((boundary) => {
+                const otherId = boundary.tensors.find((id) => id !== tensor.id);
+                const other = tensorById(otherId);
+                return `<div>${escapeHtml(other?.name || otherId)} · boundary ${fmtHex(boundary.address)} · #${boundary.timeStart}-#${boundary.timeEnd}</div>`;
+              }).join('')}
+            </div>`
+          : '';
+        detail.innerHTML = `
+          <div class="tensor-detail__title">
+            <strong>${escapeHtml(tensor.name)}</strong>
+            <span class="stat-chip">${escapeHtml(tensor.kind)}</span>
+          </div>
+          <dl class="kv-grid">
+            <dt>Size</dt><dd>${fmtKB(tensor.size)} (${tensor.size} B)</dd>
+            <dt>Address</dt><dd>${fmtHex(tensor.offset)} - ${fmtHex(tensor.offset + tensor.size)}</dd>
+            <dt>Lifetime</dt><dd>#${tensor.start} -> #${tensor.end}</dd>
+            <dt>Previous source</dt><dd>${data.sourceFile}:${tensor.lineStart}-${tensor.lineEnd}</dd>
+            <dt>Reuse</dt><dd>${escapeHtml(reuseText)}</dd>
+          </dl>
+          <div class="tag-row">
+            ${tensor.tags.map((tag) => `<span class="stat-chip">${escapeHtml(tag)}</span>`).join('')}
+          </div>
+          ${hazardHtml}
+          ${boundaryHtml}`;
+      }
+
+      function renderAll() {
+        syncStats();
+        renderCode();
+        renderSvg();
+        renderActiveList();
+        renderDetail();
+        syncArchitectureBlocks();
+        document.querySelectorAll('[data-buffer-mode]').forEach((item) => {
+          item.classList.toggle('is-selected', item.dataset.bufferMode === state.buffer);
+        });
+        document.querySelector('[data-chart-zoom-readout]').textContent = `${Math.round(state.chartZoom * 100)}%`;
+        document.querySelector('[data-status-zoom]').textContent = `chart ${Math.round(state.chartZoom * 100)}%`;
+        chartSubtitle.textContent = state.viewMode === 'address'
+          ? `x: ${state.buffer === 'ALL' ? 'relative buffer address' : `${state.buffer} address`} · y: tensor / reuse slot`
+          : `x: execution order · y: ${state.buffer === 'ALL' ? 'buffer address' : `${state.buffer} address`}`;
+      }
+
+      function eventPoint(event) {
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        return {
+          x: ((event.clientX - rect.left) / rect.width) * vb.width,
+          y: ((event.clientY - rect.top) / rect.height) * vb.height,
+        };
+      }
+
+      function showTooltip(event, tensor) {
+        if (!tensor) {
+          tooltip.style.display = 'none';
+          return;
+        }
+        tooltip.innerHTML = `
+          <strong>${escapeHtml(tensor.name)}</strong>
+          <div>${fmtHex(tensor.offset)} - ${fmtHex(tensor.offset + tensor.size)}</div>
+          <div>${fmtKB(tensor.size)} · #${tensor.start} -> #${tensor.end}</div>`;
+        const rect = chartWrap.getBoundingClientRect();
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${Math.min(event.clientX - rect.left + 14, rect.width - 286)}px`;
+        tooltip.style.top = `${Math.min(event.clientY - rect.top + 14, rect.height - 92)}px`;
+      }
+
+      function bindEvents() {
+        codeView.addEventListener('click', (event) => {
+          const row = event.target.closest('.code-line');
+          if (!row) return;
+          const tensorId = row.dataset.lineTensor;
+          const lineNo = Number(row.dataset.line || 0);
+          const matched = tensorId ? tensorById(tensorId) : data.tensors.find((tensor) => lineNo >= tensor.lineStart && lineNo <= tensor.lineEnd);
+          if (matched) setSelectedTensor(matched.id);
+        });
+
+        svg.addEventListener('pointermove', (event) => {
+          const target = event.target.closest('[data-tensor-id]');
+          const tensor = target ? tensorById(target.dataset.tensorId) : null;
+          state.hoveredTensorId = tensor?.id || null;
+          showTooltip(event, tensor);
+          renderSvg();
+        });
+
+        svg.addEventListener('pointerleave', () => {
+          state.hoveredTensorId = null;
+          tooltip.style.display = 'none';
+          renderSvg();
+        });
+
+        svg.addEventListener('click', (event) => {
+          const eventTarget = event.target.closest('[data-event-id]');
+          if (eventTarget) {
+            const eventData = data.events.find((item) => item.id === eventTarget.dataset.eventId);
+            if (eventData) setSelectedTensor(eventData.tensor, eventData.order);
+            return;
+          }
+          const tensorTarget = event.target.closest('[data-tensor-id]');
+          if (tensorTarget) {
+            setSelectedTensor(tensorTarget.dataset.tensorId);
+            return;
+          }
+          if (state.viewMode === 'lifecycle') {
+            const point = eventPoint(event);
+            const box = plotBox(svg.viewBox.baseVal.width, svg.viewBox.baseVal.height);
+            const order = ((point.x - box.left - state.panX) / (box.width * state.chartZoom)) * data.ticks;
+            if (Number.isFinite(order)) setSelectedOrder(order);
+          }
+        });
+
+        svg.addEventListener('pointerdown', (event) => {
+          if (event.target.closest('[data-tensor-id], [data-event-id]')) return;
+          state.activePan = { x: event.clientX, y: event.clientY, panX: state.panX, panY: state.panY };
+          svg.classList.add('is-panning');
+          svg.setPointerCapture?.(event.pointerId);
+        });
+
+        svg.addEventListener('pointerup', (event) => {
+          state.activePan = null;
+          svg.classList.remove('is-panning');
+          svg.releasePointerCapture?.(event.pointerId);
+        });
+
+        svg.addEventListener('pointermove', (event) => {
+          if (!state.activePan) return;
+          state.panX = state.activePan.panX + (event.clientX - state.activePan.x);
+          state.panY = state.activePan.panY + (event.clientY - state.activePan.y);
+          renderSvg();
+        });
+
+        chartWrap.addEventListener('wheel', (event) => {
+          if (!event.metaKey && !event.ctrlKey) return;
+          event.preventDefault();
+          const delta = event.deltaY > 0 ? -0.08 : 0.08;
+          state.chartZoom = Math.max(0.72, Math.min(2.2, state.chartZoom + delta));
+          renderAll();
+        }, { passive: false });
+
+        activeList.addEventListener('click', (event) => {
+          const row = event.target.closest('[data-active-tensor]');
+          if (row) setSelectedTensor(row.dataset.activeTensor, state.selectedOrder);
+        });
+
+        document.querySelectorAll('[data-view-mode]').forEach((button) => {
+          button.addEventListener('click', () => {
+            state.viewMode = button.dataset.viewMode;
+            document.querySelectorAll('[data-view-mode]').forEach((item) => item.classList.toggle('is-selected', item === button));
+            state.panX = 0;
+            state.panY = 0;
+            renderAll();
+          });
+        });
+
+        document.querySelectorAll('[data-buffer-mode]').forEach((button) => {
+          button.addEventListener('click', () => {
+            state.buffer = button.dataset.bufferMode;
+            state.panX = 0;
+            state.panY = 0;
+            const visible = visibleTensors();
+            if (!visible.some((tensor) => tensor.id === state.selectedTensorId)) {
+              state.selectedTensorId = visible[0]?.id || state.selectedTensorId;
+            }
+            state.selectedOrder = computePeak().order;
+            renderAll();
+          });
+        });
+
+        document.querySelector('[data-info-toggle]').addEventListener('click', () => {
+          infoPopover.classList.toggle('is-open');
+        });
+
+        document.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+          const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+          document.documentElement.dataset.theme = next;
+          localStorage.setItem('pto-memory-reuse-theme', next);
+          requestAnimationFrame(renderAll);
+        });
+
+        document.querySelector('[data-reset-view]').addEventListener('click', () => {
+          state.chartZoom = 1;
+          state.panX = 0;
+          state.panY = 0;
+          state.selectedOrder = computePeak().order;
+          state.archZoomController?.setZoom?.(0.58);
+          state.archZoomController?.setPan?.(0, 0);
+          renderAll();
+        });
+
+        document.querySelector('[data-chart-zoom="in"]').addEventListener('click', () => {
+          state.chartZoom = Math.min(2.2, state.chartZoom + 0.1);
+          renderAll();
+        });
+
+        document.querySelector('[data-chart-zoom="out"]').addEventListener('click', () => {
+          state.chartZoom = Math.max(0.72, state.chartZoom - 0.1);
+          renderAll();
+        });
+
+        window.addEventListener('resize', renderAll);
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            state.hoveredTensorId = null;
+            infoPopover.classList.remove('is-open');
+            tooltip.style.display = 'none';
+            renderAll();
+          }
+        });
+      }
+
+      const savedTheme = localStorage.getItem('pto-memory-reuse-theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+      initArchitecture();
+      bindEvents();
+      setSelectedTensor(state.selectedTensorId, state.selectedOrder);
+    })();
+  </script>
+</body>
+</html>
