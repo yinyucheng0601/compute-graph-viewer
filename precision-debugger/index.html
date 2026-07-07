@@ -213,9 +213,21 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 
 /* ===================== graph stage ===================== */
 .graph-pane{overflow:hidden}
-/* 层内计算图 · 中间面板 header 最左侧返回按钮 */
+/* 层内计算图 · 面包屑 + 层步进（无缝导航） */
 .head-left{display:flex;align-items:center;gap:12px;min-width:0}
-.back-head{flex:0 0 auto;height:30px}
+.head-title[hidden],.crumb[hidden]{display:none}
+.crumb{display:flex;align-items:center;gap:8px}
+.crumb-home{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:var(--radius-md);
+  border:1px solid var(--border-default);background:var(--surface-1);color:var(--foreground);font:600 12.5px/1 var(--font-sans);cursor:pointer;
+  transition:background var(--duration-fast),border-color var(--duration-fast)}
+.crumb-home:hover{background:var(--surface-3);border-color:var(--border-strong)}
+.crumb-home svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.crumb-sep{color:var(--foreground-muted);font-size:14px}
+.crumb-step{display:inline-flex;align-items:center;gap:2px;height:30px;padding:0 4px;border-radius:var(--radius-md);border:1px solid var(--border-default);background:var(--surface-1)}
+.crumb-nav{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--foreground-secondary);border-radius:6px;cursor:pointer}
+.crumb-nav:hover{background:var(--state-hover);color:var(--foreground)}
+.crumb-nav svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.crumb-cur{min-width:112px;text-align:center;font:600 12.5px/1 var(--font-mono);color:var(--foreground);white-space:nowrap}
 /* 整网侧视图（40 层逐层精度） · 无限画布 */
 .side-stage{position:absolute;inset:0;overflow:hidden;cursor:grab}
 .side-stage.is-grabbing{cursor:grabbing}
@@ -237,13 +249,23 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
   transition:transform var(--duration-base) var(--easing-out),box-shadow var(--duration-fast),border-color var(--duration-fast)}
 .layer3d .l3-h{display:flex;align-items:center;justify-content:space-between;font:700 13px/1 var(--font-sans);color:var(--foreground);margin-bottom:6px}
 .layer3d .l3-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
-.layer3d .l3-graph{display:block;width:100%;height:236px}
-.layer3d .l3-cos{position:absolute;left:13px;bottom:8px;font:var(--text-mono);font-size:9.5px;color:var(--foreground-muted)}
+.layer3d .l3-graph{display:block;width:100%;height:196px}
+/* 状态色只做卡顶柔和渐隐色晕（贴合内圆角、无硬边），避免整卡大面积染色与顶部硬条突兀 */
+.layer3d .l3-wash{position:absolute;left:1px;right:1px;top:1px;height:66px;border-radius:13px 13px 0 0;pointer-events:none;background:linear-gradient(180deg,currentColor,transparent)}
+.layer3d .l3-h{position:relative}
+.layer3d .l3-pill{margin-left:auto;font:700 9.5px/1 var(--font-sans);letter-spacing:.3px;padding:3px 8px;border-radius:var(--radius-pill);border:1px solid}
+.layer3d .l3-foot{position:absolute;left:13px;right:13px;bottom:9px;display:flex;flex-direction:column;gap:5px}
+.layer3d .l3-metric{display:flex;align-items:baseline;gap:7px}
+.layer3d .l3-mk{font:var(--text-mono);font-size:8px;letter-spacing:.14em;color:var(--foreground-muted)}
+.layer3d .l3-cosbig{font:700 16px/1 var(--font-mono);letter-spacing:-.01em}
+.layer3d .l3-dbar{height:5px;border-radius:3px;background:color-mix(in srgb,var(--foreground) 12%,transparent);overflow:hidden}
+.layer3d .l3-dbar span{display:block;height:100%;border-radius:3px}
+.layer3d .l3-graph{opacity:.55}
 .layer3d .l3-cos.bad{color:var(--danger)}
 /* 顺序即优先级：hover(中性) < 首错(红) < 选中(蓝) */
 .layer3d:hover,.layer3d.is-hover{border-color:var(--border-strong);box-shadow:0 0 18px color-mix(in srgb,var(--foreground) 20%,transparent),0 22px 46px rgba(0,0,0,.5);z-index:6;--l3-lift:-30px}
 .layer3d.is-hover .l3-cos{color:var(--foreground)}
-.layer3d.is-root{border-color:var(--danger);box-shadow:0 0 30px color-mix(in srgb,var(--danger) 60%,transparent),0 18px 42px rgba(0,0,0,.45)}
+.layer3d.is-root{border-color:color-mix(in srgb,var(--danger) 72%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--danger) 30%,transparent),0 18px 42px rgba(0,0,0,.45)}
 .layer3d.is-sel{border-color:var(--primary);border-width:2px}
 .layer3d .l3-fb{position:absolute;top:-38px;left:50%;transform:translateX(-50%);background:var(--danger);color:#fff;font:800 12px/1 var(--font-sans);padding:6px 13px;border-radius:10px;white-space:nowrap;box-shadow:0 6px 18px color-mix(in srgb,var(--danger) 50%,transparent)}
 .layer3d .l3-fb::after{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--danger)}
@@ -268,12 +290,14 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .side-state[hidden]{display:none}
 .side-state.ok{background:var(--tone-success-bg);color:var(--success);border:1px solid color-mix(in srgb,var(--success) 34%,transparent)}
 .side-state.info{background:var(--tone-warning-bg);color:var(--warning);border:1px solid color-mix(in srgb,var(--warning) 34%,transparent)}
-.stage{width:100%;height:100%;overflow:hidden;cursor:grab;color:var(--foreground);
+.stage{position:absolute;inset:0;overflow:hidden;cursor:grab;color:var(--foreground);
   background-image:radial-gradient(circle,color-mix(in srgb,var(--foreground) 5%,transparent) 1px,transparent 1.6px);
   background-size:24px 24px}
 .stage.is-grabbing{cursor:grabbing}
 @keyframes graphIn{from{opacity:0;transform:scale(.965)}to{opacity:1;transform:none}}
 #stage.enter{animation:graphIn .3s var(--easing-out)}
+/* 视图无缝切换（整网 2D/3D ⇄ 层内计算图）：切换期间两层同时可见做「推进 / 拉回」变焦叠化 */
+.graph-pane.view-swapping{pointer-events:none}
 @media (prefers-reduced-motion:reduce){#stage.enter{animation:none}}
 /* floating canvas-level zoom control (bottom-right) — grouped panel */
 .canvas-zoom{position:absolute;right:12px;bottom:12px;z-index:20;display:flex;align-items:center;gap:3px;padding:4px;border-radius:var(--radius-lg);background:color-mix(in srgb,var(--ide-pane-bg) 82%,transparent);border:1px solid var(--border-subtle);box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -335,6 +359,12 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 /* status chip under node */
 .p-chip{pointer-events:none}
 .p-chipbg{stroke:var(--surface-1);stroke-width:1}
+/* 逐算子精度叠加：状态点 + cos 读数 */
+.p-sdot{pointer-events:none;stroke:var(--surface-2);stroke-width:1.2}
+.p-cos{pointer-events:none}
+.p-cos-bg{fill:color-mix(in srgb,var(--background) 82%,transparent);stroke:var(--border-subtle);stroke-width:.8}
+.p-cos-tx{font-family:var(--font-mono);font-size:9px;font-weight:600}
+#gsvg.z-small .p-cos{display:none}
 .p-chiptx{font:700 9px/1 var(--font-mono)}
 .p-chip-ok .p-chipbg{fill:color-mix(in srgb,var(--success) 20%,var(--surface-2))}.p-chip-ok .p-chiptx{fill:var(--success)}
 .p-chip-high .p-chipbg{fill:color-mix(in srgb,var(--warning) 24%,var(--surface-2))}.p-chip-high .p-chiptx{fill:var(--warning)}
@@ -410,7 +440,9 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .isec:last-child{margin-bottom:0}
 .ikick{font:var(--text-label);letter-spacing:.5px;text-transform:uppercase;color:var(--foreground-muted);margin-bottom:8px}
 .icard{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:8px}
-.icard.crit{border-color:var(--border-subtle);border-left:3px solid var(--danger);background:var(--surface-1)}
+.icard.crit{border-color:color-mix(in srgb,var(--danger) 30%,var(--border-subtle));background:linear-gradient(180deg,color-mix(in srgb,var(--danger) 7%,var(--surface-1)),var(--surface-1) 42%)}
+.crit-tag{display:inline-flex;align-items:center;gap:6px;font:700 10px/1 var(--font-sans);letter-spacing:.4px;color:var(--danger);background:var(--tone-critical-bg);border:1px solid color-mix(in srgb,var(--danger) 32%,transparent);padding:5px 9px;border-radius:var(--radius-pill);margin-bottom:10px}
+.crit-tag .crit-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);box-shadow:0 0 5px var(--danger)}
 .icard.high{border-color:color-mix(in srgb,var(--warning) 42%,transparent);background:color-mix(in srgb,var(--warning) 6%,var(--surface-1))}
 .icard.ok{border-color:color-mix(in srgb,var(--success) 40%,transparent)}
 .inode-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
@@ -645,6 +677,20 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
 /* header rank/step selects */
 .hsel{height:24px;border-radius:var(--radius-md);border:1px solid var(--border-default);background:var(--surface-1);color:var(--foreground);font:var(--text-mono);font-size:11px;padding:0 4px;cursor:pointer}
 .hsel:focus{outline:none;border-color:var(--primary)}
+/* 层级自定义下拉：始终向下展开（原生 select 在 macOS 会把选中项对齐控件、末项选中时向上弹） */
+.hsel-dd{position:relative;display:inline-flex}
+.hsel-btn{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 6px 0 8px;white-space:nowrap;line-height:1}
+.hsel-chev{width:13px;height:13px;flex:0 0 auto;opacity:.7;transition:transform var(--duration-fast) var(--easing-default)}
+.hsel-dd.open .hsel-chev{transform:rotate(180deg)}
+.hsel-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:80;min-width:186px;padding:6px;
+  background:var(--background-elevated);border:1px solid var(--border-default);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:2px}
+.hsel-menu[hidden]{display:none}
+.hsel-item{display:flex;align-items:center;height:30px;padding:0 12px 0 26px;position:relative;border:0;background:transparent;
+  color:var(--foreground-secondary);font:var(--text-body-sm);font-size:12.5px;text-align:left;border-radius:var(--radius-md);cursor:pointer;white-space:nowrap}
+.hsel-item:hover{background:var(--state-hover);color:var(--foreground)}
+.hsel-item.is-sel{color:var(--foreground)}
+.hsel-item.is-sel::before{content:"✓";position:absolute;left:8px;font-size:12px;color:var(--primary)}
 /* segmented control (precision view mode) */
 .seg-lbl{font:var(--text-label);letter-spacing:.3px;text-transform:uppercase;color:var(--foreground-muted)}
 .seg{display:inline-flex;gap:2px;background:var(--state-muted);border-radius:9px;padding:2px}
@@ -801,8 +847,16 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
     <section class="center">
       <div class="pane-head">
         <div class="head-left">
-          <button class="btn back-head" id="backToSide" onclick="setMainView('side')" title="返回整网侧视图" hidden><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>返回</button>
-          <div>
+          <div class="crumb" id="graphCrumb" hidden>
+            <button class="crumb-home" onclick="setMainView('side')" title="返回整网逐层视图"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/></svg>整网逐层</button>
+            <span class="crumb-sep">/</span>
+            <div class="crumb-step">
+              <button class="crumb-nav" onclick="goLayer(-1)" title="上一层 (←)"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <span class="crumb-cur" id="crumbCur">layer.24</span>
+              <button class="crumb-nav" onclick="goLayer(1)" title="下一层 (→)"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+            </div>
+          </div>
+          <div class="head-title" id="headTitle">
             <h2 id="centerTitle">整网逐层 · Qwen3-14B ×40 层</h2>
             <div class="meta" id="graphMeta">Decoder ×40 · 逐层精度总览 · 点击某层进入层内计算图</div>
           </div>
@@ -830,13 +884,19 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
           </div>
           <span class="tsep"></span>
           <span class="seg-lbl">层级</span>
-          <select class="hsel" id="flatLevel" onchange="setFlatLevel(this.value)" title="展开层级（默认全展开，可切到不同层）">
-            <option value="1">L1 · Model</option>
-            <option value="2">L2 · DecoderLayer</option>
-            <option value="3">L3 · Attention / MLP</option>
-            <option value="4">L4 · Q·K·V Lane</option>
-            <option value="5" selected>L5 · Operator</option>
-          </select>
+          <span class="hsel-dd" id="flatLevelDD">
+            <button type="button" class="hsel hsel-btn" id="flatLevelBtn" onclick="toggleFlatMenu(event)" title="展开层级（默认全展开，可切到不同层）">
+              <span id="flatLevelLabel">L5 · Operator</span>
+              <svg class="hsel-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="hsel-menu" id="flatLevelMenu" hidden role="listbox">
+              <button type="button" class="hsel-item" data-v="1" onclick="pickFlatLevel('1')">L1 · Model</button>
+              <button type="button" class="hsel-item" data-v="2" onclick="pickFlatLevel('2')">L2 · DecoderLayer</button>
+              <button type="button" class="hsel-item" data-v="3" onclick="pickFlatLevel('3')">L3 · Attention / MLP</button>
+              <button type="button" class="hsel-item" data-v="4" onclick="pickFlatLevel('4')">L4 · Q·K·V Lane</button>
+              <button type="button" class="hsel-item is-sel" data-v="5" onclick="pickFlatLevel('5')">L5 · Operator</button>
+            </div>
+          </span>
           <span class="tsep"></span>
           </span>
           <span class="seg-lbl">精度视图</span>
@@ -850,7 +910,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
       <div class="pane-body graph-pane">
         <div id="stage" class="stage"><svg id="gsvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
         <div id="sideWrap" class="side-stage">
-          <svg id="sideSvg" width="1520" height="648" viewBox="0 0 1520 648" xmlns="http://www.w3.org/2000/svg"></svg>
+          <svg id="sideSvg" width="1520" height="700" viewBox="0 0 1520 700" xmlns="http://www.w3.org/2000/svg"></svg>
           <div id="side3d" class="side-3d" hidden><div class="scene3d" id="scene3d"></div></div>
           <div class="side-state" id="sideState" hidden></div>
           <div class="drilltip" id="sideTip"></div>
@@ -2118,10 +2178,13 @@ function fit() {
   const rect = els.stage.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return;
   const pad = 30;
-  const z = Math.min((rect.width - pad * 2) / G.width, (rect.height - pad * 2) / G.height, 1.05);
+  /* 用真实内容包围盒（含左右不对称留白偏移）来 fit + 居中，避免 G.width 含右侧空白导致主体偏左 */
+  let cw = G.width, ch = G.height, cx = 0, cy = 0;
+  try { const bb = els.gsvg.getBBox(); if (bb && bb.width > 1 && bb.height > 1) { cw = bb.width; ch = bb.height; cx = bb.x; cy = bb.y; } } catch (_) {}
+  const z = Math.min((rect.width - pad * 2) / cw, (rect.height - pad * 2) / ch, 1.05);
   view.z = Math.max(z, 0.2);
-  view.tx = Math.max(pad, (rect.width - G.width * view.z) / 2);
-  view.ty = pad / 2;
+  view.tx = (rect.width - cw * view.z) / 2 - cx * view.z;    /* 水平居中于内容中心 */
+  view.ty = (rect.height - ch * view.z) / 2 - cy * view.z;   /* 垂直居中（z 已保证内容完整落入画布） */
   applyTransform();
 }
 
@@ -2286,6 +2349,20 @@ function renderGraph(graph, options = {}) {
       bt.textContent = '▲ 首错';
       badge.appendChild(bt);
       group.appendChild(badge);
+    }
+    /* 逐算子精度叠加：算子节点右上角状态点（全部）+ 异常算子下方 cos 读数（仅 crit/high，保持可读） */
+    if (st && kind === 'op' && node.id in PREC) {
+      const scol = st.root ? 'var(--danger)' : st.s === 'high' ? 'var(--warning)' : 'var(--c-pass)';
+      const pd = svg('circle', { class: 'p-sdot', cx: node.w / 2 - 8, cy: -node.h / 2 + 8, r: 3.4, fill: scol });
+      group.appendChild(pd);
+      if (st.s === 'crit' || st.s === 'high') {
+        const chip = svg('g', { class: 'p-cos' });
+        chip.appendChild(svg('rect', { class: 'p-cos-bg', x: -30, y: node.h / 2 + 3, width: 60, height: 14, rx: 7 }));
+        const ct = svg('text', { class: 'p-cos-tx', x: 0, y: node.h / 2 + 10.5, 'text-anchor': 'middle', 'dominant-baseline': 'central', fill: scol });
+        ct.textContent = 'cos ' + PREC[node.id].cos.toFixed(4);
+        chip.appendChild(ct);
+        group.appendChild(chip);
+      }
     }
     group.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2593,16 +2670,45 @@ function renderSideView() {
       cells += `<rect class="sv-cell" x="${(x - cellW / 2).toFixed(1)}" y="${(cy - cellH / 2).toFixed(1)}" width="${cellW.toFixed(1)}" height="${cellH}" rx="3" fill="${c.fill}" opacity="${(c.op * dim * laneDim).toFixed(2)}"${rootCell ? ' stroke="var(--danger)" stroke-width="2"' : ''}/>`;
       if (c.wbar) cells += `<rect x="${(x - cellW / 2).toFixed(1)}" y="${(cy - cellH / 2).toFixed(1)}" width="2.4" height="${cellH}" rx="1" fill="${c.wbar}" opacity="${(dim * laneDim).toFixed(2)}"/>`;
     });
-    /* 逐层 drift 热条（精度开关关闭时不展示） */
-    const hb = Math.min(24, drift / 0.006 * 24);
-    const heat = (heatOn && hb > 0.5) ? `<rect x="${(x - 5).toFixed(1)}" y="${(laneBot + 28 - hb).toFixed(1)}" width="10" height="${hb.toFixed(1)}" rx="2" fill="${st === 'root' ? 'var(--danger)' : 'var(--warning)'}" opacity=".8"/>` : '';
     /* 列框：选中=蓝框(持久) · 首错=红框 · hover=中性描边(临时) · 默认无 */
     const boxStroke = sel ? 'var(--primary)' : (st === 'root' && heatOn) ? 'var(--danger)' : hov ? 'var(--border-strong)' : 'none';
     const boxW = sel ? 1.8 : (st === 'root' && heatOn) ? 1.6 : 1.2;
     const colBox = (boxStroke !== 'none') ? `<rect class="sv-colbox" x="${(x - step / 2 + 2).toFixed(1)}" y="60" width="${(step - 4).toFixed(1)}" height="500" rx="5" fill="transparent" stroke="${boxStroke}" stroke-width="${boxW}"/>` : '';
     const fbTag = st === 'root' && heatOn ? `<g><rect x="${(x - 34).toFixed(1)}" y="26" width="68" height="22" rx="11" fill="var(--danger)"/><text x="${x.toFixed(1)}" y="41.5" text-anchor="middle" fill="#fff" font-weight="800" font-size="13" style="font-family:var(--font-sans)">▲ 首错</text><path d="M${x.toFixed(1)} 48 v10" stroke="var(--danger)" stroke-width="2"/></g>` : '';
     const hit = `<rect class="sv-hit" data-layer="${L}" x="${(x - step / 2).toFixed(1)}" y="58" width="${step.toFixed(1)}" height="524"/>`;
-    cols += `<g data-layer="${L}" opacity="${dim}">${colBox}${cells}${heat}${fbTag}</g>${hit}`;
+    cols += `<g data-layer="${L}" opacity="${dim}">${colBox}${cells}${fbTag}</g>${hit}`;
+  }
+
+  /* 逐层 cosine 折线叠加（对齐层列，精度开关开启时显示）——精度状态直观化 + hover 读数 */
+  let curve = '';
+  if (heatOn) {
+    const cTop = 572, cBot = 614, lo = 0.9935, hi = 1.0004;
+    const cyOf = (c) => cBot - (Math.min(hi, Math.max(lo, c)) - lo) / (hi - lo) * (cBot - cTop);
+    const ty = cyOf(CFG.cos);
+    const pts = LC.map((c, i) => `${colX(i).toFixed(1)},${cyOf(c).toFixed(1)}`).join(' ');
+    const thr = `<line x1="${x0}" y1="${ty.toFixed(1)}" x2="${xEnd}" y2="${ty.toFixed(1)}" stroke="var(--warning)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/><text class="sv-shape" x="${xEnd + 2}" y="${(ty + 3).toFixed(1)}" fill="var(--warning)">cos≥${CFG.cos}</text>`;
+    const line = `<polyline points="${pts}" fill="none" stroke="var(--foreground-secondary)" stroke-width="1.6"/>`;
+    const dots = LC.map((c, i) => { const isfb = i === fb, bad = c < CFG.cos - 1e-9; const col = isfb ? 'var(--danger)' : bad ? 'var(--warning)' : 'var(--c-pass)'; return `<circle cx="${colX(i).toFixed(1)}" cy="${cyOf(c).toFixed(1)}" r="${isfb ? 3.4 : 1.9}" fill="${col}"/>`; }).join('');
+    const drop = fb >= 0 ? `<line x1="${colX(fb).toFixed(1)}" y1="${cyOf(1).toFixed(1)}" x2="${colX(fb).toFixed(1)}" y2="${cyOf(LC[fb]).toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 2" opacity=".5"/>` : '';
+    /* 精度异常层：把逐层 cosine 数值摆出来——单行对齐（不再双行交错） */
+    const vy = cBot + 14;
+    let badLbls = '';
+    LC.forEach((c, i) => {
+      if (c < CFG.cos - 1e-9) {
+        const isfb = i === fb;
+        badLbls += `<line x1="${colX(i).toFixed(1)}" y1="${(cyOf(c) + 3).toFixed(1)}" x2="${colX(i).toFixed(1)}" y2="${(vy - 7).toFixed(1)}" stroke="${isfb ? 'var(--danger)' : 'var(--warning)'}" stroke-width=".6" opacity=".3"/>`;
+        badLbls += `<text x="${colX(i).toFixed(1)}" y="${vy}" text-anchor="middle" fill="${isfb ? 'var(--danger)' : 'var(--warning)'}" font-weight="${isfb ? 700 : 500}" font-size="8" style="font-family:var(--font-mono)">${c.toFixed(4)}</text>`;
+      }
+    });
+    /* hover 层：加大该点 + 竖向引导线（数据在 HTML 层信息卡里呈现，不再画 SVG 气泡） */
+    let hv = '';
+    if (sideHover !== null) {
+      const hL = sideHover, hc = LC[hL], hst = layerStatus(hL, fb), hcol = hst === 'root' ? 'var(--danger)' : hst === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
+      const hx = colX(hL), hy = cyOf(hc);
+      hv = `<line x1="${hx.toFixed(1)}" y1="${(cyOf(hi)).toFixed(1)}" x2="${hx.toFixed(1)}" y2="${cBot}" stroke="${hcol}" stroke-width="1" opacity=".45"/>`
+        + `<circle cx="${hx.toFixed(1)}" cy="${hy.toFixed(1)}" r="4" fill="${hcol}" stroke="var(--ide-pane-bg)" stroke-width="1.4"/>`;
+    }
+    curve = `<text class="sv-shape" x="212" y="${(cTop + 4).toFixed(1)}" text-anchor="end" style="fill:var(--foreground-secondary)">逐层 cosine ↓</text>${thr}${line}${drop}${dots}${badLbls}${hv}`;
   }
 
   /* 层轴刻度 */
@@ -2610,14 +2716,14 @@ function renderSideView() {
   const ticks = [0, 8, 16, 24, 32, N - 1];
   ticks.forEach((L) => {
     if (fb >= 0 && Math.abs(L - fb) < 3 && L !== fb) return;
-    axis += `<text class="sv-axis" x="${colX(L).toFixed(1)}" y="600" text-anchor="middle" ${L === fb ? 'fill="var(--danger)" font-weight="700"' : ''}>L${L}</text>`;
+    axis += `<text class="sv-axis" x="${colX(L).toFixed(1)}" y="662" text-anchor="middle" ${L === fb ? 'fill="var(--danger)" font-weight="700"' : ''}>L${L}</text>`;
   });
-  if (fb >= 0 && !ticks.includes(fb)) axis += `<text class="sv-axis" x="${colX(fb).toFixed(1)}" y="600" text-anchor="middle" fill="var(--danger)" font-weight="700">L${fb}</text>`;
+  if (fb >= 0 && !ticks.includes(fb)) axis += `<text class="sv-axis" x="${colX(fb).toFixed(1)}" y="662" text-anchor="middle" fill="var(--danger)" font-weight="700">L${fb}</text>`;
 
   const yLbl = `<text class="sv-band" x="212" y="44" text-anchor="end">层内前向阶段 · 真实 shape ↓</text>`;
   /* 真实业务数据 caption（整网层）*/
-  const cap = `<text class="sv-cap" x="224" y="632">真实 Qwen3-14B · hidden 5120 · GQA 40:8 · head_dim 128 · intermediate 17408 · vocab 151936 · bf16 · prefill seq ${SAMPLE_INPUT.seq}（ChatML）</text>`;
-  svg.innerHTML = `<rect x="0" y="0" width="1520" height="648" rx="14" fill="color-mix(in srgb,var(--ide-pane-bg) 40%,transparent)"/>${bands}${lanes}${yLbl}${cols}${axis}${cap}`;
+  const cap = `<text class="sv-cap" x="224" y="684">真实 Qwen3-14B · hidden 5120 · GQA 40:8 · head_dim 128 · intermediate 17408 · vocab 151936 · bf16 · prefill seq ${SAMPLE_INPUT.seq}（ChatML）</text>`;
+  svg.innerHTML = `<rect x="0" y="0" width="1520" height="700" rx="14" fill="color-mix(in srgb,var(--ide-pane-bg) 40%,transparent)"/>${bands}${lanes}${yLbl}${cols}${curve}${axis}${cap}`;
   updateSideState(fb);
 }
 function showSideTip(L, event) {
@@ -2626,9 +2732,16 @@ function showSideTip(L, event) {
   const dot = st === 'root' ? 'var(--danger)' : st === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
   const lbl = st === 'root' ? '首错层 · 根因起点' : st === 'prop' ? '传播层 · 误差自首错传入' : '达标层';
   const badge = st === 'root' ? 'crit' : st === 'prop' ? 'high' : 'ok';
+  const drift = Math.max(0, CFG.cos - cos);
+  /* 异常层把数值都摆出来：cosine + Δ阈值 + 与首错的相对位置 */
+  const badRows = st === 'clean' ? '' :
+    `<div class="dtip-row"><span class="dtip-k">Δ 阈值</span><span class="dtip-v bad">-${drift.toExponential(1)}</span></div>` +
+    (st === 'prop' && fb >= 0 ? `<div class="dtip-row"><span class="dtip-k">距首错</span><span class="dtip-v">+${L - fb} 层（L${fb}→L${L}）</span></div>` : '');
   tip.innerHTML = `<div class="dtip-h"><span class="dtip-dot" style="background:${dot}"></span><span class="dtip-title">layer.${L}</span><span class="dtip-badge dtip-${badge}">${st === 'root' ? '首错' : st === 'prop' ? '传播' : '达标'}</span></div>
     <div class="dtip-sub">Qwen3-14B DecoderLayer · GQA ${SPEC.qh}:${SPEC.kvh} · head_dim ${SPEC.headDim} · bf16</div>
     <div class="dtip-rows"><div class="dtip-row"><span class="dtip-k">layer cosine</span><span class="dtip-v ${st === 'clean' ? '' : 'bad'}">${cos.toFixed(5)}</span></div>
+    <div class="dtip-row"><span class="dtip-k">阈值</span><span class="dtip-v">≥ ${CFG.cos}</span></div>
+    ${badRows}
     <div class="dtip-row"><span class="dtip-k">判定</span><span class="dtip-v">${lbl}</span></div>
     <div class="dtip-row"><span class="dtip-k"></span><span class="dtip-v" style="color:var(--primary)">点击进入层内计算图 →</span></div></div>`;
   tip.classList.add('on');
@@ -2646,7 +2759,7 @@ function fitSide() {
   if (side3d) { fitOrbit(); return; }
   const c = els.sideWrap; if (!c) return;
   const r = c.getBoundingClientRect(); if (r.width <= 0 || r.height <= 0) return;
-  const GW = 1520, GH = 648, pad = 18;
+  const GW = 1520, GH = 700, pad = 18;
   const z = Math.min((r.width - pad * 2) / GW, (r.height - pad * 2) / GH);
   sideV.z = Math.max(0.2, Math.min(1.4, z));
   sideV.tx = (r.width - GW * sideV.z) / 2;
@@ -2690,16 +2803,25 @@ function render3D() {
   const N = SPEC.layers;
   let html = '';
   for (let L = 0; L < N; L++) {
-    const st = layerStatus(L, fb);
-    const dot = st === 'root' ? 'var(--danger)' : st === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
+    const st = layerStatus(L, fb), drift = Math.max(0, CFG.cos - LC[L]);
+    const scol = st === 'root' ? 'var(--danger)' : st === 'prop' ? 'var(--warning)' : 'var(--c-pass)';
+    const slbl = st === 'root' ? '首错' : st === 'prop' ? '传播' : '达标';
     const isRoot = st === 'root' && heatOn, isSel = L === sideSel;
     const cls = 'layer3d' + (isRoot ? ' is-root' : '') + (isSel ? ' is-sel' : '');
     const pull = isRoot ? 62 : 0, scl = isRoot ? 1.12 : 1;          /* 首错卡抽出放大，不埋在队列里 */
+    /* 精度呈现：状态色只做卡顶柔和色晕（降噪，不再整卡大面积染色）+ 状态 pill + 大号 cosine + drift 条 */
+    const washOp = heatOn && st !== 'clean' ? (st === 'root' ? 0.32 : 0.16) : 0;
+    const wash = washOp > 0 ? `<div class="l3-wash" style="color:${scol};opacity:${washOp}"></div>` : '';
+    const pill = heatOn ? `<span class="l3-pill" style="color:${scol};border-color:color-mix(in srgb,${scol} 45%,transparent);background:color-mix(in srgb,${scol} 12%,transparent)">${slbl}</span>` : '';
+    const dpct = Math.min(100, drift / 0.006 * 100);
+    const dbar = heatOn ? `<div class="l3-dbar"><span style="width:${dpct.toFixed(0)}%;background:${scol}"></span></div>` : '';
+    const cosCol = heatOn && st === 'root' ? scol : 'var(--foreground)';   /* 仅首错卡用红字，传播卡回归中性以降噪 */
     html += `<div class="${cls}" data-layer="${L}" style="--l3-tf:translate3d(0,0,${(-L * SIDE3D.gap + pull).toFixed(1)}px) scale(${scl});transform:var(--l3-tf) translateY(var(--l3-lift,0px))">
+      ${wash}
       ${isRoot ? '<div class="l3-fb">▲ 首错层</div>' : ''}
-      <div class="l3-h"><span>layer.${L}</span><span class="l3-dot" style="background:${dot}" title="${st === 'root' ? '首错' : st === 'prop' ? '传播' : '达标'}"></span></div>
+      <div class="l3-h"><span>layer.${L}</span>${pill}</div>
       ${cardMiniGraph(L, fb, heatOn)}
-      <div class="l3-cos ${st === 'clean' ? '' : 'bad'}">cosine ${LC[L].toFixed(5)}</div></div>`;
+      <div class="l3-foot"><div class="l3-metric"><span class="l3-mk">COSINE</span><span class="l3-cosbig" style="color:${cosCol}">${LC[L].toFixed(5)}</span></div>${dbar}</div></div>`;
   }
   scene.innerHTML = html;
   applyOrbit();
@@ -2738,7 +2860,7 @@ function bindSide3D() {
     showSideTip(+card.dataset.layer, e);
   });
   c.addEventListener('mouseleave', () => { hideSideTip(); c.querySelectorAll('.layer3d.is-hover').forEach((n) => n.classList.remove('is-hover')); });
-  const end = () => { if (!down) return; const info = down; down = null; c.classList.remove('is-grabbing'); try { c.releasePointerCapture(info.pid); } catch (_) {} if (!info.moved && info.layer !== null) { sideSel = info.layer; enterLayer(info.layer); } };   /* 3D 点层直接进入层内计算图 */
+  const end = () => { if (!down) return; const info = down; down = null; c.classList.remove('is-grabbing'); try { c.releasePointerCapture(info.pid); } catch (_) {} if (!info.moved) { if (info.layer !== null) { sideSel = info.layer; enterLayer(info.layer, { x: info.x, y: info.y }); } else if (sideSel !== null) { sideSel = null; render3D(); } } };   /* 点层进入层内计算图；点空白处取消选中 */
   c.addEventListener('pointerup', end);
   c.addEventListener('pointercancel', () => { down = null; c.classList.remove('is-grabbing'); });
   c.addEventListener('wheel', (e) => { e.preventDefault(); orbit.z = Math.max(0.4, Math.min(1.9, orbit.z * (e.deltaY < 0 ? 1.1 : 0.9))); applyOrbit(); }, { passive: false });
@@ -2796,7 +2918,8 @@ function bindSideView() {
     try { c.releasePointerCapture(info.pid); } catch (_) {}
     if (!info.moved) {
       if (info.lane !== null) { laneSel = (laneSel === info.lane ? null : info.lane); renderSideView(); }   /* 点 lane → 看该算子 40 层表现 */
-      else if (info.layer !== null) { sideSel = info.layer; enterLayer(info.layer); }                        /* 点层 → 进入层内计算图 */
+      else if (info.layer !== null) { sideSel = info.layer; enterLayer(info.layer, { x: info.x, y: info.y }); }   /* 点层 → 进入层内计算图（从该层位置变焦潜入） */
+      else if (laneSel !== null || sideSel !== null) { laneSel = null; sideSel = null; renderSideView(); }   /* 点画布空白处 → 取消 lane/层 选中聚焦态 */
     }
   };
   c.addEventListener('pointerup', end);
@@ -2813,14 +2936,79 @@ function bindSideView() {
     applySideView();
   }, { passive: false });
 }
-function enterLayer(L) {
+function enterLayer(L, originClient) {
   if (!comparable()) return;
+  const wasSide = mainView !== 'graph';
   viewLayer = (typeof L === 'number') ? L : layerFirstBad();
   mainView = 'graph';
+  if (wasSide && !prefersReduced()) { animateEnter(originClient); return; }   /* 整网 → 层内：无缝变焦切换 */
   syncViewDom();
   renderActiveGraph({ preserveView: false });
   requestAnimationFrame(fit);
-  if (els.stage) { els.stage.classList.remove('enter'); void els.stage.offsetWidth; els.stage.classList.add('enter'); }   /* 展开进入动效 */
+  if (els.stage) { els.stage.classList.remove('enter'); void els.stage.offsetWidth; els.stage.classList.add('enter'); }   /* 层间步进：轻量展开动效 */
+}
+/* ===== 视图无缝切换引擎：整网 2D/3D ⇄ 层内计算图 ===== */
+let lastDiveOrigin = null;   /* 上次「潜入」的屏幕坐标，返回时复用，形成同源推拉 */
+let _swapTimer = null, _viewSwapping = false;   /* 切换期间冻结 fit：避免 ResizeObserver 读到被缩放的容器尺寸造成抖动 */
+function prefersReduced() { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } }
+function paneOriginFromClient(pt) {
+  const pane = els.stage && els.stage.closest('.graph-pane');
+  if (!pane || !pt) return '50% 42%';
+  const r = pane.getBoundingClientRect();
+  const x = Math.max(0, Math.min(r.width, pt.x - r.left));
+  const y = Math.max(0, Math.min(r.height, pt.y - r.top));
+  return `${x.toFixed(1)}px ${y.toFixed(1)}px`;
+}
+function clearSwapStyles(el) { if (!el) return; ['transition', 'transform', 'opacity', 'transformOrigin', 'willChange', 'zIndex'].forEach((p) => { el.style[p] = ''; }); }
+/* 变焦叠化：inEl 从 inFrom 归位并淡入，outEl 反向变换并淡出，共用 origin 作镜头焦点。
+   调用方须先把两侧内容 fit 到自然尺寸，切换期间冻结 fit（_viewSwapping），避免 ResizeObserver
+   读到被变换后的容器尺寸重算出错位 → 抖动。带 perspective 的 3D 侧用纯淡入/淡出 + 轻量 translateY，避免 scale 每帧重投影卡顿。 */
+function runSwap({ inEl, outEl, origin, inFrom, outTo, onDone }) {
+  if (_swapTimer) { clearTimeout(_swapTimer); _swapTimer = null; }
+  _viewSwapping = true;
+  const pane = els.stage && els.stage.closest('.graph-pane');
+  if (pane) pane.classList.add('view-swapping');
+  const dur = 400, ease = 'cubic-bezier(.22,.61,.36,1)';
+  /* transform 起讫都为 none 的一侧只提示 opacity，避免给 3D 子树无谓提层导致跳变 */
+  inEl.style.willChange = (inFrom === 'none') ? 'opacity' : 'transform,opacity';
+  outEl.style.willChange = (outTo === 'none') ? 'opacity' : 'transform,opacity';
+  [inEl, outEl].forEach((el) => { el.style.transformOrigin = origin; el.style.transition = 'none'; });
+  inEl.style.zIndex = '4'; outEl.style.zIndex = '3';
+  inEl.style.opacity = '0'; inEl.style.transform = inFrom;
+  outEl.style.opacity = '1'; outEl.style.transform = 'none';
+  void inEl.offsetWidth;                                   /* 强制回流锁定起始态 */
+  const t = `opacity ${dur}ms ${ease}, transform ${dur}ms ${ease}`;
+  inEl.style.transition = t; outEl.style.transition = t;
+  inEl.style.opacity = '1'; inEl.style.transform = 'none';
+  outEl.style.opacity = '0'; outEl.style.transform = outTo;
+  _swapTimer = setTimeout(() => {
+    _swapTimer = null; _viewSwapping = false;
+    clearSwapStyles(inEl); clearSwapStyles(outEl);
+    if (pane) pane.classList.remove('view-swapping');
+    if (onDone) onDone();
+  }, dur + 60);
+}
+/* 整网 → 层内：镜头推进到被点图层，整网淡出，计算图从深处放大浮现 */
+function animateEnter(originClient) {
+  lastDiveOrigin = originClient || lastDiveOrigin;
+  const origin = paneOriginFromClient(originClient);
+  syncViewDom();                                          /* 头部/工具条/面包屑切到「层内」态，stage 置为可见 */
+  renderActiveGraph({ preserveView: false });
+  els.sideWrap.hidden = false;                            /* 保留整网作为淡出的残影底层 */
+  fit();                                                  /* 在变换前把计算图 fit 到自然尺寸（避免抖动） */
+  const outTo = side3d ? 'translateY(16px)' : 'scale(1.3)';   /* 3D 侧用轻量位移代替 scale，避免重投影卡顿 */
+  runSwap({ inEl: els.stage, outEl: els.sideWrap, origin, inFrom: 'scale(.9)', outTo, onDone: () => { els.sideWrap.hidden = true; } });
+}
+/* 层内 → 整网：镜头拉回，计算图缩小淡出，整网从焦点处回落到 40 层堆叠 */
+function animateBack() {
+  const origin = paneOriginFromClient(lastDiveOrigin);
+  if (side3d) render3D(); else renderSideView();
+  syncViewDom();                                          /* 头部/工具条切回「整网」态（stage 置为 none） */
+  els.stage.style.display = '';                           /* 让计算图作为淡出残影浮在整网之上 */
+  side3d ? fitOrbit() : fitSide();                        /* 在变换前把整网 fit 到自然尺寸（避免抖动） */
+  hideSideTip();
+  const inFrom = side3d ? 'translateY(16px)' : 'scale(1.3)';   /* 3D 侧轻量上浮淡入，丝滑不卡 */
+  runSwap({ inEl: els.sideWrap, outEl: els.stage, origin, inFrom, outTo: 'scale(.9)', onDone: () => { els.stage.style.display = 'none'; } });
 }
 /* 层内计算图的精度：首错层→完整分析；达标层→全绿；传播层→全 amber（误差自首错传入） */
 function currentGraphPrec() {
@@ -2834,8 +3022,18 @@ function currentGraphPrec() {
   return { statusById, badIds: clean ? [] : order.slice(), rootId: null, path };
 }
 function frameBack() { if (mainView === 'graph') setMainView('side'); }
+/* 层内计算图里直接步进到相邻层（无缝导航，不必返回整网） */
+function goLayer(d) {
+  if (mainView !== 'graph') return;
+  const cur = viewLayer !== null ? viewLayer : (comparable() ? layerFirstBad() : 0);
+  const L = Math.max(0, Math.min(SPEC.layers - 1, cur + d));
+  if (L === cur) return;
+  sideSel = L; enterLayer(L);
+}
 function setMainView(v) {
+  const from = mainView;
   mainView = v;
+  if (v === 'side' && from === 'graph' && !prefersReduced()) { animateBack(); return; }   /* 层内 → 整网：无缝变焦拉回 */
   syncViewDom();
   if (v === 'side') { if (side3d) { render3D(); requestAnimationFrame(fitOrbit); } else { renderSideView(); requestAnimationFrame(fitSide); } hideSideTip(); }
   else { renderActiveGraph({ preserveView: false }); requestAnimationFrame(fit); }
@@ -2846,15 +3044,17 @@ function syncViewDom() {
   if (els.sideWrap) els.sideWrap.hidden = !side;
   const got = document.getElementById('graphOnlyTools'); if (got) got.style.display = side ? 'none' : 'inline-flex';
   const sot = document.getElementById('sideOnlyTools'); if (sot) sot.style.display = side ? 'inline-flex' : 'none';
-  const back = document.getElementById('backToSide'); if (back) back.hidden = side;
+  const crumb = document.getElementById('graphCrumb'); if (crumb) crumb.hidden = side;
+  const htitle = document.getElementById('headTitle'); if ( htitle) htitle.hidden = !side;
   const pane = els.gsvg && els.gsvg.closest('.graph-pane');
   if (pane) { const cz = pane.querySelector(':scope > .canvas-zoom'); if (cz) cz.style.display = side ? 'none' : ''; }
   updateCenterHead();
   renderLegend();
 }
 function updateCenterHead() {
-  const fb = comparable() ? layerFirstBad() : -1;
-  const L = viewLayer !== null ? viewLayer : (fb >= 0 ? fb : 0);
+  const showStatus = overlayOn && comparable();          /* 仅精度视图开启且可比时才谈达标/首错，精度开关关闭不展示 */
+  const fb = showStatus ? layerFirstBad() : -1;
+  const L = viewLayer !== null ? viewLayer : (comparable() ? layerFirstBad() : 0);
   const tag = fb < 0 ? '' : L === fb ? ' 首错层' : L < fb ? ' 达标层' : ' 传播层';
   if (els.centerTitle) els.centerTitle.textContent = mainView === 'side'
     ? `整网逐层 · ${SPEC.name} ×${SPEC.layers} 层`
@@ -2862,6 +3062,8 @@ function updateCenterHead() {
   if (els.graphMeta) els.graphMeta.textContent = mainView === 'side'
     ? `Decoder ×${SPEC.layers} · 逐层精度总览 · 点任意层进入层内计算图`
     : `${SPEC.name} · layer.${L} · GQA ${SPEC.qh}:${SPEC.kvh} · head_dim ${SPEC.headDim}`;
+  const cc = document.getElementById('crumbCur');
+  if (cc && mainView === 'graph') { cc.textContent = `layer.${L}`; cc.style.color = 'var(--foreground)'; }   /* 面包屑只显层号，不展示达标/首错状态 */
 }
 
 /* 可比性控制现驻留在左侧「状态」面板（与状态芯片同处），右侧详情面板只读引用 */
@@ -2964,7 +3166,7 @@ function renderSummary() {
   const red = info ? info.red : 'num';
   body.innerHTML = `
     <div class="isec"><div class="icard crit">
-      <div class="ikick" style="color:var(--danger)">首错 / 根因</div>
+      <div class="crit-tag"><span class="crit-dot"></span>首错 / 根因</div>
       <div class="inode-title">${esc(rootLabel)}</div>
       <div class="inode-sub">layer.${S.firstBadLayer}.self_attn · ${esc((PREC[prec.rootId] || {}).shape || '')} · ${esc((PREC[prec.rootId] || {}).dtype || '')}</div>
       <div class="metrics">
@@ -3155,6 +3357,30 @@ function setFlatLevel(n) {
   renderActiveGraph({ preserveView: false });
   clearSelection();
 }
+/* 层级自定义下拉（向下展开）：切换 / 选择 / 关闭 */
+function toggleFlatMenu(e) {
+  if (e) e.stopPropagation();
+  const dd = document.getElementById('flatLevelDD'), menu = document.getElementById('flatLevelMenu');
+  if (!dd || !menu) return;
+  const willOpen = menu.hidden;
+  menu.hidden = !willOpen;
+  dd.classList.toggle('open', willOpen);
+}
+function closeFlatMenu() {
+  const dd = document.getElementById('flatLevelDD'), menu = document.getElementById('flatLevelMenu');
+  if (menu) menu.hidden = true;
+  if (dd) dd.classList.remove('open');
+}
+function pickFlatLevel(v) {
+  const menu = document.getElementById('flatLevelMenu');
+  const item = menu && menu.querySelector(`.hsel-item[data-v="${v}"]`);
+  if (menu) menu.querySelectorAll('.hsel-item').forEach((b) => b.classList.toggle('is-sel', b.dataset.v === String(v)));
+  const lbl = document.getElementById('flatLevelLabel');
+  if (lbl && item) lbl.textContent = item.textContent;
+  closeFlatMenu();
+  setFlatLevel(v);
+}
+document.addEventListener('click', (e) => { if (!e.target.closest('#flatLevelDD')) closeFlatMenu(); });
 function showHelp(el) {
   const tip = document.getElementById('helpTip');
   if (!tip) return;
@@ -3859,10 +4085,17 @@ function init() {
   }, { passive: false });
   els.stage.addEventListener('click', (e) => { if (!e.target.closest('.nd')) clearSelection(); });
 
-  if ('ResizeObserver' in window) new ResizeObserver(() => { fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.stage);
-  if ('ResizeObserver' in window && els.sideWrap) new ResizeObserver(() => { if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.sideWrap);
-  window.addEventListener('resize', () => { fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (els.reportBack && !els.reportBack.hidden) { closeReport(); return; } if (els.reproBack && !els.reproBack.hidden) { closeRepro(); return; } if (drillId) { closeDrill(); return; } if (mainView === 'graph') { setMainView('side'); return; } els.legend.hidden = true; clearSelection(); } });
+  if ('ResizeObserver' in window) new ResizeObserver(() => { if (_viewSwapping) return; fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.stage);
+  if ('ResizeObserver' in window && els.sideWrap) new ResizeObserver(() => { if (_viewSwapping) return; if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; }).observe(els.sideWrap);
+  window.addEventListener('resize', () => { if (_viewSwapping) return; fit(); if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); }; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (els.reportBack && !els.reportBack.hidden) { closeReport(); return; } if (els.reproBack && !els.reproBack.hidden) { closeRepro(); return; } if (drillId) { closeDrill(); return; } if (mainView === 'graph') { setMainView('side'); return; } els.legend.hidden = true; clearSelection(); return; }
+    /* 层内计算图：← / → 无缝切换相邻层 */
+    if (mainView === 'graph' && !drillId && (els.reproBack ? els.reproBack.hidden : true)) {
+      const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goLayer(-1); } else if (e.key === 'ArrowRight') { e.preventDefault(); goLayer(1); }
+    }
+  });
 
   bindSideView();
   bindSide3D();
