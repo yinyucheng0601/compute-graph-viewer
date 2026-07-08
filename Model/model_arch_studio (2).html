@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Model Architecture Studio</title>
+<title>GPU → Ascend 迁移性能差异工作台</title>
 <style>
   @import "../vendor/pto-design-system/css/style.css";
   @import "../vendor/pto-design-system/patterns/ide-frame/pattern.css";
@@ -11,47 +11,27 @@
   :root{
     color-scheme:dark;
     --bg:var(--app-background, var(--background));
-    --chrome:color-mix(in srgb, var(--background-elevated) 86%, transparent);
     --panel:color-mix(in srgb, var(--surface-2) 84%, transparent);
-    --panel2:color-mix(in srgb, var(--surface-1) 92%, transparent);
-    --edit:color-mix(in srgb, var(--background) 88%, black);
+    --panel-2:color-mix(in srgb, var(--surface-1) 90%, transparent);
+    --header:color-mix(in srgb, var(--background-elevated) 80%, transparent);
     --line:var(--border-subtle);
-    --line2:var(--border-default);
-    --hover:var(--state-hover);
+    --line-2:var(--border-default);
     --ink:var(--foreground);
     --mut:var(--foreground-secondary);
     --dim:var(--foreground-muted);
-    --gemm:var(--primary);
-    --attn:#a56bf0;
-    --elem:var(--accent);
-    --norm:var(--warning);
-    --io:#3ec7c0;
-    --route:var(--danger);
-    --expert:#f58bbf;
-    --comm:var(--success);
-    --compute:var(--primary);
-    --memory:var(--warning);
     --acc:var(--primary);
-    --acc2:var(--danger);
-    --sel:var(--surface-4);
+    --acc-2:var(--danger);
+    --gpu:#60a5fa;
+    --ascend:#22c55e;
+    --fracture:#f59e0b;
+    --symptom:#f472b6;
+    --critical:#ef4444;
+    --high:#f97316;
+    --medium:#facc15;
     --mono:var(--font-mono);
     --sans:var(--font-sans);
-    --pane-fill:color-mix(in srgb, var(--surface-2) 84%, transparent);
-    --pane-header:color-mix(in srgb, var(--background-elevated) 76%, transparent);
-    --pane-shadow:0 14px 32px rgba(0,0,0,.22);
-    --canvas-grid:radial-gradient(circle, color-mix(in srgb, var(--foreground) 10%, transparent) 1px, transparent 1.6px);
-    --op-sem-embedding:#14b8a6;
-    --op-sem-norm:#06b6d4;
-    --op-sem-attention:#ec4899;
-    --op-sem-rope:#a855f7;
-    --op-sem-qknorm:#0ea5e9;
-    --op-sem-linear:#3b82f6;
-    --op-sem-gate:#f59e0b;
-    --op-sem-moe:#f97316;
-    --op-sem-act:#8b5cf6;
-    --op-sem-comm:#22d3ee;
-    --op-sem-io:#64748b;
-    --op-fusion-accent:var(--warning);
+    --shadow:0 14px 34px rgba(0,0,0,.24);
+    --grid:radial-gradient(circle, color-mix(in srgb, var(--foreground) 10%, transparent) 1px, transparent 1.6px);
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;overflow:hidden}
@@ -62,23 +42,22 @@
     font-size:13px;
     -webkit-font-smoothing:antialiased;
   }
+  button{font:inherit}
   .ide{
     display:grid;
     grid-template-rows:48px 1fr 24px;
     height:100vh;
     background:
+      radial-gradient(circle at 15% 10%, rgba(59,130,246,.09), transparent 26%),
+      radial-gradient(circle at 78% 12%, rgba(34,197,94,.08), transparent 22%),
       var(--ide-aura-bg),
       var(--ide-gradient-bg, var(--bg));
   }
-
-  /* ---------- title bar ---------- */
   .title{
     display:flex;
     align-items:center;
     gap:12px;
     padding:0 14px;
-    background:transparent;
-    -webkit-user-select:none;
     user-select:none;
   }
   .lights{display:flex;gap:7px}
@@ -89,15 +68,15 @@
     display:block;
     box-shadow:0 0 0 1px rgba(255,255,255,.08), inset 0 1px 0 rgba(255,255,255,.16);
   }
-  .lights i:nth-child(1){background:#ff5f57}.lights i:nth-child(2){background:#febc2e}
+  .lights i:nth-child(1){background:#ff5f57}
+  .lights i:nth-child(2){background:#febc2e}
   .lights i:nth-child(3){background:#28c840}
-  .title .name{
+  .name{
     font:600 12.5px/1.2 var(--sans);
     letter-spacing:.01em;
-    color:var(--ink);
   }
-  .title .name b{color:var(--acc)}
-  .title .doc{
+  .name b{color:var(--acc)}
+  .doc{
     min-width:0;
     color:var(--mut);
     font:500 11px/1.3 var(--mono);
@@ -106,7 +85,7 @@
     text-overflow:ellipsis;
   }
   .tspacer{flex:1}
-  .tbar{display:flex;align-items:center;gap:8px}
+  .toolbar{display:flex;align-items:center;gap:8px}
   .seg{
     display:inline-flex;
     align-items:center;
@@ -119,66 +98,43 @@
     -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
   }
   .seg button,
-  .tbtn,
-  .zoom button,
-  .welcome button{
+  .ghost{
     min-height:30px;
+    min-width:76px;
     padding:0 12px;
+    border:1px solid transparent;
     border-radius:calc(var(--radius-lg) - 2px);
-    border:1px solid var(--line);
-    background:color-mix(in srgb, var(--surface-2) 82%, transparent);
-    color:var(--ink);
-    font:500 11px/1.2 var(--sans);
+    background:transparent;
+    color:var(--mut);
     cursor:pointer;
     transition:
       background var(--duration-fast) var(--easing-default),
-      border-color var(--duration-fast) var(--easing-default),
       color var(--duration-fast) var(--easing-default),
       transform var(--duration-fast) var(--easing-default);
-    backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
-    -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
-  }
-  .seg button{
-    min-width:72px;
-    border-color:transparent;
-    background:transparent;
-    color:var(--mut);
   }
   .seg button:hover,
-  .tbtn:hover,
-  .zoom button:hover,
-  .welcome button:hover{
-    border-color:var(--line2);
+  .ghost:hover{
     background:color-mix(in srgb, var(--surface-3) 84%, transparent);
     color:var(--ink);
     transform:translateY(-1px);
   }
-  .seg button.on{
+  .seg button.on,
+  .ghost.on{
     background:var(--surface-4);
-    border-color:transparent;
     color:var(--ink);
     font-weight:600;
     transform:none;
   }
-  .tbtn.on{
-    border-color:transparent;
-    background:color-mix(in srgb, var(--primary) 20%, var(--surface-3));
-    color:var(--primary-foreground);
-    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--primary) 46%, transparent);
+  .ghost{
+    min-width:auto;
+    border-color:var(--line);
+    background:color-mix(in srgb, var(--surface-2) 82%, transparent);
   }
 
-  /* ---------- main ---------- */
   .main{
-    --lw:clamp(168px, 18vw, 232px);
-    --rw:clamp(240px, 22vw, 332px);
     display:grid;
-    grid-template-columns:
-      46px
-      minmax(160px, var(--lw, 232px))
-      5px
-      minmax(0, 1fr)
-      5px
-      minmax(220px, var(--rw, 332px));
+    grid-template-columns:46px minmax(240px, 300px) minmax(0, 1fr) minmax(280px, 360px);
+    gap:8px;
     min-height:0;
     padding:0 8px 8px 0;
   }
@@ -186,21 +142,21 @@
     display:flex;
     flex-direction:column;
     align-items:center;
-    padding-top:10px;
     gap:6px;
+    padding-top:10px;
   }
   .act{
     width:34px;
     height:34px;
     border-radius:10px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--dim);
     display:flex;
     align-items:center;
     justify-content:center;
-    color:var(--dim);
     cursor:pointer;
-    font-size:16px;
-    border:1px solid transparent;
-    background:transparent;
+    font-size:15px;
     transition:
       background var(--duration-fast) var(--easing-default),
       border-color var(--duration-fast) var(--easing-default),
@@ -214,7 +170,7 @@
   .act.on{
     color:var(--ink);
     background:color-mix(in srgb, var(--surface-3) 84%, transparent);
-    border-color:var(--line2);
+    border-color:var(--line-2);
     box-shadow:inset 2px 0 0 var(--acc);
   }
   .act.bottom{margin-top:auto;margin-bottom:8px}
@@ -223,380 +179,367 @@
   .editor,
   .inspect{
     min-width:0;
-    overflow:auto;
-    background:var(--pane-fill);
+    background:var(--panel);
     border:1px solid var(--line);
     border-radius:var(--radius-md);
-    box-shadow:var(--pane-shadow);
-    backdrop-filter:blur(18px) saturate(1.18);
-    -webkit-backdrop-filter:blur(18px) saturate(1.18);
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(18px) saturate(1.15);
+    -webkit-backdrop-filter:blur(18px) saturate(1.15);
+  }
+  .side,
+  .inspect{
+    overflow:auto;
   }
   .editor{
     display:flex;
     flex-direction:column;
     overflow:hidden;
   }
-  .splitter{background:transparent;cursor:col-resize;position:relative}
-  .splitter::after{
-    content:"";
-    position:absolute;
-    inset:0 1px;
-    border-radius:var(--radius-pill);
-    background:color-mix(in srgb, var(--foreground-muted) 36%, transparent);
-    opacity:0;
-    transition:opacity var(--duration-fast) var(--easing-default);
-  }
-  .splitter:hover::after{opacity:1}
-
-  .sect{padding:0}
-  .sect h3{
-    margin:0;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    position:sticky;
-    top:0;
-    z-index:1;
-    padding:11px 14px 8px;
-    background:var(--pane-header);
-    color:var(--mut);
-    font:500 10.5px/1.2 var(--mono);
-    letter-spacing:.08em;
-    text-transform:uppercase;
-  }
-  .sect h3 .caret{transition:transform .15s;font-size:9px;color:var(--dim)}
-  .sect.collapsed h3 .caret{transform:rotate(-90deg)}
-  .sect.collapsed .items{display:none}
-  .titem{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    margin:0 8px 4px;
-    padding:8px 12px;
-    border-radius:var(--radius-md);
-    font-size:12px;
-    color:var(--ink);
-    cursor:pointer;
-    white-space:nowrap;
-    border:1px solid transparent;
-  }
-  .titem:hover{
-    background:color-mix(in srgb, var(--surface-1) 92%, transparent);
-    border-color:var(--line);
-  }
-  .titem.on{
-    background:color-mix(in srgb, var(--surface-4) 90%, transparent);
-    border-color:var(--line2);
-  }
-  .titem .ic{width:14px;text-align:center;font-size:11px;flex:none}
-  .titem .meta{
-    margin-left:auto;
-    padding:0 8px;
-    min-height:20px;
-    border-radius:var(--radius-pill);
-    background:color-mix(in srgb, var(--surface-3) 88%, transparent);
-    color:var(--dim);
-    font:500 10px/20px var(--mono);
-  }
-  .dot{width:8px;height:8px;border-radius:999px;flex:none}
-  .importbtn{
-    margin:8px 12px 14px;
-    display:flex;
-    gap:7px;
-    align-items:center;
-    justify-content:center;
-    min-height:34px;
-    padding:0 12px;
-    border:1px dashed var(--line2);
-    border-radius:var(--radius-lg);
-    color:var(--mut);
-    cursor:pointer;
-    font:500 11px/1.2 var(--sans);
-    background:color-mix(in srgb, var(--surface-1) 76%, transparent);
-  }
-  .importbtn:hover{
-    border-color:var(--line2);
-    background:color-mix(in srgb, var(--surface-3) 72%, transparent);
-    color:var(--ink);
-  }
-  .divider{
-    height:1px;
-    background:var(--line);
-    margin:6px 12px;
-  }
-
-  /* parameters */
-  .params{padding:4px 12px 18px}
-  .prow{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    margin:10px 0;
-  }
-  .prow label{font-size:11.5px;color:var(--mut)}
-  .prow .val{font-family:var(--mono);font-size:11px;min-width:56px;text-align:right;color:var(--ink)}
-  input[type=range]{
-    -webkit-appearance:none;
-    appearance:none;
-    width:104px;
-    height:4px;
-    background:color-mix(in srgb, var(--surface-4) 72%, transparent);
-    border-radius:999px;
-    outline:none;
-  }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none;
-    width:13px;
-    height:13px;
-    border-radius:50%;
-    background:var(--acc);
-    cursor:pointer;
-    border:2px solid color-mix(in srgb, var(--background) 76%, black);
-  }
-  input.pink::-webkit-slider-thumb{background:var(--acc2)}
-  .emptyp{color:var(--dim);font-size:11.5px;padding:16px 12px;line-height:1.6}
-
-  /* ---------- editor ---------- */
-  .tabsbar{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    min-height:38px;
-    padding:5px 8px 0;
-    overflow-x:auto;
-    background:transparent;
-  }
-  .tab{
-    display:flex;
-    align-items:center;
-    gap:7px;
-    min-height:32px;
-    padding:0 12px;
-    border:1px solid transparent;
-    border-radius:var(--radius-md);
-    font:500 12px/1.2 var(--sans);
-    color:var(--mut);
-    cursor:pointer;
-    white-space:nowrap;
-    flex:none;
-  }
-  .tab:hover{
-    background:color-mix(in srgb, var(--surface-1) 70%, transparent);
-    color:var(--ink);
-  }
-  .tab.on{
-    background:color-mix(in srgb, var(--surface-3) 88%, transparent);
-    border-color:var(--line2);
-    color:var(--ink);
-    box-shadow:var(--glass-surface-shadow, none);
-  }
-  .tab .x{
-    opacity:.55;
-    font-size:13px;
-    width:15px;
-    height:15px;
-    border-radius:4px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .tab .x:hover{
-    opacity:1;
-    background:var(--state-hover);
-  }
-  .tab .dot{width:7px;height:7px}
-  .canvas{
-    position:relative;
-    flex:1;
-    min-height:0;
-    overflow:hidden;
-    background:
-      radial-gradient(circle at 18% 10%, rgba(67,105,239,.10), transparent 28%),
-      radial-gradient(circle at 80% 14%, rgba(20,184,166,.08), transparent 24%),
-      var(--canvas-grid),
-      var(--edit);
-    background-size:auto, auto, 22px 22px, auto;
-    background-position:0 0, 0 0, 0 0, 0 0;
-  }
-  .editor,
-  .canvas,
-  #stage{
-    width:100%;
-    height:100%;
-  }
-  #stage{
-    position:absolute;
-    inset:0;
-    overflow:hidden;
-    cursor:grab;
-  }
-  #stage.drag,
-  #stage.is-grabbing{cursor:grabbing}
-  #gsvg{
-    transform-origin:0 0;
-    font-family:var(--font-sans);
-  }
-  .legend,
-  .hint{
-    z-index:5;
-    background:color-mix(in srgb, var(--surface-1) 90%, transparent);
-    border:1px solid var(--line);
-    border-radius:var(--radius-md);
-    backdrop-filter:blur(14px) saturate(1.15);
-    -webkit-backdrop-filter:blur(14px) saturate(1.15);
-    box-shadow:var(--pane-shadow);
-  }
-  .legend{
-    position:absolute;
-    top:12px;
-    left:12px;
-    padding:10px 12px;
-  }
-  .legend h5{
-    margin:0 0 6px;
-    font-size:9.5px;
-    color:var(--mut);
-    letter-spacing:.08em;
-    font-family:var(--mono);
-    text-transform:uppercase;
-  }
-  .lg{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--mut);margin:3px 0}
-  .sw{width:11px;height:11px;border-radius:999px;flex:none}
-  .hint{
-    position:absolute;
-    top:12px;
-    right:12px;
-    padding:8px 10px;
-    font-size:10px;
-    color:var(--dim);
-    font-family:var(--mono);
-    text-align:right;
-    line-height:1.6;
-  }
-  .zoom{position:absolute;bottom:12px;left:12px;display:flex;gap:6px;z-index:5}
-  .zoom button{
-    width:30px;
-    padding:0;
-    font-size:14px;
-  }
-  .op-graph-tip{
-    position:absolute;
-    z-index:30;
-    max-width:300px;
-    pointer-events:none;
-    padding:10px 12px;
-    border:1px solid var(--line2);
-    border-radius:var(--radius-md);
-    background:color-mix(in srgb, var(--background) 94%, transparent);
-    color:var(--foreground-secondary);
-    box-shadow:var(--pane-shadow);
-    opacity:0;
-    transition:opacity var(--duration-fast) var(--easing-default);
-    backdrop-filter:var(--surface-backdrop-filter-soft);
-    -webkit-backdrop-filter:var(--surface-backdrop-filter-soft);
-  }
-  .op-graph-tip.is-visible{opacity:1}
-  .op-graph-tip__head{
-    display:flex;
-    align-items:center;
-    gap:var(--space-2);
-    color:var(--foreground);
-    font:var(--text-label);
-  }
-  .op-graph-tip__kind{
-    display:inline-flex;
-    align-items:center;
-    min-height:20px;
-    padding:0 var(--space-2);
-    border-radius:var(--radius-sm);
-    background:var(--state-muted);
-    color:var(--foreground);
-    font:var(--ide-frame-meta-font);
-  }
-  .op-graph-tip__row,
-  .op-graph-tip__fusion{
-    margin-top:var(--space-2);
-    font:var(--ide-frame-meta-font);
-  }
-  .op-graph-tip__fusion{color:var(--op-fusion-accent)}
-  .dropzone{
-    position:absolute;
-    inset:0;
-    z-index:20;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    background:rgba(8,10,15,.76);
-    border:2px dashed color-mix(in srgb, var(--primary) 70%, transparent);
-    border-radius:var(--radius-md);
-  }
-  .dropzone.show{display:flex}
-  .dropzone div{
-    padding:18px 22px;
-    border-radius:var(--radius-lg);
-    background:color-mix(in srgb, var(--surface-2) 84%, transparent);
-    color:var(--ink);
-    font:500 13px/1.4 var(--mono);
-  }
-  .welcome{
-    position:absolute;
-    inset:0;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:16px;
-    text-align:center;
-    color:var(--mut);
-    z-index:4;
-    padding:24px;
-  }
-  .welcome::before{
-    content:"";
-    position:absolute;
-    width:min(520px, calc(100% - 64px));
-    height:min(320px, calc(100% - 80px));
-    border-radius:var(--radius-xl);
-    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
-    border:1px solid var(--line);
-    backdrop-filter:blur(18px) saturate(1.16);
-    -webkit-backdrop-filter:blur(18px) saturate(1.16);
-    box-shadow:var(--pane-shadow);
-  }
-  .welcome > *{position:relative}
-  .welcome h2{margin:0;font:600 20px/1.3 var(--sans);color:var(--ink)}
-  .welcome p{margin:0;font-size:13px;max-width:360px;line-height:1.6}
-  .welcome .row{display:flex;gap:10px}
-  .welcome .row button:first-child{
-    background:var(--foreground);
-    border-color:transparent;
-    color:var(--background);
-    font-weight:600;
-  }
-  .welcome .row button:first-child:hover{
-    background:color-mix(in srgb, var(--foreground) 92%, var(--primary-hover));
-    color:var(--background);
-  }
-  .kbd{
-    font-family:var(--mono);
-    font-size:11px;
-    background:color-mix(in srgb, var(--surface-3) 90%, transparent);
-    border:1px solid var(--line);
-    border-radius:var(--radius-sm);
-    padding:1px 6px;
-  }
-
-  /* ---------- right panel ---------- */
-  .inspect{background:var(--pane-fill)}
+  .sect h3,
+  .tabsbar,
   .rtabs{
     position:sticky;
     top:0;
     z-index:2;
+    margin:0;
+    padding:10px 14px 8px;
+    background:var(--header);
+    color:var(--mut);
+    font:500 10.5px/1.2 var(--mono);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    border-bottom:1px solid var(--line);
+  }
+  .sect .items,
+  .sect .pad{
+    padding:10px 10px 14px;
+  }
+  .reason{
+    margin-bottom:8px;
+    padding:10px 11px;
+    border:1px solid transparent;
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 78%, transparent);
+    cursor:pointer;
+    transition:
+      border-color var(--duration-fast) var(--easing-default),
+      background var(--duration-fast) var(--easing-default),
+      transform var(--duration-fast) var(--easing-default);
+  }
+  .reason:hover{
+    border-color:var(--line);
+    background:color-mix(in srgb, var(--surface-1) 92%, transparent);
+    transform:translateY(-1px);
+  }
+  .reason.on{
+    border-color:color-mix(in srgb, var(--primary) 46%, var(--line-2));
+    background:color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+  }
+  .reason-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .reason-title{
+    flex:1;
+    font-size:12.5px;
+    font-weight:600;
+  }
+  .sev{
+    display:inline-flex;
+    align-items:center;
+    min-height:20px;
+    padding:0 8px;
+    border-radius:999px;
+    font:600 10px/20px var(--mono);
+  }
+  .sev.critical{background:rgba(239,68,68,.14);color:#fca5a5}
+  .sev.high{background:rgba(249,115,22,.14);color:#fdba74}
+  .sev.medium{background:rgba(250,204,21,.14);color:#fde68a}
+  .reason-sub{
+    margin-top:5px;
+    color:var(--mut);
+    line-height:1.5;
+    font-size:11.5px;
+  }
+  .reason-meta{
+    margin-top:8px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    min-height:20px;
+    padding:0 8px;
+    border-radius:999px;
+    background:color-mix(in srgb, var(--surface-3) 92%, transparent);
+    color:var(--dim);
+    font:500 10px/20px var(--mono);
+  }
+  .summary{
+    margin:0 10px 12px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 84%, transparent);
+  }
+  .summary h4,
+  .hero h2{
+    margin:0 0 8px;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .summary p,
+  .hero p,
+  .small-note{
+    margin:0;
+    color:var(--mut);
+    line-height:1.6;
+  }
+  .checklist{
+    margin:10px 0 0;
+    padding:0;
+    list-style:none;
+  }
+  .checklist li{
+    padding:6px 0;
+    color:var(--mut);
+    border-top:1px solid var(--line);
+    line-height:1.5;
+  }
+  .checklist li:first-child{border-top:0}
+
+  .tabsbar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    justify-content:space-between;
+    text-transform:none;
+    letter-spacing:normal;
+    font:500 12px/1.2 var(--sans);
+  }
+  .focus-tags{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .focus-tag{
+    display:inline-flex;
+    align-items:center;
+    min-height:22px;
+    padding:0 9px;
+    border-radius:999px;
+    background:color-mix(in srgb, var(--surface-3) 92%, transparent);
+    color:var(--mut);
+    font:500 10px/22px var(--mono);
+  }
+  .canvas{
+    flex:1;
+    min-height:0;
+    overflow:auto;
+    padding:14px;
+    background:
+      radial-gradient(circle at 18% 10%, rgba(96,165,250,.08), transparent 30%),
+      radial-gradient(circle at 78% 12%, rgba(34,197,94,.06), transparent 22%),
+      var(--grid),
+      color-mix(in srgb, var(--background) 88%, black);
+    background-size:auto, auto, 22px 22px, auto;
+  }
+  .hero{
+    margin-bottom:14px;
+    padding:16px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-xl);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+    box-shadow:var(--shadow);
+  }
+  .hero-top{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .hero-kpis{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+  }
+  .kpi{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-2) 88%, transparent);
+  }
+  .kpi .label{
+    color:var(--mut);
+    font:500 10px/1.2 var(--mono);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .kpi .value{
+    margin-top:7px;
+    font-size:18px;
+    font-weight:700;
+  }
+  .kpi .desc{
+    margin-top:5px;
+    color:var(--dim);
+    line-height:1.5;
+    font-size:11px;
+  }
+  .board{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .lane{
+    position:relative;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-xl);
+    background:color-mix(in srgb, var(--surface-1) 90%, transparent);
+    min-height:260px;
+  }
+  .lane::after{
+    content:"→";
+    position:absolute;
+    top:14px;
+    right:-10px;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font:700 11px/1 var(--mono);
+    background:color-mix(in srgb, var(--surface-4) 94%, transparent);
+    color:var(--dim);
+    border:1px solid var(--line);
+  }
+  .lane:last-child::after{display:none}
+  .lane h4{
+    margin:0 0 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-family:var(--mono);
+    color:var(--mut);
+  }
+  .swatch{
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    flex:none;
+  }
+  .lane-card{
+    margin-bottom:8px;
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-2) 88%, transparent);
+    line-height:1.55;
+    color:var(--mut);
+  }
+  .lane-card strong{
+    display:block;
+    margin-bottom:3px;
+    color:var(--ink);
+    font-size:12px;
+  }
+  .matrix,
+  .signals{
+    display:grid;
+    gap:10px;
+  }
+  .matrix-row{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+  }
+  .matrix-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .matrix-head strong{font-size:12px}
+  .matrix-head span{
+    color:var(--dim);
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
+  }
+  .barpack{
+    display:grid;
+    grid-template-columns:64px 1fr 54px;
+    gap:10px;
+    align-items:center;
+    margin-top:6px;
+  }
+  .barpack label{
+    color:var(--mut);
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
+  }
+  .bar{
+    height:8px;
+    border-radius:999px;
+    overflow:hidden;
+    background:color-mix(in srgb, var(--surface-4) 78%, transparent);
+  }
+  .bar i{
+    display:block;
+    height:100%;
+    border-radius:999px;
+  }
+  .bar-num{
+    color:var(--ink);
+    font:600 11px/1 var(--mono);
+    text-align:right;
+  }
+  .signal-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+  }
+  .signal{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+  }
+  .signal h4{
+    margin:0 0 7px;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .signal p{
+    margin:0;
+    color:var(--mut);
+    line-height:1.6;
+    font-size:11.5px;
+  }
+  .signal .tagrow{
+    margin-top:9px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .inspect{background:var(--panel)}
+  .rtabs{
     display:flex;
     gap:6px;
     padding:8px;
-    background:var(--pane-header);
+    text-transform:none;
+    letter-spacing:normal;
+    font:500 12px/1.2 var(--sans);
   }
   .rtabs button{
     flex:1;
@@ -605,8 +548,6 @@
     border-radius:var(--radius-md);
     background:transparent;
     color:var(--mut);
-    padding:0 10px;
-    font:500 12px/1.2 var(--sans);
     cursor:pointer;
   }
   .rtabs button:hover{
@@ -615,1261 +556,973 @@
   }
   .rtabs button.on{
     background:color-mix(in srgb, var(--surface-4) 90%, transparent);
-    border-color:var(--line2);
+    border-color:var(--line-2);
     color:var(--ink);
   }
   .pad{padding:14px}
-  .k{color:var(--mut)}
-  .v{font-family:var(--mono);color:var(--ink)}
-  .kv{
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-    padding:6px 0;
-    border-bottom:1px solid var(--line);
-    font-size:12px;
-  }
   .cardt{
-    font-size:10.5px;
-    letter-spacing:.08em;
+    margin:0 0 8px;
     color:var(--mut);
-    font-family:var(--mono);
+    font:500 10.5px/1.2 var(--mono);
+    letter-spacing:.08em;
     text-transform:uppercase;
-    margin:18px 0 8px;
   }
-  .cardt:first-child{margin-top:0}
-  .pill{
-    display:inline-flex;
-    align-items:center;
-    min-height:20px;
-    padding:0 8px;
-    border-radius:var(--radius-pill);
-    font-size:11px;
-    font-family:var(--mono);
-    font-weight:600;
-    background:color-mix(in srgb, var(--surface-3) 88%, transparent);
-  }
-  .pill.compute{color:var(--compute)}
-  .pill.memory{color:var(--memory)}
-  .bar{
-    height:7px;
-    border-radius:999px;
-    background:color-mix(in srgb, var(--surface-4) 72%, transparent);
-    overflow:hidden;
-    margin-top:4px;
-  }
-  .bar>i{display:block;height:100%;border-radius:999px}
-  .fitem,
-  .totbox{
-    border:1px solid var(--line);
-    border-radius:var(--radius-lg);
+  .detail-card,
+  .table-wrap{
+    margin-bottom:12px;
     padding:12px;
-    background:color-mix(in srgb, var(--surface-1) 84%, transparent);
-    box-shadow:none;
-  }
-  .fitem{margin-bottom:10px}
-  .fitem h6{margin:0 0 3px;font-size:12.5px;display:flex;align-items:center;gap:7px;color:var(--ink)}
-  .fitem p{margin:0 0 8px;font-size:11px;color:var(--mut);line-height:1.5}
-  .fstat{display:flex;gap:14px;font-size:11px;font-family:var(--mono)}
-  .fstat b{color:var(--primary)}
-  .fstat.pink b{color:var(--danger)}
-  .totrow{display:flex;justify-content:space-between;font-size:12px;padding:4px 0}
-  .roof{
-    width:100%;
-    height:auto;
-    display:block;
-    background:color-mix(in srgb, var(--surface-1) 92%, transparent);
     border:1px solid var(--line);
     border-radius:var(--radius-lg);
-    margin-top:6px;
+    background:color-mix(in srgb, var(--surface-1) 84%, transparent);
   }
-  table.cmp{width:100%;border-collapse:collapse;font-size:11.5px}
-  table.cmp th,table.cmp td{padding:7px 5px;text-align:right;border-bottom:1px solid var(--line)}
-  table.cmp th:first-child,table.cmp td:first-child{text-align:left;color:var(--mut)}
-  table.cmp th{color:var(--dim);font-weight:500;font-family:var(--mono);font-size:10px;text-transform:uppercase}
-  table.cmp td.g{color:var(--comm)}
-  .warn{
-    background:color-mix(in srgb, var(--warning) 14%, transparent);
-    border:0;
-    border-radius:var(--radius-lg);
-    padding:9px 11px;
-    font-size:11px;
-    color:color-mix(in srgb, var(--warning) 72%, white);
-    margin-top:10px;
-    line-height:1.5;
+  .detail-card h4{
+    margin:0 0 6px;
+    font-size:13px;
   }
-  .empty{
+  .detail-card p{
+    margin:0;
+    color:var(--mut);
+    line-height:1.65;
+  }
+  .list{
+    margin:0;
+    padding-left:18px;
+    color:var(--mut);
+    line-height:1.65;
+  }
+  .list li+li{margin-top:6px}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:11.5px;
+  }
+  th,td{
+    padding:8px 6px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  th{
     color:var(--dim);
-    font-size:12px;
-    padding:26px 14px;
-    text-align:center;
-    line-height:1.6;
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
   }
-
-  /* ---------- status bar ---------- */
+  td:last-child{color:var(--ink)}
+  .hint{
+    margin-top:10px;
+    padding:10px 11px;
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--warning) 12%, transparent);
+    color:color-mix(in srgb, var(--warning) 72%, white);
+    line-height:1.6;
+    font-size:11.5px;
+  }
   .status{
     display:flex;
     align-items:center;
     gap:0;
     padding:0 10px;
+    border-top:1px solid var(--line);
     background:color-mix(in srgb, var(--background-elevated) 86%, transparent);
     color:var(--mut);
     font:500 11px/1.2 var(--mono);
-    border-top:1px solid var(--line);
     backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
     -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
   }
-  .status.moe{
-    background:color-mix(in srgb, var(--danger) 10%, var(--background-elevated));
-    border-top-color:color-mix(in srgb, var(--danger) 34%, transparent);
-  }
-  .sitem{padding:0 10px;height:24px;display:flex;align-items:center;gap:5px}
-  .sitem.btn{
-    cursor:pointer;
-    border-radius:var(--radius-sm);
-  }
-  .sitem.btn:hover{background:var(--state-hover)}
-  .status select{
-    background:transparent;
-    border:0;
-    color:inherit;
-    font-family:var(--mono);
-    font-size:11px;
-    cursor:pointer;
-    outline:none;
-  }
-  .status select option{background:#141414;color:var(--ink)}
-  .sspace{flex:1}
-  .cl-rect{
-    fill:color-mix(in srgb, var(--foreground) 7%, transparent);
-    stroke:var(--border-default);
-    stroke-width:1.4;
-  }
-  .cl-label{
-    fill:var(--foreground-secondary);
-    font-size:11.5px;
-    font-weight:700;
-  }
-  .cl-rect.is-selected{
-    fill:color-mix(in srgb, var(--primary) 12%, transparent);
-    stroke:color-mix(in srgb, var(--primary) 46%, var(--border-default));
-  }
-  .nd{cursor:pointer}
-  .nd:hover .nd-rect{
-    stroke:var(--foreground);
-    stroke-width:2;
-    filter:drop-shadow(0 0 8px color-mix(in srgb, var(--foreground) 24%, transparent));
-  }
-  .nd-rect{
-    stroke-width:1.4;
-    transition:
-      opacity var(--duration-fast) var(--easing-default),
-      stroke var(--duration-fast) var(--easing-default);
-  }
-  .nd .nd-rect{fill-opacity:.92}
-  .nd-label{
-    fill:#fff;
-    font-size:12px;
-    font-weight:600;
-    text-anchor:middle;
-    pointer-events:none;
-  }
-  .nd-type{
-    fill:color-mix(in srgb, var(--foreground) 66%, transparent);
-    font-family:var(--font-mono);
-    font-size:9px;
-    font-weight:600;
-    text-anchor:middle;
-    pointer-events:none;
-  }
-  .nd.io .nd-rect{
-    fill:color-mix(in srgb, var(--op-sem-io) 24%, var(--surface-2));
-    stroke:var(--border-default);
-  }
-  .nd.io .nd-label{fill:var(--foreground-secondary);font-size:11px}
-  .nd.fuse .nd-rect{
-    stroke:var(--op-fusion-accent);
-    stroke-width:2;
-  }
-  .nd.sel .nd-rect{
-    stroke:var(--foreground);
-    stroke-width:2.5;
-    filter:drop-shadow(0 0 8px color-mix(in srgb, var(--foreground) 34%, transparent));
-  }
-  .nd.rel .nd-rect{
-    stroke:var(--foreground);
-    stroke-width:2;
-  }
-  .nd.dim{opacity:.28}
-  .edge{
-    fill:none;
-    stroke:var(--border-strong);
-    stroke-width:1.6;
-    transition:
-      opacity var(--duration-fast) var(--easing-default),
-      stroke var(--duration-fast) var(--easing-default);
-  }
-  .edge.param{
-    stroke:color-mix(in srgb, var(--op-sem-rope) 48%, var(--border-strong));
-    stroke-dasharray:7 6;
-    stroke-width:1.4;
-  }
-  .edge.comm{stroke:color-mix(in srgb, var(--op-sem-comm) 58%, var(--border-strong))}
-  .edge.res{
-    stroke:color-mix(in srgb, var(--accent) 58%, transparent);
-    stroke-dasharray:5 4;
-  }
-  .edge.fuse{
-    stroke:var(--op-fusion-accent);
-    stroke-width:2;
-    opacity:.9;
-  }
-  .etag{
-    fill:var(--foreground-muted);
-    font-family:var(--font-mono);
-    font-size:9px;
-    font-weight:700;
-  }
-  .etag-bg{
-    fill:color-mix(in srgb, var(--background) 88%, transparent);
-    stroke:var(--border-subtle);
-  }
-  .etag.param{fill:var(--op-sem-rope)}
-  .etag.comm{fill:var(--op-sem-comm)}
-  .etag.res{fill:var(--accent)}
-  .fuse-dot{
-    fill:var(--op-fusion-accent);
-    filter:drop-shadow(0 0 4px color-mix(in srgb, var(--op-fusion-accent) 72%, transparent));
-  }
-  .fbracket{
-    fill:none;
-    stroke:var(--op-fusion-accent);
-    stroke-width:2.2;
-    opacity:.92;
-    filter:drop-shadow(0 0 5px color-mix(in srgb, var(--op-fusion-accent) 50%, transparent));
-    pointer-events:none;
-  }
-  .fbracket-lbl{
-    fill:var(--op-fusion-accent);
-    font-family:var(--font-mono);
-    font-size:9.5px;
-    font-weight:700;
-    pointer-events:none;
-  }
-  .fbracket-bg{
-    fill:color-mix(in srgb, var(--op-fusion-accent) 10%, transparent);
-    stroke:var(--op-fusion-accent);
-    stroke-width:1.2;
-    stroke-dasharray:3 3;
-    pointer-events:none;
-  }
-  .legend .op-legend__item{
-    display:inline-flex;
+  .sitem{
+    height:24px;
+    display:flex;
     align-items:center;
-    gap:6px;
-    white-space:nowrap;
+    gap:5px;
+    padding:0 10px;
   }
-  .legend .op-swatch{
-    width:11px;
-    height:11px;
-    flex:0 0 auto;
-    border-radius:3px;
-    background:var(--foreground-muted);
-  }
-  .legend .op-swatch--io{background:var(--op-sem-io)}
-  .legend .op-swatch--norm{background:var(--op-sem-norm)}
-  .legend .op-swatch--attention{background:var(--op-sem-attention)}
-  .legend .op-swatch--linear{background:var(--op-sem-linear)}
-  .legend .op-swatch--act{background:var(--op-sem-act)}
-  .legend .op-swatch--gate{background:var(--op-sem-gate)}
-  .legend .op-swatch--moe{background:var(--op-sem-moe)}
-  .legend .op-swatch--comm{background:var(--op-sem-comm)}
-  .legend .op-line{
-    width:22px;
-    height:0;
-    flex:0 0 auto;
-    border-top:2px solid var(--foreground-muted);
-  }
-  .legend .op-line--dash{border-top-style:dashed}
-  .legend .op-line--fuse{border-color:var(--op-fusion-accent)}
+  .sspace{flex:1}
 
-  @media (max-width: 1440px){
-    .main{
-      --lw:clamp(156px, 17vw, 208px);
-      --rw:clamp(220px, 20vw, 296px);
-    }
+  @media (max-width: 1320px){
+    .main{grid-template-columns:46px minmax(220px, 260px) minmax(0, 1fr) minmax(250px, 320px)}
+    .board{grid-template-columns:repeat(2, minmax(0, 1fr))}
   }
-
-  @media (max-width: 1180px){
-    .main{
-      --lw:clamp(144px, 16vw, 184px);
-      --rw:clamp(196px, 19vw, 248px);
-      padding:0 6px 6px 0;
-    }
+  @media (max-width: 1080px){
+    html,body{overflow:auto}
+    .ide{height:auto;min-height:100vh}
+    .main{grid-template-columns:1fr;padding:0 8px 8px}
+    .activity{display:none}
+    .side,.editor,.inspect{min-height:auto}
+    .signal-grid,
+    .hero-kpis,
+    .board{grid-template-columns:1fr}
   }
 </style>
 </head>
 <body>
 <div class="ide">
-  <!-- TITLE BAR -->
   <div class="title">
     <div class="lights"><i></i><i></i><i></i></div>
-    <div class="name">Model Architecture <b>Studio</b></div>
-    <div class="doc" id="titleDoc">no model open</div>
+    <div class="name">GPU → Ascend <b>Migration Studio</b></div>
+    <div class="doc" id="titleDoc">开箱性能不足的底层原因 · 原理差异可视化</div>
     <div class="tspacer"></div>
-    <div class="tbar">
-      <div class="seg" id="phaseSeg">
-        <button data-ph="prefill" class="on">Prefill</button>
-        <button data-ph="decode">Decode</button>
-      </div>
-      <button class="tbtn" id="fuseBtn">⚡ Fusion</button>
+    <div class="toolbar">
+      <div class="seg" id="scenarioSeg"></div>
+      <button class="ghost" id="focusBtn">场景重点</button>
     </div>
   </div>
 
-  <!-- MAIN -->
-  <div class="main" id="main">
-    <div class="activity">
-      <div class="act on" title="Model Explorer">▤</div>
-      <div class="act" id="actImport" title="Import model">⬇</div>
-      <div class="act bottom" id="actSettings" title="Device &amp; precision (in status bar)">⚙</div>
-    </div>
+  <div class="main">
+    <div class="activity" id="activity"></div>
 
-    <!-- SIDEBAR -->
-    <div class="side" id="side">
-      <div class="sect" id="sectPresets">
-        <h3><span class="caret">▾</span> Preset models</h3>
-        <div class="items" id="presetList"></div>
+    <aside class="side">
+      <div class="sect">
+        <h3>根因清单</h3>
+        <div class="items" id="reasonList"></div>
       </div>
-      <div class="sect" id="sectImported">
-        <h3><span class="caret">▾</span> Imported</h3>
-        <div class="items" id="importedList"></div>
-        <div class="importbtn" id="importBtn">⬇ Import model file…</div>
+      <div class="sect">
+        <h3>场景摘要</h3>
+        <div class="summary" id="scenarioSummary"></div>
       </div>
-      <div class="divider"></div>
-      <div class="sect" id="sectParams">
-        <h3><span class="caret">▾</span> Parameters</h3>
-        <div class="params" id="params"><div class="empty">Open a model to edit its architecture.</div></div>
-      </div>
-    </div>
-
-    <div class="splitter" id="splitL"></div>
-
-    <!-- EDITOR -->
-    <div class="editor">
-      <div class="tabsbar" id="tabsbar"></div>
-      <div class="canvas" id="canvas">
-        <div class="welcome" id="welcome">
-          <h2>Model Architecture Studio</h2>
-          <p>Open a preset from the sidebar, or import a <span class="kbd">config.json</span> /
-             <span class="kbd">.gguf</span> to visualize its structure, cost and fusion.</p>
-          <div class="row">
-            <button id="wOpenPangu">Open Pangu Pro MoE</button>
-            <button id="wImport">Import a model…</button>
-          </div>
-          <p style="font-size:11.5px;color:var(--dim)">or drag a model file anywhere here</p>
+      <div class="sect">
+        <h3>优先采证</h3>
+        <div class="summary">
+          <p>先用 profiler / timeline 确认损失在哪一层，再决定是补自定义算子、改切分策略，还是重写图级融合。</p>
+          <ul class="checklist">
+            <li>看是否存在大量 format cast、transpose、pad、reshape 等边角算子。</li>
+            <li>看 AICore 利用率、MTE 搬运占比、算子碎片化和同步空洞。</li>
+            <li>看动态图 shape 命中率、compile cache、fallback 算子与静态桶配置。</li>
+            <li>看 HCCL/NVLink 对等迁移是否成立，尤其是 all-to-all 和 expert parallel。</li>
+          </ul>
         </div>
-        <div class="legend" id="legend" hidden></div>
-        <div class="hint" id="hint" hidden>click a node → inspector<br>drag to pan · scroll to zoom</div>
-        <div id="stage" class="op-stage">
-          <svg id="gsvg" xmlns="http://www.w3.org/2000/svg"></svg>
-        </div>
-        <div class="op-graph-tip" id="gtip" role="tooltip"></div>
-        <div class="zoom" id="zoom" hidden>
-          <button id="zin">+</button><button id="zout">−</button><button id="zfit">⤢</button>
-        </div>
-        <div class="dropzone" id="dropzone"><div>⬇ Drop config.json or .gguf to import</div></div>
       </div>
-    </div>
+    </aside>
 
-    <div class="splitter" id="splitR"></div>
+    <section class="editor">
+      <div class="tabsbar">
+        <div id="viewTitle">原理差异图</div>
+        <div class="focus-tags" id="focusTags"></div>
+      </div>
+      <div class="canvas">
+        <div class="hero" id="hero"></div>
+        <div class="board" id="board"></div>
+        <div class="matrix" id="matrix"></div>
+        <div class="signals" id="signals"></div>
+      </div>
+    </section>
 
-    <!-- RIGHT -->
-    <div class="inspect">
+    <aside class="inspect">
       <div class="rtabs" id="rtabs">
-        <button data-tab="insp" class="on">Inspector</button>
-        <button data-tab="fuse">Fusion</button>
-        <button data-tab="perf">Performance</button>
+        <button data-tab="principle" class="on">原理</button>
+        <button data-tab="symptoms">症状</button>
+        <button data-tab="optimization">优化</button>
+        <button data-tab="compare">对比</button>
       </div>
-      <div id="tabInsp" class="pad"></div>
-      <div id="tabFuse" class="pad" hidden></div>
-      <div id="tabPerf" class="pad" hidden></div>
-    </div>
+      <div class="pad" id="detailPane"></div>
+    </aside>
   </div>
 
-  <!-- STATUS -->
-  <div class="status" id="status">
-    <div class="sitem" id="stModel">—</div>
-    <div class="sitem" id="stParams"></div>
-    <div class="sitem" id="stLat"></div>
+  <div class="status">
+    <div class="sitem" id="stReason">根因：—</div>
+    <div class="sitem" id="stStage">层次：—</div>
+    <div class="sitem" id="stSymptom">表征：—</div>
     <div class="sspace"></div>
-    <div class="sitem btn">phase:&nbsp;<span id="stPhase">prefill</span></div>
-    <div class="sitem btn">prec:&nbsp;<select id="selPrec"></select></div>
-    <div class="sitem btn">device:&nbsp;<select id="selDev"></select></div>
+    <div class="sitem" id="stScenario">场景：通用推理</div>
+    <div class="sitem" id="stAction">抓手：—</div>
   </div>
 </div>
 
-<input type="file" id="fileInput" accept=".json,.gguf,application/json" hidden>
-
 <script>
 "use strict";
-/* ======================= device / precision ======================= */
-// Ascend NPU lineup. FP16 dense TFLOP/s + memory bandwidth (GB/s); representative
-// datasheet/roadmap figures for a first-order analytical model. fp8=native FP8 path
-// (arrives with the 950 die; 910B/910C have no native FP8 → FP8 runs at the FP16 rate).
-const DEVICES={
-  asc910b:{name:"Ascend 910B",  tflops:376,bw:1600,fp8:false,mem:"64GB HBM2e/3e", kind:"npu"},
-  asc910c:{name:"Ascend 910C",  tflops:800,bw:3200,fp8:false,mem:"128GB HBM",     kind:"npu"},
-  asc950pr:{name:"Ascend 950PR",tflops:500,bw:1600,fp8:true, mem:"128GB HiBL 1.0", kind:"npu"},
-  asc950dt:{name:"Ascend 950DT",tflops:500,bw:4000,fp8:true, mem:"144GB HiZQ 2.0", kind:"npu"},
-  asc310:{name:"Ascend 300I Duo",tflops:140,bw:408,fp8:false,mem:"96GB LPDDR4X",  kind:"npu"},
-};
-const PREC={fp8:{bytes:1,cmul:2,label:"FP8"},fp16:{bytes:2,cmul:1,label:"FP16/BF16"},fp32:{bytes:4,cmul:.5,label:"FP32"}};
-const LAUNCH_US=4;
 
-/* ======================= preset catalog ======================= */
-const PRESETS=[
-  {id:"llama2-7b",name:"LLaMA-2 7B",fam:"dense",
-   c:{layers:32,d:4096,nH:32,nKV:32,hd:128,ffn:11008,vocab:32000}},
-  {id:"llama3-70b",name:"LLaMA-3 70B",fam:"dense",
-   c:{layers:80,d:8192,nH:64,nKV:8,hd:128,ffn:28672,vocab:128256}},
-  {id:"qwen2-7b",name:"Qwen2 7B",fam:"dense",
-   c:{layers:28,d:3584,nH:28,nKV:4,hd:128,ffn:18944,vocab:152064}},
-  {id:"mixtral",name:"Mixtral 8×7B",fam:"moe",
-   c:{layers:32,d:4096,nH:32,nKV:8,hd:128,vocab:32000,experts:8,active:2,expff:14336,shared:0,groups:1,routing:"topk"}},
-  {id:"pangu",name:"Pangu Pro MoE 72B·A16B",fam:"moe",
-   c:{layers:48,d:5120,nH:40,nKV:8,hd:128,vocab:153376,experts:64,active:8,expff:1344,shared:4,groups:8,routing:"group-topk"}},
-  {id:"deepseek",name:"DeepSeek-V3 671B·A37B",fam:"moe",
-   c:{layers:61,d:7168,nH:128,nKV:128,hd:128,vocab:129280,experts:256,active:8,expff:2048,shared:1,groups:8,routing:"group-topk"}},
+const SCENARIOS=[
+  {
+    id:"general",
+    label:"通用推理",
+    summary:"首要关注执行模型、存储层次和小算子碎片化。开源 CUDA 算法常把“能跑就快”建立在成熟 kernel 生态之上，迁到 Ascend 后则先受图编译、数据格式和融合粒度约束。",
+    highlight:["execution","memory","fusion"],
+    evidence:["端到端延迟偏高但主 GEMM 不慢","图里出现大量 cast/transpose/concat","shape 一变性能波动明显"]
+  },
+  {
+    id:"decode",
+    label:"大模型 Decode",
+    summary:"Decode 单 token 时代码往往从 compute-bound 切到 launch-bound / memory-bound。GPU 上被成熟 fused-kernel 吃掉的小算子，在 Ascend 默认路径上更容易暴露出来。",
+    highlight:["execution","fusion","dynamic"],
+    evidence:["单 token 时延比 GPU 差得更明显","KV cache 相关搬运和 layout conversion 占比升高","很多细粒度算子无法摊薄启动成本"]
+  },
+  {
+    id:"moe",
+    label:"MoE / 稀疏训练",
+    summary:"MoE 的关键矛盾不是单个 GEMM，而是 router、top-k、grouped matmul、all-to-all 和负载均衡整条链是否被体系结构吸收。开箱性能通常卡在通信和动态图路由。",
+    highlight:["dynamic","communication","compiler"],
+    evidence:["专家负载不均衡","all-to-all 与专家计算重叠不足","router 与 grouped matmul 之间出现明显空洞"]
+  }
 ];
 
-/* ======================= workspace state ======================= */
-const RUN={device:"asc910b",prec:"fp16",phase:"prefill",showFuse:false,tab:"insp",avgLayers:null};
-let DOCS=[];               // open documents
-let ACT=null;              // active doc id
-let SEL=null;              // selected node id
-let importCounter=0;
-
-// working state S mirrors the active doc's architecture fields
-const S={fam:"dense",layers:32,d:4096,nH:32,nKV:32,hd:128,vocab:32000,
-  ffn:11008,expff:1344,experts:64,active:8,shared:4,groups:8,routing:"topk",
-  get device(){return RUN.device},get prec(){return RUN.prec},
-  get phase(){return RUN.phase},B:1,seq:2048};
-
-/* ======================= importers (client-side) ======================= */
-const pick=(o,ks,d)=>{for(const k of ks)if(o[k]!=null)return o[k];return d;};
-function configToArch(json,name){
-  const arch=(pick(json,["model_type","architectures"],"custom")||"custom").toString().toLowerCase();
-  const hidden=pick(json,["hidden_size","n_embd","d_model"]);
-  const heads=pick(json,["num_attention_heads","n_head"]);
-  const kvH=pick(json,["num_key_value_heads","num_kv_heads"],heads);
-  const N=pick(json,["num_local_experts","n_routed_experts","num_experts","moe_num_experts"]);
-  const base={layers:pick(json,["num_hidden_layers","n_layer","num_layers"]),
-    d:hidden,nH:heads,nKV:kvH,hd:pick(json,["head_dim"],hidden&&heads?Math.round(hidden/heads):128),
-    vocab:pick(json,["vocab_size"],32000),arch};
-  if(N){base.fam="moe";base.experts=N;
-    base.active=pick(json,["num_experts_per_tok","moe_topk","num_experts_per_token"],2);
-    base.expff=pick(json,["moe_intermediate_size","expert_intermediate_size"],pick(json,["intermediate_size"],hidden));
-    base.shared=pick(json,["n_shared_experts","num_shared_experts"],0);
-    base.groups=pick(json,["n_group","num_expert_groups"],1);
-    base.routing=pick(json,["topk_group"])?"group-topk":"topk";
-  }else{base.fam="dense";base.ffn=pick(json,["intermediate_size","ffn_dim","n_inner"]);}
-  return base;
-}
-/* --- GGUF header reader --- */
-const GT={U8:0,I8:1,U16:2,I16:3,U32:4,I32:5,F32:6,BOOL:7,STR:8,ARR:9,U64:10,I64:11,F64:12};
-function ggufKV(buf){
-  const dv=new DataView(buf);
-  if(dv.getUint32(0,true)!==0x46554747)throw new Error("Not a GGUF file");
-  let o=4;
-  const u32=()=>{const v=dv.getUint32(o,true);o+=4;return v;};
-  const u64=()=>{const v=Number(dv.getBigUint64(o,true));o+=8;return v;};
-  const str=()=>{const n=u64();let s="";for(let i=0;i<n;i++)s+=String.fromCharCode(dv.getUint8(o+i));o+=n;return s;};
-  const scal=t=>{switch(t){
-    case GT.U8:case GT.BOOL:{const v=dv.getUint8(o);o+=1;return v;}
-    case GT.I8:{const v=dv.getInt8(o);o+=1;return v;}
-    case GT.U16:{const v=dv.getUint16(o,true);o+=2;return v;}
-    case GT.I16:{const v=dv.getInt16(o,true);o+=2;return v;}
-    case GT.U32:return u32();
-    case GT.I32:{const v=dv.getInt32(o,true);o+=4;return v;}
-    case GT.F32:{const v=dv.getFloat32(o,true);o+=4;return v;}
-    case GT.U64:return u64();
-    case GT.I64:{const v=Number(dv.getBigInt64(o,true));o+=8;return v;}
-    case GT.F64:{const v=dv.getFloat64(o,true);o+=8;return v;}
-    case GT.STR:return str();
-    default:throw new Error("bad gguf type "+t);}};
-  const val=t=>{if(t!==GT.ARR)return scal(t);const et=u32(),n=u64(),a=[];
-    for(let i=0;i<n;i++)a.push(scal(et));return a;};
-  u32();u64();const kvc=u64();const kv={};
-  for(let i=0;i<kvc;i++){const k=str();kv[k]=val(u32());}
-  return kv;
-}
-function ggufToArch(kv){
-  const arch=(kv["general.architecture"]||"custom").toString();
-  const g=s=>kv[arch+"."+s];
-  const hidden=g("embedding_length"),heads=g("attention.head_count");
-  const N=g("expert_count");
-  const base={arch,d:hidden,nH:heads,nKV:g("attention.head_count_kv")||heads,
-    layers:g("block_count"),hd:g("attention.key_length")||(hidden&&heads?Math.round(hidden/heads):128),
-    vocab:(kv["tokenizer.ggml.tokens"]||[]).length||g("vocab_size")||32000};
-  if(N){base.fam="moe";base.experts=N;base.active=g("expert_used_count")||2;
-    base.expff=g("expert_feed_forward_length")||g("feed_forward_length");
-    base.shared=g("expert_shared_count")||0;base.groups=g("expert_group_count")||1;
-    base.routing=g("expert_group_count")?"group-topk":"topk";
-  }else{base.fam="dense";base.ffn=g("feed_forward_length");}
-  return base;
-}
-
-async function importFile(file){
-  const nm=file.name.toLowerCase();
-  let arch,src;
-  try{
-    if(nm.endsWith(".gguf")){
-      src="gguf";
-      const sliceN=Math.min(file.size,32*1024*1024);
-      let buf=await file.slice(0,sliceN).arrayBuffer();
-      let kv;
-      try{kv=ggufKV(buf);}
-      catch(e){ if(file.size>sliceN){buf=await file.arrayBuffer();kv=ggufKV(buf);} else throw e; }
-      arch=ggufToArch(kv);
-    }else if(nm.endsWith(".json")){
-      src="config";
-      arch=configToArch(JSON.parse(await file.text()),file.name);
-    }else throw new Error("Unsupported file type (need config.json or .gguf)");
-  }catch(err){ alert("Import failed: "+err.message); return; }
-  if(!arch.layers||!arch.d||!arch.nH){ alert("Couldn't read core dimensions from "+file.name); return; }
-  addDoc({name:file.name,source:src,icon:src==="gguf"?"◈":"{}",fields:fillDefaults(arch)});
-}
-function fillDefaults(a){
-  return {fam:a.fam||"dense",layers:a.layers,d:a.d,nH:a.nH,nKV:a.nKV||a.nH,hd:a.hd||128,
-    vocab:a.vocab||32000,ffn:a.ffn||11008,expff:a.expff||1344,experts:a.experts||64,
-    active:a.active||8,shared:a.shared||0,groups:a.groups||1,routing:a.routing||"topk",arch:a.arch};
-}
-
-/* ======================= documents / tabs ======================= */
-function addDoc(d){
-  d.id=d.id||("doc"+(++importCounter));
-  DOCS.push(d); renderImported(); setActive(d.id);
-}
-function openPreset(p){
-  const existing=DOCS.find(d=>d.presetId===p.id);
-  if(existing){setActive(existing.id);return;}
-  addDoc({id:"preset-"+p.id,presetId:p.id,name:p.name,source:"preset",
-    icon:p.fam==="moe"?"⬡":"▢",fields:fillDefaults({...p.c,fam:p.fam,arch:p.id})});
-}
-function syncFromS(doc){ if(!doc)return; Object.assign(doc.fields,{fam:S.fam,layers:S.layers,d:S.d,
-  nH:S.nH,nKV:S.nKV,hd:S.hd,vocab:S.vocab,ffn:S.ffn,expff:S.expff,experts:S.experts,
-  active:S.active,shared:S.shared,groups:S.groups,routing:S.routing}); }
-function loadToS(doc){ Object.assign(S,doc.fields); clampMoE(); }
-function setActive(id){
-  const cur=DOCS.find(d=>d.id===ACT); if(cur)syncFromS(cur);
-  ACT=id; SEL=null; RUN.avgLayers=null;
-  const d=DOCS.find(x=>x.id===id); if(!d)return;
-  loadToS(d);
-  document.getElementById("welcome").style.display="none";
-  ["legend","hint","zoom"].forEach(k=>document.getElementById(k).hidden=false);
-  renderTabs(); renderPresets(); renderImported(); renderParams();
-  draw(); fit(); renderRight(); updateStatus();
-}
-function closeTab(id,ev){
-  ev&&ev.stopPropagation();
-  const i=DOCS.findIndex(d=>d.id===id); if(i<0)return;
-  DOCS.splice(i,1);
-  if(ACT===id){
-    if(DOCS.length){setActive(DOCS[Math.max(0,i-1)].id);}
-    else{ACT=null;showWelcome();}
+const REASONS=[
+  {
+    id:"execution",
+    title:"执行模型错配",
+    severity:"critical",
+    subtitle:"CUDA kernel 链路默认成立，但 Ascend 更依赖图编译、shape 约束和 tiling 命中。",
+    stage:["图编译","Runtime"],
+    focus:["Static bucket","Graph fusion","Custom tiling"],
+    summary:"GPU 开源算法通常把性能建立在细粒度 kernel 直接 launch、运行期灵活拼接和成熟 autotune 之上；Ascend 则先过图编译、算子模板选择和 tiling 决策，开箱速度更依赖图级质量。",
+    why:[
+      "GPU 侧的性能入口是 runtime kernel launch、block/warp 形态和高成熟度库函数；很多论文或开源实现默认这条链路天然高效。",
+      "Ascend 侧通常先做 GE/ACL 图编译，再选择 TBE/算子模板与 tile 形状，运行期不是“想到哪发到哪”。",
+      "当模型 shape 多变、子图切碎或缺少专门 tiling 模板时，默认 schedule 会更保守，端到端时延被 launch、同步和 compile cache 命中率拖住。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"小 kernel 可低成本拼接，运行期 launch 足够轻，热点主要是少数大矩阵核。"},
+      {title:"代码习惯", body:"Triton/CUDA 常直接围绕 warp/block、epilogue 和 shared memory 写最优路径。"},
+      {title:"工程基础", body:"FlashAttention、CUTLASS、xFormers 等已把大量常见模式吸进 fused kernel。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同一条算子链被拆成多个 Ascend 原子算子，task 数和同步边界明显增多。"},
+      {title:"shape 代价", body:"seq/batch 频繁变化会降低编译缓存命中，甚至触发重新选路或重新编译。"},
+      {title:"默认保守", body:"没命中专门 schedule 时，会退回更泛化但不够激进的 tile 方案。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"图编译 → 子图划分 → 算子模板选择 → Tiling → AICore 执行。"},
+      {title:"性能核心", body:"默认性能更依赖静态桶、图融合和 tiling，而非单个 kernel 的即兴调度。"},
+      {title:"平台偏好", body:"更希望把一串小操作吸收到大颗粒子图或专门融合算子里。"}
+    ],
+    symptom:[
+      {title:"端到端掉速", body:"AICore 并不一定很低，但整体时延还是大，因为碎片化 launch 和等待占了比重。"},
+      {title:"形状波动敏感", body:"同一模型换 batch 或 seq 之后性能抖动明显，说明编译和 schedule 路径不稳定。"},
+      {title:"热点分散", body:"Profiler 里不是单个 GEMM 超热，而是一堆边角算子和 runtime 空洞。"}
+    ],
+    evidence:[
+      {title:"图初始化偏重", detail:"加载时图编译耗时显著，切 shape 后还有二次构图或 cache miss。", tags:["compile cache","dynamic shape"]},
+      {title:"小 task 过多", detail:"timeline 中可见大量时间很短但数量很多的任务，串起来吃掉大段时延。", tags:["launch","sync"]},
+      {title:"热点不集中", detail:"端到端掉速不是 GEMM 本身差，而是 launch / graph partition 让热度分散。", tags:["graph split","runtime"]},
+      {title:"融合前后差距大", detail:"一旦补上 fused op 或静态桶，时延会出现阶跃式改善。", tags:["fusion","bucket"]}
+    ],
+    optimize:[
+      "先做 shape bucket，把高频 batch/seq 组合固定下来，提高 compile cache 命中率。",
+      "优先把 decode 链路上的 norm、rope、mask、top-k 等边角算子前移到 fused kernel 或大颗粒子图。",
+      "为关键热点补自定义算子或定制 tiling 模板，而不是只盯单个 GEMM 指标。",
+      "把评估方式从“单核 TFLOPS”改成“图编译 + 运行期空洞 + 融合收益”的端到端视角。"
+    ],
+    compare:[
+      ["性能入口","runtime launch + kernel schedule","graph compile + fusion + tiling"],
+      ["默认最优条件","动态拼接也能跑得快","静态或半静态 shape 更容易命中最优路径"],
+      ["掉速位置","通常是主 kernel 不够快","更常见是图切碎、tiling 保守、launch 碎片化"],
+      ["优先动作","微调 kernel","先稳图，再稳 tile，再补 kernel"]
+    ],
+    dims:[
+      {label:"Kernel 直接控制", gpu:94, ascend:40, note:"GPU 默认更直接"},
+      {label:"图编译依赖", gpu:25, ascend:90, note:"Ascend 先依赖图质量"},
+      {label:"多 shape 稳定性", gpu:76, ascend:44, note:"shape 波动更伤 Ascend 默认路径"},
+      {label:"小算子容忍度", gpu:80, ascend:32, note:"细碎链路更容易掉速"},
+      {label:"融合收益弹性", gpu:62, ascend:91, note:"Ascend 对融合更敏感"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:4}
+  },
+  {
+    id:"microarch",
+    title:"微架构与并行原语错配",
+    severity:"critical",
+    subtitle:"warp / Tensor Core / shared memory 的思路，不能原样映射到 Cube / Vector / MTE / UB。",
+    stage:["AICore","指令/调度"],
+    focus:["Tile 尺寸","Cube-Vector 配合","流水并行"],
+    summary:"很多 GPU 算法默认依赖 SIMT、warp 原语、Tensor Core 矩阵形态和 shared memory 复用，而 Ascend 的 AICore 是 Cube 与 Vector 协同、搬运引擎与本地缓冲强耦合的模型。",
+    why:[
+      "GPU 上常见的最优实现，会把线程块布局、warp 级规约和 shared memory bank 设计写进算法骨架。",
+      "Ascend 更强调 Cube/Vector 双路径、MTE 搬运、UB/L0 复用，以及 tile 大小与数据排布的联动。",
+      "因此“同一个矩阵乘或归约数学公式”在两侧并不等价，真正的最优路径往往来自不同的分块、排布和流水方式。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"warp-level primitive、shared memory 和 Tensor Core tile 能直接承接算法思路。"},
+      {title:"局部最优", body:"block 维度、线程绑核、寄存器占用围绕 SM 资源做权衡。"},
+      {title:"成熟路径", body:"许多开源 kernel 已经对 Tensor Core tile 做到高度手工优化。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"原本依赖 warp 同步和 shared memory 的结构，换到 Ascend 后不再天然高效。"},
+      {title:"tile 失配", body:"矩阵分块如果不对齐 Cube/Vector 偏好，会导致搬运和计算流水断裂。"},
+      {title:"计算搬运失衡", body:"算子不只是“算得快不快”，更取决于算和搬能否被双缓冲压在一起。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"Cube 处理矩阵核，Vector 处理归一化/激活，MTE 负责搬运，本地缓冲决定流水深度。"},
+      {title:"性能核心", body:"理想情况不是单单占满 compute，而是 Cube、Vector 与搬运流水同时平衡。"},
+      {title:"平台偏好", body:"更需要显式考虑 tile 对齐、搬运步长、双缓冲和局部缓存容量。"}
+    ],
+    symptom:[
+      {title:"计算峰值上不去", body:"理论 FLOPS 很高，但实际利用率不高，因为 tile 与流水不匹配。"},
+      {title:"局部复用失效", body:"看起来是 compute kernel，却被大量中间搬运和重排抢走时间。"},
+      {title:"改 tile 后突增", body:"一旦 tile 改对，性能可能突然跃升，说明瓶颈在微架构适配而非算法本身。"}
+    ],
+    evidence:[
+      {title:"Cube/Vector 失衡", detail:"profiling 显示某一路长时间闲置，另一条路径成为单点瓶颈。", tags:["cube","vector"]},
+      {title:"MTE 占比异常", detail:"搬运时间过长，说明 tile 设计和数据步长没压住内存路径。", tags:["mte","dma"]},
+      {title:"局部缓冲不够用", detail:"UB/L0 溢出导致频繁回 HBM，计算难以形成稳定流水。", tags:["ub","l0"]},
+      {title:"对齐敏感", detail:"维度轻微变化就大幅掉速，通常是 tile 对齐或 padding 策略不合适。", tags:["alignment","tiling"]}
+    ],
+    optimize:[
+      "按 Ascend 的 Cube/Vector 路径重写 tile 设计，而不是机械照搬 CUDA block 和 warp 参数。",
+      "优先查明计算和搬运哪一路先堵，再决定是改矩阵排布、双缓冲，还是拆/并算子。",
+      "把性能模型从“SM 占用率”切换到“Cube + Vector + MTE 三路流水平衡”。",
+      "为热点算子保留架构特定实现，不要强求一套 Triton/CUDA kernel 通吃两侧。"
+    ],
+    compare:[
+      ["并行原语","warp / block / SIMT","Cube / Vector / MTE 协同"],
+      ["局部存储","shared memory / register file","UB / L0 / tile 缓冲"],
+      ["最优写法","偏线程组织","偏搬运-计算流水组织"],
+      ["核心风险","occupancy 不够","tile 失配和搬运链路断裂"]
+    ],
+    dims:[
+      {label:"SIMT 亲和度", gpu:96, ascend:28, note:"CUDA 思路天然偏 GPU"},
+      {label:"Tile 对齐敏感度", gpu:52, ascend:92, note:"Ascend 更依赖精确 tile"},
+      {label:"搬运-计算联动", gpu:58, ascend:90, note:"Ascend 更强调流水"},
+      {label:"共享缓存复用", gpu:88, ascend:54, note:"shared memory 经验不可直接照搬"},
+      {label:"架构专用优化收益", gpu:70, ascend:93, note:"架构特定实现收益很大"}
+    ],
+    scenarioScore:{general:4,decode:3,moe:3}
+  },
+  {
+    id:"memory",
+    title:"存储层次与数据布局错配",
+    severity:"critical",
+    subtitle:"格式转换、padding、transpose、KV cache 路径和局部缓存容量，常常直接吃掉开箱性能。",
+    stage:["HBM","本地缓冲"],
+    focus:["Layout","Format cast","KV cache path"],
+    summary:"很多开源 GPU 算法默认连续内存、coalesced 访问和 shared memory 复用已经足够，而 Ascend 更容易受格式布局、局部缓冲大小、搬运粒度和格式转换影响。",
+    why:[
+      "GPU 上的数据布局通常围绕 row-major、coalesced load、Tensor Core 输入格式和 L2/shared memory 行为展开。",
+      "Ascend 除了数学维度，还需要兼顾 ND/NZ/fractal 等格式、UB/L0 容量、搬运步长与 cache line 粒度。",
+      "因此迁移后即使主算子没变，周围的 cast、transpose、pad、slice、cache copy 也可能成为真正热点。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"连续内存和 coalesced 访问已足够，高效实现更多靠 shared memory 复用。"},
+      {title:"常见实现", body:"layout 往往固定在适配 CUDA/Tensor Core 的形态，转换开销不大。"},
+      {title:"经验路径", body:"大量工程默认周边重排成本相对主 GEMM 可以忽略。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"输入输出格式可能需要改写为 Ascend 偏好的分块格式，边角转换成本上升。"},
+      {title:"cache 路径变差", body:"特别是 decode / KV cache，访问粒度小、重复搬运多，容易成为瓶颈。"},
+      {title:"padding 外溢", body:"对齐和分块需要额外 pad，导致“看似没算更多，但搬得更多”。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"算子最优不只看 FLOPS，还看格式是否吻合本地缓冲与搬运步长。"},
+      {title:"性能核心", body:"理想状态是减少 format cast 和 transpose，让数据尽量在合适布局里流到底。"},
+      {title:"平台偏好", body:"更适合把多步 layout change 合并进前后算子的 prologue / epilogue。"}
+    ],
+    symptom:[
+      {title:"HBM 流量高", body:"理论算量不大，但读写流量和 format conversion 占比异常。"},
+      {title:"周边算子抢热点", body:"cast、transpose、reshape、slice 的累计时间明显超预期。"},
+      {title:"decode 更明显", body:"小 batch / 单 token 情况下，KV cache 路径和搬运开销更容易压过主算子。"}
+    ],
+    evidence:[
+      {title:"大量格式转换", detail:"图里能看到连续的 cast / transpose / format conversion 节点。", tags:["format","transpose"]},
+      {title:"HBM 占比偏高", detail:"主算子没慢很多，但内存流量明显偏高，说明数据路径不是一次到位。", tags:["bandwidth","layout"]},
+      {title:"KV cache 回写频繁", detail:"decode 场景出现重复 copy、gather、concat，访问粒度不友好。", tags:["kv cache","decode"]},
+      {title:"padding 放大成本", detail:"对齐后有效计算不变，但总搬运变多，实际吞吐下降。", tags:["padding","alignment"]}
+    ],
+    optimize:[
+      "优先合并 layout change，避免把 format cast 暴露为独立小算子。",
+      "重设 KV cache 布局和访问粒度，让 decode 路径尽量沿着 Ascend 偏好的搬运方式走。",
+      "用 profiler 看流量和格式转换，而不是只看主 GEMM 的算力利用率。",
+      "针对高频形状做专门布局，不要所有 shape 共享一套妥协格式。"
+    ],
+    compare:[
+      ["主要矛盾","coalesced load 与 shared memory reuse","layout / format / 搬运粒度 / 本地缓冲"],
+      ["常见隐性成本","bank conflict 或 cache miss","cast、transpose、pad、copy、format conversion"],
+      ["Decode 风险","更多是 cache locality","更容易被 KV cache 搬运和格式重排拖住"],
+      ["优化入口","访存合并","格式路径缩短 + cache 布局改造"]
+    ],
+    dims:[
+      {label:"连续访问友好度", gpu:88, ascend:62, note:"GPU 经验更直接"},
+      {label:"格式转换敏感度", gpu:34, ascend:93, note:"Ascend 更怕周边重排"},
+      {label:"KV cache 路径压力", gpu:58, ascend:86, note:"decode 下差距更明显"},
+      {label:"padding 放大效应", gpu:41, ascend:79, note:"对齐成本更容易外显"},
+      {label:"布局专用优化收益", gpu:64, ascend:90, note:"专门布局很关键"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:3}
+  },
+  {
+    id:"fusion",
+    title:"小算子碎片化与融合不足",
+    severity:"high",
+    subtitle:"GPU 上被成熟 fused kernel 吃掉的边角链路，迁移后可能重新暴露成真实瓶颈。",
+    stage:["图优化","Kernel 粒度"],
+    focus:["Fused op","Launch amortization","Decode 链路"],
+    summary:"开源 GPU 生态已经把 attention、norm、activation、epilogue、router 等很多链路做成 fused kernel；如果迁移到 Ascend 仍然保留原始小算子颗粒，开箱性能通常会被 launch、同步和多次读写拖住。",
+    why:[
+      "融合的本质不是减少几行代码，而是减少 HBM 往返、减少中间张量物化、减少 launch 和同步边界。",
+      "GPU 上很多这类优化已经被框架和库默认提供，所以开源实现作者不会总把“融合价值”写在算法论文里。",
+      "Ascend 若没命中对应的 fused op 或图模式，就会把这些原本隐身的边角代价重新暴露出来。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"norm、rope、softmax、activation、epilogue 往往已被融合进成熟 kernel。"},
+      {title:"工程结果", body:"看似有很多逻辑步骤，但运行时只剩少数大颗粒热点。"},
+      {title:"经验路径", body:"框架默认图优化往往足以覆盖常见模式。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同样的逻辑链在 Ascend 上未命中模式融合，重新变成一串小算子。"},
+      {title:"启动代价", body:"每一步都有 task / sync / 读写，单个看不大，累计非常可观。"},
+      {title:"decode 放大", body:"单 token 时主算子本来就小，边角链路更难被摊薄。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"依赖图级 pattern match、算子库覆盖和自定义融合来恢复大颗粒执行。"},
+      {title:"性能核心", body:"让数据在局部路径里走完，而不是每一步都回 HBM。"},
+      {title:"平台偏好", body:"越是小而密的链路，越应该用融合算子或模板化子图吸收。"}
+    ],
+    symptom:[
+      {title:"热点很碎", body:"attention 周围充满若干小算子，每个都不大，但总和很重。"},
+      {title:"单 token 慢", body:"decode 时延高于预期，常见根因是边角链路没被融合。"},
+      {title:"补融合后突降", body:"一旦命中 fused op，时延和带宽占用会显著改善。"}
+    ],
+    evidence:[
+      {title:"边角算子密集", detail:"图中 norm、mask、rope、top-k、mul、add 数量多且紧挨着主算子。", tags:["small ops","fusion gap"]},
+      {title:"中间张量多次落地", detail:"同一份中间结果被多次写回 / 读回，说明没有吃进 epilogue。", tags:["epilogue","HBM"]},
+      {title:"launch 占比高", detail:"timeline 中大量短任务堆叠，合起来吞掉明显时延。", tags:["launch","runtime"]},
+      {title:"不同版本差异大", detail:"框架或算子库版本一变性能差很多，说明依赖特定 fusion pattern。", tags:["pattern match","version"]}
+    ],
+    optimize:[
+      "先找 decode、attention 周围和 router 周围最碎的链路，优先做模式融合。",
+      "把 layout change、epilogue 和 activation 前移进主算子，减少中间张量落地。",
+      "把性能验证粒度从单 op 扩成 operator chain，否则看不出融合收益。",
+      "对高频链路做白名单式专项优化，而不是等通用图优化自动命中。"
+    ],
+    compare:[
+      ["GPU 常态","大量成熟 fused kernel","很多模式需要显式命中或补齐"],
+      ["主要损失","主核不够快","launch / HBM 往返 / 中间张量落地"],
+      ["最易受伤场景","并不总是 decode","decode 和小 batch 最明显"],
+      ["优先动作","继续压主核","先把算子链吃成大颗粒"]
+    ],
+    dims:[
+      {label:"小算子容忍度", gpu:82, ascend:30, note:"Ascend 默认更怕碎"},
+      {label:"融合收益", gpu:66, ascend:95, note:"融合常是第一抓手"},
+      {label:"HBM 往返敏感度", gpu:58, ascend:88, note:"未融合代价更外显"},
+      {label:"单 token 放大效应", gpu:48, ascend:91, note:"decode 下最明显"},
+      {label:"版本依赖", gpu:54, ascend:78, note:"pattern 命中影响大"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:4}
+  },
+  {
+    id:"dynamic",
+    title:"动态 shape / 稀疏路由 / 控制流不友好",
+    severity:"high",
+    subtitle:"开源实现喜欢运行时灵活性，但 Ascend 默认更偏静态或有界动态。",
+    stage:["动态图","稀疏执行"],
+    focus:["Dynamic shape","Router","Static bucket"],
+    summary:"很多 GPU 开源算法把动态 shape、ragged batch、MoE top-k、可变长度控制流当作自然能力；Ascend 也能做，但默认最优路径通常更依赖静态桶、可预测 shape 和受约束的动态图。",
+    why:[
+      "GPU 生态对运行时动态执行更加成熟，很多小变化只会影响少量 kernel 配置。",
+      "Ascend 上动态 shape 更容易影响图编译缓存、tiling 命中和融合 pattern。",
+      "一旦加上 MoE 路由、group top-k、ragged batch 或不同长度混跑，性能掉的不只是单个算子，而是整条图的确定性。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"运行时根据 shape 动态配置 kernel，路由逻辑和稀疏执行能被较自然地承接。"},
+      {title:"工程结果", body:"可变长度 batch、ragged 序列或 top-k 路由不会立刻让整条链失速。"},
+      {title:"经验路径", body:"动态性更多影响局部效率，而不是把整条图重新洗牌。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"shape、route 或 control flow 一变，可能触发新的 compile path 或保守调度。"},
+      {title:"模式不稳定", body:"融合 pattern 更难命中，热点位置随输入分布变化而变化。"},
+      {title:"稀疏不均衡", body:"MoE 专家负载不平时，通信与计算更难形成稳定重叠。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"更偏好静态桶、有界动态和可预测的路由分布。"},
+      {title:"性能核心", body:"先把动态性约束住，再谈 grouped matmul 或 router 的局部优化。"},
+      {title:"平台偏好", body:"把热门 shape 固化，把稀疏路径做成模板化 pattern。"}
+    ],
+    symptom:[
+      {title:"性能波动大", body:"同一模型不同输入分布时延抖动明显，说明动态图路径在变。"},
+      {title:"稀疏收益吃不满", body:"理论上是少算了，但端到端没快多少，甚至更慢。"},
+      {title:"MoE 空洞明显", body:"router、top-k、all-to-all 和 expert matmul 之间有明显等待区。"}
+    ],
+    evidence:[
+      {title:"同 batch 不同数据差异大", detail:"输入分布变化就导致大幅波动，说明稀疏路径在抖。", tags:["ragged","distribution"]},
+      {title:"compile cache 命中低", detail:"热点 shape 没被收敛进少数桶，图路径过于分散。", tags:["bucket","cache"]},
+      {title:"router 周围碎片化", detail:"top-k、mask、scatter/gather 等操作独立暴露。", tags:["router","scatter"]},
+      {title:"理论稀疏不兑现", detail:"算量减少但时延不降，说明省下的 compute 被动态图和通信吃回去了。", tags:["sparsity","e2e"] }
+    ],
+    optimize:[
+      "先做静态桶和输入分桶，把热门 shape 收敛到少数 profile。",
+      "把 MoE router、group top-k、dispatch/combiner 作为一条链优化，而不是只看 expert GEMM。",
+      "尽量让动态图有界化，必要时牺牲一点灵活性换稳定吞吐。",
+      "把稀疏收益评估从理论 FLOPS 节省改成端到端时延与重叠率。"
+    ],
+    compare:[
+      ["动态性容忍度","天然较高","可做但默认更偏静态/模板化"],
+      ["MoE 风险点","更多在负载均衡","编译路径、路由链和通信一起受影响"],
+      ["性能波动来源","局部 kernel 配置变化","整条图的模式命中与调度确定性"],
+      ["优先动作","继续做稀疏 kernel","先收敛 shape 和路由形态"]
+    ],
+    dims:[
+      {label:"动态 shape 兼容度", gpu:82, ascend:40, note:"Ascend 默认更保守"},
+      {label:"静态桶收益", gpu:42, ascend:92, note:"桶化收益很大"},
+      {label:"稀疏执行兑现率", gpu:70, ascend:46, note:"默认更难兑现代价"},
+      {label:"MoE 负载稳定性", gpu:58, ascend:43, note:"需要更强约束"},
+      {label:"性能波动敏感度", gpu:48, ascend:88, note:"Ascend 更怕路径抖动"}
+    ],
+    scenarioScore:{general:3,decode:5,moe:5}
+  },
+  {
+    id:"communication",
+    title:"并行切分与通信栈错配",
+    severity:"high",
+    subtitle:"NCCL / NVLink 的经验不能直接平移到 HCCL / HCCS / RoCE，尤其是 MoE、TP、PP 混合切分。",
+    stage:["并行策略","网络拓扑"],
+    focus:["HCCL","Topology-aware sharding","Overlap"],
+    summary:"很多大模型开源实现默认建立在 NVIDIA 通信栈和拓扑经验之上。迁移到 Ascend 后，即使算子本身没问题，TP/PP/EP 的切分与重叠逻辑也可能不再是最优。",
+    why:[
+      "通信性能不是“库名替换”就能完成，背后依赖链路类型、拓扑、collective 实现和重叠调度方式。",
+      "GPU 上围绕 NCCL / NVLink 形成的 all-reduce、all-gather、all-to-all 经验，在 Ascend 的 HCCL / HCCS / 以太网络上不一定还成立。",
+      "尤其是 MoE、专家并行和大规模 TP，错误的切分策略会让通信直接吞掉模型容量优势。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"NCCL + NVLink 的 collective 和重叠套路已经被大量框架默认吸收。"},
+      {title:"切分习惯", body:"TP/PP/EP 组合常按 GPU 拓扑经验设计，通信路径相对固定。"},
+      {title:"工程基础", body:"很多开源训练脚本默认设备互联和带宽模型近似于 NVIDIA 集群。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同样的切分策略在 Ascend 集群上可能放大跨卡流量或错过最佳链路。"},
+      {title:"重叠失效", body:"compute 与 collective 的时间窗不再对齐，导致 all-reduce / all-to-all 暴露。"},
+      {title:"MoE 更难", body:"router 和 expert dispatch 让通信粒度更碎，拓扑不对就会雪崩。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"要按 HCCL、机内 HCCS、跨机网络和设备拓扑重新设计切分与重叠。"},
+      {title:"性能核心", body:"先让通信路径贴近物理拓扑，再把 collective 挂到可重叠的计算窗口上。"},
+      {title:"平台偏好", body:"更需要拓扑感知、分组策略和专家放置规则。"}
+    ],
+    symptom:[
+      {title:"跨卡等待长", body:"单卡算得不差，但扩到多卡后吞吐掉得很快。"},
+      {title:"all-to-all 暴露", body:"MoE 里专家 dispatch / combine 成为主瓶颈。"},
+      {title:"扩展性差", body:"卡数增加后收益明显低于预期，甚至出现反向扩容。"}
+    ],
+    evidence:[
+      {title:"通信热度前移", detail:"timeline 里 collective 占比很高，且难与计算重叠。", tags:["overlap","collective"]},
+      {title:"拓扑不匹配", detail:"高频通信跨越非优先链路，导致机内/机间流量分布失衡。", tags:["topology","placement"]},
+      {title:"MoE dispatch 拖慢", detail:"专家切分后 dispatch/combine 花了大量时间。", tags:["all-to-all","expert parallel"]},
+      {title:"卡数越多越差", detail:"扩容收益异常低，说明并行策略照搬了 GPU 经验。", tags:["scaling","sharding"] }
+    ],
+    optimize:[
+      "重新设计 TP/PP/EP 的组合，不要直接继承 NCCL / NVLink 下的切分比例。",
+      "按机内与跨机拓扑重排专家放置、参数切分和 collective 分组。",
+      "重点验证通信与计算的重叠率，而不是只看单卡 kernel 性能。",
+      "MoE 优先优化 dispatch / combine 与 all-to-all，很多时候它比专家 GEMM 更关键。"
+    ],
+    compare:[
+      ["通信基线","NCCL / NVLink 经验成熟","HCCL / HCCS / 网络拓扑需要重新设计"],
+      ["风险位置","常在大规模训练后期出现","多卡一上来就可能暴露"],
+      ["MoE 关键点","all-to-all 仍重要","dispatch、放置和重叠更敏感"],
+      ["优先动作","继续放大并行度","先重做拓扑感知切分"]
+    ],
+    dims:[
+      {label:"单卡可迁移性", gpu:84, ascend:74, note:"单卡问题较少"},
+      {label:"多卡策略可平移性", gpu:78, ascend:32, note:"不能直接照搬"},
+      {label:"通信重叠稳定性", gpu:72, ascend:45, note:"Ascend 需重新设计窗口"},
+      {label:"MoE all-to-all 风险", gpu:61, ascend:88, note:"Ascend 集群更敏感"},
+      {label:"拓扑感知收益", gpu:58, ascend:94, note:"拓扑重做收益极高"}
+    ],
+    scenarioScore:{general:2,decode:2,moe:5}
+  },
+  {
+    id:"compiler",
+    title:"编译器、算子库与自动调优成熟度差距",
+    severity:"medium",
+    subtitle:"很多 GPU 开源算法快，不只是因为硬件快，也因为多年沉淀的库、模板和 autotune 已把坑踩平。",
+    stage:["生态成熟度","算子覆盖"],
+    focus:["Operator coverage","Autotune","Pattern maturity"],
+    summary:"同一份算法代码在 GPU 上往往能直接吃到多年积累的 CUTLASS、Triton、cuDNN、FlashAttention 等优化；迁移到 Ascend 时，如果对应模式还没被算子库和编译器充分覆盖，开箱性能自然不可能一步到位。",
+    why:[
+      "很多人把“GPU 开源算法很快”误解成纯硬件优势，实际上其中很大一部分来自库和编译器长期沉淀。",
+      "一旦迁移到新的后端，真正缺的可能不是数学正确性，而是高成熟度 pattern、autotune 搜索空间和默认模板。",
+      "这会让一些本来不需要手工关注的细节重新浮出水面，例如特殊形状、边界 case、稀疏模式和新模型结构。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"成熟库已经覆盖主流 attention、matmul、norm、conv、epilogue 和并行模式。"},
+      {title:"工程结果", body:"用户即使不改代码，也可能直接踩在较优实现上。"},
+      {title:"经验路径", body:"autotune 和模板库已经把常见坑平滑掉。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"新模型结构、长尾 shape 或特殊路由模式在 Ascend 上未必已有成熟模板。"},
+      {title:"默认模板保守", body:"算子能跑通，但没有充分吃满架构特色。"},
+      {title:"局部补丁多", body:"往往需要一批针对性优化才能逐步逼近 GPU 生态成熟度。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"需要靠编译器 pattern、算子库覆盖和专项调优逐步补齐。"},
+      {title:"性能核心", body:"先识别是“平台没覆盖”还是“你还没适配”。"},
+      {title:"平台偏好", body:"通过专项内核、pattern 扩展和 case-based 调优积累路径。"}
+    ],
+    symptom:[
+      {title:"长尾 case 特别慢", body:"主流形状还行，但特殊输入一下就掉下去。"},
+      {title:"版本敏感", body:"框架/驱动/算子库版本一更新，性能变化很大。"},
+      {title:"专项优化见效快", body:"补一个 pattern 或专门 kernel 后，某条链路立刻接近 GPU。"}
+    ],
+    evidence:[
+      {title:"长尾形状掉速", detail:"少数 shape 显著慢于主流 shape，说明模板覆盖不足。", tags:["long tail","template"]},
+      {title:"版本切换波动", detail:"更换 CANN 或算子库版本后，性能出现明显跃迁。", tags:["version","library"]},
+      {title:"特定模式回退", detail:"特殊 mask、rope、router 形态会回退到通用实现。", tags:["fallback","pattern"]},
+      {title:"专项 patch 立竿见影", detail:"补一条针对性优化后，端到端时延立刻收敛。", tags:["custom op","special case"] }
+    ],
+    optimize:[
+      "把问题分成平台覆盖不足与业务侧适配不足两类，不要混在一起看。",
+      "优先统计高频 shape / pattern 的长尾 case，集中补齐收益最大的模板。",
+      "保留专项优化清单，围绕 attention、MoE、layout change、通信重叠逐步沉淀平台资产。",
+      "对性能结论做版本标注，避免把某个版本的表现误判为硬件上限。"
+    ],
+    compare:[
+      ["生态成熟度","多年库与 autotune 沉淀","需要逐步补齐热点 pattern"],
+      ["默认体验","很多模式开箱即优","很多模式只是先跑通"],
+      ["风险来源","长尾 case 相对少","长尾 shape / 新结构更容易暴露"],
+      ["优先动作","继续压榨已有库","补 pattern、补模板、补专项 kernel"]
+    ],
+    dims:[
+      {label:"主流模式覆盖", gpu:92, ascend:67, note:"GPU 生态更成熟"},
+      {label:"长尾 case 成熟度", gpu:74, ascend:36, note:"Ascend 更易暴露长尾"},
+      {label:"版本敏感度", gpu:42, ascend:79, note:"版本影响更大"},
+      {label:"专项优化收益", gpu:56, ascend:88, note:"补平台资产很值"},
+      {label:"开箱稳定性", gpu:89, ascend:52, note:"GPU 默认体验更平滑"}
+    ],
+    scenarioScore:{general:4,decode:3,moe:5}
   }
-  renderTabs(); renderImported();
+];
+
+const CENTER_VIEWS=[
+  {id:"map", icon:"▤", label:"原理差异图"},
+  {id:"matrix", icon:"◫", label:"差异刻度"},
+  {id:"signals", icon:"◎", label:"证据地图"}
+];
+
+const STATE={
+  scenario:"decode",
+  reason:"execution",
+  tab:"principle",
+  view:"map"
+};
+
+function qs(id){
+  return document.getElementById(id);
 }
-function showWelcome(){
-  document.getElementById("welcome").style.display="flex";
-  ["legend","hint","zoom"].forEach(k=>document.getElementById(k).hidden=true);
-  if(gsvg)gsvg.innerHTML="";
-  hideTip();
-  document.getElementById("titleDoc").textContent="no model open";
-  document.getElementById("params").innerHTML='<div class="empty">Open a model to edit its architecture.</div>';
-  document.getElementById("tabInsp").innerHTML='<div class="empty">No model open.</div>';
-  document.getElementById("tabFuse").innerHTML="";document.getElementById("tabPerf").innerHTML="";
-  updateStatus();
+
+function getScenario(){
+  return SCENARIOS.find((item)=>item.id===STATE.scenario) || SCENARIOS[0];
+}
+
+function getReason(){
+  return REASONS.find((item)=>item.id===STATE.reason) || REASONS[0];
+}
+
+function scoreText(score){
+  if(score >= 5)return "当前场景一号矛盾";
+  if(score >= 4)return "当前场景高相关";
+  if(score >= 3)return "当前场景中相关";
+  return "当前场景次相关";
+}
+
+function severityLabel(kind){
+  if(kind === "critical")return "Critical";
+  if(kind === "high")return "High";
+  return "Medium";
+}
+
+function renderScenarioSeg(){
+  qs("scenarioSeg").innerHTML=SCENARIOS.map((item)=>(
+    `<button data-scenario="${item.id}" class="${item.id===STATE.scenario?"on":""}">${item.label}</button>`
+  )).join("");
+  qs("scenarioSeg").querySelectorAll("button").forEach((btn)=>{
+    btn.addEventListener("click",()=>{
+      STATE.scenario=btn.dataset.scenario;
+      const scenario=getScenario();
+      STATE.reason=scenario.highlight[0];
+      renderAll();
+    });
+  });
+}
+
+function renderActivity(){
+  qs("activity").innerHTML=CENTER_VIEWS.map((item)=>(
+    `<button class="act ${item.id===STATE.view?"on":""}" data-view="${item.id}" title="${item.label}">${item.icon}</button>`
+  )).join("") + '<button class="act bottom" title="专题提示">?</button>';
+  qs("activity").querySelectorAll("[data-view]").forEach((btn)=>{
+    btn.addEventListener("click",()=>{
+      STATE.view=btn.dataset.view;
+      renderActivity();
+      renderCenter();
+    });
+  });
+}
+
+function renderReasonList(){
+  const scenario=getScenario();
+  qs("reasonList").innerHTML=REASONS.map((item)=>{
+    const score=item.scenarioScore[scenario.id];
+    return `
+      <div class="reason ${item.id===STATE.reason?"on":""}" data-reason="${item.id}">
+        <div class="reason-top">
+          <div class="reason-title">${item.title}</div>
+          <span class="sev ${item.severity}">${severityLabel(item.severity)}</span>
+        </div>
+        <div class="reason-sub">${item.subtitle}</div>
+        <div class="reason-meta">
+          <span class="chip">${scoreText(score)}</span>
+          <span class="chip">${item.stage.join(" · ")}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+  qs("reasonList").querySelectorAll("[data-reason]").forEach((item)=>{
+    item.addEventListener("click",()=>{
+      STATE.reason=item.dataset.reason;
+      renderAll();
+    });
+  });
+}
+
+function renderScenarioSummary(){
+  const scenario=getScenario();
+  const topReasons=[...REASONS]
+    .sort((a,b)=>b.scenarioScore[scenario.id]-a.scenarioScore[scenario.id])
+    .slice(0,3);
+  qs("scenarioSummary").innerHTML=`
+    <h4>${scenario.label}</h4>
+    <p>${scenario.summary}</p>
+    <ul class="checklist">
+      ${scenario.evidence.map((text)=>`<li>${text}</li>`).join("")}
+      ${topReasons.map((item)=>`<li>优先排查：${item.title}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderFocusTags(){
+  const reason=getReason();
+  const scenario=getScenario();
+  qs("viewTitle").textContent=CENTER_VIEWS.find((item)=>item.id===STATE.view).label;
+  qs("focusTags").innerHTML=[
+    ...reason.stage,
+    ...reason.focus,
+    scenario.label
+  ].map((tag)=>`<span class="focus-tag">${tag}</span>`).join("");
+}
+
+function renderHero(){
+  const reason=getReason();
+  const scenario=getScenario();
+  const score=reason.scenarioScore[scenario.id];
+  const metrics=reason.dims;
+  const maxGap=metrics.reduce((best,item)=>{
+    const gap=Math.abs(item.gpu-item.ascend);
+    return gap>best.gap?{gap,label:item.label}:best;
+  },{gap:-1,label:"—"});
+  const avgAscend=Math.round(metrics.reduce((sum,item)=>sum+item.ascend,0)/metrics.length);
+  qs("hero").innerHTML=`
+    <div class="hero-top">
+      <div>
+        <div class="cardt">当前选中根因</div>
+        <h2>${reason.title}</h2>
+        <p>${reason.summary}</p>
+      </div>
+      <span class="sev ${reason.severity}">${severityLabel(reason.severity)}</span>
+    </div>
+    <div class="hero-kpis">
+      <div class="kpi">
+        <div class="label">场景相关度</div>
+        <div class="value">${score}/5</div>
+        <div class="desc">${scoreText(score)}，优先在 ${scenario.label} 中排查。</div>
+      </div>
+      <div class="kpi">
+        <div class="label">最大原理差</div>
+        <div class="value">${maxGap.label}</div>
+        <div class="desc">GPU 假设与 Ascend 默认路径偏差最大的维度。</div>
+      </div>
+      <div class="kpi">
+        <div class="label">默认吸收度</div>
+        <div class="value">${avgAscend}%</div>
+        <div class="desc">表示 Ascend 开箱状态对这类模式的天然吸收能力。</div>
+      </div>
+    </div>
+  `;
+}
+
+function laneMarkup(title,color,cards){
+  return `
+    <div class="lane">
+      <h4><span class="swatch" style="background:${color}"></span>${title}</h4>
+      ${cards.map((item)=>`<div class="lane-card"><strong>${item.title}</strong>${item.body}</div>`).join("")}
+    </div>
+  `;
+}
+
+function renderBoard(){
+  const reason=getReason();
+  qs("board").innerHTML=[
+    laneMarkup("GPU 侧性能假设","var(--gpu)",reason.gpuPath),
+    laneMarkup("迁移断点","var(--fracture)",reason.fracture),
+    laneMarkup("Ascend 默认执行路径","var(--ascend)",reason.ascendPath),
+    laneMarkup("最终性能表征","var(--symptom)",reason.symptom)
+  ].join("");
+}
+
+function renderMatrix(){
+  const reason=getReason();
+  qs("matrix").innerHTML=reason.dims.map((item)=>{
+    return `
+      <div class="matrix-row">
+        <div class="matrix-head">
+          <strong>${item.label}</strong>
+          <span>${item.note}</span>
+        </div>
+        <div class="barpack">
+          <label>GPU 假设</label>
+          <div class="bar"><i style="width:${item.gpu}%;background:var(--gpu)"></i></div>
+          <div class="bar-num">${item.gpu}</div>
+        </div>
+        <div class="barpack">
+          <label>Ascend 开箱</label>
+          <div class="bar"><i style="width:${item.ascend}%;background:var(--ascend)"></i></div>
+          <div class="bar-num">${item.ascend}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderSignals(){
+  const reason=getReason();
+  qs("signals").innerHTML=`
+    <div class="signal-grid">
+      ${reason.evidence.map((item)=>`
+        <div class="signal">
+          <h4>${item.title}</h4>
+          <p>${item.detail}</p>
+          <div class="tagrow">${item.tags.map((tag)=>`<span class="chip">${tag}</span>`).join("")}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function setCenterVisibility(){
+  const board=qs("board");
+  const matrix=qs("matrix");
+  const signals=qs("signals");
+  board.style.display=STATE.view==="map"?"grid":"none";
+  matrix.style.display=STATE.view==="matrix"?"grid":"none";
+  signals.style.display=STATE.view==="signals"?"block":"none";
+}
+
+function renderCenter(){
+  renderFocusTags();
+  renderHero();
+  renderBoard();
+  renderMatrix();
+  renderSignals();
+  setCenterVisibility();
+}
+
+function renderDetailPane(){
+  const reason=getReason();
+  const pane=qs("detailPane");
+  if(STATE.tab==="principle"){
+    pane.innerHTML=`
+      <div class="cardt">底层原理</div>
+      <div class="detail-card">
+        <h4>${reason.title}</h4>
+        <p>${reason.summary}</p>
+      </div>
+      <div class="detail-card">
+        <h4>为什么 GPU 开源实现默认更快</h4>
+        <ul class="list">${reason.why.map((item)=>`<li>${item}</li>`).join("")}</ul>
+      </div>
+      <div class="hint">判断标准：如果热点集中在图编译、边角算子、格式转换或通信空洞，而不是单一大 GEMM，本质上就不是“主核没写好”，而是体系结构吸收方式不同。</div>
+    `;
+    return;
+  }
+  if(STATE.tab==="symptoms"){
+    pane.innerHTML=`
+      <div class="cardt">典型症状</div>
+      <div class="detail-card">
+        <h4>你会在 profiler 里看到什么</h4>
+        <ul class="list">${reason.symptom.map((item)=>`<li><strong>${item.title}</strong>：${item.body}</li>`).join("")}</ul>
+      </div>
+      <div class="detail-card">
+        <h4>优先采集哪些证据</h4>
+        <ul class="list">${reason.evidence.map((item)=>`<li><strong>${item.title}</strong>：${item.detail}</li>`).join("")}</ul>
+      </div>
+    `;
+    return;
+  }
+  if(STATE.tab==="optimization"){
+    pane.innerHTML=`
+      <div class="cardt">优化抓手</div>
+      <div class="detail-card">
+        <h4>先做什么</h4>
+        <ul class="list">${reason.optimize.map((item)=>`<li>${item}</li>`).join("")}</ul>
+      </div>
+      <div class="detail-card">
+        <h4>适合落在什么层级</h4>
+        <ul class="list">
+          ${reason.stage.map((item)=>`<li>${item} 层优先处理。</li>`).join("")}
+          ${reason.focus.map((item)=>`<li>专项动作：${item}</li>`).join("")}
+        </ul>
+      </div>
+    `;
+    return;
+  }
+  pane.innerHTML=`
+    <div class="cardt">对比表</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>维度</th><th>GPU 侧</th><th>Ascend 侧</th></tr>
+        </thead>
+        <tbody>
+          ${reason.compare.map((row)=>`
+            <tr>
+              <td>${row[0]}</td>
+              <td>${row[1]}</td>
+              <td>${row[2]}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderTabs(){
-  const bar=document.getElementById("tabsbar");bar.innerHTML="";
-  DOCS.forEach(d=>{
-    const t=document.createElement("div");t.className="tab"+(d.id===ACT?" on":"");
-    const col=d.fields.fam==="moe"?"var(--acc2)":"var(--acc)";
-    t.innerHTML=`<span class="dot" style="background:${col}"></span>
-      <span>${d.name}</span><span class="x">×</span>`;
-    t.onclick=()=>setActive(d.id);
-    t.querySelector(".x").onclick=e=>closeTab(d.id,e);
-    bar.appendChild(t);
-  });
-}
-function renderPresets(){
-  const host=document.getElementById("presetList");host.innerHTML="";
-  PRESETS.forEach(p=>{
-    const on=DOCS.find(d=>d.presetId===p.id&&d.id===ACT);
-    const el=document.createElement("div");el.className="titem"+(on?" on":"");
-    const col=p.fam==="moe"?"var(--acc2)":"var(--acc)";
-    el.innerHTML=`<span class="ic">${p.fam==="moe"?"⬡":"▢"}</span><span>${p.name}</span>
-      <span class="meta">${p.fam}</span>`;
-    el.onclick=()=>openPreset(p);host.appendChild(el);
-  });
-}
-function renderImported(){
-  const host=document.getElementById("importedList");host.innerHTML="";
-  const imp=DOCS.filter(d=>d.source!=="preset");
-  if(!imp.length){host.innerHTML='<div class="empty" style="padding:6px 22px">No imported models yet.</div>';return;}
-  imp.forEach(d=>{
-    const el=document.createElement("div");el.className="titem"+(d.id===ACT?" on":"");
-    el.innerHTML=`<span class="ic">${d.icon}</span><span>${d.name}</span>
-      <span class="meta">${d.fields.fam}</span>`;
-    el.onclick=()=>setActive(d.id);host.appendChild(el);
-  });
-}
-
-/* ======================= COST MODEL ======================= */
-function peakFlops(){
-  let cmul=PREC[RUN.prec].cmul;
-  if(RUN.prec==="fp8"&&!DEVICES[RUN.device].fp8)cmul=1; // no native FP8 → FP16 rate
-  return DEVICES[RUN.device].tflops*1e12*cmul;
-}
-function fp8Unsupported(){return RUN.prec==="fp8"&&!DEVICES[RUN.device].fp8;}
-function memBW(){return DEVICES[RUN.device].bw*1e9;}
-function ab(){return PREC[RUN.prec].bytes;}
-function gemmTokens(){return RUN.phase==="prefill"?S.B*S.seq:S.B*1;}
-function qLen(){return RUN.phase==="prefill"?S.seq:1;}
-function kvLen(){return S.seq;}
-function gemm(inD,outD,tok){const f=2*tok*inD*outD,p=inD*outD;
-  return{flops:f,params:p,rd:p*ab()+tok*inD*ab(),wr:tok*outD*ab()};}
-function isMoE(){return S.fam==="moe";}
-
-function buildOps(){
-  const L=S.layers,d=S.d,nH=S.nH,nKV=S.nKV,hd=S.hd,a=ab();
-  const tk=gemmTokens(),ql=qLen(),kl=kvLen();
-  const qDim=nH*hd,qkvOut=(nH+2*nKV)*hd,kvDim=nKV*hd;
-  const ops=[];const push=o=>{o.rd=o.rd||0;o.wr=o.wr||0;o.flops=o.flops||0;o.params=o.params||0;ops.push(o);};
-  push({id:"emb",name:"Token Embedding",cls:"io",cnt:1,out:[S.B,ql,d],desc:"Gather embedding rows.",
-    params:S.vocab*d,rd:S.B*ql*d*a,wr:S.B*ql*d*a});
-  push({id:"n1",name:"RMSNorm",cls:"norm",cnt:L,out:[S.B,ql,d],desc:"Pre-attention norm.",
-    flops:5*S.B*ql*d,rd:S.B*ql*d*a+d*a,wr:S.B*ql*d*a,params:d});
-  push({id:"qkv",name:"QKV Projection",cls:"gemm",cnt:L,out:[S.B,ql,qkvOut],
-    desc:`GQA: ${nH} Q / ${nKV} KV heads (${(nH/nKV).toFixed(0)}× share).`,...gemm(d,qkvOut,tk)});
-  push({id:"rope",name:"RoPE",cls:"elem",cnt:L,out:[S.B,ql,qDim+kvDim],desc:"Rotary embedding on Q,K.",
-    flops:6*S.B*ql*(qDim+kvDim),rd:S.B*ql*(qDim+kvDim)*a,wr:S.B*ql*(qDim+kvDim)*a});
-  push({id:"qk",name:"Q·Kᵀ (scores)",cls:"attn",cnt:L,out:[S.B,nH,ql,kl],
-    desc:RUN.phase==="decode"?"1 query vs full KV cache.":"Score matrix.",
-    flops:2*S.B*nH*ql*kl*hd,rd:(S.B*nH*ql*hd+S.B*nKV*kl*hd)*a,wr:S.B*nH*ql*kl*a});
-  push({id:"sm",name:"Softmax",cls:"attn",cnt:L,out:[S.B,nH,ql,kl],desc:"Row-wise softmax.",
-    flops:5*S.B*nH*ql*kl,rd:S.B*nH*ql*kl*a,wr:S.B*nH*ql*kl*a});
-  push({id:"pv",name:"P·V (context)",cls:"attn",cnt:L,out:[S.B,nH,ql,hd],desc:"Weighted sum of values.",
-    flops:2*S.B*nH*ql*kl*hd,rd:(S.B*nH*ql*kl+S.B*nKV*kl*hd)*a,wr:S.B*nH*ql*hd*a});
-  push({id:"o",name:"Output Projection",cls:"gemm",cnt:L,out:[S.B,ql,d],desc:"Attention output proj.",...gemm(qDim,d,tk)});
-  push({id:"r1",name:"Residual Add",cls:"elem",cnt:L,out:[S.B,ql,d],desc:"Add to residual stream.",
-    flops:S.B*ql*d,rd:2*S.B*ql*d*a,wr:S.B*ql*d*a});
-  push({id:"n2",name:"RMSNorm",cls:"norm",cnt:L,out:[S.B,ql,d],desc:"Pre-MLP norm.",
-    flops:5*S.B*ql*d,rd:S.B*ql*d*a+d*a,wr:S.B*ql*d*a,params:d});
-
-  if(!isMoE()){
-    const ff=S.ffn;
-    push({id:"gu",name:"Gate + Up (SwiGLU)",cls:"gemm",cnt:L,out:[S.B,ql,2*ff],desc:"SwiGLU projections.",...gemm(d,2*ff,tk)});
-    push({id:"act",name:"SiLU × Mul",cls:"elem",cnt:L,out:[S.B,ql,ff],desc:"SiLU(gate)⊙up.",
-      flops:5*S.B*ql*ff,rd:2*S.B*ql*ff*a,wr:S.B*ql*ff*a});
-    push({id:"dn",name:"Down Projection",cls:"gemm",cnt:L,out:[S.B,ql,d],desc:"Project back to d.",...gemm(ff,d,tk)});
-  }else{
-    const N=S.experts,K=S.active,M=Math.max(1,S.groups),sh=S.shared,ef=S.expff,gt=S.routing==="group-topk";
-    push({id:"rt",name:"Router (softmax)",cls:"route",cnt:L,out:[S.B,ql,N],desc:`Score ${N} experts.`,...gemm(d,N,tk)});
-    push({id:"grp",name:gt?`Group Top-K × ${M}`:`Top-${K} select`,cls:"route",cnt:L,out:[S.B,ql,K],
-      desc:gt?`Split ${N} experts into ${M} groups; pick per group → ${K} active. Balanced load across ${M} devices.`
-             :`Pick top ${K} of ${N} experts.`,
-      flops:S.B*ql*N,rd:S.B*ql*N*a,wr:S.B*ql*K*a});
-    const tokE=tk*K, wRouted=N*(d*2*ef+ef*d)*ab();
-    const wLoad=RUN.phase==="decode"?K*(d*2*ef+ef*d)*ab():wRouted;
-    push({id:"eup",name:"Experts Gate+Up (GMM)",cls:"expert",cnt:L,out:[S.B,ql,K,2*ef],
-      desc:`Grouped GEMM over ${K} of ${N} experts.`,flops:2*tokE*d*2*ef,params:N*d*2*ef,rd:wLoad+tokE*d*a,wr:tokE*2*ef*a});
-    push({id:"eact",name:"Expert SiLU × Mul",cls:"elem",cnt:L,out:[S.B,ql,K,ef],desc:"Expert SwiGLU.",
-      flops:5*tokE*ef,rd:2*tokE*ef*a,wr:tokE*ef*a});
-    push({id:"edn",name:"Experts Down (GMM)",cls:"expert",cnt:L,out:[S.B,ql,K,d],desc:"Grouped GEMM back to d.",
-      flops:2*tokE*ef*d,params:N*ef*d,rd:(RUN.phase==="decode"?K:N)*ef*d*ab()+tokE*ef*a,wr:tokE*d*a});
-    if(sh>0){const tokS=tk*sh;
-      push({id:"sh",name:`Shared Experts × ${sh}`,cls:"expert",cnt:L,out:[S.B,ql,sh,d],desc:"Always-on dense experts.",
-        flops:2*tokS*d*2*ef+2*tokS*ef*d,params:sh*(d*2*ef+ef*d),rd:sh*(d*2*ef+ef*d)*ab()+tokS*d*a,wr:tokS*d*a});}
-    push({id:"comb",name:"Combine (weighted Σ)",cls:"route",cnt:L,out:[S.B,ql,d],desc:"Sum routed + shared outputs.",
-      flops:S.B*ql*(K+sh)*d,rd:S.B*ql*(K+sh)*d*a,wr:S.B*ql*d*a});
-  }
-  push({id:"r2",name:"Residual Add",cls:"elem",cnt:L,out:[S.B,ql,d],desc:"Add to residual stream.",
-    flops:S.B*ql*d,rd:2*S.B*ql*d*a,wr:S.B*ql*d*a});
-  push({id:"nf",name:"Final RMSNorm",cls:"norm",cnt:1,out:[S.B,ql,d],desc:"Final norm.",
-    flops:5*S.B*ql*d,rd:S.B*ql*d*a+d*a,wr:S.B*ql*d*a,params:d});
-  push({id:"lm",name:"LM Head",cls:"io",cnt:1,out:[S.B,ql,S.vocab],desc:"Project to vocab logits.",...gemm(d,S.vocab,S.B*ql)});
-
-  // ---- input tensor annotations (for the inspector) ----
-  const N=S.experts,K=S.active,ef=S.expff,sh=S.shared,ff=S.ffn;
-  const INS={
-    emb:[["token ids",[S.B,ql]],["embed table",[S.vocab,d]]],
-    n1:[["x",[S.B,ql,d]]],
-    qkv:[["x",[S.B,ql,d]],["W_qkv",[d,qkvOut]]],
-    rope:[["Q,K",[S.B,ql,qDim+kvDim]]],
-    qk:[["Q",[S.B,nH,ql,hd]],["K",[S.B,nKV,kl,hd]]],
-    sm:[["scores",[S.B,nH,ql,kl]]],
-    pv:[["P",[S.B,nH,ql,kl]],["V",[S.B,nKV,kl,hd]]],
-    o:[["context",[S.B,ql,qDim]],["W_o",[qDim,d]]],
-    r1:[["attn out",[S.B,ql,d]],["residual",[S.B,ql,d]]],
-    n2:[["x",[S.B,ql,d]]],
-    gu:[["x",[S.B,ql,d]],["W_gate,up",[d,2*ff]]],
-    act:[["gate,up",[S.B,ql,2*ff]]],
-    dn:[["h",[S.B,ql,ff]],["W_down",[ff,d]]],
-    rt:[["x",[S.B,ql,d]],["W_router",[d,N]]],
-    grp:[["logits",[S.B,ql,N]]],
-    eup:[["x×K",[S.B,ql,K,d]],["W_up (N experts)",[N,d,2*ef]]],
-    eact:[["gate,up",[S.B,ql,K,2*ef]]],
-    edn:[["h",[S.B,ql,K,ef]],["W_down (N experts)",[N,ef,d]]],
-    sh:[["x",[S.B,ql,d]],["W_shared",[sh,d,2*ef]]],
-    comb:[["expert outs",[S.B,ql,K+sh,d]],["gate weights",[S.B,ql,K]]],
-    r2:[["mlp out",[S.B,ql,d]],["residual",[S.B,ql,d]]],
-    nf:[["x",[S.B,ql,d]]],
-    lm:[["x",[S.B,ql,d]],["W_vocab",[d,S.vocab]]],
-  };
-  for(const o of ops) o.ins=INS[o.id]||[];
-
-  const pk=peakFlops(),bw=memBW();
-  for(const o of ops){
-    o.tFlops=o.flops/pk*1e6;o.tMem=(o.rd+o.wr)/bw*1e6;
-    o.tKern=Math.max(o.tFlops,o.tMem)+LAUNCH_US;o.bound=o.tFlops>o.tMem?"compute":"memory";
-    o.ai=(o.rd+o.wr)>0?o.flops/(o.rd+o.wr):0;
-    o.Tflops=o.flops*o.cnt;o.Tmem=(o.rd+o.wr)*o.cnt;o.Tparams=o.params*o.cnt;
-    o.Ttime=o.tKern*o.cnt;o.Tlaunch=o.cnt;
-  }
-  return ops;
-}
-function totals(ops){let f=0,p=0,m=0,t=0,l=0;
-  for(const o of ops){f+=o.Tflops;p+=o.Tparams;m+=o.Tmem;t+=o.Ttime;l+=o.Tlaunch;}return{flops:f,params:p,mem:m,time:t,launch:l};}
-function activeParams(){
-  const d=S.d,ef=S.expff,L=S.layers;
-  const attn=d*(S.nH+2*S.nKV)*S.hd+S.nH*S.hd*d;
-  if(!isMoE())return S.vocab*d+L*(attn+3*d*S.ffn+2*d)+d+d*S.vocab;
-  const per=d*2*ef+ef*d,router=d*S.experts;
-  const moe=router+S.active*per+S.shared*per+2*d;
-  return S.vocab*d+L*(attn+moe)+d+d*S.vocab;
-}
-function totalParams(){
-  const d=S.d,ef=S.expff,L=S.layers;
-  const attn=d*(S.nH+2*S.nKV)*S.hd+S.nH*S.hd*d;
-  if(!isMoE())return S.vocab*d+L*(attn+3*d*S.ffn+2*d)+d+d*S.vocab;
-  const per=d*2*ef+ef*d;
-  const moe=d*S.experts+S.experts*per+S.shared*per+2*d;
-  return S.vocab*d+L*(attn+moe)+d+d*S.vocab;
-}
-
-/* ======================= fusion ======================= */
-function fusionPatterns(){
-  const moe=isMoE();
-  const c=[
-    {id:"flash",name:moe?"MulAttention (fused attn)":"FlashAttention",members:["qk","sm","pv"],color:"#a56bf0",
-     desc:moe?"Ascend fused attention: QKᵀ+softmax+PV in one pass; large-packet KV transfer for decode."
-             :"Tile QKᵀ+softmax+PV so the score matrix never hits HBM.",elim:["sm"]},
-    {id:"qkv",name:"QKV + RoPE fusion",members:["qkv","rope"],color:"#4c86f0",
-     desc:"Apply RoPE in the QKV epilogue.",elim:["rope"]},
-    {id:"rn",name:"Residual + Norm fusion",members:["r1","n2"],color:"#eda24e",
-     desc:"Fuse residual add with the next RMSNorm.",elim:["r1"]},
-    {id:"epi",name:"Norm → GEMM epilogue",members:["n1","qkv"],color:"#3ec7c0",
-     desc:"Fold norm into the next GEMM prologue.",elim:["n1"]},
-  ];
-  if(!moe){c.splice(2,0,{id:"swiglu",name:"Fused SwiGLU",members:["gu","act","dn"],color:"#4c86f0",
-    desc:"Fuse gate/up, SiLU·mul and down projection.",elim:["act"]});}
-  else{c.splice(2,0,
-    {id:"swift",name:"SwiftGMM (grouped experts)",members:["eup","eact","edn"],color:"#ec5a9e",
-     desc:"Ascend grouped-matmul with tiling cache + double buffering; ~95% MTE2 use.",elim:["eact"]},
-    {id:"route",name:"Router + Group-TopK fusion",members:["rt","grp"],color:"#ec5a9e",
-     desc:"Fuse softmax router with per-group Top-K; balance is structural.",elim:["grp"]},
-    {id:"gmmrs",name:"GMMRS / AGMM comm-overlap",members:["edn","comb"],color:"#7bd88f",
-     desc:"Overlap grouped matmul with expert-parallel communication.",elim:[]});}
-  return c;
-}
-function fusionSaving(p,ops){
-  const by=Object.fromEntries(ops.map(o=>[o.id,o]));
-  let mem=0,launch=0,time=0;const present=p.members.filter(m=>by[m]);
-  if(present.length>1)launch+=present.length-1;
-  for(const e of p.elim){const o=by[e];if(!o)continue;mem+=o.Tmem;time+=o.tMem*o.cnt;launch+=o.cnt;}
-  return{mem,launch,time,present};
-}
-
-/* ======================= graph render ======================= */
-const NCOL={io:"#3ec7c0",gemm:"#4c86f0",attn:"#a56bf0",elem:"#7f93a6",norm:"#eda24e",route:"#ec5a9e",expert:"#f58bbf",comm:"#7bd88f"};
-const CLSN={io:"I/O",gemm:"GEMM",attn:"Attention core",elem:"Elementwise",norm:"Norm",route:"MoE routing",expert:"Expert (GMM)",comm:"Comm"};
-const GSEM={io:"io",gemm:"linear",attn:"attention",elem:"act",norm:"norm",route:"gate",expert:"moe",comm:"comm"};
-let OPS=[],stage,gsvg,gtip,GRAPH=null,VT={tx:0,ty:0,z:.82};
-/* composite (block-level) operators the user can select */
-function groupDefs(){
-  const ids=new Set(OPS.map(o=>o.id));const keep=a=>a.filter(id=>ids.has(id));
-  const g=[
-    {id:"attn",name:"Attention block",col:"#a56bf0",ids:keep(["n1","qkv","rope","qk","sm","pv","o","r1"])},
-    {id:"mlp",name:isMoE()?"MoE block · MoGE":"MLP block · SwiGLU",col:isMoE()?"#ec5a9e":"#4c86f0",
-     ids:keep(isMoE()?["n2","rt","grp","eup","eact","edn","sh","comb","r2"]:["n2","gu","act","dn","r2"])},
-  ];
-  if(isMoE())g.push({id:"experts",name:"Experts (routed + shared)",col:"#f58bbf",ids:keep(["eup","eact","edn","sh"])});
-  return g;
-}
-const isGroupSel=()=>typeof SEL==="string"&&SEL.startsWith("g:");
-function selGroup(){return isGroupSel()?groupDefs().find(g=>g.id===SEL.slice(2)):null;}
-function selMembers(){const g=selGroup();return g?OPS.filter(o=>g.ids.includes(o.id)):[];}
-function layout(ops){
-  const NW=190,NH=46,GY=16;
-  const ids=new Set(ops.map(o=>o.id));const keep=a=>a.filter(id=>ids.has(id));
-  const colA=keep(["n1","qkv","rope","qk","sm","pv","o","r1"]);
-  const colB=keep(isMoE()?["n2","rt","grp","eup","eact","edn","sh","comb","r2"]:["n2","gu","act","dn","r2"]);
-  const top=keep(["emb"]),bot=keep(["nf","lm"]);
-  const Ax=150,Bx=Ax+NW+120,centerX=(Ax+Bx+NW)/2-NW/2;
-  const pos={};let y=30;
-  for(const id of top){pos[id]={x:centerX,y,w:NW,h:NH};y+=NH+30;}
-  const blockTop=y;let ya=blockTop,yb=blockTop;
-  for(const id of colA){pos[id]={x:Ax,y:ya,w:NW,h:NH};ya+=NH+GY;}
-  for(const id of colB){pos[id]={x:Bx,y:yb,w:NW,h:NH};yb+=NH+GY;}
-  const blockBot=Math.max(ya,yb)-GY;let yc=blockBot+32;
-  for(const id of bot){pos[id]={x:centerX,y:yc,w:NW,h:NH};yc+=NH+GY;}
-  return{pos,NW,NH,Ax,Bx,centerX,colA,colB,blockTop,blockBot,flow:top.concat(colA,colB,bot),height:yc};
-}
-function svgEl(tag,attrs={}){const el=document.createElementNS("http://www.w3.org/2000/svg",tag);
-  Object.entries(attrs).forEach(([k,v])=>{if(v!=null)el.setAttribute(k,v);});return el;}
-function escHtml(v){return String(v).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
-function edgePath(a,b){
-  const s={x:a.x,y:a.y+a.h/2},t={x:b.x,y:b.y-b.h/2};
-  if(Math.abs(s.x-t.x)<48){return{d:`M ${s.x} ${s.y} L ${t.x} ${t.y}`,mx:(s.x+t.x)/2,my:(s.y+t.y)/2};}
-  const mx=(s.x+t.x)/2;return{d:`M ${s.x} ${s.y} C ${mx} ${s.y}, ${mx} ${t.y}, ${t.x} ${t.y}`,mx,my:(s.y+t.y)/2};
-}
-function graphFromOps(ops){
-  const Lo=layout(ops),{pos,NW,NH,flow}=Lo;
-  const fusionByNode={};
-  fusionPatterns().forEach((p,idx)=>p.members.forEach(id=>{if(pos[id])fusionByNode[id]=p.id||("f"+idx);}));
-  const nodes=ops.filter(o=>pos[o.id]).map(o=>{
-    const p=pos[o.id],perf=timeH(o.tKern*o.cnt),bound=o.bound==="memory"?"MEM":"CMP";
-    return{
-      id:o.id,label:o.name,kind:(o.id==="emb"||o.id==="lm")?"io":"op",sem:GSEM[o.cls]||"linear",
-      x:p.x+NW/2,y:p.y+NH/2,w:NW,h:NH,typeLabel:`${CLSN[o.cls]} · ${bound} · ${perf}`,
-      desc:o.desc,out:o.out,metric:o.flops>0?human(o.flops*o.cnt,"FLOP"):(o.cls==="elem"||o.cls==="norm"?"mem-bound":"—"),
-      time:perf,fuseRec:fusionByNode[o.id]||null,cls:o.cls
+  qs("rtabs").querySelectorAll("button").forEach((btn)=>{
+    btn.classList.toggle("on",btn.dataset.tab===STATE.tab);
+    btn.onclick=()=>{
+      STATE.tab=btn.dataset.tab;
+      renderTabs();
+      renderDetailPane();
     };
   });
-  const byId=Object.fromEntries(nodes.map(n=>[n.id,n]));
-  const edges=[];
-  for(let i=0;i<flow.length-1;i++){if(byId[flow[i]]&&byId[flow[i+1]])edges.push({s:flow[i],t:flow[i+1],type:"act"});}
-  if(byId.n1&&byId.r1)edges.push({s:"n1",t:"r1",type:"res",tag:"res"});
-  if(byId.n2&&byId.r2)edges.push({s:"n2",t:"r2",type:"res",tag:"res"});
-  const clusters=groupDefs().map(g=>{
-    const ms=g.ids.map(id=>byId[id]).filter(Boolean);if(!ms.length)return null;
-    const left=Math.min(...ms.map(n=>n.x-n.w/2))-22,right=Math.max(...ms.map(n=>n.x+n.w/2))+22;
-    const top=Math.min(...ms.map(n=>n.y-n.h/2))-34,bottom=Math.max(...ms.map(n=>n.y+n.h/2))+18;
-    return{id:g.id,label:g.name,x:left,y:top,w:right-left,h:bottom-top};
-  }).filter(Boolean);
-  const fusionBoxes=RUN.showFuse?fusionPatterns().map(p=>{
-    const ms=p.members.map(id=>byId[id]).filter(Boolean);if(!ms.length)return null;
-    const left=Math.min(...ms.map(n=>n.x-n.w/2))-10,right=Math.max(...ms.map(n=>n.x+n.w/2))+10;
-    const top=Math.min(...ms.map(n=>n.y-n.h/2))-8,bottom=Math.max(...ms.map(n=>n.y+n.h/2))+8;
-    return{label:p.name,x:left,y:top,w:right-left,h:bottom-top};
-  }).filter(Boolean):[];
-  const maxX=Math.max(...nodes.map(n=>n.x+n.w/2),...clusters.map(c=>c.x+c.w),...fusionBoxes.map(f=>f.x+f.w),0)+44;
-  const maxY=Math.max(...nodes.map(n=>n.y+n.h/2),...clusters.map(c=>c.y+c.h),...fusionBoxes.map(f=>f.y+f.h),0)+40;
-  return{nodes,nodeMap:byId,edges,clusters,fusionBoxes,width:maxX,height:maxY};
-}
-function renderFusionBoxes(graph){
-  graph.fusionBoxes.forEach(f=>{
-    gsvg.appendChild(svgEl("rect",{class:"fbracket-bg",x:f.x,y:f.y,width:f.w,height:f.h,rx:12}));
-    gsvg.appendChild(svgEl("path",{class:"fbracket",d:`M ${f.x+f.w-12} ${f.y+12} h 10 v ${Math.max(8,f.h-24)} h -10`}));
-    const lbl=svgEl("text",{class:"fbracket-lbl",x:f.x+10,y:f.y+10,"dominant-baseline":"central"});lbl.textContent=f.label;gsvg.appendChild(lbl);
-  });
-}
-function draw(){
-  OPS=buildOps();
-  const graph=graphFromOps(OPS),gsel=selGroup(),gmem=gsel?new Set(gsel.ids):null;
-  GRAPH=graph;gsvg.innerHTML="";
-  gsvg.setAttribute("viewBox",`0 0 ${graph.width} ${graph.height}`);
-  gsvg.setAttribute("width",graph.width);gsvg.setAttribute("height",graph.height);
-  const defs=svgEl("defs"),marker=svgEl("marker",{id:"arr",viewBox:"0 0 10 10",refX:"8.6",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"});
-  marker.appendChild(svgEl("path",{d:"M0 0 L10 5 L0 10 z",fill:"var(--border-strong)"}));defs.appendChild(marker);gsvg.appendChild(defs);
-  graph.clusters.forEach(c=>{
-    const on=SEL===`g:${c.id}`,group=svgEl("g",{class:"cl-group","data-grp":c.id});
-    group.appendChild(svgEl("rect",{class:`cl-rect${on?" is-selected":""}`,x:c.x,y:c.y,width:c.w,height:c.h,rx:16,ry:16}));
-    const label=svgEl("text",{class:"cl-label",x:c.x+18,y:c.y+22});label.textContent=c.label;group.appendChild(label);
-    group.addEventListener("click",e=>{e.stopPropagation();SEL=`g:${c.id}`;RUN.tab="insp";setRTab();draw();renderRight();});
-    gsvg.appendChild(group);
-  });
-  if(RUN.showFuse)renderFusionBoxes(graph);
-  graph.edges.forEach(edge=>{
-    const s=graph.nodeMap[edge.s],t=graph.nodeMap[edge.t];if(!s||!t)return;
-    const p=edgePath(s,t),path=svgEl("path",{class:`edge ${edge.type||"act"}`,d:p.d,"marker-end":"url(#arr)"});gsvg.appendChild(path);
-    if(edge.tag){
-      const w=edge.tag.length*6+12,tag=svgEl("g");
-      tag.appendChild(svgEl("rect",{class:"etag-bg",x:p.mx-w/2,y:p.my-8,width:w,height:16,rx:4}));
-      const tx=svgEl("text",{class:`etag ${edge.type||"act"}`,x:p.mx,y:p.my+1,"text-anchor":"middle","dominant-baseline":"central"});
-      tx.textContent=edge.tag;tag.appendChild(tx);gsvg.appendChild(tag);
-    }
-  });
-  graph.nodes.forEach(node=>{
-    const dim=!!gmem&&!gmem.has(node.id),rel=!!gmem&&gmem.has(node.id),sel=SEL===node.id;
-    const cls=`nd ${node.kind}${node.fuseRec?" fuse":""}${sel?" sel":""}${rel&&!sel?" rel":""}${dim?" dim":""}`;
-    const group=svgEl("g",{class:cls,transform:`translate(${node.x}, ${node.y})`});
-    const fill=node.kind==="io"?null:`var(--op-sem-${node.sem})`;
-    group.appendChild(svgEl("rect",{class:"nd-rect",x:-node.w/2,y:-node.h/2,width:node.w,height:node.h,rx:node.h/2,ry:node.h/2,fill,stroke:node.kind==="io"?"var(--border-default)":"color-mix(in srgb, var(--foreground) 16%, transparent)"}));
-    const label=svgEl("text",{class:"nd-label",x:0,y:-3});label.textContent=node.label;group.appendChild(label);
-    const type=svgEl("text",{class:"nd-type",x:0,y:11});type.textContent=node.typeLabel;group.appendChild(type);
-    if(node.fuseRec)group.appendChild(svgEl("circle",{class:"fuse-dot",cx:node.w/2-11,cy:0,r:4}));
-    group.addEventListener("click",e=>{e.stopPropagation();SEL=node.id;RUN.tab="insp";setRTab();draw();renderRight();});
-    group.addEventListener("mousemove",e=>showTip(node,e));
-    group.addEventListener("mouseleave",hideTip);
-    gsvg.appendChild(group);
-  });
-  requestAnimationFrame(()=>{applyVT();if(!VT.z||VT.z===.82)fit();});
-  renderLegend();
-}
-function applyVT(){gsvg.style.transform=`translate(${VT.tx}px, ${VT.ty}px) scale(${VT.z})`;}
-function fit(){
-  if(!GRAPH)return;
-  const r=stage.getBoundingClientRect();if(r.width<=0||r.height<=0)return;
-  const pad=30,z=Math.min((r.width-pad*2)/GRAPH.width,(r.height-pad*2)/GRAPH.height,1.05);
-  VT.z=Math.max(z,.22);VT.tx=Math.max(pad,(r.width-GRAPH.width*VT.z)/2);VT.ty=Math.max(14,(r.height-GRAPH.height*VT.z)/2);applyVT();
-}
-function showTip(node,event){
-  if(!gtip)return;
-  let html=`<div class="op-graph-tip__head"><span class="op-graph-tip__kind">${escHtml(node.typeLabel.split(" · ")[0])}</span>${escHtml(node.label)}</div>`;
-  html+=`<div class="op-graph-tip__row">输出：<b>[${node.out.join("×")}]</b></div>`;
-  html+=`<div class="op-graph-tip__row">估算：<b>${escHtml(node.metric)}</b> · ${escHtml(node.time)}</div>`;
-  if(node.desc)html+=`<div class="op-graph-tip__row">${escHtml(node.desc)}</div>`;
-  if(node.fuseRec)html+=`<div class="op-graph-tip__fusion">可融合链路中的关键算子</div>`;
-  gtip.innerHTML=html;gtip.classList.add("is-visible");
-  const rect=stage.getBoundingClientRect(),x=Math.min(event.clientX-rect.left+16,rect.width-300),y=Math.min(event.clientY-rect.top+16,rect.height-130);
-  gtip.style.left=`${Math.max(8,x)}px`;gtip.style.top=`${Math.max(8,y)}px`;
-}
-function hideTip(){gtip&&gtip.classList.remove("is-visible");}
-
-/* ======================= number fmt ======================= */
-function human(n,u){const a=Math.abs(n);
-  if(a>=1e12)return(n/1e12).toFixed(2)+" T"+u;if(a>=1e9)return(n/1e9).toFixed(2)+" G"+u;
-  if(a>=1e6)return(n/1e6).toFixed(2)+" M"+u;if(a>=1e3)return(n/1e3).toFixed(2)+" K"+u;return n.toFixed(0)+" "+u;}
-function pcount(n){const a=Math.abs(n);
-  if(a>=1e9)return(n/1e9).toFixed(2)+"B";if(a>=1e6)return(n/1e6).toFixed(1)+"M";return n.toFixed(0);}
-function bytesH(n){const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+" GB";
-  if(a>=1e6)return(n/1e6).toFixed(2)+" MB";if(a>=1e3)return(n/1e3).toFixed(1)+" KB";return n.toFixed(0)+" B";}
-function timeH(us){if(us>=1e6)return(us/1e6).toFixed(2)+" s";if(us>=1e3)return(us/1e3).toFixed(2)+" ms";return us.toFixed(1)+" µs";}
-function fmtInt(n){return Math.round(n).toLocaleString("en-US");}
-
-/* ======================= parameters panel ======================= */
-const CFG_COMMON=[{k:"layers",l:"Layers",min:1,max:96,st:1},{k:"d",l:"Hidden (d)",min:512,max:16384,st:128},
-  {k:"nH",l:"Query heads",min:1,max:128,st:1},{k:"nKV",l:"KV heads",min:1,max:128,st:1},
-  {k:"hd",l:"Head dim",min:32,max:256,st:8},{k:"vocab",l:"Vocab",min:16000,max:200000,st:1024,fmt:fmtInt}];
-const CFG_DENSE=[{k:"ffn",l:"FFN size",min:512,max:53248,st:256,fmt:fmtInt}];
-const CFG_MOE=[{k:"expff",l:"Expert size",min:256,max:8192,st:64,fmt:fmtInt},
-  {k:"experts",l:"Experts (N)",min:4,max:256,st:1},{k:"groups",l:"Groups (M)",min:1,max:32,st:1},
-  {k:"active",l:"Active (K)",min:1,max:64,st:1},{k:"shared",l:"Shared",min:0,max:8,st:1}];
-const CFG_RUN=[{k:"B",l:"Batch",min:1,max:256,st:1},{k:"seq",l:"Seq length",min:128,max:32768,st:128,fmt:fmtInt}];
-function renderParams(){
-  if(!ACT){document.getElementById("params").innerHTML='<div class="empty">Open a model to edit its architecture.</div>';return;}
-  const host=document.getElementById("params");host.innerHTML="";
-  const add=(defs,pink)=>defs.forEach(dfn=>{
-    const row=document.createElement("div");row.className="prow";
-    const v=dfn.fmt?dfn.fmt(S[dfn.k]):S[dfn.k];
-    row.innerHTML=`<label>${dfn.l}</label><input type="range" class="${pink?'pink':''}" min="${dfn.min}" max="${dfn.max}" step="${dfn.st}" value="${S[dfn.k]}"><span class="val">${v}</span>`;
-    const inp=row.querySelector("input"),out=row.querySelector(".val");
-    inp.oninput=()=>{S[dfn.k]=+inp.value;out.textContent=dfn.fmt?dfn.fmt(+inp.value):inp.value;
-      clampMoE();const cur=DOCS.find(d=>d.id===ACT);syncFromS(cur);draw();renderRight();updateStatus();};
-    host.appendChild(row);});
-  add(CFG_COMMON);add(isMoE()?CFG_MOE:CFG_DENSE,isMoE());add(CFG_RUN);
-}
-function clampMoE(){if(!isMoE())return;S.groups=Math.max(1,Math.min(S.groups,S.experts));if(S.active>S.experts)S.active=S.experts;}
-
-/* ======================= right panel ======================= */
-function renderRight(){renderInspector();renderFuseTab();renderPerfTab();}
-function kv(k,v,c){return `<div class="kv"><span class="k">${k}</span><span class="v ${c||""}">${v}</span></div>`;}
-function ioRows(ins,out){
-  let h="";
-  (ins||[]).forEach(([n,s])=>{h+=`<div class="kv"><span class="k">in · ${n}</span><span class="v">[${s.join("×")}]</span></div>`;});
-  h+=`<div class="kv"><span class="k">out</span><span class="v" style="color:var(--acc)">[${out.join("×")}]</span></div>`;
-  return h;
-}
-function avgK(){const L=S.layers;let k=RUN.avgLayers==null?L:RUN.avgLayers;return Math.max(1,Math.min(L,Math.round(k)));}
-function opAgg(o){return {flops:o.flops,params:o.params,rd:o.rd,wr:o.wr,tF:o.tFlops,tM:o.tMem,tK:o.tKern,bound:o.bound,ai:o.ai,cnt:o.cnt,cls:o.cls};}
-function groupAgg(ms){let flops=0,params=0,rd=0,wr=0,tF=0,tM=0,tK=0,cnt=0;
-  for(const o of ms){flops+=o.flops;params+=o.params;rd+=o.rd;wr+=o.wr;tF+=o.tFlops;tM+=o.tMem;tK+=o.tKern;cnt=Math.max(cnt,o.cnt);}
-  return {flops,params,rd,wr,tF,tM,tK,bound:tF>tM?"compute":"memory",ai:(rd+wr)>0?flops/(rd+wr):0,cnt,cls:"route"};}
-
-let CUR_AGG=null;
-function multiLayerSection(agg){
-  if(agg.cnt<=1){CUR_AGG=null;return "";}
-  CUR_AGG=agg;const L=S.layers,K=avgK();
-  return `<div class="cardt">Multi-layer average</div>
-    <div class="prow" style="margin:2px 0 8px"><label>Layers aggregated</label>
-      <input type="range" id="avgLayersInp" min="1" max="${L}" step="1" value="${K}">
-      <span class="val" id="mlK">${K} / ${L}</span></div>
-    ${kv("Avg time / layer",timeH(agg.tK),"big")}
-    <div class="kv"><span class="k">Total time</span><span class="v" id="mlTime">${timeH(agg.tK*K)}</span></div>
-    <div class="kv"><span class="k">Total FLOPs</span><span class="v" id="mlFlops">${agg.flops>0?human(agg.flops*K,"FLOP"):"—"}</span></div>
-    <div class="kv"><span class="k">Total HBM</span><span class="v" id="mlHbm">${bytesH((agg.rd+agg.wr)*K)}</span></div>
-    <div style="font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.5">
-      Layers are identical in this analytical model, so avg/layer = one layer; totals scale with the layer count you pick.</div>`;
-}
-function perfSection(agg){
-  const pk=peakFlops(),bw=memBW();
-  const tsec=Math.max(1e-12,agg.tK/1e6);
-  const achF=agg.flops/tsec,achB=(agg.rd+agg.wr)/tsec;
-  const cU=pk>0?Math.min(100,achF/pk*100):0,bU=bw>0?Math.min(100,achB/bw*100):0;
-  const attain=agg.ai>0?Math.min(pk,agg.ai*bw):pk,dev=DEVICES[RUN.device];
-  return `<div class="cardt">Estimated performance</div>
-    ${kv("Device peak compute",(pk/1e12).toFixed(0)+" TFLOP/s"+(fp8Unsupported()?" (FP16 rate)":""))}
-    ${kv("Device peak bandwidth",(bw/1e9).toFixed(0)+" GB/s")}
-    ${kv("Roofline attainable",(attain/1e12).toFixed(1)+" TFLOP/s")}
-    <div class="kv" style="border:0"><span class="k">Achieved compute</span>
-      <span class="v">${(achF/1e12).toFixed(1)} TFLOP/s · ${cU.toFixed(1)}%</span></div>
-    <div class="bar"><i style="width:${cU}%;background:var(--compute)"></i></div>
-    <div class="kv" style="border:0;margin-top:7px"><span class="k">Achieved bandwidth</span>
-      <span class="v">${(achB/1e9).toFixed(0)} GB/s · ${bU.toFixed(1)}%</span></div>
-    <div class="bar"><i style="width:${bU}%;background:var(--memory)"></i></div>
-    <div class="kv" style="border:0;margin-top:7px"><span class="k">Throughput ceiling</span>
-      <span class="v">${agg.bound==="memory"?"bandwidth":"compute"}-limited</span></div>
-    <div style="font-size:10.5px;color:var(--dim);margin-top:4px;line-height:1.5">
-      Utilization = achieved ÷ ${dev.name} peak, from max(compute, memory) time + ${LAUNCH_US}µs launch.</div>`;
 }
 
-/* ======================= right panel ======================= */
-function renderRight(){renderInspector();renderFuseTab();renderPerfTab();}
-function renderInspector(){
-  const host=document.getElementById("tabInsp");if(!ACT){host.innerHTML='<div class="empty">No model open.</div>';return;}
-  if(isGroupSel()){host.innerHTML=groupInspectorHTML();wireAvg();return;}
-  const o=OPS.find(x=>x.id===SEL),t=totals(OPS);
-  if(!o){host.innerHTML=`<div class="empty">Click any operator — or a ▣ block header (attention / MoE / experts) — to inspect it.</div>
-    <div class="cardt">Model totals · ${RUN.phase}</div>
-    ${kv("Forward FLOPs",human(t.flops,"FLOP"))}${kv("Parameters",pcount(totalParams()))}
-    ${kv("HBM traffic",bytesH(t.mem))}${kv("Kernel launches",fmtInt(t.launch))}
-    ${kv("Est. latency",timeH(t.time),"")}`;return;}
-  const share=o.Ttime/t.time*100,perLayer=o.cnt>1;
-  host.innerHTML=`<div class="cardt" style="color:${NCOL[o.cls]}">${CLSN[o.cls]} · ×${o.cnt} layer${o.cnt>1?"s":""}</div>
-    <div style="font-size:15px;font-weight:600">${o.name}</div>
-    <div style="font-size:11px;color:var(--mut);margin-bottom:10px">${o.desc}</div>
-    <div class="cardt">Inputs → output</div>${ioRows(o.ins,o.out)}
-    <div class="cardt">Size${perLayer?" · per layer":""}</div>
-    ${kv("Parameters",o.params>0?pcount(o.params):"—")}
-    ${kv("FLOPs",o.flops>0?human(o.flops,"FLOP"):"—")}
-    ${kv("HBM read",bytesH(o.rd))}${kv("HBM write",bytesH(o.wr))}
-    ${kv("Arithmetic intensity",o.ai>0?o.ai.toFixed(1)+" F/B":"—")}
-    <div class="cardt">Timing${perLayer?" · per layer":""} · ${DEVICES[RUN.device].name}</div>
-    ${kv("Compute time",timeH(o.tFlops))}${kv("Memory time",timeH(o.tMem))}
-    ${kv("Kernel time",timeH(o.tKern),"big")}
-    <div class="kv"><span class="k">Bottleneck</span><span class="pill ${o.bound}">${o.bound==="memory"?"MEMORY-BOUND":"COMPUTE-BOUND"}</span></div>
-    <div class="kv" style="border:0"><span class="k">Share of total latency</span><span class="v">${share.toFixed(1)}%</span></div>
-    <div class="bar"><i style="width:${Math.min(100,share)}%;background:${NCOL[o.cls]}"></i></div>
-    ${multiLayerSection(opAgg(o))}
-    ${perfSection(opAgg(o))}
-    <div class="cardt">Roofline</div>${rooflineSVG(o.id)}`;
-  wireAvg();
-}
-function groupInspectorHTML(){
-  const g=selGroup(),ms=selMembers(),t=totals(OPS);if(!ms.length)return '<div class="empty">Empty block.</div>';
-  const agg=groupAgg(ms);
-  const totShare=ms.reduce((s,o)=>s+o.Ttime,0)/t.time*100;
-  const inFirst=ms[0].ins,outLast=ms[ms.length-1].out;
-  let rows="";
-  for(const o of ms.slice().sort((a,b)=>b.tKern-a.tKern)){const sh=o.tKern/agg.tK*100;
-    rows+=`<div class="kv" style="border:0;padding:3px 0"><span class="k"><span class="sw" style="display:inline-block;background:${NCOL[o.cls]}"></span> ${o.name}</span>
-      <span class="v">${timeH(o.tKern)} · ${sh.toFixed(0)}%</span></div>
-      <div class="bar" style="margin-bottom:4px"><i style="width:${sh}%;background:${NCOL[o.cls]}"></i></div>`;}
-  return `<div class="cardt" style="color:${g.col}">Composite operator · ${ms.length} ops · ×${agg.cnt} layers</div>
-    <div style="font-size:15px;font-weight:600">${g.name}</div>
-    <div style="font-size:11px;color:var(--mut);margin-bottom:10px">Aggregated view — sums FLOPs, traffic and kernel time across the block's operators.</div>
-    <div class="cardt">Inputs → output</div>${ioRows(inFirst,outLast)}
-    <div class="cardt">Breakdown · per-layer kernel time</div>${rows}
-    <div class="cardt">Aggregate size · per layer</div>
-    ${kv("Parameters",agg.params>0?pcount(agg.params):"—")}
-    ${kv("FLOPs",human(agg.flops,"FLOP"))}
-    ${kv("HBM traffic",bytesH(agg.rd+agg.wr))}
-    ${kv("Arithmetic intensity",agg.ai>0?agg.ai.toFixed(1)+" F/B":"—")}
-    <div class="cardt">Aggregate timing · per layer</div>
-    ${kv("Σ compute time",timeH(agg.tF))}${kv("Σ memory time",timeH(agg.tM))}
-    ${kv("Σ kernel time",timeH(agg.tK),"big")}
-    <div class="kv"><span class="k">Mostly</span><span class="pill ${agg.bound}">${agg.bound==="memory"?"MEMORY-BOUND":"COMPUTE-BOUND"}</span></div>
-    <div class="kv" style="border:0"><span class="k">Share of total latency</span><span class="v">${totShare.toFixed(1)}%</span></div>
-    <div class="bar"><i style="width:${Math.min(100,totShare)}%;background:${g.col}"></i></div>
-    ${multiLayerSection(agg)}
-    ${perfSection(agg)}
-    <div class="cardt">Roofline · block members</div>${rooflineSVG(g.ids)}`;
-}
-function wireAvg(){const inp=document.getElementById("avgLayersInp");if(!inp||!CUR_AGG)return;
-  inp.oninput=()=>{const K=Math.max(1,Math.min(S.layers,+inp.value||1));RUN.avgLayers=K;const a=CUR_AGG;
-    document.getElementById("mlK").textContent=K+" / "+S.layers;
-    document.getElementById("mlTime").textContent=timeH(a.tK*K);
-    document.getElementById("mlFlops").textContent=a.flops>0?human(a.flops*K,"FLOP"):"—";
-    document.getElementById("mlHbm").textContent=bytesH((a.rd+a.wr)*K);};}
-function renderFuseTab(){
-  const host=document.getElementById("tabFuse");if(!ACT){host.innerHTML="";return;}
-  const pats=fusionPatterns(),t=totals(OPS);let mS=0,lS=0,tS=0,items="";
-  for(const p of pats){const s=fusionSaving(p,OPS);mS+=s.mem;lS+=s.launch;tS+=s.time;
-    const pink=p.color==="#ec5a9e"||p.color==="#7bd88f";
-    items+=`<div class="fitem"><h6><span class="dot" style="background:${p.color}"></span>${p.name}</h6>
-      <p>${p.desc}</p><div class="fstat ${pink?'pink':''}">
-      <span>saved <b>${timeH(s.time)}</b></span><span>traffic <b>−${bytesH(s.mem)}</b></span>
-      <span>launches <b>−${Math.round(s.launch)}</b></span></div></div>`;}
-  const speed=t.time/Math.max(1e-9,t.time-tS);
-  host.innerHTML=`<div style="font-size:11px;color:var(--mut);margin-bottom:10px">Fusions for the
-    <b style="color:${isMoE()?'var(--acc2)':'var(--acc)'}">${isMoE()?'MoGE':'dense'}</b> block.
-    Toggle ⚡ Fusion to draw them on the graph.</div>${items}
-    <div class="totbox">
-      <div class="totrow"><span class="k">Latency saved</span><span class="v" style="color:var(--acc)">${timeH(tS)}</span></div>
-      <div class="totrow"><span class="k">Traffic removed</span><span class="v" style="color:var(--acc)">${bytesH(mS)}</span></div>
-      <div class="totrow"><span class="k">Launches removed</span><span class="v" style="color:var(--acc)">${Math.round(lS)}</span></div>
-      <div class="totrow" style="border-top:1px solid var(--line2);margin-top:5px;padding-top:8px">
-        <span class="k">Estimated speedup</span><span class="v" style="color:var(--acc2);font-size:15px">${speed.toFixed(2)}×</span></div>
-    </div>`;
-}
-function renderPerfTab(){
-  const host=document.getElementById("tabPerf");if(!ACT){host.innerHTML="";return;}
-  const t=totals(OPS),pats=fusionPatterns();let tS=0,mS=0,lS=0;
-  for(const p of pats){const s=fusionSaving(p,OPS);tS+=s.time;mS+=s.mem;lS+=s.launch;}
-  const pk=peakFlops();const mfu=(t.flops/(t.time/1e6))/pk*100,mfuF=(t.flops/((t.time-tS)/1e6))/pk*100;
-  const cls={};for(const o of OPS)cls[o.cls]=(cls[o.cls]||0)+o.Ttime;
-  const arr=Object.entries(cls).sort((a,b)=>b[1]-a[1]);let bars="";
-  for(const[c,v]of arr)bars+=`<div class="kv" style="border:0;padding-bottom:2px">
-    <span class="k"><span class="sw" style="display:inline-block;background:${NCOL[c]}"></span> ${CLSN[c]}</span>
-    <span class="v">${(v/t.time*100).toFixed(1)}%</span></div>
-    <div class="bar" style="margin-bottom:6px"><i style="width:${v/t.time*100}%;background:${NCOL[c]}"></i></div>`;
-  host.innerHTML=`<div class="cardt">Unfused vs fused</div>
-    <table class="cmp"><tr><th>Metric</th><th>Unfused</th><th>Fused</th><th>Δ</th></tr>
-    <tr><td>Latency</td><td>${timeH(t.time)}</td><td>${timeH(t.time-tS)}</td><td class="g">−${(tS/t.time*100).toFixed(0)}%</td></tr>
-    <tr><td>HBM traffic</td><td>${bytesH(t.mem)}</td><td>${bytesH(t.mem-mS)}</td><td class="g">−${(mS/t.mem*100).toFixed(0)}%</td></tr>
-    <tr><td>Launches</td><td>${fmtInt(t.launch)}</td><td>${fmtInt(t.launch-lS)}</td><td class="g">−${Math.round(lS)}</td></tr>
-    <tr><td>MFU</td><td>${mfu.toFixed(1)}%</td><td>${mfuF.toFixed(1)}%</td><td class="g">+${(mfuF-mfu).toFixed(1)}</td></tr></table>
-    <div class="cardt">Latency by operator class</div>${bars}
-    <div class="cardt">Roofline (all ops)</div>${rooflineSVG(null)}
-    <div class="warn" style="border-color:var(--line2);background:var(--panel2);color:var(--mut)">
-    Dot size ∝ share of latency. ${RUN.phase==='decode'?'Decode pushes ops memory-bound — the regime Ascend MulAttention/SwiftGMM target.':'Prefill is compute-heavy.'}</div>
-    ${isMoE()?`<div class="warn">MoGE keeps ${pcount(activeParams())} of ${pcount(totalParams())} params active/token — compute of a small dense model at large capacity.</div>`:''}
-    ${fp8Unsupported()?`<div class="warn">${DEVICES[RUN.device].name} has no native FP8 — FP8 is modeled at the FP16 compute rate. Native FP8 arrives with the Ascend 950 series.</div>`:''}`;
-}
-function rooflineSVG(hl){
-  const hlSet=hl==null?null:(Array.isArray(hl)?new Set(hl):new Set([hl]));
-  const single=hlSet&&hlSet.size===1?[...hlSet][0]:null;
-  const W=340,H=200,pl=40,pb=26,pt=12,pr=12,pk=peakFlops(),bw=memBW();
-  const ridge=pk/bw,aiMin=.05,aiMax=Math.max(2000,ridge*4),flMin=pk/5000,flMax=pk*1.3;
-  const lx=v=>pl+(Math.log10(v)-Math.log10(aiMin))/(Math.log10(aiMax)-Math.log10(aiMin))*(W-pl-pr);
-  const ly=v=>H-pb-(Math.log10(v)-Math.log10(flMin))/(Math.log10(flMax)-Math.log10(flMin))*(H-pb-pt);
-  let poly="";for(let i=0;i<=60;i++){const ai=Math.pow(10,Math.log10(aiMin)+(Math.log10(aiMax)-Math.log10(aiMin))*i/60);
-    poly+=`${i?"L":"M"} ${lx(ai).toFixed(1)} ${ly(Math.max(flMin,Math.min(pk,ai*bw))).toFixed(1)} `;}
-  let g=`<svg class="roof" viewBox="0 0 ${W} ${H}">`;
-  for(const gx of[.1,1,10,100,1000]){if(gx<aiMin||gx>aiMax)continue;
-    g+=`<line x1="${lx(gx)}" y1="${pt}" x2="${lx(gx)}" y2="${H-pb}" stroke="#182634"/>
-    <text x="${lx(gx)}" y="${H-pb+10}" fill="#4a5a6b" font-size="8" text-anchor="middle" font-family="monospace">${gx}</text>`;}
-  g+=`<text x="${W/2}" y="${H-1}" fill="#5f7285" font-size="8" text-anchor="middle" font-family="monospace">FLOP/byte</text>`;
-  g+=`<path d="${poly}" fill="none" stroke="#2f6d6a" stroke-width="1.5"/>`;
-  g+=`<line x1="${lx(ridge)}" y1="${pt}" x2="${lx(ridge)}" y2="${H-pb}" stroke="#3ec7c0" stroke-dasharray="3 3" opacity=".5"/>`;
-  const t=totals(OPS);
-  for(const o of OPS){if(o.ai<=0||o.flops<=0)continue;const ach=o.flops/(o.tKern/1e6);
-    const x=lx(Math.max(aiMin,Math.min(aiMax,o.ai))),y=ly(Math.max(flMin,Math.min(flMax,ach)));
-    const share=o.Ttime/t.time,on=hlSet&&hlSet.has(o.id);
-    const r=hlSet?(on?6:2.4):(3+Math.sqrt(share)*11);
-    const op=hlSet?(on?1:.28):.85;
-    g+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${NCOL[o.cls]}" opacity="${op}" stroke="#0b0f14" stroke-width=".6"/>`;
-    if(single&&o.id===single)g+=`<text x="${x}" y="${y-11}" fill="#fff" font-size="9" text-anchor="middle" font-family="monospace">${o.name}</text>`;}
-  return g+"</svg>";
+function renderStatus(){
+  const reason=getReason();
+  const scenario=getScenario();
+  qs("stReason").textContent=`根因：${reason.title}`;
+  qs("stStage").textContent=`层次：${reason.stage.join(" / ")}`;
+  qs("stSymptom").textContent=`表征：${reason.symptom[0].title}`;
+  qs("stScenario").textContent=`场景：${scenario.label}`;
+  qs("stAction").textContent=`抓手：${reason.focus[0]}`;
+  qs("titleDoc").textContent=`${scenario.label} · ${reason.title} · GPU 假设 vs Ascend 默认执行路径`;
 }
 
-/* ======================= legend / status ======================= */
-function renderLegend(){const used=[...new Set(OPS.map(o=>o.cls))];let h=`<h5>Operator class</h5>`;
-  for(const c of["io","norm","gemm","attn","elem","route","expert","comm"]){if(!used.includes(c))continue;
-    const name={gemm:"linear",attn:"attention",elem:"act",route:"gate",expert:"moe",comm:"comm"}[c]||c;
-    h+=`<div class="op-legend__item"><span class="op-swatch op-swatch--${name}"></span>${CLSN[c]}</div>`;}
-  h+=`<div class="op-legend__item"><span class="op-line"></span>Activation flow</div>`;
-  h+=`<div class="op-legend__item"><span class="op-line op-line--dash"></span>Residual path</div>`;
-  if(RUN.showFuse)h+=`<div class="op-legend__item"><span class="op-line op-line--fuse"></span>Fusion region</div>`;
-  document.getElementById("legend").innerHTML=h;}
-function updateStatus(){
-  const st=document.getElementById("status");
-  if(!ACT){document.getElementById("stModel").textContent="—";
-    document.getElementById("stParams").textContent="";document.getElementById("stLat").textContent="";
-    st.classList.remove("moe");document.getElementById("titleDoc").textContent="no model open";return;}
-  const t=totals(OPS);st.classList.toggle("moe",isMoE());
-  const d=DOCS.find(x=>x.id===ACT);
-  document.getElementById("stModel").textContent=(isMoE()?"⬡ ":"▢ ")+d.name;
-  document.getElementById("stParams").textContent=isMoE()
-    ? pcount(totalParams())+" · "+pcount(activeParams())+" active"
-    : pcount(totalParams())+" params";
-  document.getElementById("stLat").textContent=timeH(t.time)+" / fwd";
-  document.getElementById("stPhase").textContent=RUN.phase;
-  document.getElementById("titleDoc").textContent=`${d.source} · ${isMoE()?'MoGE sparse':'dense'} · ${RUN.phase} · ${DEVICES[RUN.device].name}`;
+function bindFocusBtn(){
+  qs("focusBtn").onclick=()=>{
+    const scenario=getScenario();
+    const reason=getReason();
+    const best=reason.scenarioScore[scenario.id] >= 5 ? "当前就是该场景首要矛盾" : "这是当前场景需要协同排查的一环";
+    window.alert(`${scenario.label}\n\n${best}\n\n优先证据：\n- ${scenario.evidence.join("\n- ")}\n\n推荐抓手：\n- ${reason.optimize.slice(0,3).join("\n- ")}`);
+  };
 }
-function setRTab(){document.querySelectorAll("#rtabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===RUN.tab));
-  document.getElementById("tabInsp").hidden=RUN.tab!=="insp";
-  document.getElementById("tabFuse").hidden=RUN.tab!=="fuse";
-  document.getElementById("tabPerf").hidden=RUN.tab!=="perf";}
 
-/* ======================= init / events ======================= */
-function init(){
-  stage=document.getElementById("stage");gsvg=document.getElementById("gsvg");gtip=document.getElementById("gtip");
-  renderPresets();renderImported();
-
-  // precision / device (status bar)
-  const sp=document.getElementById("selPrec");Object.entries(PREC).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v.label;if(k===RUN.prec)o.selected=true;sp.appendChild(o);});
-  sp.onchange=()=>{RUN.prec=sp.value;if(ACT){draw();renderRight();updateStatus();}};
-  const sd=document.getElementById("selDev");Object.entries(DEVICES).forEach(([k,v])=>{const o=document.createElement("option");o.value=k;o.textContent=v.name;if(k===RUN.device)o.selected=true;sd.appendChild(o);});
-  sd.onchange=()=>{RUN.device=sd.value;if(ACT){draw();renderRight();updateStatus();}};
-
-  // phase / fusion
-  document.querySelectorAll("#phaseSeg button").forEach(b=>b.onclick=()=>{
-    document.querySelectorAll("#phaseSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
-    RUN.phase=b.dataset.ph;if(ACT){draw();renderRight();updateStatus();}});
-  document.getElementById("fuseBtn").onclick=()=>{RUN.showFuse=!RUN.showFuse;
-    document.getElementById("fuseBtn").classList.toggle("on",RUN.showFuse);if(ACT)draw();};
-
-  // right tabs
-  document.querySelectorAll("#rtabs button").forEach(b=>b.onclick=()=>{RUN.tab=b.dataset.tab;setRTab();});
-
-  // collapsible sidebar sections
-  document.querySelectorAll(".sect > h3").forEach(h=>h.onclick=()=>h.parentElement.classList.toggle("collapsed"));
-
-  // zoom
-  document.getElementById("zin").onclick=()=>{VT.z=Math.min(2.4,VT.z*1.18);applyVT();};
-  document.getElementById("zout").onclick=()=>{VT.z=Math.max(.3,VT.z/1.18);applyVT();};
-  document.getElementById("zfit").onclick=fit;
-
-  // pan/zoom on stage
-  let drag=false,px,py;
-  stage.addEventListener("mousedown",e=>{drag=true;px=e.clientX;py=e.clientY;stage.classList.add("drag");});
-  window.addEventListener("mousemove",e=>{if(!drag)return;VT.tx+=e.clientX-px;VT.ty+=e.clientY-py;px=e.clientX;py=e.clientY;applyVT();});
-  window.addEventListener("mouseup",()=>{drag=false;stage.classList.remove("drag");});
-  stage.addEventListener("wheel",e=>{e.preventDefault();const r=stage.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
-    const f=e.deltaY<0?1.1:1/1.1,nk=Math.max(.3,Math.min(2.6,VT.z*f));
-    VT.tx=mx-(mx-VT.tx)*(nk/VT.z);VT.ty=my-(my-VT.ty)*(nk/VT.z);VT.z=nk;applyVT();},{passive:false});
-  window.addEventListener("resize",()=>{if(ACT)fit();});
-
-  // import
-  const fi=document.getElementById("fileInput");
-  const openPicker=()=>fi.click();
-  fi.onchange=e=>{const f=e.target.files[0];if(f)importFile(f);fi.value="";};
-  document.getElementById("importBtn").onclick=openPicker;
-  document.getElementById("actImport").onclick=openPicker;
-  document.getElementById("wImport").onclick=openPicker;
-  document.getElementById("wOpenPangu").onclick=()=>openPreset(PRESETS.find(p=>p.id==="pangu"));
-
-  // drag & drop
-  const canvas=document.getElementById("canvas"),dz=document.getElementById("dropzone");
-  ["dragenter","dragover"].forEach(ev=>canvas.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("show");}));
-  ["dragleave","drop"].forEach(ev=>canvas.addEventListener(ev,e=>{e.preventDefault();
-    if(ev==="drop"||e.target===dz||!canvas.contains(e.relatedTarget))dz.classList.remove("show");}));
-  canvas.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)importFile(f);});
-
-  // splitters
-  makeSplitter("splitL","--lw",180,460,+1);
-  makeSplitter("splitR","--rw",280,520,-1);
-
-  setRTab();updateStatus();
+function renderAll(){
+  renderScenarioSeg();
+  renderActivity();
+  renderReasonList();
+  renderScenarioSummary();
+  renderCenter();
+  renderTabs();
+  renderDetailPane();
+  renderStatus();
+  bindFocusBtn();
 }
-function makeSplitter(id,varName,min,max,dir){
-  const el=document.getElementById(id),main=document.getElementById("main");
-  el.addEventListener("mousedown",e=>{e.preventDefault();
-    const startX=e.clientX,startW=parseInt(getComputedStyle(main).getPropertyValue(varName))||320;
-    const mv=ev=>{
-      const viewportCap=Math.max(min,Math.floor(window.innerWidth*(id==="splitL" ? 0.22 : 0.28)));
-      const maxW=Math.min(max,viewportCap);
-      let w=startW+dir*(ev.clientX-startX);w=Math.max(min,Math.min(maxW,w));
-      main.style.setProperty(varName,w+"px");if(ACT)fit();};
-    const up=()=>{document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);};
-    document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);});
-}
-document.addEventListener("DOMContentLoaded",init);
+
+document.addEventListener("DOMContentLoaded",renderAll);
 </script>
 </body>
 </html>

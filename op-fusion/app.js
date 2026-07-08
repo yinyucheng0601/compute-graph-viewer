@@ -2187,6 +2187,17 @@
     const node = NM[id];
     if (node?.kind === 'op') renderSourcePanel(node, event);
     else hideSourcePanel();
+
+    // 在算子详细面板中显示节点信息
+    if (node?.kind === 'op') {
+      renderOperatorDetailPanel(node);
+      // 切换到算子详细面板页签
+      const detailTabBtn = document.getElementById('tab-btn-details');
+      if (detailTabBtn && source === 'graph') {
+        detailTabBtn.click();
+      }
+    }
+
     if (node?.fuseRec) {
       const card = document.querySelector(`.op-rec-card[data-rec="${node.fuseRec}"]`);
       if (card) {
@@ -2195,6 +2206,108 @@
         if (source === 'graph') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+  }
+
+  function renderOperatorDetailPanel(node) {
+    const detailContent = document.querySelector('#tab-details .op-detail-content');
+    if (!detailContent) return;
+
+    // 构建算子类型信息
+    const typeMap = {
+      'norm': '归一化',
+      'attention': '注意力',
+      'qknorm': 'QK-Norm',
+      'rope': 'RoPE',
+      'linear': 'Linear/GEMM',
+      'act': '激活',
+      'gate': 'Router',
+      'moe': 'Expert',
+      'io': 'I/O',
+      'embedding': 'Embedding'
+    };
+    const typeName = typeMap[node.sem] || node.sem || '算子';
+
+    // 生成HTML内容
+    let html = `
+      <div class="op-detail-header">
+        <div class="cardt" style="color: var(--op-sem-${node.sem})">算子详细信息</div>
+        <h2 style="font-size: 18px; font-weight: 600; margin: 8px 0;">${esc(node.label)}</h2>
+        <div style="font-size: 12px; color: var(--foreground-muted); margin-bottom: 16px;">
+          ${esc(node.typeLabel || typeName)}
+        </div>
+      </div>
+
+      <div class="cardt">基本信息</div>
+      <div class="kv">
+        <span class="k">算子类型</span>
+        <span class="v">${esc(typeName)}</span>
+      </div>
+      <div class="kv">
+        <span class="k">语义类别</span>
+        <span class="v">${esc(node.sem || 'op')}</span>
+      </div>
+      <div class="kv">
+        <span class="k">节点ID</span>
+        <span class="v" style="font-family: var(--font-mono)">${esc(node.id)}</span>
+      </div>
+    `;
+
+    // 输出形状信息
+    if (node.out) {
+      html += `
+        <div class="cardt">输出形状</div>
+        <div class="kv">
+          <span class="k">Output Shape</span>
+          <span class="v" style="font-family: var(--font-mono); color: var(--primary)">[${node.out.join(' × ')}]</span>
+        </div>
+      `;
+    }
+
+    // 性能指标
+    if (node.metric) {
+      html += `
+        <div class="cardt">性能指标</div>
+        <div class="kv">
+          <span class="k">计算量</span>
+          <span class="v">${esc(node.metric)}</span>
+        </div>
+      `;
+    }
+
+    if (node.time) {
+      html += `
+        <div class="kv">
+          <span class="k">估算时间</span>
+          <span class="v">${esc(node.time)}</span>
+        </div>
+      `;
+    }
+
+    // 描述信息
+    if (node.desc) {
+      html += `
+        <div class="cardt">描述</div>
+        <div style="font-size: 12px; line-height: 1.6; color: var(--foreground-secondary); padding: 8px 0;">
+          ${esc(node.desc)}
+        </div>
+      `;
+    }
+
+    // 融合推荐信息
+    if (node.fuseRec) {
+      const rec = FUSION_LIB[node.fuseRec];
+      if (rec) {
+        html += `
+          <div class="cardt" style="color: var(--op-fusion-accent)">融合推荐</div>
+          <div class="fitem" style="border-color: var(--op-fusion-accent); margin: 0;">
+            <h6><span class="dot" style="background: var(--op-fusion-accent)"></span>${rec.star ? '★ ' : ''}${esc(rec.title)}</h6>
+            <p>${esc(rec.reason)}</p>
+          </div>
+        `;
+      }
+    }
+
+    detailContent.innerHTML = html;
   }
 
   function clearSelection() {
@@ -2990,6 +3103,37 @@
     els.sourceClose?.addEventListener('click', hideSourcePanel);
     renderThemeToggle();
     initCursorFollow();
+
+    // 页签切换交互
+    const tabButtons = document.querySelectorAll('.op-tab[role="tab"]');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('aria-controls');
+        const targetPanel = document.getElementById(targetId);
+
+        if (!targetPanel) return;
+
+        // 更新所有页签按钮状态
+        tabButtons.forEach(b => {
+          b.classList.remove('is-active');
+          b.setAttribute('aria-selected', 'false');
+        });
+
+        // 激活当前页签
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-selected', 'true');
+
+        // 更新所有面板状态
+        document.querySelectorAll('.op-tab-panel').forEach(panel => {
+          panel.classList.remove('is-active');
+          panel.setAttribute('hidden', '');
+        });
+
+        // 显示目标面板
+        targetPanel.classList.add('is-active');
+        targetPanel.removeAttribute('hidden');
+      });
+    });
 
     els.zin.addEventListener('click', () => {
       view.z = Math.min(2.4, view.z * 1.18);
