@@ -1,0 +1,1528 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPU → Ascend 迁移性能差异工作台</title>
+<style>
+  @import "../vendor/pto-design-system/css/style.css";
+  @import "../vendor/pto-design-system/patterns/ide-frame/pattern.css";
+
+  :root{
+    color-scheme:dark;
+    --bg:var(--app-background, var(--background));
+    --panel:color-mix(in srgb, var(--surface-2) 84%, transparent);
+    --panel-2:color-mix(in srgb, var(--surface-1) 90%, transparent);
+    --header:color-mix(in srgb, var(--background-elevated) 80%, transparent);
+    --line:var(--border-subtle);
+    --line-2:var(--border-default);
+    --ink:var(--foreground);
+    --mut:var(--foreground-secondary);
+    --dim:var(--foreground-muted);
+    --acc:var(--primary);
+    --acc-2:var(--danger);
+    --gpu:#60a5fa;
+    --ascend:#22c55e;
+    --fracture:#f59e0b;
+    --symptom:#f472b6;
+    --critical:#ef4444;
+    --high:#f97316;
+    --medium:#facc15;
+    --mono:var(--font-mono);
+    --sans:var(--font-sans);
+    --shadow:0 14px 34px rgba(0,0,0,.24);
+    --grid:radial-gradient(circle, color-mix(in srgb, var(--foreground) 10%, transparent) 1px, transparent 1.6px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{
+    background:var(--ide-gradient-bg, var(--bg));
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:13px;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit}
+  .ide{
+    display:grid;
+    grid-template-rows:48px 1fr 24px;
+    height:100vh;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(59,130,246,.09), transparent 26%),
+      radial-gradient(circle at 78% 12%, rgba(34,197,94,.08), transparent 22%),
+      var(--ide-aura-bg),
+      var(--ide-gradient-bg, var(--bg));
+  }
+  .title{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:0 14px;
+    user-select:none;
+  }
+  .lights{display:flex;gap:7px}
+  .lights i{
+    width:11px;
+    height:11px;
+    border-radius:50%;
+    display:block;
+    box-shadow:0 0 0 1px rgba(255,255,255,.08), inset 0 1px 0 rgba(255,255,255,.16);
+  }
+  .lights i:nth-child(1){background:#ff5f57}
+  .lights i:nth-child(2){background:#febc2e}
+  .lights i:nth-child(3){background:#28c840}
+  .name{
+    font:600 12.5px/1.2 var(--sans);
+    letter-spacing:.01em;
+  }
+  .name b{color:var(--acc)}
+  .doc{
+    min-width:0;
+    color:var(--mut);
+    font:500 11px/1.3 var(--mono);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .tspacer{flex:1}
+  .toolbar{display:flex;align-items:center;gap:8px}
+  .seg{
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+    padding:3px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+    backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
+    -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
+  }
+  .seg button,
+  .ghost{
+    min-height:30px;
+    min-width:76px;
+    padding:0 12px;
+    border:1px solid transparent;
+    border-radius:calc(var(--radius-lg) - 2px);
+    background:transparent;
+    color:var(--mut);
+    cursor:pointer;
+    transition:
+      background var(--duration-fast) var(--easing-default),
+      color var(--duration-fast) var(--easing-default),
+      transform var(--duration-fast) var(--easing-default);
+  }
+  .seg button:hover,
+  .ghost:hover{
+    background:color-mix(in srgb, var(--surface-3) 84%, transparent);
+    color:var(--ink);
+    transform:translateY(-1px);
+  }
+  .seg button.on,
+  .ghost.on{
+    background:var(--surface-4);
+    color:var(--ink);
+    font-weight:600;
+    transform:none;
+  }
+  .ghost{
+    min-width:auto;
+    border-color:var(--line);
+    background:color-mix(in srgb, var(--surface-2) 82%, transparent);
+  }
+
+  .main{
+    display:grid;
+    grid-template-columns:46px minmax(240px, 300px) minmax(0, 1fr) minmax(280px, 360px);
+    gap:8px;
+    min-height:0;
+    padding:0 8px 8px 0;
+  }
+  .activity{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding-top:10px;
+  }
+  .act{
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    border:1px solid transparent;
+    background:transparent;
+    color:var(--dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    font-size:15px;
+    transition:
+      background var(--duration-fast) var(--easing-default),
+      border-color var(--duration-fast) var(--easing-default),
+      color var(--duration-fast) var(--easing-default);
+  }
+  .act:hover{
+    color:var(--ink);
+    background:color-mix(in srgb, var(--surface-2) 74%, transparent);
+    border-color:var(--line);
+  }
+  .act.on{
+    color:var(--ink);
+    background:color-mix(in srgb, var(--surface-3) 84%, transparent);
+    border-color:var(--line-2);
+    box-shadow:inset 2px 0 0 var(--acc);
+  }
+  .act.bottom{margin-top:auto;margin-bottom:8px}
+
+  .side,
+  .editor,
+  .inspect{
+    min-width:0;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(18px) saturate(1.15);
+    -webkit-backdrop-filter:blur(18px) saturate(1.15);
+  }
+  .side,
+  .inspect{
+    overflow:auto;
+  }
+  .editor{
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .sect h3,
+  .tabsbar,
+  .rtabs{
+    position:sticky;
+    top:0;
+    z-index:2;
+    margin:0;
+    padding:10px 14px 8px;
+    background:var(--header);
+    color:var(--mut);
+    font:500 10.5px/1.2 var(--mono);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    border-bottom:1px solid var(--line);
+  }
+  .sect .items,
+  .sect .pad{
+    padding:10px 10px 14px;
+  }
+  .reason{
+    margin-bottom:8px;
+    padding:10px 11px;
+    border:1px solid transparent;
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 78%, transparent);
+    cursor:pointer;
+    transition:
+      border-color var(--duration-fast) var(--easing-default),
+      background var(--duration-fast) var(--easing-default),
+      transform var(--duration-fast) var(--easing-default);
+  }
+  .reason:hover{
+    border-color:var(--line);
+    background:color-mix(in srgb, var(--surface-1) 92%, transparent);
+    transform:translateY(-1px);
+  }
+  .reason.on{
+    border-color:color-mix(in srgb, var(--primary) 46%, var(--line-2));
+    background:color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+  }
+  .reason-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .reason-title{
+    flex:1;
+    font-size:12.5px;
+    font-weight:600;
+  }
+  .sev{
+    display:inline-flex;
+    align-items:center;
+    min-height:20px;
+    padding:0 8px;
+    border-radius:999px;
+    font:600 10px/20px var(--mono);
+  }
+  .sev.critical{background:rgba(239,68,68,.14);color:#fca5a5}
+  .sev.high{background:rgba(249,115,22,.14);color:#fdba74}
+  .sev.medium{background:rgba(250,204,21,.14);color:#fde68a}
+  .reason-sub{
+    margin-top:5px;
+    color:var(--mut);
+    line-height:1.5;
+    font-size:11.5px;
+  }
+  .reason-meta{
+    margin-top:8px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    min-height:20px;
+    padding:0 8px;
+    border-radius:999px;
+    background:color-mix(in srgb, var(--surface-3) 92%, transparent);
+    color:var(--dim);
+    font:500 10px/20px var(--mono);
+  }
+  .summary{
+    margin:0 10px 12px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 84%, transparent);
+  }
+  .summary h4,
+  .hero h2{
+    margin:0 0 8px;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .summary p,
+  .hero p,
+  .small-note{
+    margin:0;
+    color:var(--mut);
+    line-height:1.6;
+  }
+  .checklist{
+    margin:10px 0 0;
+    padding:0;
+    list-style:none;
+  }
+  .checklist li{
+    padding:6px 0;
+    color:var(--mut);
+    border-top:1px solid var(--line);
+    line-height:1.5;
+  }
+  .checklist li:first-child{border-top:0}
+
+  .tabsbar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    justify-content:space-between;
+    text-transform:none;
+    letter-spacing:normal;
+    font:500 12px/1.2 var(--sans);
+  }
+  .focus-tags{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .focus-tag{
+    display:inline-flex;
+    align-items:center;
+    min-height:22px;
+    padding:0 9px;
+    border-radius:999px;
+    background:color-mix(in srgb, var(--surface-3) 92%, transparent);
+    color:var(--mut);
+    font:500 10px/22px var(--mono);
+  }
+  .canvas{
+    flex:1;
+    min-height:0;
+    overflow:auto;
+    padding:14px;
+    background:
+      radial-gradient(circle at 18% 10%, rgba(96,165,250,.08), transparent 30%),
+      radial-gradient(circle at 78% 12%, rgba(34,197,94,.06), transparent 22%),
+      var(--grid),
+      color-mix(in srgb, var(--background) 88%, black);
+    background-size:auto, auto, 22px 22px, auto;
+  }
+  .hero{
+    margin-bottom:14px;
+    padding:16px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-xl);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+    box-shadow:var(--shadow);
+  }
+  .hero-top{
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .hero-kpis{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:10px;
+  }
+  .kpi{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-2) 88%, transparent);
+  }
+  .kpi .label{
+    color:var(--mut);
+    font:500 10px/1.2 var(--mono);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .kpi .value{
+    margin-top:7px;
+    font-size:18px;
+    font-weight:700;
+  }
+  .kpi .desc{
+    margin-top:5px;
+    color:var(--dim);
+    line-height:1.5;
+    font-size:11px;
+  }
+  .board{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .lane{
+    position:relative;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-xl);
+    background:color-mix(in srgb, var(--surface-1) 90%, transparent);
+    min-height:260px;
+  }
+  .lane::after{
+    content:"→";
+    position:absolute;
+    top:14px;
+    right:-10px;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font:700 11px/1 var(--mono);
+    background:color-mix(in srgb, var(--surface-4) 94%, transparent);
+    color:var(--dim);
+    border:1px solid var(--line);
+  }
+  .lane:last-child::after{display:none}
+  .lane h4{
+    margin:0 0 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-family:var(--mono);
+    color:var(--mut);
+  }
+  .swatch{
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    flex:none;
+  }
+  .lane-card{
+    margin-bottom:8px;
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-2) 88%, transparent);
+    line-height:1.55;
+    color:var(--mut);
+  }
+  .lane-card strong{
+    display:block;
+    margin-bottom:3px;
+    color:var(--ink);
+    font-size:12px;
+  }
+  .matrix,
+  .signals{
+    display:grid;
+    gap:10px;
+  }
+  .matrix-row{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+  }
+  .matrix-head{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .matrix-head strong{font-size:12px}
+  .matrix-head span{
+    color:var(--dim);
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
+  }
+  .barpack{
+    display:grid;
+    grid-template-columns:64px 1fr 54px;
+    gap:10px;
+    align-items:center;
+    margin-top:6px;
+  }
+  .barpack label{
+    color:var(--mut);
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
+  }
+  .bar{
+    height:8px;
+    border-radius:999px;
+    overflow:hidden;
+    background:color-mix(in srgb, var(--surface-4) 78%, transparent);
+  }
+  .bar i{
+    display:block;
+    height:100%;
+    border-radius:999px;
+  }
+  .bar-num{
+    color:var(--ink);
+    font:600 11px/1 var(--mono);
+    text-align:right;
+  }
+  .signal-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+  }
+  .signal{
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 88%, transparent);
+  }
+  .signal h4{
+    margin:0 0 7px;
+    font-size:12.5px;
+    color:var(--ink);
+  }
+  .signal p{
+    margin:0;
+    color:var(--mut);
+    line-height:1.6;
+    font-size:11.5px;
+  }
+  .signal .tagrow{
+    margin-top:9px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .inspect{background:var(--panel)}
+  .rtabs{
+    display:flex;
+    gap:6px;
+    padding:8px;
+    text-transform:none;
+    letter-spacing:normal;
+    font:500 12px/1.2 var(--sans);
+  }
+  .rtabs button{
+    flex:1;
+    min-height:30px;
+    border:1px solid transparent;
+    border-radius:var(--radius-md);
+    background:transparent;
+    color:var(--mut);
+    cursor:pointer;
+  }
+  .rtabs button:hover{
+    background:var(--state-hover);
+    color:var(--ink);
+  }
+  .rtabs button.on{
+    background:color-mix(in srgb, var(--surface-4) 90%, transparent);
+    border-color:var(--line-2);
+    color:var(--ink);
+  }
+  .pad{padding:14px}
+  .cardt{
+    margin:0 0 8px;
+    color:var(--mut);
+    font:500 10.5px/1.2 var(--mono);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .detail-card,
+  .table-wrap{
+    margin-bottom:12px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--surface-1) 84%, transparent);
+  }
+  .detail-card h4{
+    margin:0 0 6px;
+    font-size:13px;
+  }
+  .detail-card p{
+    margin:0;
+    color:var(--mut);
+    line-height:1.65;
+  }
+  .list{
+    margin:0;
+    padding-left:18px;
+    color:var(--mut);
+    line-height:1.65;
+  }
+  .list li+li{margin-top:6px}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:11.5px;
+  }
+  th,td{
+    padding:8px 6px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  th{
+    color:var(--dim);
+    font:500 10px/1.2 var(--mono);
+    text-transform:uppercase;
+  }
+  td:last-child{color:var(--ink)}
+  .hint{
+    margin-top:10px;
+    padding:10px 11px;
+    border-radius:var(--radius-lg);
+    background:color-mix(in srgb, var(--warning) 12%, transparent);
+    color:color-mix(in srgb, var(--warning) 72%, white);
+    line-height:1.6;
+    font-size:11.5px;
+  }
+  .status{
+    display:flex;
+    align-items:center;
+    gap:0;
+    padding:0 10px;
+    border-top:1px solid var(--line);
+    background:color-mix(in srgb, var(--background-elevated) 86%, transparent);
+    color:var(--mut);
+    font:500 11px/1.2 var(--mono);
+    backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
+    -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, blur(12px));
+  }
+  .sitem{
+    height:24px;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    padding:0 10px;
+  }
+  .sspace{flex:1}
+
+  @media (max-width: 1320px){
+    .main{grid-template-columns:46px minmax(220px, 260px) minmax(0, 1fr) minmax(250px, 320px)}
+    .board{grid-template-columns:repeat(2, minmax(0, 1fr))}
+  }
+  @media (max-width: 1080px){
+    html,body{overflow:auto}
+    .ide{height:auto;min-height:100vh}
+    .main{grid-template-columns:1fr;padding:0 8px 8px}
+    .activity{display:none}
+    .side,.editor,.inspect{min-height:auto}
+    .signal-grid,
+    .hero-kpis,
+    .board{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="ide">
+  <div class="title">
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="name">GPU → Ascend <b>Migration Studio</b></div>
+    <div class="doc" id="titleDoc">开箱性能不足的底层原因 · 原理差异可视化</div>
+    <div class="tspacer"></div>
+    <div class="toolbar">
+      <div class="seg" id="scenarioSeg"></div>
+      <button class="ghost" id="focusBtn">场景重点</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="activity" id="activity"></div>
+
+    <aside class="side">
+      <div class="sect">
+        <h3>根因清单</h3>
+        <div class="items" id="reasonList"></div>
+      </div>
+      <div class="sect">
+        <h3>场景摘要</h3>
+        <div class="summary" id="scenarioSummary"></div>
+      </div>
+      <div class="sect">
+        <h3>优先采证</h3>
+        <div class="summary">
+          <p>先用 profiler / timeline 确认损失在哪一层，再决定是补自定义算子、改切分策略，还是重写图级融合。</p>
+          <ul class="checklist">
+            <li>看是否存在大量 format cast、transpose、pad、reshape 等边角算子。</li>
+            <li>看 AICore 利用率、MTE 搬运占比、算子碎片化和同步空洞。</li>
+            <li>看动态图 shape 命中率、compile cache、fallback 算子与静态桶配置。</li>
+            <li>看 HCCL/NVLink 对等迁移是否成立，尤其是 all-to-all 和 expert parallel。</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <section class="editor">
+      <div class="tabsbar">
+        <div id="viewTitle">原理差异图</div>
+        <div class="focus-tags" id="focusTags"></div>
+      </div>
+      <div class="canvas">
+        <div class="hero" id="hero"></div>
+        <div class="board" id="board"></div>
+        <div class="matrix" id="matrix"></div>
+        <div class="signals" id="signals"></div>
+      </div>
+    </section>
+
+    <aside class="inspect">
+      <div class="rtabs" id="rtabs">
+        <button data-tab="principle" class="on">原理</button>
+        <button data-tab="symptoms">症状</button>
+        <button data-tab="optimization">优化</button>
+        <button data-tab="compare">对比</button>
+      </div>
+      <div class="pad" id="detailPane"></div>
+    </aside>
+  </div>
+
+  <div class="status">
+    <div class="sitem" id="stReason">根因：—</div>
+    <div class="sitem" id="stStage">层次：—</div>
+    <div class="sitem" id="stSymptom">表征：—</div>
+    <div class="sspace"></div>
+    <div class="sitem" id="stScenario">场景：通用推理</div>
+    <div class="sitem" id="stAction">抓手：—</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const SCENARIOS=[
+  {
+    id:"general",
+    label:"通用推理",
+    summary:"首要关注执行模型、存储层次和小算子碎片化。开源 CUDA 算法常把“能跑就快”建立在成熟 kernel 生态之上，迁到 Ascend 后则先受图编译、数据格式和融合粒度约束。",
+    highlight:["execution","memory","fusion"],
+    evidence:["端到端延迟偏高但主 GEMM 不慢","图里出现大量 cast/transpose/concat","shape 一变性能波动明显"]
+  },
+  {
+    id:"decode",
+    label:"大模型 Decode",
+    summary:"Decode 单 token 时代码往往从 compute-bound 切到 launch-bound / memory-bound。GPU 上被成熟 fused-kernel 吃掉的小算子，在 Ascend 默认路径上更容易暴露出来。",
+    highlight:["execution","fusion","dynamic"],
+    evidence:["单 token 时延比 GPU 差得更明显","KV cache 相关搬运和 layout conversion 占比升高","很多细粒度算子无法摊薄启动成本"]
+  },
+  {
+    id:"moe",
+    label:"MoE / 稀疏训练",
+    summary:"MoE 的关键矛盾不是单个 GEMM，而是 router、top-k、grouped matmul、all-to-all 和负载均衡整条链是否被体系结构吸收。开箱性能通常卡在通信和动态图路由。",
+    highlight:["dynamic","communication","compiler"],
+    evidence:["专家负载不均衡","all-to-all 与专家计算重叠不足","router 与 grouped matmul 之间出现明显空洞"]
+  }
+];
+
+const REASONS=[
+  {
+    id:"execution",
+    title:"执行模型错配",
+    severity:"critical",
+    subtitle:"CUDA kernel 链路默认成立，但 Ascend 更依赖图编译、shape 约束和 tiling 命中。",
+    stage:["图编译","Runtime"],
+    focus:["Static bucket","Graph fusion","Custom tiling"],
+    summary:"GPU 开源算法通常把性能建立在细粒度 kernel 直接 launch、运行期灵活拼接和成熟 autotune 之上；Ascend 则先过图编译、算子模板选择和 tiling 决策，开箱速度更依赖图级质量。",
+    why:[
+      "GPU 侧的性能入口是 runtime kernel launch、block/warp 形态和高成熟度库函数；很多论文或开源实现默认这条链路天然高效。",
+      "Ascend 侧通常先做 GE/ACL 图编译，再选择 TBE/算子模板与 tile 形状，运行期不是“想到哪发到哪”。",
+      "当模型 shape 多变、子图切碎或缺少专门 tiling 模板时，默认 schedule 会更保守，端到端时延被 launch、同步和 compile cache 命中率拖住。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"小 kernel 可低成本拼接，运行期 launch 足够轻，热点主要是少数大矩阵核。"},
+      {title:"代码习惯", body:"Triton/CUDA 常直接围绕 warp/block、epilogue 和 shared memory 写最优路径。"},
+      {title:"工程基础", body:"FlashAttention、CUTLASS、xFormers 等已把大量常见模式吸进 fused kernel。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同一条算子链被拆成多个 Ascend 原子算子，task 数和同步边界明显增多。"},
+      {title:"shape 代价", body:"seq/batch 频繁变化会降低编译缓存命中，甚至触发重新选路或重新编译。"},
+      {title:"默认保守", body:"没命中专门 schedule 时，会退回更泛化但不够激进的 tile 方案。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"图编译 → 子图划分 → 算子模板选择 → Tiling → AICore 执行。"},
+      {title:"性能核心", body:"默认性能更依赖静态桶、图融合和 tiling，而非单个 kernel 的即兴调度。"},
+      {title:"平台偏好", body:"更希望把一串小操作吸收到大颗粒子图或专门融合算子里。"}
+    ],
+    symptom:[
+      {title:"端到端掉速", body:"AICore 并不一定很低，但整体时延还是大，因为碎片化 launch 和等待占了比重。"},
+      {title:"形状波动敏感", body:"同一模型换 batch 或 seq 之后性能抖动明显，说明编译和 schedule 路径不稳定。"},
+      {title:"热点分散", body:"Profiler 里不是单个 GEMM 超热，而是一堆边角算子和 runtime 空洞。"}
+    ],
+    evidence:[
+      {title:"图初始化偏重", detail:"加载时图编译耗时显著，切 shape 后还有二次构图或 cache miss。", tags:["compile cache","dynamic shape"]},
+      {title:"小 task 过多", detail:"timeline 中可见大量时间很短但数量很多的任务，串起来吃掉大段时延。", tags:["launch","sync"]},
+      {title:"热点不集中", detail:"端到端掉速不是 GEMM 本身差，而是 launch / graph partition 让热度分散。", tags:["graph split","runtime"]},
+      {title:"融合前后差距大", detail:"一旦补上 fused op 或静态桶，时延会出现阶跃式改善。", tags:["fusion","bucket"]}
+    ],
+    optimize:[
+      "先做 shape bucket，把高频 batch/seq 组合固定下来，提高 compile cache 命中率。",
+      "优先把 decode 链路上的 norm、rope、mask、top-k 等边角算子前移到 fused kernel 或大颗粒子图。",
+      "为关键热点补自定义算子或定制 tiling 模板，而不是只盯单个 GEMM 指标。",
+      "把评估方式从“单核 TFLOPS”改成“图编译 + 运行期空洞 + 融合收益”的端到端视角。"
+    ],
+    compare:[
+      ["性能入口","runtime launch + kernel schedule","graph compile + fusion + tiling"],
+      ["默认最优条件","动态拼接也能跑得快","静态或半静态 shape 更容易命中最优路径"],
+      ["掉速位置","通常是主 kernel 不够快","更常见是图切碎、tiling 保守、launch 碎片化"],
+      ["优先动作","微调 kernel","先稳图，再稳 tile，再补 kernel"]
+    ],
+    dims:[
+      {label:"Kernel 直接控制", gpu:94, ascend:40, note:"GPU 默认更直接"},
+      {label:"图编译依赖", gpu:25, ascend:90, note:"Ascend 先依赖图质量"},
+      {label:"多 shape 稳定性", gpu:76, ascend:44, note:"shape 波动更伤 Ascend 默认路径"},
+      {label:"小算子容忍度", gpu:80, ascend:32, note:"细碎链路更容易掉速"},
+      {label:"融合收益弹性", gpu:62, ascend:91, note:"Ascend 对融合更敏感"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:4}
+  },
+  {
+    id:"microarch",
+    title:"微架构与并行原语错配",
+    severity:"critical",
+    subtitle:"warp / Tensor Core / shared memory 的思路，不能原样映射到 Cube / Vector / MTE / UB。",
+    stage:["AICore","指令/调度"],
+    focus:["Tile 尺寸","Cube-Vector 配合","流水并行"],
+    summary:"很多 GPU 算法默认依赖 SIMT、warp 原语、Tensor Core 矩阵形态和 shared memory 复用，而 Ascend 的 AICore 是 Cube 与 Vector 协同、搬运引擎与本地缓冲强耦合的模型。",
+    why:[
+      "GPU 上常见的最优实现，会把线程块布局、warp 级规约和 shared memory bank 设计写进算法骨架。",
+      "Ascend 更强调 Cube/Vector 双路径、MTE 搬运、UB/L0 复用，以及 tile 大小与数据排布的联动。",
+      "因此“同一个矩阵乘或归约数学公式”在两侧并不等价，真正的最优路径往往来自不同的分块、排布和流水方式。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"warp-level primitive、shared memory 和 Tensor Core tile 能直接承接算法思路。"},
+      {title:"局部最优", body:"block 维度、线程绑核、寄存器占用围绕 SM 资源做权衡。"},
+      {title:"成熟路径", body:"许多开源 kernel 已经对 Tensor Core tile 做到高度手工优化。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"原本依赖 warp 同步和 shared memory 的结构，换到 Ascend 后不再天然高效。"},
+      {title:"tile 失配", body:"矩阵分块如果不对齐 Cube/Vector 偏好，会导致搬运和计算流水断裂。"},
+      {title:"计算搬运失衡", body:"算子不只是“算得快不快”，更取决于算和搬能否被双缓冲压在一起。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"Cube 处理矩阵核，Vector 处理归一化/激活，MTE 负责搬运，本地缓冲决定流水深度。"},
+      {title:"性能核心", body:"理想情况不是单单占满 compute，而是 Cube、Vector 与搬运流水同时平衡。"},
+      {title:"平台偏好", body:"更需要显式考虑 tile 对齐、搬运步长、双缓冲和局部缓存容量。"}
+    ],
+    symptom:[
+      {title:"计算峰值上不去", body:"理论 FLOPS 很高，但实际利用率不高，因为 tile 与流水不匹配。"},
+      {title:"局部复用失效", body:"看起来是 compute kernel，却被大量中间搬运和重排抢走时间。"},
+      {title:"改 tile 后突增", body:"一旦 tile 改对，性能可能突然跃升，说明瓶颈在微架构适配而非算法本身。"}
+    ],
+    evidence:[
+      {title:"Cube/Vector 失衡", detail:"profiling 显示某一路长时间闲置，另一条路径成为单点瓶颈。", tags:["cube","vector"]},
+      {title:"MTE 占比异常", detail:"搬运时间过长，说明 tile 设计和数据步长没压住内存路径。", tags:["mte","dma"]},
+      {title:"局部缓冲不够用", detail:"UB/L0 溢出导致频繁回 HBM，计算难以形成稳定流水。", tags:["ub","l0"]},
+      {title:"对齐敏感", detail:"维度轻微变化就大幅掉速，通常是 tile 对齐或 padding 策略不合适。", tags:["alignment","tiling"]}
+    ],
+    optimize:[
+      "按 Ascend 的 Cube/Vector 路径重写 tile 设计，而不是机械照搬 CUDA block 和 warp 参数。",
+      "优先查明计算和搬运哪一路先堵，再决定是改矩阵排布、双缓冲，还是拆/并算子。",
+      "把性能模型从“SM 占用率”切换到“Cube + Vector + MTE 三路流水平衡”。",
+      "为热点算子保留架构特定实现，不要强求一套 Triton/CUDA kernel 通吃两侧。"
+    ],
+    compare:[
+      ["并行原语","warp / block / SIMT","Cube / Vector / MTE 协同"],
+      ["局部存储","shared memory / register file","UB / L0 / tile 缓冲"],
+      ["最优写法","偏线程组织","偏搬运-计算流水组织"],
+      ["核心风险","occupancy 不够","tile 失配和搬运链路断裂"]
+    ],
+    dims:[
+      {label:"SIMT 亲和度", gpu:96, ascend:28, note:"CUDA 思路天然偏 GPU"},
+      {label:"Tile 对齐敏感度", gpu:52, ascend:92, note:"Ascend 更依赖精确 tile"},
+      {label:"搬运-计算联动", gpu:58, ascend:90, note:"Ascend 更强调流水"},
+      {label:"共享缓存复用", gpu:88, ascend:54, note:"shared memory 经验不可直接照搬"},
+      {label:"架构专用优化收益", gpu:70, ascend:93, note:"架构特定实现收益很大"}
+    ],
+    scenarioScore:{general:4,decode:3,moe:3}
+  },
+  {
+    id:"memory",
+    title:"存储层次与数据布局错配",
+    severity:"critical",
+    subtitle:"格式转换、padding、transpose、KV cache 路径和局部缓存容量，常常直接吃掉开箱性能。",
+    stage:["HBM","本地缓冲"],
+    focus:["Layout","Format cast","KV cache path"],
+    summary:"很多开源 GPU 算法默认连续内存、coalesced 访问和 shared memory 复用已经足够，而 Ascend 更容易受格式布局、局部缓冲大小、搬运粒度和格式转换影响。",
+    why:[
+      "GPU 上的数据布局通常围绕 row-major、coalesced load、Tensor Core 输入格式和 L2/shared memory 行为展开。",
+      "Ascend 除了数学维度，还需要兼顾 ND/NZ/fractal 等格式、UB/L0 容量、搬运步长与 cache line 粒度。",
+      "因此迁移后即使主算子没变，周围的 cast、transpose、pad、slice、cache copy 也可能成为真正热点。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"连续内存和 coalesced 访问已足够，高效实现更多靠 shared memory 复用。"},
+      {title:"常见实现", body:"layout 往往固定在适配 CUDA/Tensor Core 的形态，转换开销不大。"},
+      {title:"经验路径", body:"大量工程默认周边重排成本相对主 GEMM 可以忽略。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"输入输出格式可能需要改写为 Ascend 偏好的分块格式，边角转换成本上升。"},
+      {title:"cache 路径变差", body:"特别是 decode / KV cache，访问粒度小、重复搬运多，容易成为瓶颈。"},
+      {title:"padding 外溢", body:"对齐和分块需要额外 pad，导致“看似没算更多，但搬得更多”。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"算子最优不只看 FLOPS，还看格式是否吻合本地缓冲与搬运步长。"},
+      {title:"性能核心", body:"理想状态是减少 format cast 和 transpose，让数据尽量在合适布局里流到底。"},
+      {title:"平台偏好", body:"更适合把多步 layout change 合并进前后算子的 prologue / epilogue。"}
+    ],
+    symptom:[
+      {title:"HBM 流量高", body:"理论算量不大，但读写流量和 format conversion 占比异常。"},
+      {title:"周边算子抢热点", body:"cast、transpose、reshape、slice 的累计时间明显超预期。"},
+      {title:"decode 更明显", body:"小 batch / 单 token 情况下，KV cache 路径和搬运开销更容易压过主算子。"}
+    ],
+    evidence:[
+      {title:"大量格式转换", detail:"图里能看到连续的 cast / transpose / format conversion 节点。", tags:["format","transpose"]},
+      {title:"HBM 占比偏高", detail:"主算子没慢很多，但内存流量明显偏高，说明数据路径不是一次到位。", tags:["bandwidth","layout"]},
+      {title:"KV cache 回写频繁", detail:"decode 场景出现重复 copy、gather、concat，访问粒度不友好。", tags:["kv cache","decode"]},
+      {title:"padding 放大成本", detail:"对齐后有效计算不变，但总搬运变多，实际吞吐下降。", tags:["padding","alignment"]}
+    ],
+    optimize:[
+      "优先合并 layout change，避免把 format cast 暴露为独立小算子。",
+      "重设 KV cache 布局和访问粒度，让 decode 路径尽量沿着 Ascend 偏好的搬运方式走。",
+      "用 profiler 看流量和格式转换，而不是只看主 GEMM 的算力利用率。",
+      "针对高频形状做专门布局，不要所有 shape 共享一套妥协格式。"
+    ],
+    compare:[
+      ["主要矛盾","coalesced load 与 shared memory reuse","layout / format / 搬运粒度 / 本地缓冲"],
+      ["常见隐性成本","bank conflict 或 cache miss","cast、transpose、pad、copy、format conversion"],
+      ["Decode 风险","更多是 cache locality","更容易被 KV cache 搬运和格式重排拖住"],
+      ["优化入口","访存合并","格式路径缩短 + cache 布局改造"]
+    ],
+    dims:[
+      {label:"连续访问友好度", gpu:88, ascend:62, note:"GPU 经验更直接"},
+      {label:"格式转换敏感度", gpu:34, ascend:93, note:"Ascend 更怕周边重排"},
+      {label:"KV cache 路径压力", gpu:58, ascend:86, note:"decode 下差距更明显"},
+      {label:"padding 放大效应", gpu:41, ascend:79, note:"对齐成本更容易外显"},
+      {label:"布局专用优化收益", gpu:64, ascend:90, note:"专门布局很关键"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:3}
+  },
+  {
+    id:"fusion",
+    title:"小算子碎片化与融合不足",
+    severity:"high",
+    subtitle:"GPU 上被成熟 fused kernel 吃掉的边角链路，迁移后可能重新暴露成真实瓶颈。",
+    stage:["图优化","Kernel 粒度"],
+    focus:["Fused op","Launch amortization","Decode 链路"],
+    summary:"开源 GPU 生态已经把 attention、norm、activation、epilogue、router 等很多链路做成 fused kernel；如果迁移到 Ascend 仍然保留原始小算子颗粒，开箱性能通常会被 launch、同步和多次读写拖住。",
+    why:[
+      "融合的本质不是减少几行代码，而是减少 HBM 往返、减少中间张量物化、减少 launch 和同步边界。",
+      "GPU 上很多这类优化已经被框架和库默认提供，所以开源实现作者不会总把“融合价值”写在算法论文里。",
+      "Ascend 若没命中对应的 fused op 或图模式，就会把这些原本隐身的边角代价重新暴露出来。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"norm、rope、softmax、activation、epilogue 往往已被融合进成熟 kernel。"},
+      {title:"工程结果", body:"看似有很多逻辑步骤，但运行时只剩少数大颗粒热点。"},
+      {title:"经验路径", body:"框架默认图优化往往足以覆盖常见模式。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同样的逻辑链在 Ascend 上未命中模式融合，重新变成一串小算子。"},
+      {title:"启动代价", body:"每一步都有 task / sync / 读写，单个看不大，累计非常可观。"},
+      {title:"decode 放大", body:"单 token 时主算子本来就小，边角链路更难被摊薄。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"依赖图级 pattern match、算子库覆盖和自定义融合来恢复大颗粒执行。"},
+      {title:"性能核心", body:"让数据在局部路径里走完，而不是每一步都回 HBM。"},
+      {title:"平台偏好", body:"越是小而密的链路，越应该用融合算子或模板化子图吸收。"}
+    ],
+    symptom:[
+      {title:"热点很碎", body:"attention 周围充满若干小算子，每个都不大，但总和很重。"},
+      {title:"单 token 慢", body:"decode 时延高于预期，常见根因是边角链路没被融合。"},
+      {title:"补融合后突降", body:"一旦命中 fused op，时延和带宽占用会显著改善。"}
+    ],
+    evidence:[
+      {title:"边角算子密集", detail:"图中 norm、mask、rope、top-k、mul、add 数量多且紧挨着主算子。", tags:["small ops","fusion gap"]},
+      {title:"中间张量多次落地", detail:"同一份中间结果被多次写回 / 读回，说明没有吃进 epilogue。", tags:["epilogue","HBM"]},
+      {title:"launch 占比高", detail:"timeline 中大量短任务堆叠，合起来吞掉明显时延。", tags:["launch","runtime"]},
+      {title:"不同版本差异大", detail:"框架或算子库版本一变性能差很多，说明依赖特定 fusion pattern。", tags:["pattern match","version"]}
+    ],
+    optimize:[
+      "先找 decode、attention 周围和 router 周围最碎的链路，优先做模式融合。",
+      "把 layout change、epilogue 和 activation 前移进主算子，减少中间张量落地。",
+      "把性能验证粒度从单 op 扩成 operator chain，否则看不出融合收益。",
+      "对高频链路做白名单式专项优化，而不是等通用图优化自动命中。"
+    ],
+    compare:[
+      ["GPU 常态","大量成熟 fused kernel","很多模式需要显式命中或补齐"],
+      ["主要损失","主核不够快","launch / HBM 往返 / 中间张量落地"],
+      ["最易受伤场景","并不总是 decode","decode 和小 batch 最明显"],
+      ["优先动作","继续压主核","先把算子链吃成大颗粒"]
+    ],
+    dims:[
+      {label:"小算子容忍度", gpu:82, ascend:30, note:"Ascend 默认更怕碎"},
+      {label:"融合收益", gpu:66, ascend:95, note:"融合常是第一抓手"},
+      {label:"HBM 往返敏感度", gpu:58, ascend:88, note:"未融合代价更外显"},
+      {label:"单 token 放大效应", gpu:48, ascend:91, note:"decode 下最明显"},
+      {label:"版本依赖", gpu:54, ascend:78, note:"pattern 命中影响大"}
+    ],
+    scenarioScore:{general:5,decode:5,moe:4}
+  },
+  {
+    id:"dynamic",
+    title:"动态 shape / 稀疏路由 / 控制流不友好",
+    severity:"high",
+    subtitle:"开源实现喜欢运行时灵活性，但 Ascend 默认更偏静态或有界动态。",
+    stage:["动态图","稀疏执行"],
+    focus:["Dynamic shape","Router","Static bucket"],
+    summary:"很多 GPU 开源算法把动态 shape、ragged batch、MoE top-k、可变长度控制流当作自然能力；Ascend 也能做，但默认最优路径通常更依赖静态桶、可预测 shape 和受约束的动态图。",
+    why:[
+      "GPU 生态对运行时动态执行更加成熟，很多小变化只会影响少量 kernel 配置。",
+      "Ascend 上动态 shape 更容易影响图编译缓存、tiling 命中和融合 pattern。",
+      "一旦加上 MoE 路由、group top-k、ragged batch 或不同长度混跑，性能掉的不只是单个算子，而是整条图的确定性。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"运行时根据 shape 动态配置 kernel，路由逻辑和稀疏执行能被较自然地承接。"},
+      {title:"工程结果", body:"可变长度 batch、ragged 序列或 top-k 路由不会立刻让整条链失速。"},
+      {title:"经验路径", body:"动态性更多影响局部效率，而不是把整条图重新洗牌。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"shape、route 或 control flow 一变，可能触发新的 compile path 或保守调度。"},
+      {title:"模式不稳定", body:"融合 pattern 更难命中，热点位置随输入分布变化而变化。"},
+      {title:"稀疏不均衡", body:"MoE 专家负载不平时，通信与计算更难形成稳定重叠。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"更偏好静态桶、有界动态和可预测的路由分布。"},
+      {title:"性能核心", body:"先把动态性约束住，再谈 grouped matmul 或 router 的局部优化。"},
+      {title:"平台偏好", body:"把热门 shape 固化，把稀疏路径做成模板化 pattern。"}
+    ],
+    symptom:[
+      {title:"性能波动大", body:"同一模型不同输入分布时延抖动明显，说明动态图路径在变。"},
+      {title:"稀疏收益吃不满", body:"理论上是少算了，但端到端没快多少，甚至更慢。"},
+      {title:"MoE 空洞明显", body:"router、top-k、all-to-all 和 expert matmul 之间有明显等待区。"}
+    ],
+    evidence:[
+      {title:"同 batch 不同数据差异大", detail:"输入分布变化就导致大幅波动，说明稀疏路径在抖。", tags:["ragged","distribution"]},
+      {title:"compile cache 命中低", detail:"热点 shape 没被收敛进少数桶，图路径过于分散。", tags:["bucket","cache"]},
+      {title:"router 周围碎片化", detail:"top-k、mask、scatter/gather 等操作独立暴露。", tags:["router","scatter"]},
+      {title:"理论稀疏不兑现", detail:"算量减少但时延不降，说明省下的 compute 被动态图和通信吃回去了。", tags:["sparsity","e2e"] }
+    ],
+    optimize:[
+      "先做静态桶和输入分桶，把热门 shape 收敛到少数 profile。",
+      "把 MoE router、group top-k、dispatch/combiner 作为一条链优化，而不是只看 expert GEMM。",
+      "尽量让动态图有界化，必要时牺牲一点灵活性换稳定吞吐。",
+      "把稀疏收益评估从理论 FLOPS 节省改成端到端时延与重叠率。"
+    ],
+    compare:[
+      ["动态性容忍度","天然较高","可做但默认更偏静态/模板化"],
+      ["MoE 风险点","更多在负载均衡","编译路径、路由链和通信一起受影响"],
+      ["性能波动来源","局部 kernel 配置变化","整条图的模式命中与调度确定性"],
+      ["优先动作","继续做稀疏 kernel","先收敛 shape 和路由形态"]
+    ],
+    dims:[
+      {label:"动态 shape 兼容度", gpu:82, ascend:40, note:"Ascend 默认更保守"},
+      {label:"静态桶收益", gpu:42, ascend:92, note:"桶化收益很大"},
+      {label:"稀疏执行兑现率", gpu:70, ascend:46, note:"默认更难兑现代价"},
+      {label:"MoE 负载稳定性", gpu:58, ascend:43, note:"需要更强约束"},
+      {label:"性能波动敏感度", gpu:48, ascend:88, note:"Ascend 更怕路径抖动"}
+    ],
+    scenarioScore:{general:3,decode:5,moe:5}
+  },
+  {
+    id:"communication",
+    title:"并行切分与通信栈错配",
+    severity:"high",
+    subtitle:"NCCL / NVLink 的经验不能直接平移到 HCCL / HCCS / RoCE，尤其是 MoE、TP、PP 混合切分。",
+    stage:["并行策略","网络拓扑"],
+    focus:["HCCL","Topology-aware sharding","Overlap"],
+    summary:"很多大模型开源实现默认建立在 NVIDIA 通信栈和拓扑经验之上。迁移到 Ascend 后，即使算子本身没问题，TP/PP/EP 的切分与重叠逻辑也可能不再是最优。",
+    why:[
+      "通信性能不是“库名替换”就能完成，背后依赖链路类型、拓扑、collective 实现和重叠调度方式。",
+      "GPU 上围绕 NCCL / NVLink 形成的 all-reduce、all-gather、all-to-all 经验，在 Ascend 的 HCCL / HCCS / 以太网络上不一定还成立。",
+      "尤其是 MoE、专家并行和大规模 TP，错误的切分策略会让通信直接吞掉模型容量优势。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"NCCL + NVLink 的 collective 和重叠套路已经被大量框架默认吸收。"},
+      {title:"切分习惯", body:"TP/PP/EP 组合常按 GPU 拓扑经验设计，通信路径相对固定。"},
+      {title:"工程基础", body:"很多开源训练脚本默认设备互联和带宽模型近似于 NVIDIA 集群。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"同样的切分策略在 Ascend 集群上可能放大跨卡流量或错过最佳链路。"},
+      {title:"重叠失效", body:"compute 与 collective 的时间窗不再对齐，导致 all-reduce / all-to-all 暴露。"},
+      {title:"MoE 更难", body:"router 和 expert dispatch 让通信粒度更碎，拓扑不对就会雪崩。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"要按 HCCL、机内 HCCS、跨机网络和设备拓扑重新设计切分与重叠。"},
+      {title:"性能核心", body:"先让通信路径贴近物理拓扑，再把 collective 挂到可重叠的计算窗口上。"},
+      {title:"平台偏好", body:"更需要拓扑感知、分组策略和专家放置规则。"}
+    ],
+    symptom:[
+      {title:"跨卡等待长", body:"单卡算得不差，但扩到多卡后吞吐掉得很快。"},
+      {title:"all-to-all 暴露", body:"MoE 里专家 dispatch / combine 成为主瓶颈。"},
+      {title:"扩展性差", body:"卡数增加后收益明显低于预期，甚至出现反向扩容。"}
+    ],
+    evidence:[
+      {title:"通信热度前移", detail:"timeline 里 collective 占比很高，且难与计算重叠。", tags:["overlap","collective"]},
+      {title:"拓扑不匹配", detail:"高频通信跨越非优先链路，导致机内/机间流量分布失衡。", tags:["topology","placement"]},
+      {title:"MoE dispatch 拖慢", detail:"专家切分后 dispatch/combine 花了大量时间。", tags:["all-to-all","expert parallel"]},
+      {title:"卡数越多越差", detail:"扩容收益异常低，说明并行策略照搬了 GPU 经验。", tags:["scaling","sharding"] }
+    ],
+    optimize:[
+      "重新设计 TP/PP/EP 的组合，不要直接继承 NCCL / NVLink 下的切分比例。",
+      "按机内与跨机拓扑重排专家放置、参数切分和 collective 分组。",
+      "重点验证通信与计算的重叠率，而不是只看单卡 kernel 性能。",
+      "MoE 优先优化 dispatch / combine 与 all-to-all，很多时候它比专家 GEMM 更关键。"
+    ],
+    compare:[
+      ["通信基线","NCCL / NVLink 经验成熟","HCCL / HCCS / 网络拓扑需要重新设计"],
+      ["风险位置","常在大规模训练后期出现","多卡一上来就可能暴露"],
+      ["MoE 关键点","all-to-all 仍重要","dispatch、放置和重叠更敏感"],
+      ["优先动作","继续放大并行度","先重做拓扑感知切分"]
+    ],
+    dims:[
+      {label:"单卡可迁移性", gpu:84, ascend:74, note:"单卡问题较少"},
+      {label:"多卡策略可平移性", gpu:78, ascend:32, note:"不能直接照搬"},
+      {label:"通信重叠稳定性", gpu:72, ascend:45, note:"Ascend 需重新设计窗口"},
+      {label:"MoE all-to-all 风险", gpu:61, ascend:88, note:"Ascend 集群更敏感"},
+      {label:"拓扑感知收益", gpu:58, ascend:94, note:"拓扑重做收益极高"}
+    ],
+    scenarioScore:{general:2,decode:2,moe:5}
+  },
+  {
+    id:"compiler",
+    title:"编译器、算子库与自动调优成熟度差距",
+    severity:"medium",
+    subtitle:"很多 GPU 开源算法快，不只是因为硬件快，也因为多年沉淀的库、模板和 autotune 已把坑踩平。",
+    stage:["生态成熟度","算子覆盖"],
+    focus:["Operator coverage","Autotune","Pattern maturity"],
+    summary:"同一份算法代码在 GPU 上往往能直接吃到多年积累的 CUTLASS、Triton、cuDNN、FlashAttention 等优化；迁移到 Ascend 时，如果对应模式还没被算子库和编译器充分覆盖，开箱性能自然不可能一步到位。",
+    why:[
+      "很多人把“GPU 开源算法很快”误解成纯硬件优势，实际上其中很大一部分来自库和编译器长期沉淀。",
+      "一旦迁移到新的后端，真正缺的可能不是数学正确性，而是高成熟度 pattern、autotune 搜索空间和默认模板。",
+      "这会让一些本来不需要手工关注的细节重新浮出水面，例如特殊形状、边界 case、稀疏模式和新模型结构。"
+    ],
+    gpuPath:[
+      {title:"性能假设", body:"成熟库已经覆盖主流 attention、matmul、norm、conv、epilogue 和并行模式。"},
+      {title:"工程结果", body:"用户即使不改代码，也可能直接踩在较优实现上。"},
+      {title:"经验路径", body:"autotune 和模板库已经把常见坑平滑掉。"}
+    ],
+    fracture:[
+      {title:"迁移断点", body:"新模型结构、长尾 shape 或特殊路由模式在 Ascend 上未必已有成熟模板。"},
+      {title:"默认模板保守", body:"算子能跑通，但没有充分吃满架构特色。"},
+      {title:"局部补丁多", body:"往往需要一批针对性优化才能逐步逼近 GPU 生态成熟度。"}
+    ],
+    ascendPath:[
+      {title:"真实路径", body:"需要靠编译器 pattern、算子库覆盖和专项调优逐步补齐。"},
+      {title:"性能核心", body:"先识别是“平台没覆盖”还是“你还没适配”。"},
+      {title:"平台偏好", body:"通过专项内核、pattern 扩展和 case-based 调优积累路径。"}
+    ],
+    symptom:[
+      {title:"长尾 case 特别慢", body:"主流形状还行，但特殊输入一下就掉下去。"},
+      {title:"版本敏感", body:"框架/驱动/算子库版本一更新，性能变化很大。"},
+      {title:"专项优化见效快", body:"补一个 pattern 或专门 kernel 后，某条链路立刻接近 GPU。"}
+    ],
+    evidence:[
+      {title:"长尾形状掉速", detail:"少数 shape 显著慢于主流 shape，说明模板覆盖不足。", tags:["long tail","template"]},
+      {title:"版本切换波动", detail:"更换 CANN 或算子库版本后，性能出现明显跃迁。", tags:["version","library"]},
+      {title:"特定模式回退", detail:"特殊 mask、rope、router 形态会回退到通用实现。", tags:["fallback","pattern"]},
+      {title:"专项 patch 立竿见影", detail:"补一条针对性优化后，端到端时延立刻收敛。", tags:["custom op","special case"] }
+    ],
+    optimize:[
+      "把问题分成平台覆盖不足与业务侧适配不足两类，不要混在一起看。",
+      "优先统计高频 shape / pattern 的长尾 case，集中补齐收益最大的模板。",
+      "保留专项优化清单，围绕 attention、MoE、layout change、通信重叠逐步沉淀平台资产。",
+      "对性能结论做版本标注，避免把某个版本的表现误判为硬件上限。"
+    ],
+    compare:[
+      ["生态成熟度","多年库与 autotune 沉淀","需要逐步补齐热点 pattern"],
+      ["默认体验","很多模式开箱即优","很多模式只是先跑通"],
+      ["风险来源","长尾 case 相对少","长尾 shape / 新结构更容易暴露"],
+      ["优先动作","继续压榨已有库","补 pattern、补模板、补专项 kernel"]
+    ],
+    dims:[
+      {label:"主流模式覆盖", gpu:92, ascend:67, note:"GPU 生态更成熟"},
+      {label:"长尾 case 成熟度", gpu:74, ascend:36, note:"Ascend 更易暴露长尾"},
+      {label:"版本敏感度", gpu:42, ascend:79, note:"版本影响更大"},
+      {label:"专项优化收益", gpu:56, ascend:88, note:"补平台资产很值"},
+      {label:"开箱稳定性", gpu:89, ascend:52, note:"GPU 默认体验更平滑"}
+    ],
+    scenarioScore:{general:4,decode:3,moe:5}
+  }
+];
+
+const CENTER_VIEWS=[
+  {id:"map", icon:"▤", label:"原理差异图"},
+  {id:"matrix", icon:"◫", label:"差异刻度"},
+  {id:"signals", icon:"◎", label:"证据地图"}
+];
+
+const STATE={
+  scenario:"decode",
+  reason:"execution",
+  tab:"principle",
+  view:"map"
+};
+
+function qs(id){
+  return document.getElementById(id);
+}
+
+function getScenario(){
+  return SCENARIOS.find((item)=>item.id===STATE.scenario) || SCENARIOS[0];
+}
+
+function getReason(){
+  return REASONS.find((item)=>item.id===STATE.reason) || REASONS[0];
+}
+
+function scoreText(score){
+  if(score >= 5)return "当前场景一号矛盾";
+  if(score >= 4)return "当前场景高相关";
+  if(score >= 3)return "当前场景中相关";
+  return "当前场景次相关";
+}
+
+function severityLabel(kind){
+  if(kind === "critical")return "Critical";
+  if(kind === "high")return "High";
+  return "Medium";
+}
+
+function renderScenarioSeg(){
+  qs("scenarioSeg").innerHTML=SCENARIOS.map((item)=>(
+    `<button data-scenario="${item.id}" class="${item.id===STATE.scenario?"on":""}">${item.label}</button>`
+  )).join("");
+  qs("scenarioSeg").querySelectorAll("button").forEach((btn)=>{
+    btn.addEventListener("click",()=>{
+      STATE.scenario=btn.dataset.scenario;
+      const scenario=getScenario();
+      STATE.reason=scenario.highlight[0];
+      renderAll();
+    });
+  });
+}
+
+function renderActivity(){
+  qs("activity").innerHTML=CENTER_VIEWS.map((item)=>(
+    `<button class="act ${item.id===STATE.view?"on":""}" data-view="${item.id}" title="${item.label}">${item.icon}</button>`
+  )).join("") + '<button class="act bottom" title="专题提示">?</button>';
+  qs("activity").querySelectorAll("[data-view]").forEach((btn)=>{
+    btn.addEventListener("click",()=>{
+      STATE.view=btn.dataset.view;
+      renderActivity();
+      renderCenter();
+    });
+  });
+}
+
+function renderReasonList(){
+  const scenario=getScenario();
+  qs("reasonList").innerHTML=REASONS.map((item)=>{
+    const score=item.scenarioScore[scenario.id];
+    return `
+      <div class="reason ${item.id===STATE.reason?"on":""}" data-reason="${item.id}">
+        <div class="reason-top">
+          <div class="reason-title">${item.title}</div>
+          <span class="sev ${item.severity}">${severityLabel(item.severity)}</span>
+        </div>
+        <div class="reason-sub">${item.subtitle}</div>
+        <div class="reason-meta">
+          <span class="chip">${scoreText(score)}</span>
+          <span class="chip">${item.stage.join(" · ")}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+  qs("reasonList").querySelectorAll("[data-reason]").forEach((item)=>{
+    item.addEventListener("click",()=>{
+      STATE.reason=item.dataset.reason;
+      renderAll();
+    });
+  });
+}
+
+function renderScenarioSummary(){
+  const scenario=getScenario();
+  const topReasons=[...REASONS]
+    .sort((a,b)=>b.scenarioScore[scenario.id]-a.scenarioScore[scenario.id])
+    .slice(0,3);
+  qs("scenarioSummary").innerHTML=`
+    <h4>${scenario.label}</h4>
+    <p>${scenario.summary}</p>
+    <ul class="checklist">
+      ${scenario.evidence.map((text)=>`<li>${text}</li>`).join("")}
+      ${topReasons.map((item)=>`<li>优先排查：${item.title}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderFocusTags(){
+  const reason=getReason();
+  const scenario=getScenario();
+  qs("viewTitle").textContent=CENTER_VIEWS.find((item)=>item.id===STATE.view).label;
+  qs("focusTags").innerHTML=[
+    ...reason.stage,
+    ...reason.focus,
+    scenario.label
+  ].map((tag)=>`<span class="focus-tag">${tag}</span>`).join("");
+}
+
+function renderHero(){
+  const reason=getReason();
+  const scenario=getScenario();
+  const score=reason.scenarioScore[scenario.id];
+  const metrics=reason.dims;
+  const maxGap=metrics.reduce((best,item)=>{
+    const gap=Math.abs(item.gpu-item.ascend);
+    return gap>best.gap?{gap,label:item.label}:best;
+  },{gap:-1,label:"—"});
+  const avgAscend=Math.round(metrics.reduce((sum,item)=>sum+item.ascend,0)/metrics.length);
+  qs("hero").innerHTML=`
+    <div class="hero-top">
+      <div>
+        <div class="cardt">当前选中根因</div>
+        <h2>${reason.title}</h2>
+        <p>${reason.summary}</p>
+      </div>
+      <span class="sev ${reason.severity}">${severityLabel(reason.severity)}</span>
+    </div>
+    <div class="hero-kpis">
+      <div class="kpi">
+        <div class="label">场景相关度</div>
+        <div class="value">${score}/5</div>
+        <div class="desc">${scoreText(score)}，优先在 ${scenario.label} 中排查。</div>
+      </div>
+      <div class="kpi">
+        <div class="label">最大原理差</div>
+        <div class="value">${maxGap.label}</div>
+        <div class="desc">GPU 假设与 Ascend 默认路径偏差最大的维度。</div>
+      </div>
+      <div class="kpi">
+        <div class="label">默认吸收度</div>
+        <div class="value">${avgAscend}%</div>
+        <div class="desc">表示 Ascend 开箱状态对这类模式的天然吸收能力。</div>
+      </div>
+    </div>
+  `;
+}
+
+function laneMarkup(title,color,cards){
+  return `
+    <div class="lane">
+      <h4><span class="swatch" style="background:${color}"></span>${title}</h4>
+      ${cards.map((item)=>`<div class="lane-card"><strong>${item.title}</strong>${item.body}</div>`).join("")}
+    </div>
+  `;
+}
+
+function renderBoard(){
+  const reason=getReason();
+  qs("board").innerHTML=[
+    laneMarkup("GPU 侧性能假设","var(--gpu)",reason.gpuPath),
+    laneMarkup("迁移断点","var(--fracture)",reason.fracture),
+    laneMarkup("Ascend 默认执行路径","var(--ascend)",reason.ascendPath),
+    laneMarkup("最终性能表征","var(--symptom)",reason.symptom)
+  ].join("");
+}
+
+function renderMatrix(){
+  const reason=getReason();
+  qs("matrix").innerHTML=reason.dims.map((item)=>{
+    return `
+      <div class="matrix-row">
+        <div class="matrix-head">
+          <strong>${item.label}</strong>
+          <span>${item.note}</span>
+        </div>
+        <div class="barpack">
+          <label>GPU 假设</label>
+          <div class="bar"><i style="width:${item.gpu}%;background:var(--gpu)"></i></div>
+          <div class="bar-num">${item.gpu}</div>
+        </div>
+        <div class="barpack">
+          <label>Ascend 开箱</label>
+          <div class="bar"><i style="width:${item.ascend}%;background:var(--ascend)"></i></div>
+          <div class="bar-num">${item.ascend}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderSignals(){
+  const reason=getReason();
+  qs("signals").innerHTML=`
+    <div class="signal-grid">
+      ${reason.evidence.map((item)=>`
+        <div class="signal">
+          <h4>${item.title}</h4>
+          <p>${item.detail}</p>
+          <div class="tagrow">${item.tags.map((tag)=>`<span class="chip">${tag}</span>`).join("")}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function setCenterVisibility(){
+  const board=qs("board");
+  const matrix=qs("matrix");
+  const signals=qs("signals");
+  board.style.display=STATE.view==="map"?"grid":"none";
+  matrix.style.display=STATE.view==="matrix"?"grid":"none";
+  signals.style.display=STATE.view==="signals"?"block":"none";
+}
+
+function renderCenter(){
+  renderFocusTags();
+  renderHero();
+  renderBoard();
+  renderMatrix();
+  renderSignals();
+  setCenterVisibility();
+}
+
+function renderDetailPane(){
+  const reason=getReason();
+  const pane=qs("detailPane");
+  if(STATE.tab==="principle"){
+    pane.innerHTML=`
+      <div class="cardt">底层原理</div>
+      <div class="detail-card">
+        <h4>${reason.title}</h4>
+        <p>${reason.summary}</p>
+      </div>
+      <div class="detail-card">
+        <h4>为什么 GPU 开源实现默认更快</h4>
+        <ul class="list">${reason.why.map((item)=>`<li>${item}</li>`).join("")}</ul>
+      </div>
+      <div class="hint">判断标准：如果热点集中在图编译、边角算子、格式转换或通信空洞，而不是单一大 GEMM，本质上就不是“主核没写好”，而是体系结构吸收方式不同。</div>
+    `;
+    return;
+  }
+  if(STATE.tab==="symptoms"){
+    pane.innerHTML=`
+      <div class="cardt">典型症状</div>
+      <div class="detail-card">
+        <h4>你会在 profiler 里看到什么</h4>
+        <ul class="list">${reason.symptom.map((item)=>`<li><strong>${item.title}</strong>：${item.body}</li>`).join("")}</ul>
+      </div>
+      <div class="detail-card">
+        <h4>优先采集哪些证据</h4>
+        <ul class="list">${reason.evidence.map((item)=>`<li><strong>${item.title}</strong>：${item.detail}</li>`).join("")}</ul>
+      </div>
+    `;
+    return;
+  }
+  if(STATE.tab==="optimization"){
+    pane.innerHTML=`
+      <div class="cardt">优化抓手</div>
+      <div class="detail-card">
+        <h4>先做什么</h4>
+        <ul class="list">${reason.optimize.map((item)=>`<li>${item}</li>`).join("")}</ul>
+      </div>
+      <div class="detail-card">
+        <h4>适合落在什么层级</h4>
+        <ul class="list">
+          ${reason.stage.map((item)=>`<li>${item} 层优先处理。</li>`).join("")}
+          ${reason.focus.map((item)=>`<li>专项动作：${item}</li>`).join("")}
+        </ul>
+      </div>
+    `;
+    return;
+  }
+  pane.innerHTML=`
+    <div class="cardt">对比表</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>维度</th><th>GPU 侧</th><th>Ascend 侧</th></tr>
+        </thead>
+        <tbody>
+          ${reason.compare.map((row)=>`
+            <tr>
+              <td>${row[0]}</td>
+              <td>${row[1]}</td>
+              <td>${row[2]}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTabs(){
+  qs("rtabs").querySelectorAll("button").forEach((btn)=>{
+    btn.classList.toggle("on",btn.dataset.tab===STATE.tab);
+    btn.onclick=()=>{
+      STATE.tab=btn.dataset.tab;
+      renderTabs();
+      renderDetailPane();
+    };
+  });
+}
+
+function renderStatus(){
+  const reason=getReason();
+  const scenario=getScenario();
+  qs("stReason").textContent=`根因：${reason.title}`;
+  qs("stStage").textContent=`层次：${reason.stage.join(" / ")}`;
+  qs("stSymptom").textContent=`表征：${reason.symptom[0].title}`;
+  qs("stScenario").textContent=`场景：${scenario.label}`;
+  qs("stAction").textContent=`抓手：${reason.focus[0]}`;
+  qs("titleDoc").textContent=`${scenario.label} · ${reason.title} · GPU 假设 vs Ascend 默认执行路径`;
+}
+
+function bindFocusBtn(){
+  qs("focusBtn").onclick=()=>{
+    const scenario=getScenario();
+    const reason=getReason();
+    const best=reason.scenarioScore[scenario.id] >= 5 ? "当前就是该场景首要矛盾" : "这是当前场景需要协同排查的一环";
+    window.alert(`${scenario.label}\n\n${best}\n\n优先证据：\n- ${scenario.evidence.join("\n- ")}\n\n推荐抓手：\n- ${reason.optimize.slice(0,3).join("\n- ")}`);
+  };
+}
+
+function renderAll(){
+  renderScenarioSeg();
+  renderActivity();
+  renderReasonList();
+  renderScenarioSummary();
+  renderCenter();
+  renderTabs();
+  renderDetailPane();
+  renderStatus();
+  bindFocusBtn();
+}
+
+document.addEventListener("DOMContentLoaded",renderAll);
+</script>
+</body>
+</html>

@@ -1,0 +1,2997 @@
+﻿<!doctype html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AscendPort · flash_mla 迁移工作台</title>
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+<link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+<style>
+:root{
+  --bg:var(--app-background, var(--background));
+  --chrome:color-mix(in srgb, var(--background-elevated) 94%, black 6%);
+  --chrome2:color-mix(in srgb, var(--surface-2) 90%, var(--background-elevated));
+  --side:color-mix(in srgb, var(--surface-2) 94%, black 6%);
+  --edit:color-mix(in srgb, var(--surface-1) 86%, black 14%);
+  --line:var(--border-subtle);
+  --line2:var(--border-default);
+  --txt:var(--foreground);
+  --dim:var(--foreground-secondary);
+  --dim2:var(--foreground-muted);
+  --acc:var(--primary);
+  --acc-soft:var(--state-selected);
+  --cube:#f2b44a;        /* 鐭╅樀 Cube */
+  --vec:#37c7c9;         /* 鍚戦噺 Vector */
+  --scalar:#a98bff;      /* 鏍囬噺 Scalar */
+  --mem:#6c8cff;         /* 鐗囦笂鎼繍 */
+  --risk:#ff5470;        /* SIMT 涓撳睘 路 闇€閲嶅啓 */
+  --ok:var(--success);
+  --warn:var(--warning);
+  --k:#ff7ba6; --ty:#f2b44a; --fn:#68b6ff; --num:#c99bff; --str:#8fd98f; --com:#5b6379; --pp:#e08adf;
+  --mono:var(--font-mono);
+  --sans:var(--font-sans);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:13px;overflow:hidden}
+button{font-family:inherit}
+
+/* ---------- shell ---------- */
+#app{display:grid;grid-template-rows:32px minmax(0,1fr) 22px;height:100vh;overflow:hidden}
+.titlebar{display:flex;align-items:center;gap:14px;background:var(--chrome);border-bottom:1px solid #0c0d12;padding:0 12px;-webkit-user-select:none;user-select:none}
+.tb-dots{display:flex;gap:7px}
+.tb-dots i{width:11px;height:11px;border-radius:50%;display:block}
+.tb-dots i:nth-child(1){background:#ff5f57}.tb-dots i:nth-child(2){background:#febc2e}.tb-dots i:nth-child(3){background:#28c840}
+.tb-title{color:var(--dim);font-size:12px;letter-spacing:.2px}
+.tb-title b{color:#e7eaf3;font-weight:600}
+.tb-menu{display:flex;gap:16px;margin-left:8px;color:var(--dim);font-size:12px}
+.tb-badge{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--acc);font-weight:600;font-size:11px;letter-spacing:.4px}
+.tb-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+
+.body{display:grid;grid-template-columns:46px 220px 1fr;min-height:0;height:100%;overflow:hidden}
+/* activity bar */
+.activity{background:var(--chrome);border-right:1px solid #0c0d12;display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:4px}
+.act{width:40px;height:40px;display:grid;place-items:center;color:var(--dim2);border-left:2px solid transparent;cursor:pointer;border-radius:6px}
+.act svg{width:22px;height:22px}
+.act.on{color:#eef;border-left-color:var(--acc)}
+.act:hover{color:#cfd6ea}
+.act.pl{margin-top:auto;margin-bottom:8px}
+
+/* sidebar */
+.sidebar{background:var(--side);border-right:1px solid #0c0d12;display:flex;flex-direction:column;min-height:0}
+.side-h{padding:10px 14px 8px;color:var(--dim);font-size:11px;letter-spacing:1.4px;text-transform:uppercase;display:flex;justify-content:space-between}
+.tree{padding:2px 6px;overflow:auto}
+.node{display:flex;align-items:center;gap:7px;padding:3px 8px;border-radius:5px;color:var(--txt);cursor:pointer;font-size:12.5px;white-space:nowrap}
+.node:hover{background:#ffffff08}
+.node.sel{background:var(--acc-soft);color:#fff}
+.node .chev,.node .ic{flex:none}
+.node.ind{padding-left:22px}
+.node.ind2{padding-left:36px}
+.tag{margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.5px;padding:1px 5px;border-radius:4px}
+.tag.new{background:#1f7a4d33;color:#4fd68f;border:1px solid #4fd68f55}
+.tag.mod{background:#7a5a1f33;color:var(--warn);border:1px solid #f2b44a55}
+.fic{width:14px;height:14px}
+.dot-c{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+/* ---------- editor region ---------- */
+.main{display:grid;grid-template-rows:36px 36px minmax(0,1fr) 210px;min-height:0;min-width:0;overflow:hidden}
+.edtoolbar{display:flex;align-items:center;gap:10px;background:var(--edit);border-bottom:1px solid #0c0d12;padding:0 12px}
+.etb-path{color:var(--dim2);font-size:11px;font-family:var(--mono)}
+.etb-path b{color:var(--dim)}
+.etb-spacer{flex:1}
+.etb-btn{display:flex;align-items:center;gap:7px;border:1px solid var(--line2);background:#ffffff08;color:var(--txt);border-radius:7px;padding:5px 11px;font-size:11.5px;cursor:pointer;transition:border-color .15s,background .15s}
+.etb-btn:hover{border-color:var(--acc);background:var(--acc-soft);color:#fff}
+.etb-btn.on{border-color:var(--acc);background:var(--acc-soft);color:#fff}
+.etb-btn svg{width:14px;height:14px}
+.tabs{display:flex;align-items:stretch;background:var(--chrome);border-bottom:1px solid #0c0d12;overflow:hidden}
+.tab{display:flex;align-items:center;gap:8px;padding:0 16px;color:var(--dim);border-right:1px solid #0c0d12;cursor:pointer;font-size:12.5px;position:relative;white-space:nowrap}
+.tab.on{background:var(--edit);color:#eef}
+.tab.on:after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--acc)}
+.tab .cd{width:12px;height:12px}
+.tab .x{opacity:.5;font-size:14px;line-height:1}
+
+/* editor split: code | graph | compare(cpp) */
+.edit-split{display:grid;grid-template-columns:1fr 0px 0px 0px 0px;min-height:0;transition:grid-template-columns .5s cubic-bezier(.5,0,.2,1)}
+.edit-split.graph-open{grid-template-columns:1fr minmax(340px,44%) 0px 0px 0px}
+.edit-split.compare-open{grid-template-columns:1fr 0px 1fr 0px 0px}
+.edit-split.tiling-open{grid-template-columns:1fr 0px 0px minmax(360px,46%) 0px}
+.edit-split.pipe-open{grid-template-columns:1fr 0px 0px 0px minmax(380px,48%)}
+@media(max-width:1180px){.edit-split.graph-open{grid-template-columns:1fr minmax(300px,50%) 0px 0px 0px}}
+
+/* code pane */
+.codewrap{position:relative;background:var(--edit);overflow:auto;min-width:0;min-height:0}
+.pane-h{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:7px;padding:7px 12px;background:var(--chrome);border-bottom:1px solid #0c0d12;font-size:11px;color:var(--dim)}
+.pane-h b{color:#dfe4f2;font-weight:600;font-family:var(--mono);font-size:11px}
+.pane-h .link-hint{font-size:9.5px;color:var(--vec);background:#37c7c918;border:1px solid #37c7c944;border-radius:5px;padding:1px 7px}
+.pane-h .pane-tag{margin-left:auto;font-size:9px;font-weight:700;letter-spacing:.4px;padding:1px 7px;border-radius:5px}
+.pane-h .pane-tag.cuda{background:#f2b44a22;color:var(--cube);border:1px solid #f2b44a55}
+.pane-h .pane-tag.asc{background:var(--acc-soft);color:var(--acc);border:1px solid #ff415f55}
+.diffpane{background:var(--edit);border-left:1px solid #0c0d12;opacity:0;transition:opacity .4s ease .15s}
+.edit-split.compare-open .diffpane{opacity:1}
+.edit-split:not(.compare-open) .diffpane{pointer-events:none}
+/* tiling 鍙鍖栭潰鏉?*/
+.tilingpane{background:#101418;border-left:1px solid #0c0d12;min-width:0;display:flex;flex-direction:column;opacity:0;transition:opacity .4s ease .15s;overflow:hidden}
+.edit-split.tiling-open .tilingpane{opacity:1}
+.edit-split:not(.tiling-open) .tilingpane{pointer-events:none}
+.tp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #ffffff0d;background:#141a1e}
+.tp-head b{font-size:12px;color:#eef;font-weight:600}
+.tp-head .sub{color:var(--dim);font-size:10.5px}
+.tp-close{margin-left:auto;color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:2px 6px;border-radius:4px}
+.tp-close:hover{background:#ffffff10;color:#fff}
+.tp-body{flex:1;overflow:auto;padding:12px}
+.tp-sec{margin-bottom:14px}
+.tp-sec>.h{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.tp-opts{display:flex;gap:6px;margin-bottom:12px}
+.tp-opt{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 6px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.tp-opt:hover{border-color:var(--dim)}
+.tp-opt.on{border-color:var(--vec);background:#37c7c916}
+.tp-opt b{display:block;font-size:12px;color:#eef}
+.tp-opt span{font-size:9px;color:var(--dim)}
+.tp-opt .rec{font-size:8px;font-weight:700;color:var(--ok)}
+.tp-opt .wrn{font-size:8px;font-weight:700;color:var(--risk)}
+/* S 缁村垎鍧楁潯 */
+.sbar{position:relative;height:34px;border:1px solid var(--line2);border-radius:7px;overflow:hidden;display:flex;background:#0c0f12}
+.sblk{flex:1;border-right:1px dashed #ffffff22;display:flex;align-items:center;justify-content:center;font-size:9px;color:#cfe;font-family:var(--mono);min-width:0;transition:background .3s}
+.sblk:last-child{border-right:none}
+.sblk.tail{background:#ff547026;color:#ffbcc7}
+.sblk.act{background:#37c7c93a}
+.sbar-cap{display:flex;justify-content:space-between;font-size:9px;color:var(--dim2);margin-top:4px;font-family:var(--mono)}
+/* 缂撳啿鍗犵敤鏉?*/
+.util{margin-bottom:9px}
+.util .ul{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:3px}
+.util .ul b{color:#eef;font-family:var(--mono)}
+.util .track{height:9px;border-radius:5px;background:#ffffff10;overflow:hidden;position:relative}
+.util .fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.util .cap-line{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.5}
+.tp-metrics{display:flex;gap:8px}
+.tp-metric{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#ffffff05}
+.tp-metric .mv{font-size:16px;font-weight:700;color:#eef}
+.tp-metric .mk{font-size:9.5px;color:var(--dim);margin-top:1px}
+.tp-anim{border:1px solid var(--line2);border-radius:6px;padding:5px 9px;font-size:10.5px;color:var(--vec);background:#37c7c910;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:10px}
+.tp-anim:hover{background:#37c7c91e}
+/* pipeline 鍓嶅悗瀵规瘮闈㈡澘 */
+.pipepane{background:#101016;border-left:1px solid #0c0d12;min-width:0;display:flex;flex-direction:column;opacity:0;transition:opacity .4s ease .15s;overflow:hidden}
+.edit-split.pipe-open .pipepane{opacity:1}
+.edit-split:not(.pipe-open) .pipepane{pointer-events:none}
+.pp-block{margin-bottom:14px}
+.pp-block>.h{font-size:11px;font-weight:600;color:#eef;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+.pp-block>.h .badge{font-size:8.5px;font-weight:700;letter-spacing:.4px;padding:1px 6px;border-radius:5px}
+.pp-block>.h .badge.old{background:#ff547022;color:var(--risk);border:1px solid #ff547055}
+.pp-block>.h .badge.new{background:#48d59722;color:var(--ok);border:1px solid #48d59755}
+.tl-rows{display:flex;flex-direction:column;gap:5px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#0c0d12}
+.tl-row{display:flex;align-items:center;gap:8px}
+.tl-lbl{width:52px;flex:none;font-size:9.5px;font-family:var(--mono);color:var(--dim);text-align:right}
+.tl-track{flex:1;position:relative;height:16px;background:#ffffff08;border-radius:4px;overflow:hidden}
+.tl-cell{position:absolute;top:2px;height:12px;border-radius:3px;font-size:8px;color:#0009;display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden}
+.tl-cell.mte{background:var(--mem)}
+.tl-cell.cube{background:var(--cube)}
+.tl-cell.vec{background:var(--vec)}
+.tl-cell.bub{background:repeating-linear-gradient(45deg,#ffffff10,#ffffff10 3px,transparent 3px,transparent 6px);border:1px dashed #ffffff30}
+.tl-axis{display:flex;justify-content:space-between;font-size:8.5px;color:var(--dim2);font-family:var(--mono);margin-top:5px;padding-left:60px}
+.pp-metrics{display:flex;gap:8px;margin-top:10px}
+.pp-metric{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#ffffff05;text-align:center}
+.pp-metric .mv{font-size:16px;font-weight:700}
+.pp-metric .mk{font-size:9px;color:var(--dim);margin-top:1px}
+.pp-metric .arw{font-size:10px;color:var(--dim);margin:0 3px}
+.pp-play{border:1px solid var(--line2);border-radius:6px;padding:5px 10px;font-size:10.5px;color:var(--mem);background:#6c8cff12;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:10px}
+.pp-play:hover{background:#6c8cff22}
+.tl-cell.play{animation:tlpop .4s ease both}
+@keyframes tlpop{from{opacity:.25;transform:scaleX(.6)}to{opacity:1;transform:none}}
+.code{display:grid;grid-template-columns:auto 1fr;font-family:var(--mono);font-size:12.5px;line-height:19px;min-height:100%;min-width:max-content}
+.gutter{position:sticky;left:0;z-index:2;background:var(--edit);color:var(--dim2);text-align:right;padding:10px 12px 10px 16px;white-space:pre;border-right:1px solid #ffffff08;-webkit-user-select:none;user-select:none}
+.codelines{padding:10px 20px 40px 16px;white-space:pre;min-width:0}
+.ln{display:block;min-height:19px;transition:background .2s}
+.ln.hl-risk{background:linear-gradient(90deg,#ff547018,transparent);box-shadow:inset 2px 0 0 var(--risk)}
+.ln.hl-add{background:linear-gradient(90deg,#48d59714,transparent);box-shadow:inset 2px 0 0 var(--ok)}
+.ln.hl-buf{background:linear-gradient(90deg,#6c8cff18,transparent);box-shadow:inset 2px 0 0 var(--mem)}
+/* S4 鏂版敞鍏ョ殑鍐呭瓨灞傛浠ｇ爜 鈥斺€?鏇撮啋鐩?*/
+.ln.hl-new{background:linear-gradient(90deg,#48d5972e,#48d59710 60%,transparent);box-shadow:inset 3px 0 0 var(--ok);position:relative}
+.ln.hl-new::after{content:"锛婼4";position:absolute;right:14px;font-size:8.5px;font-weight:700;letter-spacing:.4px;color:var(--ok);background:#48d59722;border:1px solid #48d59755;border-radius:4px;padding:0 4px;opacity:.9}
+@keyframes injectFlash{0%{background:linear-gradient(90deg,#48d59766,transparent)}100%{background:linear-gradient(90deg,#48d5972e,#48d59710 60%,transparent)}}
+.ln.hl-new.flash{animation:injectFlash 1s ease}
+.ln.hl-node{background:linear-gradient(90deg,#ff415f28,transparent);box-shadow:inset 3px 0 0 var(--acc);animation:nodeHighlight .6s ease}
+/* 瀵规瘮鑱斿姩楂樹寒 */
+.ln.link-hot{background:linear-gradient(90deg,#37c7c92e,transparent)!important;box-shadow:inset 3px 0 0 var(--vec)!important}
+.ln.link-grp{cursor:pointer}
+.ln.link-grp:hover{background:linear-gradient(90deg,#37c7c918,transparent)}
+.edit-split.compare-open.link-active .ln.link-grp:not(.link-hot){opacity:.5}
+.edit-split.compare-open.link-active .ln:not(.link-hot){opacity:.5}
+.c-k{color:var(--k)}.c-ty{color:var(--ty)}.c-fn{color:var(--fn)}.c-num{color:var(--num)}.c-str{color:var(--str)}.c-com{color:var(--com);font-style:italic}.c-pp{color:var(--pp)}
+@keyframes nodeHighlight{0%{background:linear-gradient(90deg,#ff415f38,transparent)}100%{background:linear-gradient(90deg,#ff415f28,transparent)}}
+
+/* graph pane */
+.graphpane{background:#131015;border-left:1px solid #0c0d12;min-width:0;display:flex;flex-direction:column;opacity:0;transition:opacity .4s ease .15s;overflow:hidden}
+.edit-split.graph-open .graphpane{opacity:1}
+.gp-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #ffffff0d;background:#17131a}
+.gp-head b{font-size:12px;color:#eef;font-weight:600}
+.gp-head .sub{color:var(--dim);font-size:10.5px}
+.gp-close{margin-left:auto;color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:2px 6px;border-radius:4px}
+.gp-close:hover{background:#ffffff10;color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;border-bottom:1px solid #ffffff0a;font-size:10.5px;color:var(--dim)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.gcanvas{flex:1;overflow:auto;position:relative}
+.gcanvas svg{display:block;width:100%;height:auto;min-height:100%}
+.gnode{cursor:pointer}
+.gnode rect{transition:filter .2s,stroke-width .2s}
+.gnode:hover rect{filter:brightness(1.18)}
+.gnode.sel rect{stroke-width:2.4px}
+.gnode text{font-family:var(--sans);pointer-events:none}
+.gnode .nt{font-weight:600}
+.gnode .ns{fill:#0009}
+.gedge{stroke:#4a4f63;stroke-width:1.6;fill:none;marker-end:url(#arrow)}
+.gedge.hot{stroke:var(--acc);stroke-width:2}
+.risk-pulse{animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:.9}}
+.gnode.enter{animation:pop .38s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.9)}to{opacity:1;transform:none}}
+.gp-detail{border-top:1px solid #ffffff0d;background:#17131a;padding:10px 12px;font-size:11.5px;color:var(--dim);min-height:74px}
+.gp-detail b{color:#eef}
+.gp-detail .badge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:5px;margin-right:6px;vertical-align:middle}
+
+/* ---------- bottom panel ---------- */
+.panel{background:var(--chrome);border-top:1px solid #0c0d12;display:flex;flex-direction:column;min-height:0}
+.panel-tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid #0c0d12;height:34px;align-items:center}
+.ptab{padding:6px 10px;color:var(--dim);font-size:11.5px;letter-spacing:.4px;cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase}
+.ptab.on{color:#eef;border-bottom-color:var(--acc)}
+.ptab .cnt{display:inline-block;min-width:15px;text-align:center;font-size:9.5px;background:#ffffff14;border-radius:8px;padding:0 5px;margin-left:6px}
+.ptab .cnt.err{background:#ff547033;color:#ff8ba0}
+.term{flex:1;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.55;padding:8px 14px;color:#b7bed2}
+.tl{white-space:pre-wrap;word-break:break-word}
+.tl .t{color:var(--dim2)}
+.tl .g{color:var(--ok)}.tl .y{color:var(--warn)}.tl .r{color:var(--risk)}.tl .b{color:var(--fn)}.tl .a{color:var(--acc)}.tl .d{color:var(--dim)}
+.tl .p{color:var(--acc);font-weight:700}
+.cursor{display:inline-block;width:7px;height:14px;background:var(--acc);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.probs{flex:1;overflow:auto;padding:6px 0;display:none}
+.prob{display:flex;gap:9px;align-items:flex-start;padding:5px 14px;font-size:12px;color:var(--txt)}
+.prob:hover{background:#ffffff06}
+.prob .pi{flex:none;margin-top:1px}
+.prob .pf{color:var(--dim);font-size:11px}
+
+/* ---------- 鏁版嵁娴佸姩鐢婚潰鏉?---------- */
+.flowpane{flex:1;min-height:0;display:flex;flex-direction:column;background:#121016}
+.flow-bar{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid #ffffff0a}
+.flow-bar .fb-btn{display:flex;align-items:center;gap:6px;border:1px solid var(--line2);background:#ffffff08;color:var(--txt);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+.flow-bar .fb-btn:hover{border-color:var(--acc);color:#fff}
+.flow-bar .fb-btn.on{border-color:var(--acc);background:var(--acc-soft);color:#fff}
+.flow-bar .fb-step{font-size:11px;color:var(--dim);font-family:var(--mono)}
+.flow-bar .fb-step b{color:#eef;font-weight:600}
+.flow-bar .fb-spacer{flex:1}
+.flow-bar .fb-legend{display:flex;gap:10px;font-size:9.5px;color:var(--dim)}
+.flow-bar .fb-legend span{display:inline-flex;align-items:center;gap:4px}
+.flow-bar .fb-legend i{width:8px;height:8px;border-radius:2px}
+.flow-stage{flex:1;min-height:0;overflow:hidden;position:relative}
+.flow-stage svg{width:100%;height:100%;display:block}
+.fu-box{transition:filter .2s}
+.fu-box.active rect{filter:brightness(1.35)}
+.fu-lbl{font-family:var(--sans);font-size:10.5px;font-weight:600;fill:#eef;pointer-events:none}
+.fu-sub{font-family:var(--mono);font-size:8px;fill:#9aa2ba;pointer-events:none}
+.fedge{stroke:#3a3f52;stroke-width:2;fill:none}
+.fedge.lit{stroke:var(--ok);stroke-width:2.6}
+.fnote{font-family:var(--sans);font-size:10px;fill:#c9cede}
+.fcap{font-family:var(--mono);font-size:9px;fill:var(--dim)}
+
+/* ---------- 绮惧害鎶ュ憡闈㈡澘 ---------- */
+.accpane{flex:1;min-height:0;overflow:auto;background:#121016;padding:12px 16px}
+.acc-top{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.acc-kpi{flex:1;min-width:120px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#ffffff05}
+.acc-kpi .kv{font-size:17px;font-weight:700}
+.acc-kpi .kk{font-size:10px;color:var(--dim);margin-top:2px}
+.acc-kpi .kd{font-size:9.5px;margin-top:3px}
+.acc-sec-h{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin:14px 0 8px}
+.acc-table{width:100%;border-collapse:collapse;font-size:11px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.acc-table th{text-align:left;color:var(--dim2);font-weight:600;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;padding:7px 11px;background:#ffffff08;border-bottom:1px solid #ffffff0a}
+.acc-table td{padding:8px 11px;border-bottom:1px solid #ffffff08;vertical-align:middle}
+.acc-table tr:last-child td{border-bottom:none}
+.acc-table tr.bad td{background:#ff547010}
+.acc-op{font-family:var(--mono);font-size:10.5px;color:#dfe4f2}
+.acc-st{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:5px;white-space:nowrap}
+.acc-st.pass{background:#48d59722;color:var(--ok);border:1px solid #48d59755}
+.acc-st.fail{background:#ff547022;color:var(--risk);border:1px solid #ff547055}
+.acc-st.fixed{background:#6c8cff22;color:var(--mem);border:1px solid #6c8cff55}
+.acc-err{font-family:var(--mono);font-size:10.5px}
+.acc-card{border:1px solid #ff547055;background:#ff54700d;border-radius:10px;padding:12px 14px;margin-top:10px}
+.acc-card.ok{border-color:#48d59755;background:#48d5970d}
+.acc-card .ac-h{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#eef;margin-bottom:8px}
+.acc-card .ac-h .tag{font-size:8.5px;font-weight:700;padding:1px 7px;border-radius:5px}
+.acc-card .ac-h .tag.risk{background:#ff547022;color:var(--risk);border:1px solid #ff547055}
+.acc-card .ac-row{display:flex;gap:8px;margin-bottom:6px;font-size:11px;line-height:1.5}
+.acc-card .ac-k{flex:none;width:58px;color:var(--dim);font-size:10px;padding-top:1px}
+.acc-card .ac-v{color:var(--txt)}
+.acc-card code{font-family:var(--mono);font-size:10.5px;background:#ffffff10;padding:1px 5px;border-radius:4px;color:#dfe4f2}
+.acc-fix{margin-top:10px;border:1px solid #48d59744;border-radius:8px;overflow:hidden}
+.acc-fix .fh{display:flex;align-items:center;gap:7px;padding:7px 11px;background:#48d5970f;font-size:11px;font-weight:600;color:var(--ok)}
+.acc-diff{font-family:var(--mono);font-size:10.5px;line-height:1.7;padding:8px 11px;white-space:pre-wrap;word-break:break-word}
+.acc-diff .del{color:#ff9aa8;background:#ff54701a;display:block;border-radius:3px;padding:0 4px}
+.acc-diff .add{color:#9ff0c0;background:#48d5971a;display:block;border-radius:3px;padding:0 4px}
+.acc-diff .ctx{color:var(--dim);display:block;padding:0 4px}
+.acc-apply{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ok);background:#48d59715;color:var(--ok);border-radius:6px;padding:5px 11px;font-size:11px;cursor:pointer;margin:8px 11px}
+.acc-apply:hover{background:#48d59728}
+.acc-apply.done{border-color:var(--dim2);color:var(--dim);background:transparent;cursor:default}
+
+/* ---------- 鎬ц兘鎶ュ憡闈㈡澘 ---------- */
+.perfpane{flex:1;min-height:0;overflow:auto;background:#121016;padding:12px 16px}
+.perf-top{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.perf-kpi{flex:1;min-width:110px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#ffffff05}
+.perf-kpi .kv{font-size:18px;font-weight:700;color:#eef}
+.perf-kpi .kv .arw{font-size:11px;color:var(--dim);margin:0 4px}
+.perf-kpi .kk{font-size:10px;color:var(--dim);margin-top:2px}
+.perf-sec-h{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim2);margin:14px 0 8px;display:flex;align-items:center;gap:8px}
+.perf-sec-h .tag{font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.3px}
+.perf-sec-h .tag.old{background:#ff547022;color:var(--risk);border:1px solid #ff547055}
+.perf-sec-h .tag.new{background:#48d59722;color:var(--ok);border:1px solid #48d59755}
+/* 娉抽亾鍥?*/
+.swim{border:1px solid var(--line);border-radius:9px;padding:10px;background:#0c0d12;margin-bottom:8px}
+.swim-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.swim-row:last-child{margin-bottom:0}
+.swim-lbl{width:62px;flex:none;font-size:9.5px;font-family:var(--mono);color:var(--dim);text-align:right}
+.swim-track{flex:1;position:relative;height:18px;background:#ffffff08;border-radius:4px;overflow:hidden}
+.swim-cell{position:absolute;top:2px;height:14px;border-radius:3px;font-size:8px;color:#0009;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap}
+.swim-cell.mte{background:var(--mem)}
+.swim-cell.cube{background:var(--cube)}
+.swim-cell.vec{background:var(--vec)}
+.swim-cell.idle{background:repeating-linear-gradient(45deg,#ffffff08,#ffffff08 3px,transparent 3px,transparent 6px);border:1px dashed #ffffff26}
+.swim-axis{display:flex;justify-content:space-between;font-size:8.5px;color:var(--dim2);font-family:var(--mono);margin-top:5px;padding-left:70px}
+.swim-legend{display:flex;gap:12px;font-size:9.5px;color:var(--dim);margin:6px 0 0;padding-left:70px}
+.swim-legend span{display:inline-flex;align-items:center;gap:5px}
+.swim-legend i{width:9px;height:9px;border-radius:2px}
+/* 鍒╃敤鐜囧姣旀潯 */
+.cmp{margin-bottom:9px}
+.cmp .cl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-bottom:4px}
+.cmp .cl b{color:#eef;font-family:var(--mono)}
+.cmp .bars{display:flex;flex-direction:column;gap:4px}
+.cmp .barrow{display:flex;align-items:center;gap:8px}
+.cmp .brl{width:44px;flex:none;font-size:9px;color:var(--dim2);text-align:right}
+.cmp .brt{flex:1;height:12px;background:#ffffff0c;border-radius:4px;overflow:hidden}
+.cmp .brf{height:100%;border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:5px;font-size:8px;font-weight:700;color:#0009;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.perf-tune{border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:8px}
+.perf-tune .pt-item{display:flex;gap:9px;align-items:flex-start;padding:8px 11px;border-bottom:1px solid #ffffff08;font-size:11px}
+.perf-tune .pt-item:last-child{border-bottom:none}
+.perf-tune .pt-item .ic{flex:none;margin-top:1px}
+.perf-tune .pt-item .pv{color:var(--dim)}
+.perf-tune .pt-item b{color:#eef}
+.perf-reg{border:1px solid #48d59755;background:#48d5970d;border-radius:9px;padding:10px 13px;margin-top:10px;font-size:11.5px}
+.perf-reg b{color:#eef}
+.perf-reg code{font-family:var(--mono);font-size:10.5px;background:#ffffff10;padding:1px 5px;border-radius:4px;color:var(--ok)}
+.perf-play{border:1px solid var(--line2);border-radius:6px;padding:5px 10px;font-size:10.5px;color:var(--vec);background:#37c7c910;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:10px}
+.perf-play:hover{background:#37c7c91e}
+.swim-cell.play{animation:tlpop .4s ease both}
+
+/* ---------- wizard (right activity panel) ---------- */
+.wizard{width:340px;background:var(--chrome2);border-left:1px solid #0c0d12;display:flex;flex-direction:column;min-height:0}
+.wz-h{padding:14px 16px 12px;border-bottom:1px solid #0c0d12}
+.wz-h .kick{color:var(--acc);font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase}
+.wz-h h1{margin:5px 0 2px;font-size:15px;color:#eef;font-weight:600;letter-spacing:.2px}
+.wz-h p{margin:0;color:var(--dim);font-size:11.5px;line-height:1.5}
+.prog{display:flex;gap:3px;padding:12px 16px 4px}
+.pstep{flex:1;height:4px;border-radius:3px;background:#ffffff12;position:relative}
+.pstep.done{background:var(--ok)}
+.pstep.cur{background:var(--acc)}
+.plabels{display:flex;justify-content:space-between;padding:0 16px 10px;color:var(--dim2);font-size:9px;letter-spacing:.3px}
+.wz-scroll{flex:1;overflow:auto;padding:6px 16px 16px}
+.stepcard{border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:12px;background:#ffffff05}
+.stepcard.cur-card{border-color:var(--acc);background:var(--acc-soft)}
+.sc-h{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.sc-n{flex:none;width:26px;height:26px;border-radius:8px;background:var(--acc-soft);color:var(--acc);display:grid;place-items:center;font-weight:800;font-size:12px}
+.sc-t b{font-size:13px;color:#eef;display:block}
+.sc-t span{font-size:10.5px;color:var(--dim)}
+.sc-body{font-size:12px;color:var(--dim);line-height:1.6}
+.sc-body ul{margin:8px 0 0;padding-left:16px}
+.sc-body li{margin:3px 0}
+.sc-body code{font-family:var(--mono);font-size:11px;background:#ffffff10;padding:1px 5px;border-radius:4px;color:#dfe4f2}
+.riskcard{margin-top:10px;border:1px solid #ff547055;background:#ff54700f;border-radius:9px;padding:10px 11px}
+.riskcard .rh{display:flex;align-items:center;gap:7px;color:var(--risk);font-weight:700;font-size:11.5px}
+.riskcard p{margin:6px 0 0;color:#e6b7bf;font-size:11px;line-height:1.5}
+.choice{margin-top:10px}
+.choice>.q{font-size:11.5px;color:#eef;font-weight:600;margin-bottom:8px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:border-color .15s,background .15s}
+.opt:hover{border-color:var(--dim)}
+.opt.on{border-color:var(--acc);background:var(--acc-soft)}
+.opt .rd{flex:none;width:15px;height:15px;border-radius:50%;border:2px solid var(--dim2);margin-top:1px}
+.opt.on .rd{border-color:var(--acc);background:radial-gradient(circle,var(--acc) 40%,transparent 46%)}
+.opt .ot b{font-size:12px;color:#eef;display:flex;align-items:center;gap:6px}
+.opt .ot span{font-size:10.5px;color:var(--dim);display:block;margin-top:2px;line-height:1.45}
+.pill{font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.4px}
+.pill.rec{background:#48d59722;color:var(--ok);border:1px solid #48d59755}
+.pill.warn{background:#f2b44a22;color:var(--warn);border:1px solid #f2b44a55}
+.chk{list-style:none;padding:0;margin:0}
+.chk li{display:flex;align-items:center;gap:9px;padding:5px 2px;font-size:12px;color:var(--dim);border-bottom:1px solid #ffffff08}
+.chk li .cb{flex:none;width:16px;height:16px;border-radius:5px;border:1.6px solid var(--dim2);display:grid;place-items:center;font-size:11px}
+.chk li.done{color:var(--txt)}
+.chk li.done .cb{background:var(--ok);border-color:var(--ok);color:#06210f}
+.chk li.cur .cb{border-color:var(--acc);animation:pulse 1.4s infinite}
+
+/* 绠楀瓙鏄犲皠娓呭崟琛?*/
+.opmap{margin:12px 0 4px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.opmap-h{display:flex;align-items:center;gap:6px;padding:8px 11px;background:#ffffff08;border-bottom:1px solid var(--line);font-size:11px;color:#eef;font-weight:600}
+.opmap-h .cnt{margin-left:auto;font-size:9.5px;font-weight:600;color:var(--dim);background:#ffffff10;border-radius:7px;padding:1px 7px}
+.opmap table{width:100%;border-collapse:collapse;font-size:11px}
+.opmap th{text-align:left;color:var(--dim2);font-weight:600;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;padding:6px 11px;border-bottom:1px solid #ffffff0a}
+.opmap td{padding:6px 11px;border-bottom:1px solid #ffffff08;vertical-align:middle}
+.opmap tr:last-child td{border-bottom:none}
+.opmap tr.rw td{background:#ff547010}
+.opmap .cuda{font-family:var(--mono);font-size:10.5px;color:#e6b7bf}
+.opmap .op{font-family:var(--mono);font-size:10.5px;color:#dfe4f2}
+.opmap .unit{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;white-space:nowrap}
+.opmap .unit i{width:8px;height:8px;border-radius:2px;flex:none}
+.opmap .st{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:5px;white-space:nowrap}
+.opmap .st.ok{background:#48d59722;color:var(--ok);border:1px solid #48d59755}
+.opmap .st.rw{background:#ff547022;color:var(--risk);border:1px solid #ff547055}
+
+.wz-foot{border-top:1px solid #0c0d12;padding:12px 16px;background:#191b24;position:sticky;bottom:0;z-index:10}
+.run{width:100%;border:none;border-radius:9px;padding:12px;background:var(--acc);color:#fff;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:8px;transition:filter .15s,transform .05s;box-shadow:0 2px 8px #ff415f44}
+.run:hover{filter:brightness(1.08)}.run:active{transform:translateY(1px)}
+.run:disabled{background:#2a2e3c;color:var(--dim2);cursor:default;box-shadow:none}
+.run.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);box-shadow:none}
+.foot-hint{text-align:center;color:var(--dim2);font-size:10px;margin-top:8px}
+
+/* statusbar */
+.statusbar{background:var(--acc);color:#fff;display:flex;align-items:center;gap:16px;padding:0 12px;font-size:11px;letter-spacing:.3px}
+.statusbar .s{display:flex;align-items:center;gap:5px;opacity:.95}
+.statusbar .r{margin-left:auto;display:flex;gap:16px}
+
+/* notification */
+.notif-wrap{position:fixed;right:18px;bottom:34px;z-index:50;display:flex;flex-direction:column;gap:9px;pointer-events:none}
+.notif{background:#22252f;border:1px solid var(--line2);border-left:3px solid var(--acc);border-radius:9px;padding:11px 14px;min-width:250px;max-width:320px;box-shadow:0 12px 34px #0008;animation:slidein .3s cubic-bezier(.2,1.2,.3,1) both}
+.notif.ok{border-left-color:var(--ok)}.notif.warn{border-left-color:var(--warn)}
+.notif b{color:#eef;font-size:12px;display:block;margin-bottom:2px}
+.notif span{color:var(--dim);font-size:11px;line-height:1.4}
+@keyframes slidein{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+.mobile-note{display:none}
+@media(max-width:860px){
+  #app{display:none}
+  .mobile-note{display:flex;height:100vh;align-items:center;justify-content:center;text-align:center;padding:32px;flex-direction:column;gap:14px;color:var(--dim)}
+  .mobile-note b{color:#eef;font-size:16px}
+}
+</style>
+<style>
+body{
+  background:var(--app-background, var(--background));
+  color:var(--foreground);
+  font:var(--text-body-sm);
+}
+
+#app,
+.mobile-note{
+  background:transparent;
+}
+
+.titlebar,
+.activity,
+.sidebar,
+.tabs,
+.edtoolbar,
+.panel,
+.wizard,
+.statusbar,
+.pane-h,
+.gp-head,
+.tp-head,
+.panel-tabs{
+  backdrop-filter:var(--surface-backdrop-filter-soft, none);
+  -webkit-backdrop-filter:var(--surface-backdrop-filter-soft, none);
+}
+
+.titlebar,
+.activity,
+.sidebar,
+.tabs,
+.edtoolbar,
+.panel,
+.wizard{
+  border-color:var(--border-subtle);
+}
+
+.titlebar{
+  min-height:40px;
+  padding:0 14px;
+  background:color-mix(in srgb, var(--background-elevated) 96%, black 4%);
+  box-shadow:inset 0 -1px 0 var(--border-subtle);
+}
+
+.tb-title,
+.tb-menu,
+.etb-path,
+.side-h,
+.gp-head .sub,
+.tp-head .sub,
+.foot-hint,
+.plabels,
+.statusbar .s,
+.panel-tabs > div:last-child{
+  color:var(--foreground-secondary);
+}
+
+.tb-title b,
+.pane-h b,
+.gp-head b,
+.tp-head b,
+.wz-h h1,
+.sc-t b,
+.opmap-h,
+.perf-reg b,
+.acc-card .ac-h,
+.gp-detail b{
+  color:var(--foreground);
+}
+
+.tb-menu{
+  gap:12px;
+}
+
+.tb-badge{
+  min-height:22px;
+  padding:0 10px;
+  border-radius:999px;
+  background:color-mix(in srgb, var(--primary) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  color:color-mix(in srgb, var(--primary) 88%, white 8%);
+  font:var(--text-label);
+}
+
+.tb-badge .dot{
+  width:7px;
+  height:7px;
+  background:currentColor;
+  box-shadow:none;
+}
+
+.activity{
+  padding-top:12px;
+  background:color-mix(in srgb, var(--surface-2) 96%, black 4%);
+}
+
+.act{
+  width:38px;
+  height:38px;
+  border-left:none;
+  border-radius:12px;
+  color:var(--foreground-muted);
+  transition:background var(--duration-fast) var(--easing-default), color var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
+}
+
+.act.on{
+  background:var(--state-selected);
+  color:var(--foreground);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.act:hover{
+  background:var(--state-hover);
+  color:var(--foreground);
+}
+
+.sidebar{
+  background:color-mix(in srgb, var(--surface-2) 92%, black 8%);
+}
+
+.side-h{
+  padding:12px 14px 10px;
+  font:var(--text-label);
+  letter-spacing:.08em;
+}
+
+.tree{
+  padding:4px 8px 10px;
+}
+
+.node{
+  min-height:30px;
+  padding:4px 10px;
+  border-radius:10px;
+  color:var(--foreground-secondary);
+}
+
+.node:hover{
+  background:var(--state-hover);
+  color:var(--foreground);
+}
+
+.node.sel{
+  background:var(--state-selected);
+  color:var(--foreground);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+.tag,
+.pill,
+.acc-st,
+.pane-tag{
+  border-radius:999px;
+}
+
+.tag.new,
+.pill.rec,
+.acc-st.pass{
+  background:color-mix(in srgb, var(--success) 14%, transparent);
+  color:color-mix(in srgb, var(--success) 88%, white 8%);
+  border:1px solid color-mix(in srgb, var(--success) 28%, transparent);
+}
+
+.tag.mod,
+.pill.warn{
+  background:color-mix(in srgb, var(--warning) 14%, transparent);
+  color:color-mix(in srgb, var(--warning) 92%, white 4%);
+  border:1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+}
+
+.pane-tag.cuda{
+  background:color-mix(in srgb, var(--warning) 14%, transparent);
+  color:color-mix(in srgb, var(--warning) 92%, white 4%);
+  border-color:color-mix(in srgb, var(--warning) 28%, transparent);
+}
+
+.pane-tag.asc{
+  background:color-mix(in srgb, var(--primary) 14%, transparent);
+  color:color-mix(in srgb, var(--primary) 92%, white 4%);
+  border-color:color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.tabs,
+.edtoolbar,
+.pane-h,
+.gp-head,
+.tp-head,
+.panel-tabs{
+  background:color-mix(in srgb, var(--background-elevated) 96%, black 4%);
+}
+
+.tab{
+  color:var(--foreground-secondary);
+  border-right-color:var(--border-subtle);
+}
+
+.tab.on{
+  background:color-mix(in srgb, var(--surface-1) 88%, black 12%);
+  color:var(--foreground);
+}
+
+.tab.on:after{
+  background:var(--primary);
+}
+
+.etb-btn,
+.flow-bar .fb-btn,
+.pp-play,
+.tp-anim,
+.perf-play,
+.acc-apply{
+  min-height:var(--button-height-sm);
+  padding:0 var(--button-padding-x-sm);
+  border-radius:var(--button-radius);
+  border:1px solid var(--button-secondary-border);
+  background:var(--button-secondary-bg);
+  color:var(--button-secondary-fg);
+  font:var(--button-font);
+  box-shadow:var(--button-secondary-shadow);
+  transition:background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default), color var(--duration-fast) var(--easing-default), transform var(--duration-fast) var(--easing-default), box-shadow var(--duration-fast) var(--easing-default);
+}
+
+.etb-btn:hover,
+.flow-bar .fb-btn:hover,
+.pp-play:hover,
+.tp-anim:hover,
+.perf-play:hover,
+.acc-apply:hover{
+  background:var(--button-secondary-bg-hover);
+  border-color:var(--border-default);
+  color:var(--foreground);
+  transform:translateY(-1px);
+}
+
+.etb-btn.on,
+.flow-bar .fb-btn.on{
+  background:var(--button-solid-bg);
+  border-color:transparent;
+  color:var(--button-solid-fg);
+  box-shadow:none;
+}
+
+.run{
+  min-height:var(--button-height-lg);
+  border-radius:var(--button-radius);
+  padding:0 var(--button-padding-x-lg);
+  background:var(--button-solid-bg);
+  color:var(--button-solid-fg);
+  border:1px solid transparent;
+  box-shadow:none;
+  font:600 13px/1 var(--font-sans);
+}
+
+.run:hover{
+  background:var(--button-solid-bg-hover);
+  filter:none;
+}
+
+.run:disabled{
+  opacity:var(--button-disabled-opacity);
+}
+
+.run.ghost{
+  background:var(--button-secondary-bg);
+  border-color:var(--button-secondary-border);
+  color:var(--button-secondary-fg);
+}
+
+.codewrap,
+.diffpane,
+.tilingpane,
+.pipepane,
+.graphpane,
+.flowpane,
+.accpane,
+.perfpane{
+  background:color-mix(in srgb, var(--surface-1) 88%, black 12%);
+}
+
+.codewrap,
+.diffpane,
+.tilingpane,
+.pipepane,
+.graphpane{
+  border-left-color:var(--border-subtle);
+}
+
+.gutter{
+  background:color-mix(in srgb, var(--surface-1) 88%, black 12%);
+  color:var(--foreground-muted);
+  border-right-color:var(--border-subtle);
+}
+
+.codelines{
+  color:var(--foreground);
+}
+
+.legend,
+.gp-detail,
+.flow-bar{
+  border-color:var(--border-subtle);
+  background:color-mix(in srgb, var(--background-elevated) 94%, black 6%);
+}
+
+.gp-detail,
+.prob .pf,
+.acc-card .ac-k,
+.perf-tune .pt-item .pv,
+.cmp .cl,
+.cmp .brl,
+.sbar-cap,
+.util .ul,
+.plabels,
+.stepcard,
+.sc-body,
+.opt .ot span,
+.flow-bar .fb-step{
+  color:var(--foreground-secondary);
+}
+
+.panel{
+  background:color-mix(in srgb, var(--background-elevated) 96%, black 4%);
+}
+
+.panel-tabs{
+  min-height:38px;
+}
+
+.ptab{
+  min-height:28px;
+  display:inline-flex;
+  align-items:center;
+  border-bottom:none;
+  border-radius:999px;
+  color:var(--foreground-secondary);
+  text-transform:none;
+  letter-spacing:0;
+}
+
+.ptab.on{
+  background:var(--state-selected);
+  color:var(--foreground);
+}
+
+.ptab .cnt{
+  background:var(--surface-disabled);
+  color:var(--foreground-secondary);
+}
+
+.term,
+.probs,
+.flowpane,
+.accpane,
+.perfpane{
+  color:var(--foreground);
+}
+
+.wizard{
+  background:color-mix(in srgb, var(--background-elevated) 94%, black 6%);
+}
+
+.wz-h,
+.wz-foot{
+  border-color:var(--border-subtle);
+  background:transparent;
+}
+
+.wz-h .kick{
+  color:var(--primary);
+}
+
+.stepcard,
+.riskcard,
+.opt,
+.opmap,
+.acc-kpi,
+.perf-kpi,
+.acc-card,
+.perf-reg,
+.perf-tune,
+.swim,
+.tl-rows,
+.tp-metric,
+.pp-metric,
+.notif{
+  background:var(--card-bg);
+  border:1px solid var(--card-border);
+  box-shadow:none;
+}
+
+.stepcard.cur-card,
+.opt.on{
+  border-color:color-mix(in srgb, var(--primary) 30%, transparent);
+  background:color-mix(in srgb, var(--card-bg) 84%, var(--state-selected));
+}
+
+.sc-n{
+  background:color-mix(in srgb, var(--primary) 14%, transparent);
+  color:color-mix(in srgb, var(--primary) 92%, white 4%);
+}
+
+.opt:hover,
+.tp-opt:hover,
+.prob:hover{
+  border-color:var(--border-default);
+  background:var(--state-hover);
+}
+
+.opt .rd{
+  border-color:var(--border-default);
+}
+
+.opt.on .rd{
+  border-color:var(--primary);
+}
+
+.tp-opt,
+.tp-metric,
+.pp-metric,
+.acc-kpi,
+.perf-kpi,
+.acc-table,
+.opmap,
+.perf-tune,
+.acc-fix{
+  border-color:var(--card-border);
+}
+
+.tp-opt.on{
+  border-color:color-mix(in srgb, var(--primary) 30%, transparent);
+  background:color-mix(in srgb, var(--surface-1) 82%, var(--state-selected));
+}
+
+.acc-card.ok,
+.perf-reg{
+  border-color:color-mix(in srgb, var(--success) 30%, transparent);
+  background:color-mix(in srgb, var(--card-bg) 86%, color-mix(in srgb, var(--success) 10%, transparent));
+}
+
+.acc-card,
+.riskcard{
+  border-color:color-mix(in srgb, var(--danger) 28%, transparent);
+  background:color-mix(in srgb, var(--card-bg) 88%, color-mix(in srgb, var(--danger) 8%, transparent));
+}
+
+.acc-st.fail{
+  background:color-mix(in srgb, var(--danger) 14%, transparent);
+  color:color-mix(in srgb, var(--danger) 92%, white 4%);
+  border:1px solid color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.acc-st.fixed{
+  background:color-mix(in srgb, var(--primary) 14%, transparent);
+  color:color-mix(in srgb, var(--primary) 92%, white 4%);
+  border:1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.statusbar{
+  min-height:28px;
+  background:color-mix(in srgb, var(--background-elevated) 96%, black 4%);
+  color:var(--foreground-secondary);
+  border-top:1px solid var(--border-subtle);
+}
+
+.statusbar .s{
+  color:inherit;
+}
+
+.notif{
+  border-left:3px solid var(--primary);
+}
+
+.notif.ok{
+  border-left-color:var(--success);
+}
+
+.notif.warn{
+  border-left-color:var(--warning);
+}
+
+.notif b{
+  color:var(--foreground);
+}
+
+.notif span{
+  color:var(--foreground-secondary);
+}
+</style>
+</head>
+<body>
+
+<div class="mobile-note">
+  <b>璇峰湪妗岄潰绔墦寮€</b>
+  <span>AscendPort 杩佺Щ宸ヤ綔鍙版槸涓夋爮 IDE 甯冨眬(鏂囦欢鏍?路 缂栬緫鍣?+ 璁＄畻鍥?路 杩佺Щ鍚戝),闇€瑕佽緝瀹界殑灞忓箷鎵嶈兘瀹屾暣鍛堢幇寮€鍙戞祦绋嬨€</span>
+</div>
+
+<div id="app">
+  <!-- title bar -->
+  <div class="titlebar">
+    <div class="tb-dots"><i></i><i></i><i></i></div>
+    <div class="tb-title"><b>flash_mla_interface.py</b> · deepseek-v3.2-sparse · AscendPort</div>
+    <div class="tb-menu"><span>鏂囦欢</span><span>缂栬緫</span><span>杩佺Щ</span><span>杩愯</span><span>甯姪</span></div>
+    <div class="tb-badge"><span class="dot"></span>AscendPort 宸茶繛鎺?路 Atlas 800T A2</div>
+  </div>
+
+  <div class="body">
+    <!-- activity bar -->
+    <div class="activity">
+      <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h18M3 12h18M3 19h18"/></svg></div>
+      <div class="act on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+      <div class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3v12a3 3 0 0 0 3 3h6M6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4m9 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4M18 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4m0 0v3a3 3 0 0 1-3 3H9"/></svg></div>
+      <div class="act pl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1m0-14.2-2.1 2.1m-10 10-2.1 2.1"/></svg></div>
+    </div>
+
+    <!-- sidebar -->
+    <div class="sidebar">
+      <div class="side-h"><span>璧勬簮绠＄悊鍣</span><span>鈰</span></div>
+      <div class="tree" id="tree"></div>
+    </div>
+
+    <!-- main + wizard -->
+    <div style="display:grid;grid-template-columns:1fr 340px;min-width:0;min-height:0;overflow:hidden">
+      <div class="main">
+        <div class="tabs" id="tabs"></div>
+        <div class="edtoolbar">
+          <span class="etb-path"><b>ops</b> / <span id="etbFile">flash_mla_interface.py</span></span>
+          <span class="etb-spacer"></span>
+          <button class="etb-btn" id="parseBtn" title="瑙ｆ瀽绠楀瓙骞舵墦寮€璁＄畻鍥剧敾甯?>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 7.5 11 15m6-8.5L13 15"/></svg>
+            瑙ｆ瀽绠楀瓙 路 璁＄畻鍥?          </button>
+        </div>
+        <div class="edit-split" id="split">
+          <div class="codewrap" id="codewrap">
+            <div class="pane-h" id="leftPaneH" style="display:none">
+              <span class="dot-c" style="background:var(--cube)"></span><b>flash_mla_interface.py</b><span class="pane-tag cuda">CUDA 路 GPU</span>
+              <span class="link-hint">鎮仠/鐐瑰嚮浠ｇ爜 鈫?鑱斿姩瀵逛晶</span>
+            </div>
+            <div class="code">
+              <div class="gutter" id="gutter"></div>
+              <div class="codelines" id="codelines"></div>
+            </div>
+          </div>
+          <!-- computation graph canvas -->
+          <div class="graphpane" id="graphpane">
+            <div class="gp-head">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 7.5 11 15m6-8.5L13 15"/></svg>
+              <div><b>绠楀瓙璁＄畻鍥</b> <span class="sub">瑙ｆ瀽缁撴灉 路 fused flash_mla</span></div>
+              <div class="gp-close" id="gclose" title="鏀惰捣">脳</div>
+            </div>
+            <div class="legend">
+              <span><i style="background:var(--mem)"></i>鐗囦笂鎼繍</span>
+              <span><i style="background:var(--cube)"></i>Cube 鐭╅樀</span>
+              <span><i style="background:var(--vec)"></i>Vector 鍚戦噺</span>
+              <span><i style="background:var(--scalar)"></i>Scalar 鏍囬噺</span>
+              <span><i style="background:var(--risk)"></i>SIMT 涓撳睘 路 闇€閲嶅啓</span>
+            </div>
+            <div class="gcanvas" id="gcanvas"></div>
+            <div class="gp-detail" id="gdetail">
+              <b>鐐瑰嚮浠绘剰鑺傜偣鏌ョ湅瑙ｆ瀽璇︽儏</b><br>
+              <span>璁＄畻鍥剧敱 S1 浠?CUDA AST 鑷姩鎶藉彇,鑺傜偣棰滆壊涓哄伐鍏锋帹鏂殑鐩爣鏄囪吘鎵ц鍗曞厓 鈥斺€?灏嗕綔涓?S2 绠楀瓙鏄犲皠鐨勮緭鍏ャ€</span>
+            </div>
+          </div>
+          <!-- compare (AscendC) pane -->
+          <div class="codewrap diffpane" id="diffwrap">
+            <div class="pane-h">
+              <span class="dot-c" style="background:var(--acc)"></span><b id="diffFile">flash_mla.cpp</b><span class="pane-tag asc">AscendC 路 鏄囪吘</span>
+            </div>
+            <div class="code">
+              <div class="gutter" id="diffGutter"></div>
+              <div class="codelines" id="diffLines"></div>
+            </div>
+          </div>
+          <!-- tiling visualization pane -->
+          <div class="tilingpane" id="tilingpane">
+            <div class="tp-head">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vec)" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+              <div><b>Tiling 鍙鍖</b> <span class="sub">key(S 缁?鍒嗗潡 路 缂撳啿鍗犵敤</span></div>
+              <div class="tp-close" id="tpClose" title="鏀惰捣">脳</div>
+            </div>
+            <div class="tp-body" id="tpBody"></div>
+          </div>
+          <!-- pipeline before/after pane -->
+          <div class="pipepane" id="pipepane">
+            <div class="tp-head">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--mem)" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+              <div><b>娴佹按绾跨紪鎺?路 鍓嶅悗瀵规瘮</b> <span class="sub">涓茶 鈫?鍙岀紦鍐查噸鍙</span></div>
+              <div class="tp-close" id="ppClose" title="鏀惰捣">脳</div>
+            </div>
+            <div class="tp-body" id="ppBody"></div>
+          </div>
+        </div>
+
+        <!-- bottom panel -->
+        <div class="panel">
+          <div class="panel-tabs">
+            <div class="ptab on" data-p="term">缁堢</div>
+            <div class="ptab" data-p="probs">闂<span class="cnt" id="probCnt">0</span></div>
+            <div class="ptab" data-p="flow" id="flowTab" style="display:none">鏁版嵁娴?<span class="cnt" style="background:#48d59722;color:var(--ok)">S4</span></div>
+            <div class="ptab" data-p="acc" id="accTab" style="display:none">绮惧害鎶ュ憡 <span class="cnt" id="accCnt" style="background:#48d59722;color:var(--ok)">S7</span></div>
+            <div class="ptab" data-p="perf" id="perfTab" style="display:none">鎬ц兘鎶ュ憡 <span class="cnt" style="background:#48d59722;color:var(--ok)">S8</span></div>
+            <div class="ptab" data-p="term2">杈撳嚭</div>
+            <div style="margin-left:auto;color:var(--dim2);font-size:11px;align-self:center">ascendport 鈻?migrate</div>
+          </div>
+          <div class="term" id="term"></div>
+          <div class="probs" id="probs"></div>
+          <div class="flowpane" id="flowpane" style="display:none"></div>
+          <div class="accpane" id="accpane" style="display:none"></div>
+          <div class="perfpane" id="perfpane" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- wizard -->
+      <div class="wizard">
+        <div class="wz-h">
+          <div class="kick">算子迁移向导</div>
+          <h1>GPU → 昇腾 · 八阶段流水</h1>
+          <p>逐步把 flash_mla 接口迁移为 AscendC/aclNN 算子。点击底部按钮执行当前阶段。</p>
+        </div>
+        <div class="prog" id="prog"></div>
+        <div class="plabels" id="plabels"></div>
+        <div class="wz-scroll" id="wzScroll"></div>
+        <div class="wz-foot">
+          <button class="run" id="runBtn">鈻?杩愯 S1 路 瑙ｆ瀽绠楀瓙</button>
+          <div class="foot-hint" id="footHint">鍏?8 涓樁娈?路 褰撳墠 0 / 8 瀹屾垚</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- statusbar -->
+  <div class="statusbar">
+    <span class="s">migrate/flash-mla</span>
+    <span class="s" id="sbStep">S0 路 灏辩华</span>
+    <span class="s">AscendC · CANN 8.0</span>
+    <div class="r">
+      <span class="s" id="sbAicore">aicore 鈥</span>
+      <span class="s">FP8 · e4m3</span>
+      <span class="s">UTF-8</span>
+    </div>
+  </div>
+</div>
+
+<div class="notif-wrap" id="notifs"></div>
+
+<script>
+/* ============================ 婧愪唬鐮?& 浜х墿 ============================ */
+const CUDA = String.raw`// flash_mla_interface.py
+from typing import Optional, Tuple
+import dataclasses
+
+import torch
+
+import flash_mla.cuda as flash_mla_cuda
+
+@dataclasses.dataclass
+class FlashMLASchedMeta:
+    """
+    A class that stores the tile scheduler metadata of FlashMLA
+    """
+
+    @dataclasses.dataclass
+    class Config:
+        b: int
+        s_q: int
+        h_q: int
+        page_block_size: int
+        h_k: int
+
+        causal: bool
+        is_fp8_kvcache: bool
+        topk: Optional[int]
+
+        extra_page_block_size: Optional[int]
+        extra_topk: Optional[int]
+
+    have_initialized: bool = False
+
+    config: Optional[Config] = None
+
+    tile_scheduler_metadata: Optional[torch.Tensor] = None   # (num_sm_parts, TileSchedulerMetaDataSize), dtype torch.int32.
+    num_splits: Optional[torch.Tensor] = None                # (1), dtype torch.int32.
+
+
+def get_mla_metadata(
+    *args,
+    **kwargs
+) -> Tuple[FlashMLASchedMeta, None]:
+    """
+    Returns an empty instance of FlashMLASchedMeta. The actual scheduling metadata will be generated during the first invocation of flash_mla_with_kvcache.
+
+    Arguments:
+        This function does not need any arguments, but we keep *args and **kwargs to be compatible with the old interface.
+
+    Return:
+        A tuple. Due to historical reasons, we return a tuple of (FlashMLASchedMeta, None) now. Only the first element is useful.
+    """
+    return FlashMLASchedMeta(), None
+
+
+def flash_mla_with_kvcache(
+    q: torch.Tensor,
+    k_cache: torch.Tensor,
+    block_table: Optional[torch.Tensor],
+    cache_seqlens: Optional[torch.Tensor],
+    head_dim_v: int,
+    tile_scheduler_metadata: FlashMLASchedMeta,
+    num_splits: None = None,
+    softmax_scale: Optional[float] = None,
+    causal: bool = False,
+    is_fp8_kvcache: bool = False,
+    indices: Optional[torch.Tensor] = None,
+    attn_sink: Optional[torch.Tensor] = None,
+    extra_k_cache: Optional[torch.Tensor] = None,
+    extra_indices_in_kvcache: Optional[torch.Tensor] = None,
+    topk_length: Optional[torch.Tensor] = None,
+    extra_topk_length: Optional[torch.Tensor] = None
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Arguments:
+        q: (batch_size, seq_len_q, num_heads_q, head_dim).
+        k_cache: (num_blocks, page_block_size, num_heads_k, head_dim).
+                Different modes (including fp8/bf16, and sparsity) has different KV cache layouts. See comments below for details.
+                The KV cache must be contiguously valid for sparse attention on sm100. Here "contiguously valid" means that every byte, from the very beginning of the KV cache, till the last byte in the KV cache, is valid memory address to visit (i.e. won't IMA). In other words, the KV cache could be a slice of a larger array, but cannot be a list of disjoint memory blocks.
+        block_table: (batch_size, max_num_blocks_per_seq), torch.int32. Can be None when sparse attention is used.
+        cache_seqlens: (batch_size), torch.int32. Can be None when sparse attention is used.
+        head_dim_v: Head_dim of v. Must be 512
+        sched_meta: FlashMLASchedMeta, return by get_mla_metadata. You may reuse the same sched_meta across different invocations, but only when the tensor shapes and the values of cache_seqlens, topk_length, and extra_topk_length remain the same.
+        num_splits_placeholder: must be "None" (to be compatible with the old interface).
+        softmax_scale: float. The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim_k).
+        causal: bool. Whether to apply causal attention mask. Only valid for dense attention
+        is_fp8_kvcache: bool.
+        indices: (batch_size, seq_len_q, topk). KV indices when sparse attention is enabled.
+                    Pay attention that indices_in_kvcache[i][j][k] = (the index of the page block where token t resides) * block_size + (the offset of token t among the page block),
+                    where t is the k-th token of the j-th q-sequence in the i-th batch.
+        attn_sink: Optional[torch.Tensor], (num_heads_q, ), torch.float32. If presented, the final output will be scaled by exp(lse) / (exp(lse) + exp(attn_sink)). Have no affect on the returned softmax_lse. +inf will cause the result to become 0.
+        extra_k_cache and extra_indices_in_kvcache: If provided, will attend to these extra tokens in addition to those in k_cache and indices_in_kvcache. Their format requirements are the same as k_cache and indices_in_kvcache respectively.
+        topk_length/extra_topk_length: (batch_size, ), torch.int32. If provided, only the leftmost topk_length indices will be processed. Useful when the actual topk for different queries are different so that we can save some computation, compared to masking.
+    
+    For DeepSeek V3, DeepSeek V3.1, and DeepSeek V3.2:
+        head_dim should be 576 while head_dim_v should be 512.
+        In FP8+sparse mode, each token's KV cache is 656 Bytes, structured as:
+            - The shape of the tensor \`k_cache\` is (num_blocks, page_block_size, num_heads_k, head_dim), and num_heads_k must be 1.
+            - First 512 bytes: The "quantized NoPE" part, containing 512 float8_e4m3 values.
+            - Next 16 bytes: Scale factors, containing 4 float32 values. The first float32 is the scale for the first 128 float8_e4m3 values, the second for the next 128, and so on.
+            - Last 128 bytes: The "RoPE" part, containing 64 bfloat16 values. This part is not quantized for accuracy.
+
+    Return:
+        out: (batch_size, seq_len_q, num_heads_q, head_dim_v).
+        softmax_lse: (batch_size, num_heads_q, seq_len_q), torch.float32.
+    """
+    sched_meta = tile_scheduler_metadata
+    indices_in_kvcache = indices
+    assert isinstance(sched_meta, FlashMLASchedMeta), "tile_scheduler_metadata must be of type FlashMLASchedMeta"
+    assert num_splits is None, "num_splits must be None"
+
+    topk = indices_in_kvcache.shape[-1] if indices_in_kvcache is not None else None
+    extra_k_page_block_size = extra_k_cache.shape[1] if extra_k_cache is not None else None
+    extra_topk = extra_indices_in_kvcache.shape[-1] if extra_indices_in_kvcache is not None else None
+    if softmax_scale is None:
+        softmax_scale = q.shape[-1] ** (-0.5)
+
+    if not sched_meta.have_initialized:
+        # Sanity check. We only perform sanity check during the first invocation to save CPU time.
+        if indices_in_kvcache is not None:
+            assert not causal, "causal must be False when indices_in_kvcache is not None (i.e. sparse attention is enabled)"
+            
+        # Initialize the tile scheduler metadata during the first invocation.
+        sched_meta.have_initialized = True
+        sched_meta.config = FlashMLASchedMeta.Config(
+            q.shape[0],
+            q.shape[1],
+            q.shape[2],
+            k_cache.shape[1],
+            k_cache.shape[2],
+
+            causal,
+            is_fp8_kvcache,
+            topk,
+
+            extra_k_page_block_size,
+            extra_topk,
+        )
+    else:
+        # Check whether the input arguments are consistent with sched_meta
+        helper_msg = " Your input arguments are inconsistent with sched_meta. Please make sure the input arguments are consistent across different invocations of flash_mla_with_kvcache on the same sched_meta."
+        assert sched_meta.config is not None
+        assert sched_meta.config.b == q.shape[0], "sched_meta.config.b must be equal to batch_size." + helper_msg
+        assert sched_meta.config.s_q == q.shape[1], "sched_meta.config.s_q must be equal to seq_len_q." + helper_msg
+        assert sched_meta.config.h_q == q.shape[2], "sched_meta.config.h_q must be equal to num_heads_q." + helper_msg
+        assert sched_meta.config.page_block_size == k_cache.shape[1], "sched_meta.config.page_block_size must be equal to page_block_size." + helper_msg
+        assert sched_meta.config.h_k == k_cache.shape[2], "sched_meta.config.h_k must be equal to num_heads_k." + helper_msg
+        assert sched_meta.config.causal == causal, "sched_meta.config.causal must be equal to causal." + helper_msg
+        assert sched_meta.config.is_fp8_kvcache == is_fp8_kvcache, "sched_meta.config.is_fp8_kvcache must be equal to is_fp8_kvcache." + helper_msg
+        assert sched_meta.config.topk == topk, "sched_meta.config.topk must be equal to the last dim of indices_in_kvcache." + helper_msg
+        assert sched_meta.config.extra_page_block_size == extra_k_page_block_size, "sched_meta.config.extra_page_block_size must be equal to the page_block_size of extra_k_cache." + helper_msg
+        assert sched_meta.config.extra_topk == extra_topk, "sched_meta.config.extra_topk must be equal to the last dim of extra_indices_in_kvcache." + helper_msg
+
+    if topk is not None:
+        # Sparse attention
+        assert not causal, "causal must be False when sparse attention is enabled"
+        assert is_fp8_kvcache, "is_fp8_kvcache must be True when sparse attention is enabled"
+        out, lse, new_tile_scheduler_metadata, new_num_splits = flash_mla_cuda.sparse_decode_fwd(
+            q, k_cache, indices_in_kvcache, topk_length, attn_sink,
+            sched_meta.tile_scheduler_metadata, sched_meta.num_splits,
+            extra_k_cache, extra_indices_in_kvcache, extra_topk_length,
+            head_dim_v, softmax_scale
+        )
+    else:
+        # Dense attention
+        assert indices_in_kvcache is None and attn_sink is None and extra_k_cache is None and extra_indices_in_kvcache is None and topk_length is None and extra_topk_length is None, "indices_in_kvcache, attn_sink, extra_k_cache, extra_indices_in_kvcache, topk_length and extra_topk_length must be None when dense attention is used."
+        assert block_table is not None and cache_seqlens is not None, "block_table and cache_seqlens must be provided when dense attention is used."
+        out, lse, new_tile_scheduler_metadata, new_num_splits = flash_mla_cuda.dense_decode_fwd(
+            q, k_cache, head_dim_v,
+            cache_seqlens, block_table,
+            softmax_scale, causal,
+            sched_meta.tile_scheduler_metadata, sched_meta.num_splits
+        )
+    sched_meta.tile_scheduler_metadata = new_tile_scheduler_metadata
+    sched_meta.num_splits = new_num_splits
+    return (out, lse)
+
+
+def flash_mla_sparse_fwd(
+    q: torch.Tensor,
+    kv: torch.Tensor,
+    indices: torch.Tensor,
+    sm_scale: float,
+    d_v: int = 512,
+    attn_sink: Optional[torch.Tensor] = None,
+    topk_length: Optional[torch.Tensor] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Sparse attention prefill kernel
+
+    Args:
+        q: [s_q, h_q, d_qk], bfloat16
+        kv: [s_kv, h_kv, d_qk], bfloat16
+        indices: [s_q, h_kv, topk], int32. Invalid indices should be set to -1 or numbers >= s_kv
+        sm_scale: float
+        d_v: The dimension of value vectors. Can only be 512
+        attn_sink: optional, [h_q], float32.
+            If attn_sink is provided, when computing output, output will be additionally multiplied by exp(lse) / (exp(lse) + exp(attn_sink)).
+            +-inf in attn_sink will be handled normally (i.e., -inf has no effect, +inf will make corresponding output all zeros).
+            This argument has no effect on lse and max_logits.
+        topk_length: optional, [s_q], int32. If provided, the i-th q token will only attend to k tokens specified by indices[i, :, :topk_length[i]], ignoring later k/v tokens (even if provided in indices).
+            In extremely rare cases (topk_length provided, there is a valid topk index between topk_length[i] ~ s_kv, and that topk index points to a k token containing NaN), operator output will contain NaN, so please avoid this situation.
+
+    Returns:
+        (output, max_logits, lse)
+        Please refer to tests/ref.py for the precise definitions of these parameters.
+        - output: [s_q, h_q, d_v], bfloat16
+        - max_logits:  [s_q, h_q], float
+        - lse: [s_q, h_q], float, log-sum-exp of attention scores
+    """
+    results = flash_mla_cuda.sparse_prefill_fwd(
+        q, kv, indices, sm_scale, d_v, attn_sink, topk_length
+    )
+    return results
+
+
+def _flash_attn_varlen_forward(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    cu_seqlens_qo: torch.Tensor,
+    cu_seqlens_kv: torch.Tensor,
+    max_seqlen_qo: int,
+    max_seqlen_kv: int,
+    out: Optional[torch.Tensor] = None,
+    lse: Optional[torch.Tensor] = None,
+    causal: bool = False,
+    softmax_scale: Optional[float] = None,
+    is_varlen: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    qo_total_len, num_qo_heads, head_dim_qk = q.shape
+    kv_total_len, num_kv_heads, head_dim_vo = v.shape
+
+    mask_mode_code = 1 if causal else 0
+    if softmax_scale is None:
+        softmax_scale = head_dim_qk ** (-0.5)
+
+    if out is None:
+        out = torch.empty(qo_total_len, num_qo_heads, head_dim_vo, device=q.device, dtype=q.dtype)
+    if lse is None:
+        # Make lse contiguous on seqlen dim
+        lse = torch.empty(num_qo_heads, qo_total_len, device=q.device, dtype=torch.float32).T
+
+    workspace_buffer = torch.empty(32 * 1024 * 1024, dtype=torch.uint8, device=q.device)
+    flash_mla_cuda.dense_prefill_fwd(
+        workspace_buffer,
+        q,
+        k,
+        v,
+        cu_seqlens_qo,
+        cu_seqlens_kv,
+        out,
+        lse,
+        mask_mode_code,
+        softmax_scale,
+        max_seqlen_qo,
+        max_seqlen_kv,
+        is_varlen,
+    )
+
+    return out, lse
+
+
+def _flash_attn_varlen_backward(
+    do: torch.Tensor,
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    out: torch.Tensor,
+    lse: torch.Tensor,
+    cu_seqlens_qo: torch.Tensor,
+    cu_seqlens_kv: torch.Tensor,
+    max_seqlen_qo: int,
+    max_seqlen_kv: int,
+    dq: Optional[torch.Tensor] = None,
+    dk: Optional[torch.Tensor] = None,
+    dv: Optional[torch.Tensor] = None,
+    causal: bool = False,
+    softmax_scale: Optional[float] = None,
+    is_varlen: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    qo_total_len, num_qo_heads, head_dim_qk = q.shape
+    kv_total_len, num_kv_heads, head_dim_vo = v.shape
+
+    # TODO: fix bwd GQA
+    if num_qo_heads != num_kv_heads:
+        raise ValueError(f"SM100 bwd doesn't support GQA now. num_qo_heads: {num_qo_heads}, num_kv_heads: {num_kv_heads}.")
+
+    mask_mode_code = 1 if causal else 0
+    if softmax_scale is None:
+        softmax_scale = head_dim_qk ** (-0.5)
+
+    if dq is None:
+        dq = torch.empty(qo_total_len, num_qo_heads, head_dim_qk, device=q.device, dtype=q.dtype)
+    if dk is None:
+        dk = torch.empty(kv_total_len, num_kv_heads, head_dim_qk, device=q.device, dtype=q.dtype)
+    if dv is None:
+        dv = torch.empty(kv_total_len, num_kv_heads, head_dim_vo, device=q.device, dtype=q.dtype)
+
+    max_seqlen_qo_aligned = (max_seqlen_qo + 7) // 8 * 8
+    bs = cu_seqlens_qo.shape[0] - 1
+    workspace_bytes = 0
+    workspace_bytes += 4 * bs * max_seqlen_qo_aligned * num_qo_heads * head_dim_qk  # dQ_acc
+    workspace_bytes += 4 * max_seqlen_qo_aligned * bs * num_qo_heads * 2  # sum_OdO and scaled_lse
+    if num_qo_heads != num_kv_heads:
+        workspace_bytes += 2 * kv_total_len * num_qo_heads * (head_dim_qk + head_dim_vo)  # dKV_acc
+    workspace_buffer = torch.empty(workspace_bytes, dtype=torch.uint8, device=q.device)
+    flash_mla_cuda.dense_prefill_bwd(
+        workspace_buffer,
+        do,
+        q,
+        k,
+        v,
+        out,
+        lse,
+        cu_seqlens_qo,
+        cu_seqlens_kv,
+        dq,
+        dk,
+        dv,
+        mask_mode_code,
+        softmax_scale,
+        max_seqlen_qo,
+        max_seqlen_kv,
+        is_varlen,
+    )
+
+    return dq, dk, dv
+
+
+class FlashAttnVarlenFunc(torch.autograd.Function):
+    def forward(
+        ctx,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        cu_seqlens_qo: torch.Tensor,
+        cu_seqlens_kv: torch.Tensor,
+        max_seqlen_qo: int,
+        max_seqlen_kv: int,
+        causal: bool = False,
+        softmax_scale: Optional[float] = None,
+        is_varlen: bool = True,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        out, lse = _flash_attn_varlen_forward(
+            q, k, v,
+            cu_seqlens_qo, cu_seqlens_kv, max_seqlen_qo, max_seqlen_kv,
+            causal=causal, softmax_scale=softmax_scale,
+            is_varlen=is_varlen,
+        )
+        ctx.save_for_backward(q, k, v, out, lse, cu_seqlens_qo, cu_seqlens_kv)
+        ctx.max_seqlen_qo = max_seqlen_qo
+        ctx.max_seqlen_kv = max_seqlen_kv
+        ctx.causal = causal
+        ctx.softmax_scale = softmax_scale
+        ctx.is_varlen = is_varlen
+        return out, lse
+
+    def backward(
+        ctx,
+        do: torch.Tensor,
+        dlse: torch.Tensor,
+    ):
+        del dlse  # LSE doesn't support backward currently
+        q, k, v, out, lse, cu_seqlens_qo, cu_seqlens_kv = ctx.saved_tensors
+        dq, dk, dv = _flash_attn_varlen_backward(
+            do, q, k, v, out, lse,
+            cu_seqlens_qo, cu_seqlens_kv, ctx.max_seqlen_qo, ctx.max_seqlen_kv,
+            causal=ctx.causal, softmax_scale=ctx.softmax_scale,
+            is_varlen=ctx.is_varlen,
+        )
+        return dq, dk, dv, None, None, None, None, None, None, None
+
+
+def flash_attn_varlen_func(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    cu_seqlens_qo: torch.Tensor,
+    cu_seqlens_kv: torch.Tensor,
+    max_seqlen_qo: int,
+    max_seqlen_kv: int,
+    dropout_p: float = 0.0,
+    softmax_scale: Optional[float] = None,
+    causal: bool = False,
+    deterministic: bool = False,
+    is_varlen: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    assert dropout_p == 0.0
+    assert not deterministic
+    return FlashAttnVarlenFunc.apply(
+        q, k, v,
+        cu_seqlens_qo, cu_seqlens_kv, max_seqlen_qo, max_seqlen_kv,
+        causal, softmax_scale, is_varlen,
+    )
+
+
+def flash_attn_varlen_qkvpacked_func(
+    qkv: torch.Tensor,
+    cu_seqlens: torch.Tensor,
+    max_seqlen: int,
+    head_dim_qk: int,
+    dropout_p: float = 0.0,
+    softmax_scale: Optional[float] = None,
+    causal: bool = False,
+    deterministic: bool = False,
+    is_varlen: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    assert dropout_p == 0.0
+    assert not deterministic
+    return FlashAttnVarlenFunc.apply(
+        qkv[:, :, :head_dim_qk], qkv[:, :, head_dim_qk:head_dim_qk * 2], qkv[:, :, head_dim_qk * 2:],
+        cu_seqlens, cu_seqlens, max_seqlen, max_seqlen,
+        causal, softmax_scale, is_varlen,
+    )
+
+
+def flash_attn_varlen_kvpacked_func(
+    q: torch.Tensor,
+    kv: torch.Tensor,
+    cu_seqlens_qo: torch.Tensor,
+    cu_seqlens_kv: torch.Tensor,
+    max_seqlen_qo: int,
+    max_seqlen_kv: int,
+    head_dim_qk: int,
+    dropout_p: float = 0.0,
+    softmax_scale: Optional[float] = None,
+    causal: bool = False,
+    deterministic: bool = False,
+    is_varlen: bool = True,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    assert dropout_p == 0.0
+    assert not deterministic
+    return FlashAttnVarlenFunc.apply(
+        q, kv[:, :, :head_dim_qk], kv[:, :, head_dim_qk:],
+        cu_seqlens_qo, cu_seqlens_kv, max_seqlen_qo, max_seqlen_kv,
+        causal, softmax_scale, is_varlen,
+    )
+`;
+
+const S3 = String.raw`// flash_mla.cpp 路 AscendC 鏍? (AscendPort 路 S3 鑷姩鐢熸垚)
+// 鐢?flash_mla_with_kvcache 杩佺Щ 鈥斺€?SIMT grid 鈫?鍒嗘牳 SPMD
+#include "kernel_operator.h"
+using namespace AscendC;
+
+constexpr int32_t HEADS    = 8;
+constexpr int32_t HEAD_DIM = 128;
+constexpr int32_t TOPK     = 2048;
+
+class FlashMLA {
+public:
+    __aicore__ inline FlashMLA() {}
+    __aicore__ inline void Init(GM_ADDR qI, GM_ADDR kI, GM_ADDR headW,
+                                GM_ADDR topkVal, GM_ADDR topkIdx,
+                                int32_t T, int32_t S) {
+        // CUDA: blockIdx.x = t  鈫? 鏄囪吘:鎶?T 涓?query 琛屾寜 AI Core 鏁板垏鍒?        this->t0 = GetBlockIdx();            // 鏈牳璐熻矗 query 琛?[t0 :: coreNum]
+        this->T  = T;  this->S = S;
+        qIGm.SetGlobalBuffer((__gm__ fp8_t*)qI);
+        kIGm.SetGlobalBuffer((__gm__ fp8_t*)kI);
+        headWGm.SetGlobalBuffer((__gm__ float*)headW);
+        topkValGm.SetGlobalBuffer((__gm__ float*)topkVal);
+        topkIdxGm.SetGlobalBuffer((__gm__ int32_t*)topkIdx);
+        // TODO(S4): 鍒嗛厤 L1 / L0A / L0B / L0C / UB,鎻掑叆閫愮骇 DataCopy
+        // TODO(S5): 娌?key(S 缁?閫夋嫨鍒嗗潡闀垮害 sTile
+    }
+    __aicore__ inline void Process() {
+        for (int32_t t = t0; t < T; t += GetBlockNum()) {
+            ComputeScores(t);      // QK岬€ (Cube) 鈫?ReLU路w 褰掔害 (Vector)
+            SelectTopK(t);         // 鏇夸唬 __shfl_xor_sync + 鍙岃皟鎺掑簭 鈫?Vector 瑙勭害
+        }
+    }
+private:
+    // TODO(S4): QK岬€ 璧?Cube,ReLU 涓庤法澶村姞鏉冨綊绾﹁蛋 Vector
+    __aicore__ inline void ComputeScores(int32_t t) { /* 寰?S4 濉厖 */ }
+    // TODO(S6): warp 鍙岃皟鎺掑簭鏃犲搴旂墿,鏀瑰啓涓?Vector 鐗囦笂 Top-K 瑙勭害
+    __aicore__ inline void SelectTopK(int32_t t)    { /* 寰?S6 濉厖 */ }
+
+    GlobalTensor<fp8_t>   qIGm, kIGm;
+    GlobalTensor<float>   headWGm, topkValGm;
+    GlobalTensor<int32_t> topkIdxGm;
+    int32_t t0, T, S;
+};
+
+extern "C" __global__ __aicore__ void flash_mla(
+        GM_ADDR qI, GM_ADDR kI, GM_ADDR headW,
+        GM_ADDR topkVal, GM_ADDR topkIdx, GM_ADDR tiling) {
+    FlashMLA op;
+    op.Init(qI, kI, headW, topkVal, topkIdx, /*T*/0, /*S*/0);
+    op.Process();
+}
+`;
+
+const S4 = String.raw`// flash_mla.cpp 路 AscendC 鏍? (AscendPort 路 S4 鍐呭瓨灞傛宸叉敞鍏?
+#include "kernel_operator.h"
+using namespace AscendC;
+
+constexpr int32_t HEADS    = 8;
+constexpr int32_t HEAD_DIM = 128;
+constexpr int32_t TOPK     = 2048;
+
+class FlashMLA {
+public:
+    __aicore__ inline void Init(GM_ADDR qI, GM_ADDR kI, GM_ADDR headW,
+                                GM_ADDR topkVal, GM_ADDR topkIdx,
+                                int32_t T, int32_t S, int32_t sTile) {
+        this->t0 = GetBlockIdx();  this->T = T;  this->S = S;  this->sTile = sTile;
+        qIGm.SetGlobalBuffer((__gm__ fp8_t*)qI);
+        kIGm.SetGlobalBuffer((__gm__ fp8_t*)kI);
+        headWGm.SetGlobalBuffer((__gm__ float*)headW);
+        topkValGm.SetGlobalBuffer((__gm__ float*)topkVal);
+        topkIdxGm.SetGlobalBuffer((__gm__ int32_t*)topkIdx);
+        // === 鐗囦笂缂撳啿灞傛(S4 娉ㄥ叆)===
+        pipe.InitBuffer(qL1,  1, HEADS * HEAD_DIM * sizeof(fp8_t));   // qI: GM鈫扡1鈫扡0A
+        pipe.InitBuffer(kL1,  1, sTile * HEAD_DIM * sizeof(fp8_t));   // kI: GM鈫扡1鈫扡0B
+        pipe.InitBuffer(cO,   1, sTile * HEADS * sizeof(float));      // QK岬€ logits: L0C
+        pipe.InitBuffer(ubW,  1, HEADS * sizeof(float));             // 澶存潈閲?鈫?UB
+        pipe.InitBuffer(ubS,  1, sTile * sizeof(float));             // 鎵撳垎/ReLU 鈫?UB
+    }
+    __aicore__ inline void Process() {
+        LocalTensor<float> w = ubW.Get<float>();
+        for (int32_t t = t0; t < T; t += GetBlockNum()) {
+            DataCopy(w, headWGm[t * HEADS], HEADS);                  // 澶存潈閲?GM鈫扷B
+            for (int32_t s0 = 0; s0 <= t; s0 += sTile)
+                ComputeScores(t, s0, w);                            // 鍒嗗潡鎵撳垎
+            SelectTopK(t);
+        }
+    }
+private:
+    __aicore__ inline void ComputeScores(int32_t t, int32_t s0, LocalTensor<float>& w) {
+        LocalTensor<fp8_t> kloc = kL1.AllocTensor<fp8_t>();
+        DataCopy(kloc, kIGm[s0 * HEAD_DIM], sTile * HEAD_DIM);       // kI  GM鈫扡1
+        kL1.EnQue(kloc);
+        LocalTensor<fp8_t> k = kL1.DeQue<fp8_t>();
+        LocalTensor<fp8_t> qloc = qL1.AllocTensor<fp8_t>();
+        DataCopy(qloc, qIGm[t * HEADS * HEAD_DIM], HEADS * HEAD_DIM);// qI  GM鈫扡1
+        qL1.EnQue(qloc);
+        LocalTensor<fp8_t> q = qL1.DeQue<fp8_t>();
+
+        LocalTensor<float> logits = cO.AllocTensor<float>();
+        Mmad(logits, q, k, {HEADS, sTile, HEAD_DIM});               // Cube: QK岬€
+        cO.EnQue(logits);
+        LocalTensor<float> lg = cO.DeQue<float>();
+
+        LocalTensor<float> sc = ubS.Get<float>();
+        Relu(sc, lg, sTile * HEADS);                                // Vector: ReLU
+        WeightedHeadReduce(sc, w, sTile);                           // Vector: 危 w路(路)
+        AccumulateBest(sc, s0, sTile);
+        kL1.FreeTensor(k);  qL1.FreeTensor(q);  cO.FreeTensor(lg);
+    }
+    __aicore__ inline void SelectTopK(int32_t t) { /* TODO(S6): Vector Top-K 瑙勭害 */ }
+
+    TPipe pipe;
+    TQue<TPosition::A1, 1> qL1;
+    TQue<TPosition::B1, 1> kL1;
+    TQue<TPosition::CO1,1> cO;
+    TBuf<TPosition::VECCALC> ubW, ubS;
+    GlobalTensor<fp8_t> qIGm, kIGm;
+    GlobalTensor<float> headWGm, topkValGm;
+    GlobalTensor<int32_t> topkIdxGm;
+    int32_t t0, T, S, sTile;
+};
+`;
+
+const S6 = String.raw`// flash_mla.cpp 路 AscendC 鏍? (AscendPort 路 S6 鍙岀紦鍐叉祦姘村凡缂栨帓)
+#include "kernel_operator.h"
+using namespace AscendC;
+
+constexpr int32_t HEADS    = 8;
+constexpr int32_t HEAD_DIM = 128;
+constexpr int32_t TOPK     = 2048;
+constexpr int32_t DEPTH    = 2;              // 鈫?鍙岀紦鍐叉繁搴?Ping-Pong)
+
+class FlashMLA {
+public:
+    __aicore__ inline void Init(GM_ADDR qI, GM_ADDR kI, GM_ADDR headW,
+                                GM_ADDR topkVal, GM_ADDR topkIdx,
+                                int32_t T, int32_t S, int32_t sTile) {
+        this->t0 = GetBlockIdx();  this->T = T;  this->S = S;  this->sTile = sTile;
+        qIGm.SetGlobalBuffer((__gm__ fp8_t*)qI);
+        kIGm.SetGlobalBuffer((__gm__ fp8_t*)kI);
+        headWGm.SetGlobalBuffer((__gm__ float*)headW);
+        topkValGm.SetGlobalBuffer((__gm__ float*)topkVal);
+        topkIdxGm.SetGlobalBuffer((__gm__ int32_t*)topkIdx);
+        pipe.InitBuffer(kL1, DEPTH, sTile * HEAD_DIM * sizeof(fp8_t));  // 娣卞害=2 鍙岀紦鍐?        pipe.InitBuffer(qL1, 1,     HEADS * HEAD_DIM * sizeof(fp8_t));
+        pipe.InitBuffer(cO,  DEPTH, sTile * HEADS * sizeof(float));
+        pipe.InitBuffer(ubS, DEPTH, sTile * sizeof(float));
+        pipe.InitBuffer(ubW, 1,     HEADS * sizeof(float));
+    }
+    __aicore__ inline void Process() {
+        LocalTensor<float> w = ubW.Get<float>();
+        for (int32_t t = t0; t < T; t += GetBlockNum()) {
+            DataCopy(w, headWGm[t * HEADS], HEADS);
+            int32_t nTile = (t / sTile) + 1;
+            // ---- 杞欢娴佹按:棰勫彇 n+1  鈭? Cube/Vector 璁＄畻 n  鈭? 鍐欏洖 n-1 ----
+            CopyIn(t, 0);                                   // 棰勭儹:杞藉叆绗?0 鍧?            for (int32_t n = 0; n < nTile; ++n) {
+                if (n + 1 < nTile) CopyIn(t, n + 1);        // 棰勫彇涓嬩竴鍧?涓庤绠楅噸鍙?
+                Compute(t, n);                              // Cube QK岬€ 鈫?Vector ReLU路w
+            }
+            SelectTopK(t);                                  // Vector Top-K 瑙勭害
+        }
+    }
+private:
+    __aicore__ inline void CopyIn(int32_t t, int32_t n) {
+        LocalTensor<fp8_t> kloc = kL1.AllocTensor<fp8_t>();
+        DataCopy(kloc, kIGm[n * sTile * HEAD_DIM], sTile * HEAD_DIM);
+        kL1.EnQue(kloc);                                    // 鍏ラ槦 鈫?涓?Compute 骞惰
+    }
+    __aicore__ inline void Compute(int32_t t, int32_t n) {
+        LocalTensor<fp8_t> k = kL1.DeQue<fp8_t>();          // 鍙栦笂涓€杞鍙栫殑鍧?        LocalTensor<float> logits = cO.AllocTensor<float>();
+        Mmad(logits, qCur, k, {HEADS, sTile, HEAD_DIM});    // Cube
+        cO.EnQue(logits);
+        LocalTensor<float> lg = cO.DeQue<float>();
+        LocalTensor<float> sc = ubS.AllocTensor<float>();
+        Relu(sc, lg, sTile * HEADS);                        // Vector
+        WeightedHeadReduce(sc, wCur, sTile);                // Vector
+        AccumulateBest(sc, n * sTile, sTile);
+        ubS.EnQue(sc);
+        kL1.FreeTensor(k);  cO.FreeTensor(lg);
+    }
+    // warp 鍙岃皟鎺掑簭鍦ㄦ槆鑵炬棤瀵瑰簲鐗?鈫?鏀瑰啓涓?Vector 鐗囦笂褰掔害 + Top-K 鍘熻
+    __aicore__ inline void SelectTopK(int32_t t) {
+        LocalTensor<float> vals = ubS.DeQue<float>();
+        TopK(topkValLoc, topkIdxLoc, vals, TOPK, sTile);    // Vector Top-K 瑙勭害
+        DataCopy(topkValGm[t * TOPK], topkValLoc, TOPK);    // UB 鈫?GM
+        DataCopy(topkIdxGm[t * TOPK], topkIdxLoc, TOPK);
+    }
+
+    TPipe pipe;
+    TQue<TPosition::A1, 1>     qL1;
+    TQue<TPosition::B1, DEPTH> kL1;      // 鈫?Ping-Pong
+    TQue<TPosition::CO1,DEPTH> cO;
+    TQue<TPosition::VECOUT,DEPTH> ubS;
+    TBuf<TPosition::VECCALC>   ubW;
+    LocalTensor<fp8_t> qCur;  LocalTensor<float> wCur, topkValLoc;  LocalTensor<int32_t> topkIdxLoc;
+    GlobalTensor<fp8_t> qIGm, kIGm;
+    GlobalTensor<float> headWGm, topkValGm;
+    GlobalTensor<int32_t> topkIdxGm;
+    int32_t t0, T, S, sTile;
+};
+`;
+
+/* view: {file, lang, text, hl(lineText,idx)->class} */
+function riskHL(t){return /__shfl_xor_sync|warp_bitonic|cg::|__shared__|thread_block/.test(t)?'hl-risk':''}
+function todoHL(t){return /TODO\(/.test(t)?'hl-add':''}
+function copyHL(t){return /DataCopy|InitBuffer|Mmad|Relu\(|WeightedHeadReduce|AllocTensor|EnQue|DeQue/.test(t)?'hl-add':''}
+// S4锛氬唴瀛樺眰娆℃敞鍏ョ殑鍏抽敭琛屾洿閱掔洰
+function s4HL(t){
+  if(/InitBuffer|DataCopy|Mmad\(|Relu\(|WeightedHeadReduce/.test(t)) return 'hl-new';
+  if(/AllocTensor|EnQue|DeQue|FreeTensor|\.Get</.test(t)) return 'hl-add';
+  return '';
+}
+function bufHL(t){return /DEPTH|CopyIn|棰勫彇|Ping-Pong|鍙岀紦鍐瞸娴佹按|EnQue|DeQue|TopK\(/.test(t)?'hl-buf':''}
+// S6锛氬弻缂撳啿娴佹按鏂板浠ｇ爜鏇撮啋鐩?
+function s6HL(t){
+  if(/DEPTH|杞欢娴佹按|棰勫彇|CopyIn\(t|Ping-Pong|TopK\(|nTile/.test(t)) return 'hl-new';
+  if(/EnQue|DeQue|AllocTensor|FreeTensor|Compute\(t|SelectTopK/.test(t)) return 'hl-buf';
+  return '';
+}
+// tiling.h 楂樹寒:sTile / TilingData 鍏抽敭琛岄啋鐩?
+function tilingHL(t){
+  if(/sTile|TILING_KEY|TilingData|SetBlockDim|GET_TILING_DATA/.test(t)) return 'hl-new';
+  if(/BEGIN_TILING|REGISTER_TILING|FIELD/.test(t)) return 'hl-add';
+  return '';
+}
+// tiling.h 鍐呭闅忔墍閫?sTile 鍙樺寲
+function tilingSrc(){
+  const c=state.choices['S5']||'B';
+  const sTile=(c==='A')?128:(c==='B')?256:512;
+  const ubUtil=(c==='A')?61:(c==='B')?88:103;
+  const cyc=(c==='A')?'1.00':(c==='B')?'0.72':'0.95';
+  const note=(c==='C')?'// 鈿?sTile=512 瓒?L0C 瀹归噺,灏嗚Е鍙戝洖閫€鎼繍':'// 鉁?鐗囦笂椹荤暀鏈€澶у寲,鍥?GM 娆℃暟鏈€灏?';
+  return `// tiling.h 路 AscendC Tiling 缁撴瀯  (AscendPort 路 S5 鑷姩鐢熸垚)
+// 娌?key(S 缁?鍒嗗潡:姣忔牳姣忔澶勭悊 sTile 涓?key,璐村悎 L1/L0C/UB 瀹归噺
+#include "register/tilingdata_base.h"
+#include "tiling/tiling_api.h"
+namespace optiling {
+
+BEGIN_TILING_DATA_DEF(FlashMLATiling)
+  TILING_DATA_FIELD_DEF(int32_t, T);       // query 琛屾暟
+  TILING_DATA_FIELD_DEF(int32_t, S);       // key 鎬婚暱
+  TILING_DATA_FIELD_DEF(int32_t, sTile);   // 鈫?key 缁村垎鍧楅暱搴?鏈鎼滅储缁撴灉)
+  TILING_DATA_FIELD_DEF(int32_t, nTile);   // 姣忚鍒嗗潡鏁?= ceil(S / sTile)
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(flash_mla, FlashMLATiling)
+
+// ---- 鑷姩 Tiling:鍦?L0C / UB 瀹归噺绾︽潫涓嬮€夊畾 sTile ----
+constexpr int32_t sTile = ${sTile};        // UB 鍒╃敤鐜?${ubUtil}% 路 cycles ${cyc}脳
+${note}
+static ge::graphStatus TilingFunc(gert::TilingContext* ctx) {
+    FlashMLATiling t;
+    int32_t T = ctx->GetInputShape(0)->GetStorageShape().GetDim(0);
+    int32_t S = ctx->GetInputShape(1)->GetStorageShape().GetDim(0);
+    t.set_T(T);  t.set_S(S);
+    t.set_sTile(sTile);
+    t.set_nTile((S + sTile - 1) / sTile);   // 鍚戜笂鍙栨暣鍒嗗潡鏁?    ctx->SetBlockDim(GetCoreNum());
+    ctx->SetTilingKey(1);
+    t.SaveToBuffer(ctx->GetRawTilingData()->GetData(),
+                   ctx->GetRawTilingData()->GetCapacity());
+    ctx->GetRawTilingData()->SetDataSize(t.GetDataSize());
+    return ge::GRAPH_SUCCESS;
+}
+} // namespace optiling
+`;
+}
+
+const VIEWS = {
+  cuda:{file:'flash_mla_interface.py', lang:'python', text:CUDA, hl:riskHL},
+  s3:{file:'flash_mla.cpp', lang:'cpp', text:S3, hl:todoHL},
+  s4:{file:'flash_mla.cpp', lang:'cpp', text:S4, hl:s4HL},
+  s6:{file:'flash_mla.cpp', lang:'cpp', text:S6, hl:s6HL},
+  get tiling(){ return {file:'tiling.h', lang:'cpp', text:tilingSrc(), hl:tilingHL}; },
+};
+
+/* ============================ 璇硶楂樹寒 ============================ */
+const KW = new Set(('for while if else return const void int float bool char class public private struct namespace using constexpr inline extern template this reinterpret_cast static true false __global__ __device__ __aicore__ __forceinline__ __restrict__ __shared__ __nv_fp8_e4m3 __nv_fp8x4_e4m3 from import as def dataclasses Optional Tuple None assert raise with not and or is').split(' '));
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function highlight(line){
+  let s = esc(line);
+  const RE=/(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|(#[a-zA-Z]+)|\b(0x[0-9a-fA-F]+|\d+\.?\d*f?)\b|\b([A-Za-z_][A-Za-z0-9_]*)\b(\s*\()?/g;
+  return s.replace(RE,(m,com,str,pp,num,word,paren)=>{
+    if(com) return '<span class="c-com">'+com+'</span>';
+    if(str) return '<span class="c-str">'+str+'</span>';
+    if(pp)  return '<span class="c-pp">'+pp+'</span>';
+    if(num!==undefined) return '<span class="c-num">'+num+'</span>';
+    if(word){
+      if(KW.has(word)) return '<span class="c-k">'+word+'</span>'+(paren||'');
+      if(paren) return '<span class="c-fn">'+word+'</span>'+paren;
+      if(/^[A-Z_]/.test(word)&&/[a-z]/.test(word)===false&&word.length>1) return '<span class="c-num">'+word+'</span>';
+      if(/^[A-Z]/.test(word)) return '<span class="c-ty">'+word+'</span>';
+      return word;
+    }
+    return m;
+  });
+}
+function renderCode(key){
+  const v=VIEWS[key]; const lines=v.text.replace(/\n$/,'').split('\n');
+  const g=document.getElementById('gutter'), c=document.getElementById('codelines');
+  g.textContent=lines.map((_,i)=>i+1).join('\n');
+  c.innerHTML=lines.map(l=>{const cls=v.hl?v.hl(l):'';return '<span class="ln '+cls+'">'+(highlight(l)||' ')+'</span>'}).join('\n');
+  document.getElementById('codewrap').scrollTop=0;
+}
+// 鍙充晶瀵规瘮闈㈡澘锛氭覆鏌撶敓鎴愮殑 AscendC 婧愮爜
+function renderDiff(key){
+  const v=VIEWS[key]; if(!v) return;
+  const lines=v.text.replace(/\n$/,'').split('\n');
+  const g=document.getElementById('diffGutter'), c=document.getElementById('diffLines');
+  g.textContent=lines.map((_,i)=>i+1).join('\n');
+  c.innerHTML=lines.map(l=>{const cls=v.hl?v.hl(l):'';return '<span class="ln '+cls+'">'+(highlight(l)||' ')+'</span>'}).join('\n');
+  const f=document.getElementById('diffFile'); if(f) f.textContent=v.file;
+  document.getElementById('diffwrap').scrollTop=0;
+  // S4锛氭柊娉ㄥ叆鐨勫唴瀛樺眰娆¤鍋氫竴娆″叆鍦洪棯鐑?
+  if(key==='s4'){
+    const news=c.querySelectorAll('.ln.hl-new');
+    news.forEach(el=>el.classList.add('flash'));
+    setTimeout(()=>news.forEach(el=>el.classList.remove('flash')),1100);
+  }
+}
+// 寮€鍚?CUDA 鈫?AscendC 鍚屽睆瀵规瘮锛氬乏 CUDA銆佸彸鐢熸垚鐨?cpp
+function openCompare(diffKey){
+  closeGraph(); closeTiling(); closePipe();        // 鍏抽棴璁＄畻鍥?/ tiling / 娴佹按瀵规瘮
+  activeTab='cuda';
+  renderCode('cuda');                             // 宸︿晶鍥哄畾涓?CUDA
+  document.getElementById('leftPaneH').style.display='flex';
+  renderDiff(diffKey);                            // 鍙充晶涓虹敓鎴愮殑 AscendC
+  document.getElementById('split').classList.add('compare-open');
+  renderTabs(); renderTree();
+  const f=document.getElementById('etbFile'); if(f) f.textContent='flash_mla_interface.py 鈫?.cpp';
+  tagLinkGroups(diffKey);                          // 寤虹珛鐩稿悓璁＄畻杩囩▼鐨勮仈鍔ㄥ懠搴?
+}
+function closeCompare(){
+  const sp=document.getElementById('split');
+  sp.classList.remove('compare-open'); sp.classList.remove('link-active');
+  clearLinkHot();
+  document.getElementById('leftPaneH').style.display='none';
+}
+
+/* ---------- S3 瀵规瘮鑱斿姩锛氱浉鍚岃绠楄繃绋嬬殑浠ｇ爜鐗囨浜掔浉鍛煎簲 ---------- */
+// 姣忕粍锛歝uda[璧?姝 鈫?asc[璧?姝锛?-based锛屽惈绔偣锛夛紝label 涓鸿璁＄畻杩囩▼銆?
+let linkGroups=[]; // 褰撳墠瀵规瘮瑙嗗浘鐨勫垎缁?
+const LINKMAP={
+  s3:[
+    {label:'鍐呮牳鍏ュ彛 / 鍙傛暟', cuda:[35,41], asc:[13,23]},
+    {label:'grid 鈫?鍒嗘牳 (blockIdx.x=t)', cuda:[44,44], asc:[16,18]},
+    {label:'澶栧眰 query 寰幆', cuda:[57,57], asc:[27,32]},
+    {label:'QK岬€ 鐐圭Н + ReLU路w 褰掔害', cuda:[60,72], asc:[34,35]},
+    {label:'warp 鍙岃皟鎺掑簭 鈫?Vector Top-K', cuda:[76,83], asc:[36,37]},
+    {label:'warp_bitonic_sort (SIMT 涓撳睘)', cuda:[17,32], asc:[36,37]},
+    {label:'Top-K 杈撳嚭', cuda:[87,94], asc:[22,23]},
+  ],
+  s4:[
+    {label:'grid 鈫?鍒嗘牳', cuda:[44,44], asc:[14,14]},
+    {label:'澶存潈閲?__shared__ 鈫?UB', cuda:[48,51], asc:[30,30]},
+    {label:'causal 鍒嗗潡寰幆 (s<=t)', cuda:[57,57], asc:[31,32]},
+    {label:'kI / qI 杞藉叆 GM鈫扡1', cuda:[62,63], asc:[38,45]},
+    {label:'QK岬€ 鐐圭Н 鈫?Cube (Mmad)', cuda:[65,70], asc:[47,50]},
+    {label:'ReLU 鈫?Vector', cuda:[71,71], asc:[53,53]},
+    {label:'璺ㄥご鍔犳潈褰掔害 鈫?Vector', cuda:[60,72], asc:[54,54]},
+  ],
+  s6:[
+    {label:'causal 鍒嗗潡 + 杞欢娴佹按', cuda:[57,57], asc:[29,40]},
+    {label:'棰勫彇涓嬩竴鍧?(鍙岀紦鍐?', cuda:[57,57], asc:[33,37]},
+    {label:'kI 杞藉叆 (CopyIn)', cuda:[62,63], asc:[42,46]},
+    {label:'QK岬€ 鐐圭Н 鈫?Cube (Mmad)', cuda:[65,70], asc:[47,51]},
+    {label:'ReLU 鈫?Vector', cuda:[71,71], asc:[54,54]},
+    {label:'璺ㄥご鍔犳潈褰掔害 鈫?Vector', cuda:[60,72], asc:[55,55]},
+    {label:'warp 鍙岃皟鎺掑簭 鈫?Vector TopK', cuda:[76,83], asc:[60,66]},
+    {label:'warp_bitonic_sort (SIMT 涓撳睘)', cuda:[17,32], asc:[60,66]},
+    {label:'Top-K 杈撳嚭 UB鈫扜M', cuda:[87,94], asc:[64,65]},
+  ],
+};
+// 缁欎袱渚т唬鐮佽鎵撲笂鍒嗙粍鏍囪锛堜竴琛屽彲灞炰簬澶氫釜鍒嗙粍锛?
+function tagLinkGroups(diffKey){
+  linkGroups = LINKMAP[diffKey] || [];
+  const leftLns = document.querySelectorAll('#codelines .ln');
+  const rightLns = document.querySelectorAll('#diffLines .ln');
+  const reset=el=>{el.classList.remove('link-grp');el.removeAttribute('data-grp');};
+  leftLns.forEach(reset); rightLns.forEach(reset);
+  const add=(el,gi)=>{ if(!el) return; el.classList.add('link-grp');
+    const cur=el.dataset.grp?el.dataset.grp.split(','):[]; if(!cur.includes(''+gi)){cur.push(''+gi);el.dataset.grp=cur.join(',');} };
+  linkGroups.forEach((g,gi)=>{
+    for(let i=g.cuda[0]-1;i<=g.cuda[1]-1;i++) add(leftLns[i],gi);
+    for(let i=g.asc[0]-1;i<=g.asc[1]-1;i++) add(rightLns[i],gi);
+  });
+  bindLinkHover(leftLns,'left'); bindLinkHover(rightLns,'right');
+}
+function clearLinkHot(){
+  document.querySelectorAll('.ln.link-hot').forEach(el=>el.classList.remove('link-hot'));
+  document.getElementById('split').classList.remove('link-active');
+}
+function highlightGroup(grpAttr, originSide){
+  clearLinkHot();
+  if(grpAttr==null||grpAttr==='') return;
+  const gis=(''+grpAttr).split(',').map(Number).filter(x=>!isNaN(x));
+  if(!gis.length) return;
+  const leftLns=document.querySelectorAll('#codelines .ln');
+  const rightLns=document.querySelectorAll('#diffLines .ln');
+  let firstOppLine=null;
+  gis.forEach(gi=>{
+    const g=linkGroups[gi]; if(!g) return;
+    for(let i=g.cuda[0]-1;i<=g.cuda[1]-1;i++){ if(leftLns[i]) leftLns[i].classList.add('link-hot'); }
+    for(let i=g.asc[0]-1;i<=g.asc[1]-1;i++){ if(rightLns[i]) rightLns[i].classList.add('link-hot'); }
+    // 璁板綍瀵逛晶棣栬鐢ㄤ簬婊氬姩
+    if(firstOppLine===null){
+      firstOppLine = originSide==='left' ? rightLns[g.asc[0]-1] : leftLns[g.cuda[0]-1];
+    }
+  });
+  const wrapId = originSide==='left' ? 'diffwrap' : 'codewrap';
+  scrollLineIntoView(wrapId, firstOppLine);
+  document.getElementById('split').classList.add('link-active');
+}
+function scrollLineIntoView(wrapId, lineEl){
+  if(!lineEl) return;
+  const wrap=document.getElementById(wrapId);
+  const wr=wrap.getBoundingClientRect(), lr=lineEl.getBoundingClientRect();
+  const offset=(lr.top-wr.top)+wrap.scrollTop;
+  wrap.scrollTo({top:Math.max(0,offset - wrap.clientHeight/3), behavior:'smooth'});
+}
+function bindLinkHover(lns, side){
+  lns.forEach(el=>{
+    if(!el.classList.contains('link-grp')) return;
+    if(el.__linkSide===side) return; el.__linkSide=side;
+    el.onmouseenter=()=>highlightGroup(el.dataset.grp, side);
+    el.onclick=()=>highlightGroup(el.dataset.grp, side); // 鐐瑰嚮婊氬姩鍒板渚?
+  });
+  // 绂诲紑浠ｇ爜鍖烘竻闄ら珮浜?
+  const wrap = side==='left'?document.getElementById('codewrap'):document.getElementById('diffwrap');
+  wrap.onmouseleave=()=>clearLinkHot();
+}
+
+/* ============================ S4 纭欢鏁版嵁娴佸姩鐢?============================ */
+// 杈捐姮濂囧唴瀛樺眰娆?+ 鎵ц鍗曞厓銆傚潗鏍囧熀浜?viewBox 780脳188銆?
+const FUNITS={
+  gm:  {x:14,  y:70, w:78, h:48, c:'--mem',    t:'Global Mem', s:'GM 路 HBM'},
+  l1:  {x:150, y:70, w:74, h:48, c:'--mem',    t:'L1 Buffer',  s:'鐗囦笂缂撳瓨'},
+  l0a: {x:280, y:14, w:74, h:40, c:'--cube',   t:'L0A',        s:'Cube 杈撳叆路q'},
+  l0b: {x:280, y:134,w:74, h:40, c:'--cube',   t:'L0B',        s:'Cube 杈撳叆路k'},
+  cube:{x:410, y:60, w:86, h:66, c:'--cube',   t:'Cube',       s:'Mmad 路 QK岬€'},
+  l0c: {x:540, y:60, w:74, h:48, c:'--cube',   t:'L0C',        s:'鐭╅樀杈撳嚭路logits'},
+  ub:  {x:664, y:14, w:102,h:48, c:'--vec',    t:'Unified Buffer', s:'UB 路 澶存潈閲?鎵撳垎'},
+  vec: {x:664, y:118,w:102,h:52, c:'--vec',    t:'Vector',     s:'ReLU 路 危w路(路)'},
+};
+const FEDGES={
+  gm_l1:  ['gm','l1'], l1_l0a:['l1','l0a'], l1_l0b:['l1','l0b'],
+  l0a_cube:['l0a','cube'], l0b_cube:['l0b','cube'], cube_l0c:['cube','l0c'],
+  l0c_vec:['l0c','vec'], gm_ub:['gm','ub'], ub_vec:['ub','vec'],
+};
+// 姣忎竴姝ワ細浜捣鐨勫崟鍏冦€佽蛋鐨勮竟銆佽鏄庛€侀鑹层€佸搴?S4 浠ｇ爜琛?
+const FLOW_STEPS=[
+  {t:'DataCopy 澶存潈閲?GM鈫扷B', units:['gm','ub'], edges:['gm_ub'], code:[30,30], col:'--mem',
+   note:'w[t,*] head weights are copied from Global Memory into Unified Buffer for later weighted reduction.'},
+  {t:'DataCopy kI GM鈫扡1鈫扡0B', units:['gm','l1','l0b'], edges:['gm_l1','l1_l0b'], code:[38,40], col:'--mem',
+   note:'Key tiles are staged through GM -> L1 -> L0B and then consumed by the Cube B operand path.'},
+  {t:'DataCopy qI GM鈫扡1鈫扡0A', units:['gm','l1','l0a'], edges:['gm_l1','l1_l0a'], code:[42,45], col:'--mem',
+   note:'Query tiles are staged through GM -> L1 -> L0A and then consumed by the Cube A operand path.'},
+  {t:'Mmad 鐭╅樀涔?鈫?L0C', units:['l0a','l0b','cube','l0c'], edges:['l0a_cube','l0b_cube','cube_l0c'], code:[47,50], col:'--cube',
+   note:'Cube computes QK^T with FP8 operands and writes logits into L0C.'},
+  {t:'Relu 婵€娲?路 L0C鈫扷B鈫扸ector', units:['l0c','vec','ub'], edges:['l0c_vec'], code:[52,53], col:'--vec',
+   note:'Vector applies ReLU to logits and writes the activated values into UB.'},
+  {t:'WeightedHeadReduce 鍔犳潈褰掔害', units:['ub','vec'], edges:['ub_vec'], code:[54,54], col:'--vec',
+   note:'Vector reads head weights from UB and performs the weighted head reduction for each key score.'},
+];
+let flowIdx=0, flowTimer=null, flowPlaying=false;
+
+function unitCol(k){return getComputedStyle(document.documentElement).getPropertyValue(FUNITS[k].c).trim();}
+function edgePath(ek){
+  const [a,b]=FEDGES[ek]; const na=FUNITS[a], nb=FUNITS[b];
+  // 绔栫洿鐩搁偦(鍚屽垪涓婁笅,濡?UB鈫昖ector):璧板瀭鐩磋繛绾?  const sameCol = Math.abs((na.x+na.w/2)-(nb.x+nb.w/2)) < 30;
+  if(sameCol){
+    const x=na.x+na.w/2;
+    const y1=(na.y<nb.y)?na.y+na.h:na.y;
+    const y2=(na.y<nb.y)?nb.y:nb.y+nb.h;
+    return {d:`M${x},${y1} L${x},${y2}`, x1:x,y1,x2:x,y2};
+  }
+  // 澶存潈閲?GM鈫扷B:浠?GM 椤堕儴缁曡鍒?UB 宸︿晶,閬垮厤妯┛鐢诲竷
+  if(ek==='gm_ub'){
+    const x1=na.x+na.w/2, y1=na.y, x2=nb.x, y2=nb.y+nb.h/2;
+    return {d:`M${x1},${y1} C${x1},2 ${x2-40},2 ${x2},${y2}`, x1,y1,x2,y2};
+  }
+  const x1=na.x+na.w, y1=na.y+na.h/2, x2=nb.x, y2=nb.y+nb.h/2;
+  const mx=(x1+x2)/2;
+  return {d:`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, x1,y1,x2,y2};
+}
+function buildFlowSVG(){
+  let edges='', nodes='';
+  Object.keys(FEDGES).forEach(ek=>{ const p=edgePath(ek);
+    edges+=`<path class="fedge" id="fe_${ek}" d="${p.d}"/>`; });
+  Object.keys(FUNITS).forEach(k=>{ const u=FUNITS[k]; const col=unitCol(k);
+    nodes+=`<g class="fu-box" id="fu_${k}">
+      <rect x="${u.x}" y="${u.y}" width="${u.w}" height="${u.h}" rx="9" fill="${col}22" stroke="${col}" stroke-width="1.5"/>
+      <text class="fu-lbl" x="${u.x+u.w/2}" y="${u.y+u.h/2-2}" text-anchor="middle">${u.t}</text>
+      <text class="fu-sub" x="${u.x+u.w/2}" y="${u.y+u.h/2+11}" text-anchor="middle">${u.s}</text>
+    </g>`; });
+  return `<svg viewBox="0 0 780 188" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    ${edges}
+    <text class="fcap" x="53" y="134" text-anchor="middle">DDR / HBM</text>
+    <text class="fcap" x="453" y="140" text-anchor="middle">鐭╅樀鍗曞厓</text>
+    <text class="fcap" x="715" y="180" text-anchor="middle">鍚戦噺鍗曞厓</text>
+    ${nodes}
+    <g id="fpkts"></g>
+  </svg>`;
+}
+function renderFlow(){
+  const pane=document.getElementById('flowpane');
+  pane.innerHTML=`
+    <div class="flow-bar">
+      <button class="fb-btn" id="flowPlay">鈻?鎾斁</button>
+      <button class="fb-btn" id="flowStep">鈴?鍗曟</button>
+      <span class="fb-step">姝ラ <b id="flowNo">1</b>/${FLOW_STEPS.length} 路 <span id="flowTitle">${FLOW_STEPS[0].t}</span></span>
+      <span class="fb-spacer"></span>
+      <span class="fb-legend">
+        <span><i style="background:var(--mem)"></i>鐗囦笂鎼繍 (MTE)</span>
+        <span><i style="background:var(--cube)"></i>Cube 鐭╅樀</span>
+        <span><i style="background:var(--vec)"></i>Vector 鍚戦噺</span>
+      </span>
+    </div>
+    <div class="flow-stage" id="flowStage"></div>
+    <div style="padding:6px 12px;border-top:1px solid #ffffff0a;font-size:11px;color:var(--dim)"><span id="flowNote">${FLOW_STEPS[0].note}</span></div>`;
+  document.getElementById('flowStage').innerHTML=buildFlowSVG();
+  document.getElementById('flowPlay').onclick=toggleFlowPlay;
+  document.getElementById('flowStep').onclick=()=>{ stopFlow(); flowIdx=(flowIdx+1)%FLOW_STEPS.length; showFlowStep(flowIdx); };
+  flowIdx=0; showFlowStep(0);
+}
+function clearFlowHot(){
+  Object.keys(FUNITS).forEach(k=>document.getElementById('fu_'+k)?.classList.remove('active'));
+  Object.keys(FEDGES).forEach(ek=>document.getElementById('fe_'+ek)?.classList.remove('lit'));
+}
+function spawnPacket(ek, col){
+  const stage=document.getElementById('flowStage'); if(!stage) return;
+  const svg=stage.querySelector('svg'); const layer=svg.querySelector('#fpkts');
+  const path=svg.querySelector('#fe_'+ek); if(!path) return;
+  const len=path.getTotalLength();
+  const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('r','4.5'); c.setAttribute('fill',col); c.setAttribute('filter','url(#glow)');
+  c.setAttribute('opacity','0.95'); layer.appendChild(c);
+  const t0=performance.now(), dur=620;
+  (function move(now){
+    const p=Math.min(1,(now-t0)/dur); const pt=path.getPointAtLength(p*len);
+    c.setAttribute('cx',pt.x); c.setAttribute('cy',pt.y);
+    if(p<1) requestAnimationFrame(move); else c.remove();
+  })(t0);
+}
+function showFlowStep(i){
+  const s=FLOW_STEPS[i]; if(!s) return;
+  clearFlowHot();
+  const col=getComputedStyle(document.documentElement).getPropertyValue(s.col).trim();
+  s.units.forEach(u=>document.getElementById('fu_'+u)?.classList.add('active'));
+  s.edges.forEach(ek=>{ document.getElementById('fe_'+ek)?.classList.add('lit'); spawnPacket(ek,col); });
+  const no=document.getElementById('flowNo'), ti=document.getElementById('flowTitle'), nt=document.getElementById('flowNote');
+  if(no) no.textContent=i+1; if(ti) ti.textContent=s.t; if(nt) nt.textContent=s.note;
+  // 涓庡彸渚?AscendC 浠ｇ爜鑱斿姩锛氶珮浜搴旀敞鍏ヨ
+  if(s.code && document.getElementById('split').classList.contains('compare-open')){
+    highlightDiffLines(s.code[0], s.code[1]);
+  }
+}
+// 楂樹寒/婊氬姩 AscendC(鍙?闈㈡澘鐨勬寚瀹氳
+function highlightDiffLines(a,b){
+  const lns=document.querySelectorAll('#diffLines .ln');
+  lns.forEach(el=>el.classList.remove('hl-node'));
+  for(let i=a-1;i<b && i<lns.length;i++) lns[i]?.classList.add('hl-node');
+  if(lns[a-1]) scrollLineIntoView('diffwrap', lns[a-1]);
+}
+function toggleFlowPlay(){ flowPlaying?stopFlow():startFlow(); }
+function startFlow(){
+  flowPlaying=true; const b=document.getElementById('flowPlay'); if(b){b.textContent='鈴?鏆傚仠';b.classList.add('on');}
+  showFlowStep(flowIdx);
+  flowTimer=setInterval(()=>{ flowIdx=(flowIdx+1)%FLOW_STEPS.length; showFlowStep(flowIdx); }, 1500);
+}
+function stopFlow(){
+  flowPlaying=false; if(flowTimer){clearInterval(flowTimer);flowTimer=null;}
+  const b=document.getElementById('flowPlay'); if(b){b.textContent='鈻?鎾斁';b.classList.remove('on');}
+}
+// 渚涢潰鏉?tab 璋冪敤
+function openFlowPanel(autoplay){
+  document.getElementById('flowTab').style.display='';
+  activatePanelTab('flow');
+  renderFlow();
+  if(autoplay) startFlow();
+}
+function activatePanelTab(p){
+  document.querySelectorAll('.ptab').forEach(x=>x.classList.toggle('on',x.dataset.p===p));
+  const showTerm = (p==='term'||p==='term2');
+  document.getElementById('term').style.display=showTerm?'block':'none';
+  document.getElementById('probs').style.display=p==='probs'?'block':'none';
+  document.getElementById('flowpane').style.display=p==='flow'?'flex':'none';
+  document.getElementById('accpane').style.display=p==='acc'?'block':'none';
+  document.getElementById('perfpane').style.display=p==='perf'?'block':'none';
+}
+
+/* ============================ S7 绮惧害鎶ュ憡 ============================ */
+// 閫愮畻瀛愬榻?CUDA 榛勯噾鍩哄噯銆俧ixed 琛ㄧず宸插簲鐢ㄤ慨澶嶅悗鐨勫娴嬬粨鏋溿€?
+let accFixed=false;
+const ACC_OPS=[
+  {op:'DataCopy (GM鈫扡1/UB)', kind:'鎼繍', err:'0',      pass:true},
+  {op:'Mmad 路 QK岬€',          kind:'Cube', err:'2.4e-4', pass:true},
+  {op:'Relu',                kind:'Vector',err:'0',     pass:true},
+  {op:'WeightedHeadReduce',  kind:'Vector',err:'3.1e-2',pass:false,   // 鈫?寮傚父绠楀瓙
+    fixedErr:'8.0e-4', anomaly:true},
+  {op:'TopK 路 Top-K 瑙勭害',   kind:'Vector',err:'-',     pass:true, note:'hit rate 100%(2048/2048)'},
+];
+function accStats(){
+  const anomaly = ACC_OPS.find(o=>o.anomaly);
+  const maxErr = accFixed ? '8.0e-4' : '3.1e-2';
+  const cos    = accFixed ? '0.99987' : '0.9962';
+  const passN  = accFixed ? ACC_OPS.length : ACC_OPS.filter(o=>o.pass).length;
+  return {anomaly, maxErr, cos, passN, total:ACC_OPS.length};
+}
+function renderAccReport(){
+  const st=accStats();
+  const pane=document.getElementById('accpane');
+  const rows=ACC_OPS.map(o=>{
+    const ok = o.pass || accFixed;
+    const err = (o.anomaly && accFixed) ? o.fixedErr : o.err;
+    const stCls = (o.anomaly && accFixed) ? 'fixed' : (ok?'pass':'fail');
+    const stTxt = (o.anomaly && accFixed) ? 'fixed' : (ok?'pass':'anomaly');
+    const errCol = (!ok)?'color:var(--risk)':((o.anomaly&&accFixed)?'color:var(--mem)':'color:var(--txt)');
+    return `<tr class="${(!ok)?'bad':''}">
+      <td class="acc-op">${o.op}</td>
+      <td style="color:var(--dim)">${o.kind}</td>
+      <td class="acc-err" style="${errCol}">${err}${o.note?`<div style="font-size:9px;color:var(--dim);font-family:var(--sans)">${o.note}</div>`:''}</td>
+      <td><span class="acc-st ${stCls}">${stTxt}</span></td>
+    </tr>`;
+  }).join('');
+
+  const a=st.anomaly;
+  const anomalyBlock = accFixed ? `
+    <div class="acc-card ok">
+      <div class="ac-h">鉁?绮惧害瀵归綈閫氳繃 <span class="tag" style="background:#48d59722;color:var(--ok);border:1px solid #48d59755">FIXED</span></div>
+      <div class="ac-row"><div class="ac-k">澶嶆祴</div><div class="ac-v">max_abs_err <code>8.0e-4</code> 路 cos_sim <code>0.99987</code>,宸茶揪 rtol 1e-3 闃堝€笺€</div></div>
+      <div class="ac-row"><div class="ac-k">Top-K</div><div class="ac-v">鍛戒腑涓€鑷寸巼 <code>100%</code> (2048/2048),骞跺垪鍒嗘暟椤哄簭宸插榻愩€</div></div>
+    </div>` : `
+    <div class="acc-card">
+      <div class="ac-h">鈿?妫€娴嬪埌绮惧害寮傚父绠楀瓙 <span class="tag risk">FAIL</span></div>
+      <div class="ac-row"><div class="ac-k">绠楀瓙</div><div class="ac-v"><code>${a.op}</code>(${a.kind})</div></div>
+      <div class="ac-row"><div class="ac-k">鐜拌薄</div><div class="ac-v">max_abs_err <code>${a.err}</code>,瓒呭嚭 rtol <code>1e-3</code> 闃堝€?~30脳銆</div></div>
+      <div class="ac-row"><div class="ac-k">鏍瑰洜</div><div class="ac-v"><b>FP8 绱姞椤哄簭涓嶄竴鑷</b>:CUDA 閲屽悇 head 鐨?<code>危 w路ReLU</code> 鍦?FP32 瀵勫瓨鍣ㄤ覆琛岀疮鍔?鏄囪吘 Vector 褰掔害鎸変笉鍚屾搴忋€佷笖涓棿浠?<b>FP8/FP16 绱姞</b>,鑸嶅叆璇樊鍦ㄨ法 head 姹傚拰鏃惰鏀惧ぇ銆</div></div>
+      <div class="ac-fix">
+        <div class="fh">馃敡 淇鏂规 路 绱姞鎻愬崌 FP32 + 瀵归綈褰掔害娆″簭</div>
+        <div class="acc-diff"><span class="ctx">    // WeightedHeadReduce(sc, w, sTile);</span><span class="del">-   ReduceSum&lt;fp16_t&gt;(sc, prod, sTile);          // FP16 绱姞,鑸嶅叆鏀惧ぇ</span><span class="add">+   ReduceSum&lt;float&gt;(sc, prod, sTile);            // 鎻愬崌 FP32 绱姞</span><span class="add">+   SetReduceOrder(HEAD_ORDER_FIXED);              // 瀵归綈 CUDA head 褰掔害娆″簭</span></div>
+        <div class="acc-apply" id="accApply">鈻?搴旂敤淇骞跺娴</div>
+      </div>
+    </div>`;
+
+  pane.innerHTML=`
+    <div class="acc-top">
+      <div class="acc-kpi"><div class="kv" style="color:${accFixed?'var(--ok)':'var(--risk)'}">${st.maxErr}</div><div class="kk">max_abs_err</div><div class="kd" style="color:${accFixed?'var(--ok)':'var(--risk)'}">闃堝€?rtol 1e-3</div></div>
+      <div class="acc-kpi"><div class="kv" style="color:${accFixed?'var(--ok)':'var(--warn)'}">${st.cos}</div><div class="kk">cos_sim</div><div class="kd" style="color:var(--dim)">瓒婃帴杩?1 瓒婂ソ</div></div>
+      <div class="acc-kpi"><div class="kv">${st.passN}/${st.total}</div><div class="kk">operator pass</div><div class="kd" style="color:${accFixed?'var(--ok)':'var(--risk)'}">${accFixed?'all pass':'1 anomaly'}</div></div>
+    </div>
+    <div class="acc-sec-h">閫愮畻瀛愮簿搴﹀榻?路 golden = CUDA</div>
+    <table class="acc-table">
+      <thead><tr><th>operator</th><th>unit</th><th>max_abs_err</th><th>status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${anomalyBlock}`;
+
+  const ap=document.getElementById('accApply');
+  if(ap) ap.onclick=()=>{
+    accFixed=true; setProblems(0);
+    document.getElementById('accCnt').textContent='ok';
+    renderAccReport();
+    notify('accuracy fix applied','FP32 accumulation · cos_sim 0.99987 · issues cleared','ok');
+  };
+}
+function openAccPanel(){
+  document.getElementById('accTab').style.display='';
+  document.getElementById('accCnt').textContent = accFixed?'ok':'!';
+  document.getElementById('accCnt').style.background = accFixed?'#48d59722':'#ff547033';
+  document.getElementById('accCnt').style.color = accFixed?'var(--ok)':'#ff8ba0';
+  activatePanelTab('acc');
+  renderAccReport();
+}
+
+/* ============================ S8 鎬ц兘鎶ュ憡 ============================ */
+// 娉抽亾鍥?姣忔潯娉抽亾涓€涓‖浠跺崟鍏?cell 涓?{s璧? w瀹? cls, l鏍囩}銆傛椂闂翠互鏍间负鍗曚綅銆?
+// 鐩磋瘧鐗?before):涓茶,鍗曞厓闂村ぇ閲?idle 绌鸿浆銆?
+function perfSwimBefore(){
+  const rows={mte:[],cube:[],vec:[]}; let t=0;
+  for(let n=0;n<3;n++){
+    rows.mte.push({s:t,w:3,cls:'mte',l:`鎼?{n}`});
+    rows.cube.push({s:t,w:3,cls:'idle',l:''});          // Cube 绌虹瓑鎼繍
+    rows.cube.push({s:t+3,w:2,cls:'cube',l:`Cube${n}`});
+    rows.vec.push({s:t,w:5,cls:'idle',l:''});           // Vector 闀挎椂闂寸┖绛?
+    rows.vec.push({s:t+5,w:1,cls:'vec',l:`V${n}`});
+    t+=6;
+  }
+  return {rows,total:t};
+}
+// 浼樺寲鐗?after):鍙岀紦鍐查噸鍙?MTE 闅愯棌鍦ㄨ绠椾笅,鍗曞厓瀵嗘帓銆?
+function perfSwimAfter(){
+  const rows={mte:[],cube:[],vec:[]};
+  for(let n=0;n<3;n++) rows.mte.push({s:n*2,w:2,cls:'mte',l:`鎼?{n}`});
+  for(let n=0;n<3;n++) rows.cube.push({s:2+n*2,w:2,cls:'cube',l:`Cube${n}`});
+  for(let n=0;n<3;n++) rows.vec.push({s:4+n*2,w:1,cls:'vec',l:`V${n}`});
+  return {rows,total:4+3*2};
+}
+function swimRow(label, cells, total, play){
+  const pct=x=>(x/total*100);
+  let inner='';
+  cells.forEach((c,i)=>{ inner+=`<div class="swim-cell ${c.cls} ${play?'play':''}" style="left:${pct(c.s)}%;width:${pct(c.w)}%;${play?`animation-delay:${i*70}ms`:''}">${c.l}</div>`; });
+  return `<div class="swim-row"><div class="swim-lbl">${label}</div><div class="swim-track">${inner}</div></div>`;
+}
+function swimHTML(model, play){
+  const {rows,total}=model;
+  return `<div class="swim">
+    ${swimRow('MTE 鎼繍', rows.mte, total, play)}
+    ${swimRow('Cube', rows.cube, total, play)}
+    ${swimRow('Vector', rows.vec, total, play)}
+    <div class="swim-axis"><span>t=0</span><span>鏃堕棿(cycle)鈫</span><span>t=${total}</span></div>
+    <div class="swim-legend"><span><i style="background:var(--mem)"></i>MTE 鎼繍</span><span><i style="background:var(--cube)"></i>Cube</span><span><i style="background:var(--vec)"></i>Vector</span><span><i style="background:repeating-linear-gradient(45deg,#ffffff30,#ffffff30 3px,transparent 3px,transparent 6px)"></i>绌鸿浆 idle</span></div>
+  </div>`;
+}
+// 鍒╃敤鐜囧姣旀潯
+function cmpBar(label, before, after){
+  return `<div class="cmp"><div class="cl"><span>${label}</span><b><span style="color:var(--risk)">${before}%</span> 鈫?<span style="color:var(--ok)">${after}%</span></b></div>
+    <div class="bars">
+      <div class="barrow"><span class="brl">鐩磋瘧</span><div class="brt"><div class="brf" style="width:${before}%;background:var(--risk)">${before}%</div></div></div>
+      <div class="barrow"><span class="brl">浼樺寲</span><div class="brt"><div class="brf" style="width:${after}%;background:var(--ok)">${after}%</div></div></div>
+    </div></div>`;
+}
+function renderPerfReport(play){
+  const before=perfSwimBefore(), after=perfSwimAfter();
+  const speedup=(before.total/after.total).toFixed(1);
+  const pane=document.getElementById('perfpane');
+  pane.innerHTML=`
+    <div class="perf-top">
+      <div class="perf-kpi"><div class="kv" style="color:var(--ok)">3.1脳</div><div class="kk">绔埌绔姞閫</div></div>
+      <div class="perf-kpi"><div class="kv"><span style="color:var(--risk)">31%</span><span class="arw">鈫</span><span style="color:var(--ok)">82%</span></div><div class="kk">aicore 鍒╃敤鐜</div></div>
+      <div class="perf-kpi"><div class="kv" style="color:var(--ok)">76%</div><div class="kk">Cube 鍗犵敤</div></div>
+      <div class="perf-kpi"><div class="kv" style="color:var(--ok)">94%</div><div class="kk">MTE 闅愯棌</div></div>
+    </div>
+
+    <div class="perf-sec-h">娴佹按娉抽亾鍥?路 msProf<span class="tag old">鐩磋瘧鐗</span></div>
+    <div class="perf-play" id="perfPlay">鈻?鎾斁娉抽亾鏃跺簭</div>
+    ${swimHTML(before, play)}
+    <div style="font-size:10px;color:var(--dim);margin:2px 0 0">涓茶鎼繍-璁＄畻,Cube/Vector 澶ч噺绌鸿浆(鏂滅汗),鎬昏€楁椂 ${before.total} cycle銆</div>
+
+    <div class="perf-sec-h">娴佹按娉抽亾鍥?路 msProf<span class="tag new">浼樺寲鐗</span></div>
+    ${swimHTML(after, play)}
+    <div style="font-size:10px;color:var(--dim);margin:2px 0 0">鍙岀紦鍐查噸鍙?MTE 鎼繍闅愯棌鍦ㄨ绠椾笅,鎬昏€楁椂 ${after.total} cycle(绾?${speedup}脳 缂╃煭)銆</div>
+
+    <div class="perf-sec-h">鍒╃敤鐜囧姣?路 鐩磋瘧 鈫?浼樺寲</div>
+    ${cmpBar('aicore 鎬诲埄鐢ㄧ巼', 31, 82)}
+    ${cmpBar('Cube occupancy', 22, 76)}
+    ${cmpBar('MTE hidden ratio', 12, 94)}
+
+    <div class="perf-sec-h">璋冧紭鍙戠幇涓庡缓璁</div>
+    <div class="perf-tune">
+      <div class="pt-item"><span class="ic" style="color:var(--ok)">鉁</span><div><b>鍙岀紦鍐查噸鍙</b> <span class="pv">宸叉秷闄ゆ惉杩愭皵娉?娴佹按姘旀场 21%鈫?%(瑙?S6)銆</span></div></div>
+      <div class="pt-item"><span class="ic" style="color:var(--ok)">鉁</span><div><b>Cube FP8 婊℃祦姘</b> <span class="pv">Mmad 杩炵画鏃犳柇娴?Cube 鍗犵敤 76%銆</span></div></div>
+      <div class="pt-item"><span class="ic" style="color:var(--warn)">鈼</span><div><b>Vector 浠嶆湁绌洪殭</b> <span class="pv">ReLU/褰掔害涓?Cube 瀛樺湪杞诲井涓茶,鍙繘涓€姝ョ敤 UB Ping-Pong 閲嶅彔(娼滃湪 +6%)銆</span></div></div>
+      <div class="pt-item"><span class="ic" style="color:var(--warn)">鈼</span><div><b>鏈潡灏炬晥搴</b> <span class="pv">nTile 鏈潡鏃犻鍙栧璞?寤鸿鎸?sTile 瀵归綈 S 闀垮害浠ユ憡钖勫熬寤惰繜銆</span></div></div>
+    </div>
+
+    <div class="perf-reg"><b>鉁?宸叉敞鍐?aclNN 绠楀瓙:</b> <code>aclnnFlashMLA</code> 鈥斺€?鍙緵鍥惧眰鐩存帴璋冪敤銆傜鍒扮鐩歌緝鐩磋瘧鐗?<b>3.1脳</b> 鍔犻€?绮惧害 cos_sim 0.99987銆</div>`;
+  const pb=document.getElementById('perfPlay');
+  if(pb) pb.onclick=()=>renderPerfReport(true);
+}
+function openPerfPanel(){
+  document.getElementById('perfTab').style.display='';
+  activatePanelTab('perf');
+  renderPerfReport(true);
+}
+
+/* ============================ S5 Tiling 鍙鍖?============================ */
+const TILING_OPTS={
+  A:{sTile:128, ub:61,  l0c:48, gm:16, cyc:'1.00', tag:'',       tagCls:''},
+  B:{sTile:256, ub:88,  l0c:96, gm:8,  cyc:'0.72', tag:'鎺ㄨ崘',   tagCls:'rec'},
+  C:{sTile:512, ub:103, l0c:128,gm:4,  cyc:'0.95', tag:'婧㈠嚭',   tagCls:'wrn'},
+};
+const S_TOTAL=2048; // 婕旂ず鐢?key 鎬婚暱
+function openTiling(){
+  closeGraph(); closeCompare(); closePipe();
+  document.getElementById('split').classList.add('tiling-open');
+  renderTilingViz();
+}
+function closeTiling(){ document.getElementById('split').classList.remove('tiling-open'); }
+function renderTilingViz(){
+  const c=state.choices['S5']||'B';
+  const o=TILING_OPTS[c];
+  const nTile=Math.ceil(S_TOTAL/o.sTile);
+  const full=Math.floor(S_TOTAL/o.sTile), tail=S_TOTAL - full*o.sTile;
+  // S 缁村垎鍧楁潯
+  let blks='';
+  for(let i=0;i<nTile;i++){
+    const isTail=(tail>0 && i===nTile-1);
+    blks+=`<div class="sblk ${isTail?'tail':''}" data-i="${i}">${o.sTile}</div>`;
+  }
+  const ubCol=o.ub>100?'var(--risk)':(o.ub>=85?'var(--ok)':'var(--warn)');
+  const l0cCol=o.l0c>100?'var(--risk)':(o.l0c>=85?'var(--ok)':'var(--cube)');
+  const body=document.getElementById('tpBody');
+  body.innerHTML=`
+    <div class="tp-sec">
+      <div class="h">鍒嗗潡鏂规 路 sTile</div>
+      <div class="tp-opts">
+        ${Object.entries(TILING_OPTS).map(([k,v])=>`
+          <div class="tp-opt ${k===c?'on':''}" data-v="${k}">
+            <b>${v.sTile}</b><span>UB ${v.ub}%</span>
+            ${v.tag?`<span class="${v.tagCls}">${v.tag}</span>`:'<span>&nbsp;</span>'}
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="tp-sec">
+      <div class="h">key(S=${S_TOTAL}) 缁村垎鍧?路 nTile = 鈱圫/sTile鈱?= ${nTile}</div>
+      <div class="tp-anim" id="tpPlay">鈻?婕旂ず鍒嗗潡鎼繍杩囩▼</div>
+      <div class="sbar" id="sbar">${blks}</div>
+      <div class="sbar-cap"><span>鈫?娌?key 缁存祦寮忚浇鍏?姣忓潡 sTile=${o.sTile}</span><span>${tail>0?`鏈潡 ${tail}`:'鏁撮櫎'}</span></div>
+    </div>
+
+    <div class="tp-sec">
+      <div class="h">鐗囦笂缂撳啿鍗犵敤 路 瀹归噺绾︽潫</div>
+      <div class="util">
+        <div class="ul"><span>Unified Buffer (UB)</span><b style="color:${ubCol}">${o.ub}%</b></div>
+        <div class="track"><div class="fill" style="width:${Math.min(o.ub,100)}%;background:${ubCol}"></div><div class="cap-line" style="left:100%"></div></div>
+      </div>
+      <div class="util">
+        <div class="ul"><span>L0C (鐭╅樀杈撳嚭)</span><b style="color:${l0cCol}">${o.l0c}%</b></div>
+        <div class="track"><div class="fill" style="width:${Math.min(o.l0c,100)}%;background:${l0cCol}"></div><div class="cap-line" style="left:100%"></div></div>
+      </div>
+      ${o.ub>100||o.l0c>100?`<div style="font-size:10.5px;color:var(--risk);margin-top:4px">鈿?瓒呭嚭鐗囦笂瀹归噺 鈫?瑙﹀彂鍥為€€鎼繍(spill),cycles 鍙嶈€屽崌楂</div>`:`<div style="font-size:10.5px;color:var(--ok);margin-top:4px">鉁?鎭板ソ璐村悎鐗囦笂瀹归噺,椹荤暀鏈€澶у寲</div>`}
+    </div>
+
+    <div class="tp-sec">
+      <div class="h">浠ｄ环璇勪及</div>
+      <div class="tp-metrics">
+        <div class="tp-metric"><div class="mv">${nTile}</div><div class="mk">鍥?GM 娆℃暟 / 琛</div></div>
+        <div class="tp-metric"><div class="mv" style="color:${o.cyc==='0.72'?'var(--ok)':'#eef'}">${o.cyc}脳</div><div class="mk">鐩稿 cycles</div></div>
+        <div class="tp-metric"><div class="mv">${o.sTile}</div><div class="mk">sTile</div></div>
+      </div>
+    </div>`;
+  // 閫夐」鑱斿姩:鏇存柊閫夋嫨 鈫?閲嶆覆鏌?tiling.h 涓庡彲瑙嗗寲
+  body.querySelectorAll('.tp-opt').forEach(el=>el.onclick=()=>{
+    state.choices['S5']=el.dataset.v;
+    renderTilingViz();
+    if(activeTab==='tiling') renderCode('tiling');       // 鍚屾 tiling.h 婧愮爜
+    renderWizard();                                       // 鍚屾鍚戝閫夐」
+  });
+  const play=document.getElementById('tpPlay');
+  if(play) play.onclick=()=>animateTiling(nTile);
+}
+let tileAnimTimer=null;
+function animateTiling(nTile){
+  if(tileAnimTimer){clearInterval(tileAnimTimer);tileAnimTimer=null;}
+  const blks=document.querySelectorAll('#sbar .sblk');
+  blks.forEach(b=>b.classList.remove('act'));
+  let i=0;
+  tileAnimTimer=setInterval(()=>{
+    blks.forEach(b=>b.classList.remove('act'));
+    if(i>=blks.length){ clearInterval(tileAnimTimer); tileAnimTimer=null; return; }
+    blks[i].classList.add('act'); i++;
+  }, Math.max(120, 1200/Math.max(nTile,1)));
+}
+
+/* ============================ S6 娴佹按绾垮墠鍚庡姣斿彲瑙嗗寲 ============================ */
+// 涓変釜 tile,鏃堕棿浠ャ€屾牸銆嶄负鍗曚綅銆俹p:mte(鎼繍2鏍?/cube(2鏍?/vec(1鏍?
+const PIPE_TILES=3;
+// 涓茶:姣?tile 渚濇 MTE鈫扖ube鈫扸ec,鍗曞厓闂寸┖妗ｅ舰鎴愭皵娉?
+function buildSerial(){
+  const rows={mte:[],cube:[],vec:[]}; let t=0;
+  for(let n=0;n<PIPE_TILES;n++){
+    rows.mte.push({s:t,w:2,l:`鎼?{n}`,cls:'mte'});
+    // Cube 闇€绛?MTE 瀹屾垚 鈫?姘旀场
+    rows.cube.push({s:t,w:2,l:'',cls:'bub'});          // Cube 绌鸿浆绛夊緟
+    rows.cube.push({s:t+2,w:2,l:`Cube${n}`,cls:'cube'});
+    rows.vec.push({s:t+4,w:1,l:`Vec${n}`,cls:'vec'});
+    t+=5;
+  }
+  return {rows,total:t};
+}
+// 鍙岀紦鍐叉祦姘?MTE 杩炵画棰勫彇,Cube 绱ф帴涓婁竴鍧楁惉杩愬悗杩炵画鎵ц,Vec 璺熼殢
+function buildPipe(){
+  const rows={mte:[],cube:[],vec:[]};
+  // MTE 棰勭儹鍧?(2鏍?,涔嬪悗姣忓潡鎻愬墠棰勫彇,杩炵画鎺掑竷
+  for(let n=0;n<PIPE_TILES;n++) rows.mte.push({s:n*2,w:2,l:`鎼?{n}`,cls:'mte'});
+  // Cube 浠庡潡0鎼畬(t=2)璧疯繛缁墽琛?姣忓潡2鏍?
+  for(let n=0;n<PIPE_TILES;n++) rows.cube.push({s:2+n*2,w:2,l:`Cube${n}`,cls:'cube'});
+  // Vec 璺熷湪鍚勮嚜 Cube 涔嬪悗
+  for(let n=0;n<PIPE_TILES;n++) rows.vec.push({s:4+n*2,w:1,l:`Vec${n}`,cls:'vec'});
+  const total=4+PIPE_TILES*2; // 鏈潡 Cube 缁撴潫 + Vec
+  return {rows,total};
+}
+function tlRowHTML(label, cells, total, play){
+  const pct=x=>(x/total*100);
+  let inner='';
+  cells.forEach((c,i)=>{
+    inner+=`<div class="tl-cell ${c.cls} ${play?'play':''}" style="left:${pct(c.s)}%;width:${pct(c.w)}%;${play?`animation-delay:${i*90}ms`:''}">${c.l}</div>`;
+  });
+  return `<div class="tl-row"><div class="tl-lbl">${label}</div><div class="tl-track">${inner}</div></div>`;
+}
+function timelineHTML(model, play){
+  const {rows,total}=model;
+  return `<div class="tl-rows">
+    ${tlRowHTML('MTE 鎼繍', rows.mte, total, play)}
+    ${tlRowHTML('Cube', rows.cube, total, play)}
+    ${tlRowHTML('Vector', rows.vec, total, play)}
+  </div>
+  <div class="tl-axis"><span>t=0</span><span>鏃堕棿 鈫</span><span>t=${total}</span></div>`;
+}
+function openPipe(){
+  closeGraph(); closeCompare(); closeTiling();
+  document.getElementById('split').classList.add('pipe-open');
+  renderPipeViz(false);
+}
+function closePipe(){ document.getElementById('split').classList.remove('pipe-open'); }
+function renderPipeViz(play){
+  const ser=buildSerial(), pip=buildPipe();
+  const serBubbles=ser.rows.cube.filter(c=>c.cls==='bub').length;
+  const body=document.getElementById('ppBody');
+  body.innerHTML=`
+    <div class="pp-play" id="ppPlay">鈻?鎾斁娴佹按鏃跺簭</div>
+    <div class="pp-block">
+      <div class="h"><span class="badge old">缂栨帓鍓</span>涓茶:鎼繍鈫掕绠?椤哄簭鎵ц</div>
+      ${timelineHTML(ser, play)}
+      <div style="font-size:10px;color:var(--dim);margin-top:5px">Cube 姣忓潡閮借绌虹瓑 MTE 鎼繍瀹屾垚(鏂滅汗涓烘皵娉?,鍗曞厓鍒╃敤鐜囦綆銆</div>
+    </div>
+    <div class="pp-block">
+      <div class="h"><span class="badge new">缂栨帓鍚</span>鍙岀紦鍐?Ping-Pong:棰勫彇 n+1 鈭?璁＄畻 n</div>
+      ${timelineHTML(pip, play)}
+      <div style="font-size:10px;color:var(--dim);margin-top:5px">TQue 娣卞害 1鈫?,MTE 棰勫彇涓?Cube/Vector 璁＄畻閲嶅彔,姘旀场鍑犱箮娑堥櫎銆</div>
+    </div>
+    <div class="pp-metrics">
+      <div class="pp-metric"><div class="mv"><span style="color:var(--risk)">${ser.total}</span><span class="arw">鈫</span><span style="color:var(--ok)">${pip.total}</span></div><div class="mk">鎬诲懆鏈?鏍?</div></div>
+      <div class="pp-metric"><div class="mv"><span style="color:var(--risk)">21%</span><span class="arw">鈫</span><span style="color:var(--ok)">4%</span></div><div class="mk">娴佹按姘旀场</div></div>
+      <div class="pp-metric"><div class="mv" style="color:var(--ok)">${(ser.total/pip.total).toFixed(2)}脳</div><div class="mk">鍚炲悙鎻愬崌</div></div>
+    </div>`;
+  const pb=document.getElementById('ppPlay');
+  if(pb) pb.onclick=()=>renderPipeViz(true);
+}
+
+/* ============================ 璁＄畻鍥?============================ */
+// unit: mem|cube|vector|scalar|risk
+const GNODES=[
+  {id:'qI', x:26,  y:14,  w:120,h:40, unit:'mem', t:'q tensor', s:'[B,Sq,Hq,D]', d:'Query tensor passed to flash_mla_with_kvcache.', lines:[54,56]},
+  {id:'kI', x:200, y:14,  w:120,h:40, unit:'mem', t:'k_cache', s:'paged KV cache', d:'Paged KV cache used by dense and sparse decode.', lines:[55,74]},
+  {id:'w',  x:26,  y:150, w:120,h:40, unit:'mem', t:'sched_meta', s:'FlashMLASchedMeta', d:'Scheduler metadata is initialized once and reused when shapes match.', lines:[10,31]},
+  {id:'qk', x:200, y:86,  w:120,h:44, unit:'cube', t:'decode dispatch', s:'sparse / dense', d:'flash_mla_with_kvcache dispatches to sparse_decode_fwd or dense_decode_fwd.', lines:[152,168]},
+  {id:'relu',x:200,y:158, w:120,h:40, unit:'vector', t:'softmax scale', s:'QK scaling', d:'Default scale is derived from q head dimension when not provided.', lines:[119,120]},
+  {id:'wr', x:200, y:224, w:120,h:44, unit:'vector', t:'topk path', s:'indices + lengths', d:'Sparse path consumes indices, topk_length, optional extra cache, and attn_sink.', lines:[151,160]},
+  {id:'mask',x:200,y:296, w:120,h:40, unit:'vector', t:'causal path', s:'dense decode', d:'Dense path validates block_table and cache_seqlens, then calls dense_decode_fwd.', lines:[161,168]},
+  {id:'shf',x:26, y:296, w:120,h:44, unit:'risk', t:'CUDA extension', s:'flash_mla_cuda', d:'Python interface depends on flash_mla.cuda extension kernels.', lines:[6,6]},
+  {id:'bit',x:26, y:368, w:120,h:44, unit:'risk', t:'autograd bwd', s:'dense_prefill_bwd', d:'Backward path rejects unsupported GQA before calling dense_prefill_bwd.', lines:[250,286]},
+  {id:'out',x:200,y:368, w:120,h:44, unit:'mem', t:'out + lse', s:'return tensors', d:'The interface returns output and softmax log-sum-exp tensors.', lines:[170,171]},
+];
+const GEDGES=[['qI','qk'],['kI','qk'],['qk','relu'],['relu','wr'],['w','wr'],['wr','mask'],['mask','shf'],['shf','bit'],['bit','out'],['mask','out']];
+const UNITC={mem:'--mem',cube:'--cube',vector:'--vec',scalar:'--scalar',risk:'--risk'};
+let graphMapped=false; // 缁?S2 鍚?risk鈫抳ector
+
+function unitColor(u){return getComputedStyle(document.documentElement).getPropertyValue(UNITC[u]).trim()}
+function renderGraph(animate){
+  const W=346,H=430;
+  const eff=id=>{const n=GNODES.find(x=>x.id===id);let u=n.unit;if(graphMapped&&u==='risk')u='vector';return u;};
+  let edges='';
+  GEDGES.forEach(([a,b])=>{
+    const na=GNODES.find(n=>n.id===a),nb=GNODES.find(n=>n.id===b);
+    const x1=na.x+na.w/2,y1=na.y+na.h,x2=nb.x+nb.w/2,y2=nb.y;
+    const my=(y1+y2)/2;
+    const hot=(eff(a)==='risk'||eff(b)==='risk');
+    edges+=`<path class="gedge${hot?' hot':''}" d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}"/>`;
+  });
+  let nodes='';
+  GNODES.forEach((n,i)=>{
+    const u=eff(n.id); const col=unitColor(u);
+    const risk=(u==='risk');
+    nodes+=`<g class="gnode${animate?' enter':''}" data-id="${n.id}" style="${animate?`animation-delay:${i*70}ms`:''}">
+      ${risk?`<rect x="${n.x-3}" y="${n.y-3}" width="${n.w+6}" height="${n.h+6}" rx="11" fill="none" stroke="${col}" stroke-width="1.5" class="risk-pulse"/>`:''}
+      <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="9" fill="${col}22" stroke="${col}" stroke-width="1.4"/>
+      <text class="nt" x="${n.x+11}" y="${n.y+ (n.h>42?19:18)}" fill="#eef" font-size="11.5">${n.t}</text>
+      <text class="ns2" x="${n.x+11}" y="${n.y+(n.h>42?33:31)}" fill="${col}" font-size="9.5" font-family="ui-monospace,Menlo,Consolas,monospace">${n.s}</text>
+      ${(graphMapped&&n.unit==='risk')?`<text x="${n.x+n.w-8}" y="${n.y+13}" text-anchor="end" fill="${col}" font-size="9" font-weight="700">鉁撴敼鍐</text>`:''}
+    </g>`;
+  });
+  document.getElementById('gcanvas').innerHTML=
+    `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="min-height:${H}px">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L9,5 L0,10 z" fill="#5a6076"/></marker></defs>
+      ${edges}${nodes}
+    </svg>`;
+  document.querySelectorAll('.gnode').forEach(el=>el.addEventListener('click',()=>selectNode(el.dataset.id)));
+}
+function selectNode(id){
+  document.querySelectorAll('.gnode').forEach(e=>e.classList.toggle('sel',e.dataset.id===id));
+  const n=GNODES.find(x=>x.id===id); let u=n.unit; if(graphMapped&&u==='risk')u='vector';
+  const label={mem:'鐗囦笂鎼繍',cube:'Cube 鐭╅樀',vector:'Vector 鍚戦噺',scalar:'Scalar 鏍囬噺',risk:'SIMT 涓撳睘 路 闇€閲嶅啓'}[u];
+  const col=unitColor(u);
+  let note=n.d;
+  if(graphMapped&&n.unit==='risk') note='Mapped in S2. '+n.d;
+  document.getElementById('gdetail').innerHTML=
+    `<span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}66">${label}</span>`+
+    `<b>${n.t}</b> 路 <code style="font-family:var(--mono);font-size:10.5px">${n.s}</code><br>`+
+    `<span style="display:block;margin-top:6px">${note}</span>`;
+
+  // 婧愮爜鑱斿姩锛氳绠楀浘鑺傜偣鏉ヨ嚜 CUDA 瑙ｆ瀽锛屽缁堝畾浣嶅埌 .cu 婧愮爜
+  if(n.lines && n.lines.length >= 2){
+    if(activeTab !== 'cuda'){ switchTab('cuda'); }
+    // 鍒囨崲 tab 鍚?DOM 闇€瑕侀噸鏂版覆鏌擄紝绋嶄綔寤惰繜鍐嶉珮浜粴鍔?
+    requestAnimationFrame(()=>highlightCodeLines(n.lines[0], n.lines[1]));
+  }
+}
+
+/* ---------- S2 绠楀瓙鏄犲皠娓呭崟锛堜富鍐呭鍖哄睍绀猴級 ---------- */
+// CUDA 绠楀瓙 鈫?鏄囪吘绠楀瓙/鎵ц鍗曞厓 瀵圭収銆俽isk 椤归殢 S2 鍐崇瓥鍙樺寲銆?
+const OPMAP=[
+  {cuda:'flash_mla_with_kvcache dispatch', op:'Decode dispatch', unit:'cube', node:'qk', rewrite:false},
+  {cuda:'softmax_scale default', op:'Vector scale', unit:'vector', node:'relu', rewrite:false},
+  {cuda:'indices / topk_length sparse path', op:'Sparse TopK path', unit:'vector', node:'wr', rewrite:false},
+  {cuda:'causal dense path', op:'Vector Mask', unit:'vector', node:'mask', rewrite:false},
+  {cuda:'FlashMLASchedMeta cache', op:'Scheduler metadata', unit:'mem', node:'w', rewrite:false},
+  {cuda:'q / k_cache tensors', op:'DataCopy / cache read', unit:'mem', node:'kI', rewrite:false},
+  {cuda:'flash_mla.cuda extension', op:null, unit:'risk', node:'shf', rewrite:true},
+  {cuda:'dense_prefill_bwd limitation', op:null, unit:'risk', node:'bit', rewrite:true},
+];
+const UNIT_LABEL={mem:'鐗囦笂鎼繍',cube:'Cube 鐭╅樀',vector:'Vector 鍚戦噺',scalar:'Scalar 鏍囬噺',risk:'SIMT 路 闇€閲嶅啓'};
+function renderOpMapTable(){
+  const choice = state.choices['S2'] || 'vector';
+  let rows='';
+  OPMAP.forEach(m=>{
+    let unit=m.unit, op=m.op, st, stCls, isRw=false;
+    if(m.rewrite){
+      // 渚濇嵁 S2 鍐崇瓥鍐冲畾閲嶅啓鐩爣
+      if(choice==='scalar'){ unit='scalar'; op='Scalar fallback'; }
+      else { unit='vector'; op=(m.node==='bit')?'Vector 褰掔害 + TopK 鍘熻':'Vector 鐗囦笂褰掔害'; }
+      st='闇€閲嶅啓'; stCls='rw'; isRw=true;
+    } else {
+      st='鐩存帴鏄犲皠'; stCls='ok';
+    }
+    const col=unitColor(unit);
+    rows+=`<tr class="${isRw?'rw':''}">
+      <td class="cuda">${m.cuda}</td>
+      <td class="op">${op}</td>
+      <td><span class="unit" style="color:${col}"><i style="background:${col}"></i>${UNIT_LABEL[unit]}</span></td>
+      <td><span class="st ${stCls}">${st}</span></td>
+    </tr>`;
+  });
+  const rwN=OPMAP.filter(m=>m.rewrite).length, okN=OPMAP.length-rwN;
+  return `<div class="opmap">
+    <div class="opmap-h">馃椇 绠楀瓙鏄犲皠娓呭崟 路 CUDA 鈫?鏄囪吘<span class="cnt">${okN} 鐩存帴鏄犲皠 路 ${rwN} 闇€閲嶅啓</span></div>
+    <table>
+      <thead><tr><th>CUDA 绠楀瓙</th><th>鏄囪吘绠楀瓙</th><th>鎵ц鍗曞厓</th><th>鐘舵€</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+function syncParseBtn(){const open=document.getElementById('split').classList.contains('graph-open');
+  document.getElementById('parseBtn').classList.toggle('on',open);}
+function openGraph(){closeCompare();closeTiling();closePipe();document.getElementById('split').classList.add('graph-open');renderGraph(true);syncParseBtn();}
+function closeGraph(){document.getElementById('split').classList.remove('graph-open');syncParseBtn();}
+
+// 婧愮爜楂樹寒鑱斿姩鍑芥暟
+function highlightCodeLines(startLine, endLine){
+  // 娓呴櫎涔嬪墠鐨勯珮浜?  document.querySelectorAll('.ln.hl-node').forEach(el => el.classList.remove('hl-node'));
+
+  // 娣诲姞鏂扮殑楂樹寒
+  const codelines = document.getElementById('codelines');
+  if(!codelines) return;
+
+  const lines = codelines.querySelectorAll('.ln');
+  for(let i = startLine - 1; i < endLine && i < lines.length; i++){
+    lines[i].classList.add('hl-node');
+  }
+
+  // 婊氬姩鍒板彲瑙嗗尯鍩燂紙鐢?rect 璁＄畻锛屽吋瀹?sticky gutter 涓庡唴杈硅窛锛?  const targetLine = lines[startLine - 1];
+  if(targetLine){
+    const codewrap = document.getElementById('codewrap');
+    const wrapRect = codewrap.getBoundingClientRect();
+    const lineRect = targetLine.getBoundingClientRect();
+    // 鐩爣琛屽綋鍓嶇浉瀵规粴鍔ㄥ鍣ㄩ《閮ㄧ殑鍋忕Щ + 宸叉湁婊氬姩閲?    const lineOffsetInWrap = (lineRect.top - wrapRect.top) + codewrap.scrollTop;
+    const scrollTarget = lineOffsetInWrap - codewrap.clientHeight / 3; // 鏄剧ず鍦ㄤ笂 1/3 浣嶇疆
+    codewrap.scrollTo({top: Math.max(0, scrollTarget), behavior: 'smooth'});
+  }
+}
+
+document.getElementById('gclose').onclick=closeGraph;
+document.getElementById('tpClose').onclick=closeTiling;
+document.getElementById('ppClose').onclick=closePipe;
+document.getElementById('parseBtn').onclick=()=>{
+  const open=document.getElementById('split').classList.contains('graph-open');
+  if(open){closeGraph();}
+  else{ openGraph();
+    termLine('瑙ｆ瀽绠楀瓙 鈫?鐢熸垚璁＄畻鍥?鎵嬪姩瑙﹀彂)','d');
+    if(state.step===0) notify('graph opened','S1 parse preview is available','ok');
+  }
+};
+
+/* ============================ 鏂囦欢鏍?/ Tabs ============================ */
+let hasCpp=false, activeTab='cuda', tilingReady=false;
+function renderTree(){
+  const t=document.getElementById('tree');
+  t.innerHTML=`
+   <div class="node"><svg class="fic" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.6"><path d="m6 9 6 6 6-6"/></svg><b style="font-weight:600;color:#cfd6ea">DEEPSEEK-V3.2-SPARSE</b></div>
+   <div class="node ind"><svg class="fic" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.5"><path d="m6 9 6 6 6-6"/></svg>ops/</div>
+   <div class="node ind2 ${activeTab==='cuda'?'sel':''}" data-open="cuda"><span class="dot-c" style="background:var(--cube)"></span>flash_mla_interface.py</div>
+   ${hasCpp?`<div class="node ind2 ${(activeTab!=='cuda'&&activeTab!=='tiling')?'sel':''}" data-open="cpp"><span class="dot-c" style="background:var(--acc)"></span>flash_mla.cpp<span class="tag new">NEW</span></div>`:''}
+   ${tilingReady?`<div class="node ind2 ${activeTab==='tiling'?'sel':''}" data-open="tiling"><span class="dot-c" style="background:var(--vec)"></span>tiling.h<span class="tag new">NEW</span></div>`:''}
+   <div class="node ind2"><span class="dot-c" style="background:var(--dim2)"></span>flash_mla_ref.py</div>
+   <div class="node ind"><svg class="fic" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.5"><path d="m9 18 6-6-6-6"/></svg>tests/</div>
+   ${hasCpp?`<div class="node ind"><svg class="fic" viewBox="0 0 24 24" fill="none" stroke="var(--dim)" stroke-width="1.5"><path d="m9 18 6-6-6-6"/></svg>build/</div>`:''}
+  `;
+  t.querySelectorAll('[data-open]').forEach(n=>n.onclick=()=>{
+    const d=n.dataset.open;
+    if(d==='cuda') switchTab('cuda');
+    else if(d==='tiling') openTilingFile();
+    else switchTab(codeKey());
+  });
+}
+function codeKey(){ if(state.step>=6)return's6'; if(state.step>=4)return's4'; if(state.step>=3)return's3'; return'cuda'; }
+function renderTabs(){
+  const tabs=document.getElementById('tabs');
+  let html=`<div class="tab ${activeTab==='cuda'?'on':''}" data-t="cuda">
+     <span class="dot-c" style="background:var(--cube)"></span>flash_mla_interface.py<span class="x">脳</span></div>`;
+  if(hasCpp) html+=`<div class="tab ${(activeTab!=='cuda'&&activeTab!=='tiling')?'on':''}" data-t="cpp">
+     <span class="dot-c" style="background:var(--acc)"></span>flash_mla.cpp<span class="x">脳</span></div>`;
+  if(tilingReady) html+=`<div class="tab ${activeTab==='tiling'?'on':''}" data-t="tiling">
+     <span class="dot-c" style="background:var(--vec)"></span>tiling.h<span class="x">脳</span></div>`;
+  tabs.innerHTML=html;
+  tabs.querySelectorAll('[data-t]').forEach(el=>el.onclick=()=>{
+    const d=el.dataset.t;
+    if(d==='cuda') switchTab('cuda');
+    else if(d==='tiling') openTilingFile();
+    else switchTab(codeKey());
+  });
+}
+function switchTab(key){ closeCompare(); closeTiling(); closePipe(); activeTab = (key==='cuda')?'cuda':key; renderCode(activeTab==='cuda'?'cuda':key); renderTabs(); renderTree();
+  document.getElementById('leftPaneH').style.display='none';
+  const f=document.getElementById('etbFile'); if(f) f.textContent=(activeTab==='cuda')?'flash_mla_interface.py':'flash_mla.cpp'; }
+// 鎵撳紑 tiling.h 鏂囦欢 + 鍙充晶 Tiling 鍙鍖?function openTilingFile(){
+  closeCompare(); closeGraph(); closePipe();
+  activeTab='tiling';
+  renderCode('tiling');                 // 宸︿晶鏄剧ず tiling.h
+  renderTabs(); renderTree();
+  document.getElementById('leftPaneH').style.display='none';
+  const f=document.getElementById('etbFile'); if(f) f.textContent='tiling.h';
+  openTiling();                         // 鍙充晶 Tiling 鍙鍖?}
+// S6:瀹氫綅鍥?AscendC 婧愮爜椤电 + 楂樹寒鏂板娴佹按浠ｇ爜 + 鍙充晶鍓嶅悗瀵规瘮
+function openS6Source(){
+  closeGraph(); closeCompare(); closeTiling();
+  activeTab='s6';
+  renderCode('s6');                     // 宸︿晶鏄剧ず AscendC(S6)婧愮爜
+  renderTabs(); renderTree();
+  document.getElementById('leftPaneH').style.display='none';
+  const f=document.getElementById('etbFile'); if(f) f.textContent='flash_mla.cpp';
+  openPipe();                           // 鍙充晶娴佹按鍓嶅悗瀵规瘮
+  // 楂樹寒骞舵粴鍔ㄥ埌鏂板鐨勮蒋浠舵祦姘翠唬鐮佸潡(Process 鍐?
+  requestAnimationFrame(()=>flashCodeLines(31,38));
+}
+// 鍦ㄥ乏渚т唬鐮侀潰鏉块棯鐑侀珮浜竴娈佃骞舵粴鍔?
+function flashCodeLines(a,b){
+  const lns=document.querySelectorAll('#codelines .ln');
+  lns.forEach(el=>el.classList.remove('hl-node'));
+  for(let i=a-1;i<b && i<lns.length;i++) lns[i]?.classList.add('hl-node');
+  if(lns[a-1]){
+    const wrap=document.getElementById('codewrap');
+    const wr=wrap.getBoundingClientRect(), lr=lns[a-1].getBoundingClientRect();
+    wrap.scrollTo({top:Math.max(0,(lr.top-wr.top)+wrap.scrollTop - wrap.clientHeight/3), behavior:'smooth'});
+  }
+}
+
+/* ============================ 姝ラ瀹氫箟 ============================ */
+const STEPS=[
+ {n:'S1',t:'Parse operator',sub:'Python interface -> compute graph',
+  body:`Scan <code>flash_mla_with_kvcache</code> and related FlashMLA interface functions, then build a migration graph for decode, sparse prefill, dense prefill, and backward paths.`,
+  risk:{h:'CUDA extension dependency detected',p:'The Python interface delegates core work to <code>flash_mla_cuda</code>. Ascend migration should map these extension calls to AscendC kernels or aclNN wrappers.'},
+  log:[['','ascendport migrate ./ops/flash_mla_interface.py','p'],
+       ['Parse Python interface and function signatures','d'],
+       ['found entry: flash_mla_with_kvcache','g'],
+       ['found sparse prefill and dense varlen helpers','g'],
+       ['build compute graph nodes','b'],
+       ['flag CUDA extension calls for rewrite','r'],
+       ['compute graph ready','a']],
+  run(){ hasCpp=false; graphMapped=false; renderTree(); renderTabs(); switchTab('cuda'); openGraph(); }},
+
+ {n:'S2',t:'Map operator',sub:'FlashMLA API -> Ascend units',
+  body:`Map FlashMLA interface responsibilities to Ascend execution units: metadata handling, GM/cache reads, dense and sparse decode dispatch, vector masking, and TopK-style sparse paths.`,
+  choice:{q:'How should CUDA-extension-only pieces be represented during migration?',
+    opts:[
+     {v:'vector',rec:'recommended',title:'Vector/aclNN rewrite',desc:'Represent sparse decode and reductions with Vector kernels and aclNN wrapper boundaries.'},
+     {v:'scalar',warn:'slow',title:'Scalar fallback',desc:'Keep a scalar compatibility path for debugging only; throughput will be lower.'}]},
+  log:[['','ascendport map --target davinci','p'],
+       ['q/k_cache tensors -> GM/cache read path','g'],
+       ['FlashMLASchedMeta -> tiling metadata','g'],
+       ['sparse_decode_fwd -> Vector sparse path','g'],
+       ['dense_decode_fwd -> Cube/Vector dense path','g']],
+  logVector:[['CUDA extension calls -> AscendC/aclNN rewrite boundaries','g'],['graph risk nodes remapped','a']],
+  logScalar:[['CUDA extension calls -> scalar compatibility stubs','y'],['warning: scalar path is for debug only','r']]},
+
+ {n:'S3',t:'Generate code',sub:'Interface skeleton -> AscendC wrapper',
+  body:`Generate <code>flash_mla.cpp</code> and open the source comparison view: left side shows <code>flash_mla_interface.py</code>, right side shows the generated AscendC skeleton.`,
+  log:[['','ascendport codegen --arch ascend910b','p'],
+       ['generate FlashMLA AscendC class','d'],
+       ['new file flash_mla.cpp','g'],
+       ['Init/Process/ComputeScores/SelectTopK skeleton emitted','d'],
+       ['comparison view opened','a']],
+  run(){ hasCpp=true; renderTree(); renderTabs(); openCompare('s3'); }},
+
+ {n:'S4',t:'Map memory hierarchy',sub:'Explicit buffers + DataCopy',
+  body:`Inject explicit buffer and DataCopy stages for q, k_cache, scheduler metadata, logits, and output/lse tensors. The dataflow panel highlights GM, L1, L0, Cube, UB, and Vector movement.`,
+  log:[['','ascendport memmap --emit-datacopy','p'],
+       ['analyze tensor lifetimes','d'],
+       ['insert InitBuffer and DataCopy stages','g'],
+       ['highlight memory hierarchy code','a']],
+  run(){ openCompare('s4'); }},
+
+ {n:'S5',t:'Auto tiling',sub:'Choose tile size',
+  body:`Search candidate tile sizes under UB/L0 constraints and write the selected plan into <code>tiling.h</code>.`,
+  choice:{q:'Select tile size:',
+    opts:[
+     {v:'A',title:'sTile = 128',desc:'Conservative capacity usage; more GM traffic.'},
+     {v:'B',rec:'recommended',title:'sTile = 256',desc:'Balanced UB usage and cycle count.'},
+     {v:'C',warn:'risk',title:'sTile = 512',desc:'Higher capacity pressure and possible spill.'}]},
+  log:[['','ascendport tiling --search --constraint l0c,ub','p'],
+       ['sTile=128 cycles 1.00x','d'],
+       ['sTile=256 cycles 0.72x','g'],
+       ['sTile=512 spill risk','y']],
+  logDone:[['tiling.h generated','a'],['tiling visualization opened','a']],
+  run(){ tilingReady=true; renderTree(); renderTabs(); }},
+
+ {n:'S6',t:'Pipeline schedule',sub:'Double buffer overlap',
+  body:`Reorder copy, compute, and writeback into a double-buffered software pipeline. The right panel compares the serial and overlapped schedules.`,
+  log:[['','ascendport pipeline --double-buffer','p'],
+       ['build software pipeline','d'],
+       ['overlap CopyIn(n+1) with Compute(n)','g'],
+       ['TopK path lowered to Vector primitive boundary','g'],
+       ['pipeline comparison opened','a']],
+  run(){ }},
+
+ {n:'S7',t:'Verify accuracy',sub:'Golden comparison',
+  body:`Compare Ascend results with the original FlashMLA CUDA-extension behavior and generate an accuracy report.`,
+  log:[['','ascendport verify --golden flash_mla_cuda --rtol 1e-3','p'],
+       ['run operator-level comparison','d'],
+       ['detect weighted reduction drift','r'],
+       ['accuracy report generated','a']],
+  run(){ }},
+
+ {n:'S8',t:'Profile and register',sub:'msProf -> aclNN',
+  body:`Profile the optimized pipeline, summarize utilization, and register the migrated operator as <code>aclnnFlashMLA</code>.`,
+  log:[['','ascendport profile --with msprof','p'],
+       ['aicore utilization 82%','g'],
+       ['end-to-end speedup 3.1x','g'],
+       ['registered aclNN operator: aclnnFlashMLA','a'],
+       ['migration complete','a']],
+  run(){ if(!accFixed){ accFixed=true; setProblems(0); } setAicore('82%'); }},
+];
+
+/* ============================ 鐘舵€佹満 ============================ */
+const state={step:1, choices:{}}; // 鍒濆 step=1锛歋1 宸插畬鎴愶紝鎸夐挳鎵ц S2
+function renderProg(){
+  const p=document.getElementById('prog'), l=document.getElementById('plabels');
+  p.innerHTML=STEPS.map((s,i)=>`<div class="pstep ${i<state.step?'done':''} ${i===state.step?'cur':''}"></div>`).join('');
+  l.innerHTML=STEPS.map(s=>`<span>${s.n}</span>`).join('');
+}
+function renderChecklist(){
+  return `<div class="stepcard"><div class="sc-h"><div class="sc-n" style="background:#ffffff10;color:var(--dim)">鉁</div>
+    <div class="sc-t"><b>杩佺Щ妫€鏌ユ竻鍗</b><span>${state.step} / 8 闃舵瀹屾垚</span></div></div>
+    <ul class="chk">${STEPS.map((s,i)=>`<li class="${i<state.step?'done':''} ${i===state.step?'cur':''}">
+      <span class="cb">${i<state.step?'ok':(i===state.step?'':'')}</span>${s.n} - ${s.t}</li>`).join('')}</ul></div>`;
+}
+function renderWizard(){
+  const sc=document.getElementById('wzScroll');
+  // 褰撳墠灞曠ず"宸插畬鎴?鐨勯偅涓€姝ワ紙state.step-1锛夈€傚簳閮ㄦ寜閽墽琛?涓嬩竴姝?锛坰tate.step锛夈€?
+  const completedStep = state.step > 0 ? STEPS[state.step - 1] : null;
+  const nextStep = state.step < STEPS.length ? STEPS[state.step] : null;
+
+  let html='';
+
+  // 鍙睍绀?褰撳墠宸插畬鎴?姝ｅ湪鏌ョ湅"鐨勮繖涓€姝ョ殑瀹屾暣鍐呭銆備笉灞曠ず涓嬩竴姝ョ殑浠讳綍鍐呭銆?
+  if(completedStep){
+    html+=`<div class="stepcard" style="border-color:var(--ok);background:#48d59708">
+      <div class="sc-h"><div class="sc-n" style="background:#48d59722;color:var(--ok)">鉁</div>
+        <div class="sc-t"><b>${completedStep.n} 路 ${completedStep.t}</b><span>${completedStep.sub} 路 宸插畬鎴</span></div></div>
+      <div class="sc-body">${completedStep.body}`;
+    // S2锛氬湪涓诲唴瀹瑰尯灞曠ず"绠楀瓙鏄犲皠娓呭崟"锛岀洿瑙傚憟鐜?CUDA 绠楀瓙 鈫?鏄囪吘绠楀瓙/鍗曞厓
+    if(completedStep.n==='S2') html+=renderOpMapTable();
+    if(completedStep.risk) html+=`<div class="riskcard"><div class="rh">鈿?${completedStep.risk.h}</div><p>${completedStep.risk.p}</p></div>`;
+    // 璇ユ楠よ嚜韬嫢鍚喅绛栭」锛屾樉绀哄湪鏈楠ゅ崱鐗囧唴锛堝睘浜庡綋鍓嶆楠わ紝鑰岄潪涓嬩竴姝ワ級
+    if(completedStep.choice){
+      const sel=state.choices[completedStep.n]||completedStep.choice.opts.find(o=>o.rec)?.v||completedStep.choice.opts[0].v;
+      state.choices[completedStep.n]=sel;
+      html+=`<div class="choice"><div class="q">${completedStep.choice.q}</div>`+
+        completedStep.choice.opts.map(o=>`<div class="opt ${o.v===sel?'on':''}" data-step="${completedStep.n}" data-v="${o.v}">
+          <div class="rd"></div><div class="ot"><b>${o.title} ${o.rec?`<span class="pill rec">${o.rec}</span>`:''}${o.warn?`<span class="pill warn">${o.warn}</span>`:''}</b>
+          <span>${o.desc}</span></div></div>`).join('')+`</div>`;
+    }
+    html+=`</div></div>`;
+  }
+
+  if(!nextStep){
+    // 鍏ㄩ儴瀹屾垚
+    html+=`<div class="stepcard" style="border-color:var(--ok);background:#48d5970d">
+      <div class="sc-h"><div class="sc-n" style="background:#48d59722;color:var(--ok)">鉁</div>
+      <div class="sc-t"><b>杩佺Щ瀹屾垚</b><span>S1 鈫?S8 鍏ㄦ祦绋嬮€氳繃</span></div></div>
+      <div class="sc-body">flash_mla 宸茶縼绉讳负 AscendC 绠楀瓙骞舵敞鍐屼负 <code>aclnnFlashMLA</code>銆傜鍒扮 <b>3.1脳</b> 鍔犻€?aicore 鍒╃敤鐜?31%鈫?2%,绮惧害瀵归綈 cos_sim 0.99987銆</div></div>`;
+  }
+  html+=renderChecklist();
+  sc.innerHTML=html;
+  sc.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
+    state.choices[o.dataset.step]=o.dataset.v;
+    // 鑻ュ湪 S2 鍗＄墖涓婃敼鍙樻槧灏勫喅绛栵紝瀹炴椂鍙嶆槧鍒拌绠楀浘
+    if(o.dataset.step==='S2'){ graphMapped=(o.dataset.v==='vector'); renderGraph(false); }
+    // 鑻ュ湪 S5 鍗＄墖涓婃敼鍙?tiling 鍐崇瓥锛屽疄鏃跺弽鏄犲埌 tiling.h 涓庡彲瑙嗗寲
+    if(o.dataset.step==='S5'){
+      if(document.getElementById('split').classList.contains('tiling-open')) renderTilingViz();
+      if(activeTab==='tiling') renderCode('tiling');
+    }
+    renderWizard();
+  });
+
+  // footer
+  const btn=document.getElementById('runBtn'), hint=document.getElementById('footHint');
+  if(state.step>=STEPS.length){
+    btn.disabled=false; btn.textContent='Restart migration'; btn.className='run ghost';
+    hint.textContent='All 8 stages complete';
+  } else {
+    btn.disabled=false; btn.className='run';
+    btn.textContent=`Run ${nextStep.n} - ${nextStep.t}`;
+    hint.textContent=`8 stages - current ${state.step} / 8 complete`;
+  }
+  document.getElementById('sbStep').textContent = state.step>=STEPS.length?'complete':(completedStep?`${completedStep.n} complete`:'ready');
+}
+
+/* ---------- terminal ---------- */
+let termBusy=false;
+function termLine(txt,cls){const d=document.createElement('div');d.className='tl';
+  d.innerHTML=`<span class="t">$ </span><span class="${cls||''}">${txt}</span>`;
+  if(cls==='p'){d.innerHTML=`<span class="t">鉃?</span><span class="p">${txt}</span>`;}
+  document.getElementById('term').appendChild(d);
+  document.getElementById('term').scrollTop=1e9;}
+function streamLog(lines,done){
+  termBusy=true; let i=0; let finished=false;
+  const term=document.getElementById('term');
+  const cur=document.createElement('div');cur.className='tl';cur.innerHTML='<span class="cursor"></span>';
+  term.appendChild(cur);
+  const finish=()=>{ if(finished) return; finished=true; clearInterval(iv);
+    if(cur.parentNode) cur.remove(); termBusy=false; done&&done(); };
+  const iv=setInterval(()=>{
+    if(i>=lines.length){ finish(); return; }
+    const [txt,cls]=lines[i]; termLine(txt,cls); i++;
+    term.appendChild(cur); term.scrollTop=1e9;
+  },160);
+  // 鐪嬮棬鐙?鏃犺涓€斿彂鐢熶粈涔?娴佸紡閮戒細缁撴潫骞舵仮澶嶆寜閽?鐘舵€?  setTimeout(finish, lines.length*160 + 800);
+}
+
+/* ---------- problems ---------- */
+let problems=2;
+function setProblems(n){problems=n;const c=document.getElementById('probCnt');c.textContent=n;c.className='cnt'+(n>0?' err':'');
+  const pl=document.getElementById('probs');
+  if(n===0){pl.innerHTML=`<div class="prob" style="color:var(--ok)"><span class="pi">ok</span>No issues - accuracy aligned</div>`;}
+}
+function initProblems(){
+  const pl=document.getElementById('probs');
+  pl.innerHTML=`
+   <div class="prob"><span class="pi" style="color:var(--risk)">!</span><div><div><code style="font-family:var(--mono)">flash_mla_cuda</code> extension call requires Ascend replacement</div><div class="pf">flash_mla_interface.py</div></div></div>
+   <div class="prob"><span class="pi" style="color:var(--risk)">!</span><div><div><code style="font-family:var(--mono)">dense_prefill_bwd</code> has interface constraints to preserve</div><div class="pf">flash_mla_interface.py</div></div></div>`;
+}
+// S7锛氱簿搴﹀紓甯稿啓鍏ラ棶棰橀潰鏉?
+function setAccProblem(){
+  problems=1;const c=document.getElementById('probCnt');c.textContent=1;c.className='cnt err';
+  document.getElementById('probs').innerHTML=`
+   <div class="prob"><span class="pi" style="color:var(--risk)">!</span><div><div><code style="font-family:var(--mono)">FlashMLA reduction</code> precision drift detected</div><div class="pf">flash_mla.cpp - accuracy report</div></div></div>`;
+}
+
+/* ---------- notifications ---------- */
+function notify(title,msg,kind){
+  const w=document.getElementById('notifs');const d=document.createElement('div');
+  d.className='notif '+(kind||'');d.innerHTML=`<b>${title}</b><span>${msg}</span>`;
+  w.appendChild(d);setTimeout(()=>{d.style.transition='opacity .4s,transform .4s';d.style.opacity=0;d.style.transform='translateX(20px)';setTimeout(()=>d.remove(),400)},3400);
+}
+function setAicore(v){document.getElementById('sbAicore').textContent='aicore '+v;}
+
+/* ---------- panel tabs ---------- */
+document.querySelectorAll('.ptab').forEach(t=>t.onclick=()=>{
+  const p=t.dataset.p;
+  if(p==='flow'){ if(document.getElementById('flowpane').innerHTML.trim()==='') renderFlow(); }
+  else { stopFlow(); }
+  if(p==='acc'){ renderAccReport(); }
+  if(p==='perf'){ renderPerfReport(false); }
+  activatePanelTab(p);
+});
+
+/* ---------- run a step ---------- */
+function runStep(){
+  if(termBusy) return;
+  if(state.step>=STEPS.length){ reset(); return; }
+
+  const s=STEPS[state.step]; // 鎵ц涓嬩竴姝?
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true; btn.textContent=`Running ${s.n}...`;
+  document.getElementById('sbStep').textContent=`${s.n} running`;
+  stopFlow();
+
+  // 鍒囧埌缁堢鏍囩,纭繚鐢ㄦ埛鐪嬪埌娴佸紡鏃ュ織
+  activatePanelTab('term');
+
+  // assemble log with choice enrichment
+  let lines=s.log.slice();
+  if(s.n==='S2'){ const c=state.choices['S2']||'vector';
+    lines=lines.concat(c==='vector'?s.logVector:s.logScalar); }
+  if(s.n==='S5'){ const c=state.choices['S5']||'B';
+    lines.push([`selected sTile = ${c==='A'?128:c==='B'?256:512}`, c==='C'?'y':'g']);
+    lines=lines.concat(s.logDone); }
+
+  s.run && s.run();
+  streamLog(lines,()=>{
+    // graph mapping update after S2
+    if(s.n==='S2'){ const c=state.choices['S2']||'vector'; if(c==='vector'){graphMapped=true;renderGraph(false);} }
+    state.step++; // 瀹屾垚鍚庢楠?1
+    renderProg(); renderWizard();
+    // S4锛氬畬鎴愬悗鎵撳紑纭欢鏁版嵁娴佸姩鐢诲苟鑷姩鎾斁
+    if(s.n==='S4'){ openFlowPanel(true); }
+    // S5锛氬畬鎴愬悗榛樿鎵撳紑 tiling.h 骞跺睍绀?Tiling 鍙鍖?
+    if(s.n==='S5'){ openTilingFile(); }
+    // S6锛氬畬鎴愬悗瀹氫綅鍥?AscendC 婧愮爜,楂樹寒鏂板娴佹按浠ｇ爜骞跺睍绀哄墠鍚庡姣?
+    if(s.n==='S6'){ openS6Source(); }
+    // S7锛氬畬鎴愬悗鎵撳紑绮惧害鎶ュ憡
+    if(s.n==='S7'){ accFixed=false; setAccProblem(); openAccPanel(); }
+    // S8锛氬畬鎴愬悗鎵撳紑鎬ц兘鎶ュ憡(娉抽亾鍥?+ 瀵规瘮)
+    if(s.n==='S8'){ openPerfPanel(); }
+    const done=state.step>=STEPS.length;
+    notify(done?'migration complete':`${s.n} complete`, done?'flash_mla registered as aclNN operator':`${s.t} - ${s.sub}`, done?'ok':'ok');
+    if(!done) document.getElementById('runBtn').disabled=false;
+  });
+}
+function reset(){
+  state.step=1; state.choices={}; hasCpp=false; graphMapped=false; activeTab='cuda'; tilingReady=false; accFixed=false; // 閲嶇疆鍒?S1 宸插畬鎴愮姸鎬?
+  document.getElementById('term').innerHTML='';
+  closeCompare(); closeTiling(); closePipe(); stopFlow();
+  document.getElementById('flowTab').style.display='none';
+  document.getElementById('flowpane').style.display='none';
+  document.getElementById('flowpane').innerHTML='';
+  document.getElementById('accTab').style.display='none';
+  document.getElementById('accpane').style.display='none';
+  document.getElementById('accpane').innerHTML='';
+  document.getElementById('perfTab').style.display='none';
+  document.getElementById('perfpane').style.display='none';
+  document.getElementById('perfpane').innerHTML='';
+  initProblems(); setProblems(2); setAicore('-');
+  renderTree(); renderTabs(); renderCode('cuda'); renderProg(); renderWizard();
+  openGraph(); // S1 宸插畬鎴愶紝灞曠ず璁＄畻鍥?
+  termLine('AscendPort migration workspace ready. S1 parse is complete; run S2 to continue.','d');
+}
+document.getElementById('runBtn').onclick=runStep;
+
+/* ---------- boot ---------- */
+initProblems();
+renderTree(); renderTabs(); renderCode('cuda'); renderProg(); renderWizard();
+termLine('AscendPort v0.9 路 target=Atlas 800T A2 (Ascend 910B)','d');
+termLine('S1 parse complete - compute graph generated. Click any node to locate source.','g');
+termLine('Run S2 - Map operator to continue the migration flow.','d');
+// S1 宸插畬鎴愶紝鎵撳紑璁＄畻鍥?
+openGraph();
+</script>
+</body>
+</html>
+
+
+
+
+

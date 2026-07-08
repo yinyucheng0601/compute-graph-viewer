@@ -132,6 +132,167 @@
     },
   };
 
+  const AIV_VIZ = {
+    qknorm_rope: {
+      name: 'QK-Norm + RoPE',
+      flow: 'Q,K → per-head RMSNorm(q_norm/k_norm) → RoPE → Qr,Kr',
+      before: {
+        metrics: ['kernel 3', 'HBM 往返 2 次'],
+        notes: ['q_norm / k_norm 输出写回 HBM', 'RoPE 再次读入做旋转编码'],
+        markers: [
+          { node: 'hbm:HBM', label: 'Q/K 输入', tone: 'input', title: 'Q/K 从 HBM 进入片上' },
+          { node: 'buffer:UB', label: 'Q,K tile', tone: 'input', title: 'Q/K staging 到 UB' },
+          { node: 'vector:Vector', label: 'RMSNorm', tone: 'compute', title: 'per-head RMSNorm 归约/缩放' },
+          { node: 'hbm:HBM', label: 'Qn/Kn 中间结果', tone: 'output', title: '融合前：Qn/Kn 落 HBM' },
+          { node: 'vector:Vector', label: 'RoPE', tone: 'compute', title: '旋转位置编码' },
+          { node: 'buffer:UB', label: 'Qr/Kr 输出', tone: 'output', title: 'RoPE 输出驻留 UB' },
+        ],
+        steps: [
+          { title: '1) Q/K 从 HBM 经 ND-DMA 进入 UB（tile staging）', nodes: ['hbm:HBM', 'cache:ND-DMA Cache', 'buffer:UB'], routes: [['hbm:HBM', 'cache:ND-DMA Cache'], ['cache:ND-DMA Cache', 'buffer:UB']] },
+          { title: '2) Vector 执行 per-head RMSNorm：归约 sum(x^2) → rsqrt → scale', nodes: ['buffer:UB', 'exec:SIMD', 'vector:Vector'], routes: [['buffer:UB', 'vector:Vector'], ['exec:SIMD', 'vector:Vector'], ['vector:Vector', 'buffer:UB']] },
+          { title: '3) 归一化后的 Qn/Kn 写回 HBM（中间张量落地）', nodes: ['buffer:UB', 'cache:ND-DMA Cache', 'hbm:HBM'], routes: [['cache:ND-DMA Cache', 'hbm:HBM']] },
+          { title: '4) RoPE 再次从 HBM 读回 Qn/Kn，并读取 cos/sin', nodes: ['hbm:HBM', 'cache:ND-DMA Cache', 'buffer:UB'], routes: [['hbm:HBM', 'cache:ND-DMA Cache'], ['cache:ND-DMA Cache', 'buffer:UB']] },
+          { title: '5) Vector 计算 RoPE，输出 Qr/Kr 回到 UB（供后续 Attention）', nodes: ['buffer:UB', 'exec:SIMD', 'vector:Vector'], routes: [['buffer:UB', 'vector:Vector'], ['exec:SIMD', 'vector:Vector'], ['vector:Vector', 'buffer:UB']] },
+        ],
+        blocks: [
+          { buffer: 'UB', label: 'Q (HBM->UB)', state: 'loaded', tone: 'input', cellRange: [0, 15], sourceTile: 'Q[t,:]' },
+          { buffer: 'UB', label: 'K (HBM->UB)', state: 'loaded', tone: 'input', cellRange: [16, 31], sourceTile: 'K[t,:]' },
+          { buffer: 'UB', label: 'RMS stats', state: 'accumulating', tone: 'accumulator', cellRange: [32, 37], sourceTile: 'sum(x^2),rsqrt' },
+          { buffer: 'UB', label: 'Q_norm (store)', state: 'committed', tone: 'output', cellRange: [38, 53], sourceTile: 'Qn[t,:]' },
+          { buffer: 'UB', label: 'K_norm (store)', state: 'committed', tone: 'output', cellRange: [54, 69], sourceTile: 'Kn[t,:]' },
+          { buffer: 'UB', label: 'Q_norm (reload)', state: 'loaded', tone: 'input', cellRange: [70, 85], sourceTile: 'Qn[t,:]' },
+          { buffer: 'UB', label: 'K_norm (reload)', state: 'loaded', tone: 'input', cellRange: [86, 101], sourceTile: 'Kn[t,:]' },
+          { buffer: 'UB', label: 'cos/sin', state: 'loaded', tone: 'input', cellRange: [102, 115], sourceTile: 'RoPE cache' },
+        ],
+      },
+      after: {
+        metrics: ['kernel 1', 'HBM 往返 0 次'],
+        notes: ['归一化结果驻留 UB', '直接喂给 RoPE 输出 Q/K_rope'],
+        markers: [
+          { node: 'hbm:HBM', label: 'Q/K 输入', tone: 'input', title: 'Q/K 从 HBM 进入片上' },
+          { node: 'buffer:UB', label: 'Q,K tile', tone: 'input', title: 'Q/K staging 到 UB' },
+          { node: 'vector:Vector', label: 'RMSNorm+RoPE', tone: 'compute', title: '融合后：同一段执行内完成归一化 + RoPE' },
+          { node: 'hbm:HBM', label: 'Qn/Kn 不落地', tone: 'note', title: '融合后：中间张量不写回 HBM' },
+          { node: 'buffer:UB', label: 'Qr/Kr 输出', tone: 'output', title: 'RoPE 输出驻留 UB' },
+        ],
+        steps: [
+          { title: '1) Q/K 从 HBM 经 ND-DMA 进入 UB（tile staging）', nodes: ['hbm:HBM', 'cache:ND-DMA Cache', 'buffer:UB'], routes: [['hbm:HBM', 'cache:ND-DMA Cache'], ['cache:ND-DMA Cache', 'buffer:UB']] },
+          { title: '2) Vector 执行 RMSNorm 归约与缩放，结果不落 HBM（保持 UB 驻留）', nodes: ['buffer:UB', 'exec:SIMD', 'vector:Vector'], routes: [['buffer:UB', 'vector:Vector'], ['exec:SIMD', 'vector:Vector'], ['vector:Vector', 'buffer:UB']] },
+          { title: '3) 在同一融合 kernel 内读取 cos/sin 并完成 RoPE，输出 Qr/Kr 回到 UB', nodes: ['buffer:UB', 'exec:SIMD', 'vector:Vector'], routes: [['buffer:UB', 'vector:Vector'], ['exec:SIMD', 'vector:Vector'], ['vector:Vector', 'buffer:UB']] },
+        ],
+        blocks: [
+          { buffer: 'UB', label: 'Q (HBM->UB)', state: 'loaded', tone: 'input', cellRange: [0, 15], sourceTile: 'Q[t,:]' },
+          { buffer: 'UB', label: 'K (HBM->UB)', state: 'loaded', tone: 'input', cellRange: [16, 31], sourceTile: 'K[t,:]' },
+          { buffer: 'UB', label: 'RMS stats', state: 'accumulating', tone: 'accumulator', cellRange: [32, 37], sourceTile: 'sum(x^2),rsqrt' },
+          { buffer: 'UB', label: 'Q_norm (no store)', state: 'avoided', tone: 'input', cellRange: [38, 53], sourceTile: 'Qn[t,:]' },
+          { buffer: 'UB', label: 'K_norm (no store)', state: 'avoided', tone: 'input', cellRange: [54, 69], sourceTile: 'Kn[t,:]' },
+          { buffer: 'UB', label: 'Q_rope', state: 'committed', tone: 'output', cellRange: [70, 85], sourceTile: 'Qr[t,:]' },
+          { buffer: 'UB', label: 'K_rope', state: 'committed', tone: 'output', cellRange: [86, 101], sourceTile: 'Kr[t,:]' },
+          { buffer: 'UB', label: 'cos/sin', state: 'loaded', tone: 'input', cellRange: [102, 115], sourceTile: 'RoPE cache' },
+        ],
+      },
+    },
+    add_rmsnorm: {
+      name: 'Add + RMSNorm',
+      flow: 'residual + hidden → RMSNorm → y',
+      before: {
+        metrics: ['kernel 2', 'HBM 往返 1 次'],
+        notes: ['Add 写回后再读入做 RMSNorm', '归约与归一化跨 kernel 分离'],
+        blocks: [
+          { buffer: 'UB', label: 'hidden (load)', state: 'loaded', tone: 'input', cellRange: [0, 17], sourceTile: 'x[t,:]' },
+          { buffer: 'UB', label: 'residual (load)', state: 'loaded', tone: 'input', cellRange: [18, 35], sourceTile: 'r[t,:]' },
+          { buffer: 'UB', label: 'add_out (store)', state: 'committed', tone: 'output', cellRange: [46, 63], sourceTile: 'x+r' },
+          { buffer: 'UB', label: 'add_out (reload)', state: 'loaded', tone: 'input', cellRange: [64, 81], sourceTile: 'x+r' },
+          { buffer: 'UB', label: 'norm_out', state: 'committed', tone: 'output', cellRange: [90, 107], sourceTile: 'y' },
+        ],
+      },
+      after: {
+        metrics: ['kernel 1', 'HBM 往返 0 次'],
+        notes: ['Add 结果片上直接归一化', '减少一次写回与读取'],
+        blocks: [
+          { buffer: 'UB', label: 'hidden (load)', state: 'loaded', tone: 'input', cellRange: [0, 17], sourceTile: 'x[t,:]' },
+          { buffer: 'UB', label: 'residual (load)', state: 'loaded', tone: 'input', cellRange: [18, 35], sourceTile: 'r[t,:]' },
+          { buffer: 'UB', label: 'add_out (no store)', state: 'avoided', tone: 'input', cellRange: [46, 63], sourceTile: 'x+r' },
+          { buffer: 'UB', label: 'norm_out', state: 'committed', tone: 'output', cellRange: [90, 107], sourceTile: 'y' },
+        ],
+      },
+    },
+    swiglu: {
+      name: 'SwiGLU (SiluAndMul)',
+      flow: 'gate/up → SiLU(gate) → ⊙ up → out',
+      before: {
+        metrics: ['kernel 2', 'HBM 往返 1 次'],
+        notes: ['SiLU 输出落地后再做乘法', '中间张量造成额外带宽压力'],
+        blocks: [
+          { buffer: 'UB', label: 'gate/up (load)', state: 'loaded', tone: 'input', cellRange: [0, 29], sourceTile: 'gate,up' },
+          { buffer: 'UB', label: 'silu(gate) (store)', state: 'committed', tone: 'output', cellRange: [38, 61], sourceTile: 'silu(gate)' },
+          { buffer: 'UB', label: 'silu(gate) (reload)', state: 'loaded', tone: 'input', cellRange: [62, 85], sourceTile: 'silu(gate)' },
+          { buffer: 'UB', label: 'mul_out', state: 'committed', tone: 'output', cellRange: [92, 115], sourceTile: 'silu(gate)*up' },
+        ],
+      },
+      after: {
+        metrics: ['kernel 1', 'HBM 往返 0 次'],
+        notes: ['SiLU 后立即逐元素相乘', '中间结果不写回'],
+        blocks: [
+          { buffer: 'UB', label: 'gate/up (load)', state: 'loaded', tone: 'input', cellRange: [0, 29], sourceTile: 'gate,up' },
+          { buffer: 'UB', label: 'silu(gate) (no store)', state: 'avoided', tone: 'input', cellRange: [38, 61], sourceTile: 'silu(gate)' },
+          { buffer: 'UB', label: 'mul_out', state: 'committed', tone: 'output', cellRange: [92, 115], sourceTile: 'silu(gate)*up' },
+        ],
+      },
+    },
+    qkv_merge: {
+      name: 'QKV 合并投影',
+      flow: 'hidden → GEMM(QKV) → split → Q,K,V',
+      before: {
+        metrics: ['kernel 3', 'HBM 读输入 3 次'],
+        notes: ['Q/K/V 各自 GEMM 反复读取同一 hidden', '启动与权重访存开销叠加'],
+        blocks: [
+          { buffer: 'UB', label: 'hidden (Q load)', state: 'loaded', tone: 'input', cellRange: [0, 17], sourceTile: 'x' },
+          { buffer: 'UB', label: 'hidden (K load)', state: 'loaded', tone: 'input', cellRange: [18, 35], sourceTile: 'x' },
+          { buffer: 'UB', label: 'hidden (V load)', state: 'loaded', tone: 'input', cellRange: [36, 53], sourceTile: 'x' },
+          { buffer: 'UB', label: 'Q', state: 'committed', tone: 'output', cellRange: [64, 75], sourceTile: 'Q' },
+          { buffer: 'UB', label: 'K', state: 'committed', tone: 'output', cellRange: [76, 87], sourceTile: 'K' },
+          { buffer: 'UB', label: 'V', state: 'committed', tone: 'output', cellRange: [88, 99], sourceTile: 'V' },
+        ],
+      },
+      after: {
+        metrics: ['kernel 1', 'HBM 读输入 1 次'],
+        notes: ['一次大 GEMM 产出 QKV', '更好填满 Cube + 更少启动开销'],
+        blocks: [
+          { buffer: 'UB', label: 'hidden (load)', state: 'loaded', tone: 'input', cellRange: [0, 17], sourceTile: 'x' },
+          { buffer: 'UB', label: 'hidden (avoid 2x)', state: 'avoided', tone: 'input', cellRange: [18, 35], sourceTile: 'x' },
+          { buffer: 'UB', label: 'Q', state: 'committed', tone: 'output', cellRange: [64, 75], sourceTile: 'Q' },
+          { buffer: 'UB', label: 'K', state: 'committed', tone: 'output', cellRange: [76, 87], sourceTile: 'K' },
+          { buffer: 'UB', label: 'V', state: 'committed', tone: 'output', cellRange: [88, 99], sourceTile: 'V' },
+        ],
+      },
+    },
+    flash_paged: {
+      name: 'FlashAttention + PagedKV',
+      flow: 'QK^T → online-softmax → ⊙V (PagedKV) → out',
+      before: {
+        metrics: ['S 矩阵落地', 'HBM 写大张量'],
+        notes: ['显式 materialize QK^T / softmax 分离', 'score 矩阵带来显存与带宽压力'],
+        blocks: [
+          { buffer: 'UB', label: 'Q/K tile', state: 'loaded', tone: 'input', cellRange: [0, 23], sourceTile: 'Q,K' },
+          { buffer: 'UB', label: 'Scores S (store)', state: 'committed', tone: 'output', cellRange: [38, 77], sourceTile: 'S=QK^T' },
+          { buffer: 'UB', label: 'Scores S (reload)', state: 'loaded', tone: 'input', cellRange: [78, 117], sourceTile: 'S' },
+          { buffer: 'UB', label: 'Attn out', state: 'committed', tone: 'output', cellRange: [118, 139], sourceTile: 'P·V' },
+        ],
+      },
+      after: {
+        metrics: ['online softmax', 'S 不落地'],
+        notes: ['分块计算 + online-softmax', 'PagedKV 按 block_table 寻址 KV'],
+        blocks: [
+          { buffer: 'UB', label: 'Q/K tile', state: 'loaded', tone: 'input', cellRange: [0, 23], sourceTile: 'Q,K' },
+          { buffer: 'UB', label: 'Scores S (avoided)', state: 'avoided', tone: 'input', cellRange: [38, 77], sourceTile: 'S' },
+          { buffer: 'UB', label: 'Softmax stats', state: 'accumulating', tone: 'accumulator', cellRange: [78, 93], sourceTile: 'm,l' },
+          { buffer: 'UB', label: 'Attn out', state: 'committed', tone: 'output', cellRange: [118, 139], sourceTile: 'P·V' },
+        ],
+      },
+    },
+  };
+
   const MODELS = {
     qwen3_14b: {
       name: 'Qwen3-14B',
@@ -2026,6 +2187,17 @@
     const node = NM[id];
     if (node?.kind === 'op') renderSourcePanel(node, event);
     else hideSourcePanel();
+
+    // 在算子详细面板中显示节点信息
+    if (node?.kind === 'op') {
+      renderOperatorDetailPanel(node);
+      // 切换到算子详细面板页签
+      const detailTabBtn = document.getElementById('tab-btn-details');
+      if (detailTabBtn && source === 'graph') {
+        detailTabBtn.click();
+      }
+    }
+
     if (node?.fuseRec) {
       const card = document.querySelector(`.op-rec-card[data-rec="${node.fuseRec}"]`);
       if (card) {
@@ -2034,6 +2206,108 @@
         if (source === 'graph') card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+  }
+
+  function renderOperatorDetailPanel(node) {
+    const detailContent = document.querySelector('#tab-details .op-detail-content');
+    if (!detailContent) return;
+
+    // 构建算子类型信息
+    const typeMap = {
+      'norm': '归一化',
+      'attention': '注意力',
+      'qknorm': 'QK-Norm',
+      'rope': 'RoPE',
+      'linear': 'Linear/GEMM',
+      'act': '激活',
+      'gate': 'Router',
+      'moe': 'Expert',
+      'io': 'I/O',
+      'embedding': 'Embedding'
+    };
+    const typeName = typeMap[node.sem] || node.sem || '算子';
+
+    // 生成HTML内容
+    let html = `
+      <div class="op-detail-header">
+        <div class="cardt" style="color: var(--op-sem-${node.sem})">算子详细信息</div>
+        <h2 style="font-size: 18px; font-weight: 600; margin: 8px 0;">${esc(node.label)}</h2>
+        <div style="font-size: 12px; color: var(--foreground-muted); margin-bottom: 16px;">
+          ${esc(node.typeLabel || typeName)}
+        </div>
+      </div>
+
+      <div class="cardt">基本信息</div>
+      <div class="kv">
+        <span class="k">算子类型</span>
+        <span class="v">${esc(typeName)}</span>
+      </div>
+      <div class="kv">
+        <span class="k">语义类别</span>
+        <span class="v">${esc(node.sem || 'op')}</span>
+      </div>
+      <div class="kv">
+        <span class="k">节点ID</span>
+        <span class="v" style="font-family: var(--font-mono)">${esc(node.id)}</span>
+      </div>
+    `;
+
+    // 输出形状信息
+    if (node.out) {
+      html += `
+        <div class="cardt">输出形状</div>
+        <div class="kv">
+          <span class="k">Output Shape</span>
+          <span class="v" style="font-family: var(--font-mono); color: var(--primary)">[${node.out.join(' × ')}]</span>
+        </div>
+      `;
+    }
+
+    // 性能指标
+    if (node.metric) {
+      html += `
+        <div class="cardt">性能指标</div>
+        <div class="kv">
+          <span class="k">计算量</span>
+          <span class="v">${esc(node.metric)}</span>
+        </div>
+      `;
+    }
+
+    if (node.time) {
+      html += `
+        <div class="kv">
+          <span class="k">估算时间</span>
+          <span class="v">${esc(node.time)}</span>
+        </div>
+      `;
+    }
+
+    // 描述信息
+    if (node.desc) {
+      html += `
+        <div class="cardt">描述</div>
+        <div style="font-size: 12px; line-height: 1.6; color: var(--foreground-secondary); padding: 8px 0;">
+          ${esc(node.desc)}
+        </div>
+      `;
+    }
+
+    // 融合推荐信息
+    if (node.fuseRec) {
+      const rec = FUSION_LIB[node.fuseRec];
+      if (rec) {
+        html += `
+          <div class="cardt" style="color: var(--op-fusion-accent)">融合推荐</div>
+          <div class="fitem" style="border-color: var(--op-fusion-accent); margin: 0;">
+            <h6><span class="dot" style="background: var(--op-fusion-accent)"></span>${rec.star ? '★ ' : ''}${esc(rec.title)}</h6>
+            <p>${esc(rec.reason)}</p>
+          </div>
+        `;
+      }
+    }
+
+    detailContent.innerHTML = html;
   }
 
   function clearSelection() {
@@ -2057,6 +2331,508 @@
 
   function codeBlock(title, lines) {
     return `<div class="op-code-block"><div class="op-code-block__head">${esc(title)}</div><pre>${lines.map(esc).join('\n')}</pre></div>`;
+  }
+
+  function aivVizSectionHtml(recId) {
+    const config = AIV_VIZ[recId];
+    if (!config) return '';
+    const flow = config.flow ? `<div class="op-arch-flow">${esc(config.flow)}</div>` : '';
+    return `<section class="op-detail-section">
+      <div class="op-detail-section__head">硬件视角 · Ascend 910 (AIV)</div>
+      <div class="op-arch-panel op-arch-panel--single" data-aiv-viz data-rec="${esc(recId)}" data-phase="before" role="group" aria-label="${esc(config.name)} 的数据流对照">
+        <div class="op-arch-panel__head">
+          <span class="op-arch-panel__title">${esc(config.name)}</span>
+          <span class="op-arch-toggle" role="tablist" aria-label="融合前后对比">
+            <button class="btn btn-sm op-arch-toggle__btn is-selected" type="button" role="tab" aria-selected="true" aria-pressed="true" data-aiv-toggle="before">融合前</button>
+            <button class="btn btn-sm op-arch-toggle__btn" type="button" role="tab" aria-selected="false" aria-pressed="false" data-aiv-toggle="after">融合后</button>
+          </span>
+        </div>
+        ${flow}
+        <div class="op-arch-chip-row" data-aiv-metrics></div>
+        <div class="op-aiv-surface"><div class="op-aiv-mount" data-aiv-core data-rec="${esc(recId)}"></div></div>
+        <div class="op-aiv-playback" data-aiv-playback aria-label="数据流播放控制"></div>
+        <ul class="op-arch-notes" data-aiv-notes></ul>
+        <ol class="op-arch-steps" data-aiv-steps></ol>
+      </div>
+    </section>`;
+  }
+
+  function ensureAivEnhancedStage(mount) {
+    const stage = mount?.querySelector?.('.pto-aiv-core') || null;
+    if (!stage) return null;
+    if (stage.dataset.opAivEnhanced === 'true') return stage;
+    const layout = stage.querySelector('.pto-aiv-core__layout');
+    if (!layout) return stage;
+
+    const innerVectorNode = stage.querySelector('[data-aiv-node="vector:Vector"]');
+    if (innerVectorNode && !innerVectorNode.classList.contains('op-aiv-unit')) {
+      innerVectorNode.dataset.aivNode = 'vector:VectorRF';
+    }
+
+    const hbm = document.createElement('section');
+    hbm.className = 'op-aiv-unit op-aiv-unit--hbm';
+    hbm.dataset.aivNode = 'hbm:HBM';
+    hbm.innerHTML = '<span class="op-aiv-unit__label">HBM</span><span class="op-aiv-unit__meta">Global</span>';
+    layout.insertBefore(hbm, layout.firstChild);
+
+    const vector = document.createElement('section');
+    vector.className = 'op-aiv-unit op-aiv-unit--vector';
+    vector.dataset.aivNode = 'vector:Vector';
+    vector.innerHTML = '<span class="op-aiv-unit__label">Vector</span>';
+    layout.appendChild(vector);
+
+    stage.dataset.opAivEnhanced = 'true';
+    return stage;
+  }
+
+  function ensureAivOverlay(stage) {
+    if (!stage) return null;
+    if (stage.__opAivOverlay) return stage.__opAivOverlay;
+    const svgEl = document.createElementNS(SVGNS, 'svg');
+    svgEl.setAttribute('class', 'op-aiv-overlay');
+    svgEl.setAttribute('viewBox', '0 0 10 10');
+    svgEl.setAttribute('preserveAspectRatio', 'none');
+
+    const defs = document.createElementNS(SVGNS, 'defs');
+    const marker = document.createElementNS(SVGNS, 'marker');
+    marker.setAttribute('id', 'op-aiv-flow-arrow');
+    marker.setAttribute('markerUnits', 'userSpaceOnUse');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('refX', '5.4');
+    marker.setAttribute('refY', '3');
+    marker.setAttribute('orient', 'auto');
+    const arrow = document.createElementNS(SVGNS, 'path');
+    arrow.setAttribute('d', 'M1,1 L5.4,3 L1,5');
+    arrow.setAttribute('fill', 'none');
+    arrow.setAttribute('stroke', 'currentColor');
+    arrow.setAttribute('stroke-width', '1.4');
+    arrow.setAttribute('stroke-linecap', 'round');
+    arrow.setAttribute('stroke-linejoin', 'round');
+    marker.appendChild(arrow);
+    defs.appendChild(marker);
+    svgEl.appendChild(defs);
+
+    stage.appendChild(svgEl);
+
+    const state = {
+      svg: svgEl,
+      defs,
+      paths: new Map(),
+      active: [],
+      update() {},
+    };
+
+    const edgePoint = (stageRect, nodeRect, side) => {
+      const x0 = nodeRect.left - stageRect.left;
+      const y0 = nodeRect.top - stageRect.top;
+      const w = nodeRect.width;
+      const h = nodeRect.height;
+      if (side === 'left') return { x: x0, y: y0 + h / 2 };
+      if (side === 'right') return { x: x0 + w, y: y0 + h / 2 };
+      if (side === 'top') return { x: x0 + w / 2, y: y0 };
+      if (side === 'bottom') return { x: x0 + w / 2, y: y0 + h };
+      return { x: x0 + w / 2, y: y0 + h / 2 };
+    };
+
+    const chooseSides = (fromRect, toRect) => {
+      const fromCx = fromRect.left + fromRect.width / 2;
+      const toCx = toRect.left + toRect.width / 2;
+      const fromCy = fromRect.top + fromRect.height / 2;
+      const toCy = toRect.top + toRect.height / 2;
+      if (Math.abs(fromCx - toCx) >= Math.abs(fromCy - toCy)) {
+        return fromCx < toCx ? ['right', 'left'] : ['left', 'right'];
+      }
+      return fromCy < toCy ? ['bottom', 'top'] : ['top', 'bottom'];
+    };
+
+    const pathFor = (fromPoint, toPoint) => {
+      const midX = (fromPoint.x + toPoint.x) / 2;
+      return `M ${fromPoint.x} ${fromPoint.y} L ${midX} ${fromPoint.y} L ${midX} ${toPoint.y} L ${toPoint.x} ${toPoint.y}`;
+    };
+
+    const update = () => {
+      const stageRect = stage.getBoundingClientRect();
+      svgEl.setAttribute('viewBox', `0 0 ${Math.max(1, stageRect.width)} ${Math.max(1, stageRect.height)}`);
+      (state.active || []).forEach(({ from, to }) => {
+        const fromEl = stage.querySelector(`[data-aiv-node="${CSS.escape(from)}"]`);
+        const toEl = stage.querySelector(`[data-aiv-node="${CSS.escape(to)}"]`);
+        const pathEl = state.paths.get(`${from}__${to}`);
+        if (!fromEl || !toEl || !pathEl) return;
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const [fromSide, toSide] = chooseSides(fromRect, toRect);
+        const fromPoint = edgePoint(stageRect, fromRect, fromSide);
+        const toPoint = edgePoint(stageRect, toRect, toSide);
+        pathEl.setAttribute('d', pathFor(fromPoint, toPoint));
+      });
+    };
+
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+    ro?.observe(stage);
+    stage.querySelectorAll('[data-aiv-node]').forEach((el) => ro?.observe(el));
+    requestAnimationFrame(() => requestAnimationFrame(update));
+
+    state.update = update;
+    state.destroy = () => ro?.disconnect();
+
+    stage.__opAivOverlay = state;
+    return state;
+  }
+
+  function ensureAivDriver(mount) {
+    if (mount?.__opAivDriver) return mount.__opAivDriver;
+    const stage = ensureAivEnhancedStage(mount);
+    if (!stage) return null;
+    const overlay = ensureAivOverlay(stage);
+
+    const clearNodeHighlights = () => {
+      stage.querySelectorAll('[data-aiv-node]').forEach((el) => el.classList.remove('is-highlighted'));
+    };
+
+    const highlightNodes = (nodeIds = []) => {
+      const set = new Set((Array.isArray(nodeIds) ? nodeIds : []).map(String));
+      stage.querySelectorAll('[data-aiv-node]').forEach((el) => {
+        el.classList.toggle('is-highlighted', set.has(el.dataset.aivNode));
+      });
+    };
+
+    const clearMarkers = () => {
+      stage.querySelectorAll('.op-aiv-markers').forEach((node) => node.remove());
+    };
+
+    const setNodeMarkers = (markers = []) => {
+      clearMarkers();
+      (Array.isArray(markers) ? markers : []).forEach((marker) => {
+        const nodeKey = marker?.node || marker?.target;
+        const label = marker?.label;
+        if (!nodeKey || !label) return;
+        const target = stage.querySelector(`[data-aiv-node="${CSS.escape(String(nodeKey))}"]`);
+        if (!target) return;
+        const stack = document.createElement('div');
+        stack.className = 'op-aiv-markers';
+        const tone = String(marker.tone || 'note').toLowerCase();
+        const chip = document.createElement('span');
+        chip.className = `op-aiv-marker is-tone-${tone}`;
+        chip.textContent = String(label);
+        if (marker.title) chip.title = String(marker.title);
+        stack.appendChild(chip);
+        target.appendChild(stack);
+      });
+    };
+
+    const clearActiveRoutes = () => {
+      if (!overlay) return;
+      overlay.active = [];
+      overlay.paths.forEach((pathEl) => {
+        pathEl.classList.remove('is-active', 'is-flow');
+      });
+      overlay.update();
+    };
+
+    const setActiveRoutes = (routes = [], options = {}) => {
+      if (!overlay) return;
+      const animate = options.animate !== false;
+      clearActiveRoutes();
+      const list = (Array.isArray(routes) ? routes : [])
+        .map((route) => Array.isArray(route) ? { from: route[0], to: route[1] } : route)
+        .filter((route) => route && route.from && route.to)
+        .map((route) => ({ from: String(route.from), to: String(route.to) }));
+
+      overlay.active = list;
+
+      list.forEach(({ from, to }) => {
+        const key = `${from}__${to}`;
+        let pathEl = overlay.paths.get(key);
+        if (!pathEl) {
+          pathEl = document.createElementNS(SVGNS, 'path');
+          pathEl.setAttribute('fill', 'none');
+          pathEl.setAttribute('stroke-width', '2.2');
+          pathEl.setAttribute('stroke-linecap', 'round');
+          pathEl.setAttribute('stroke-linejoin', 'round');
+          pathEl.setAttribute('marker-end', 'url(#op-aiv-flow-arrow)');
+          pathEl.dataset.from = from;
+          pathEl.dataset.to = to;
+          overlay.svg.appendChild(pathEl);
+          overlay.paths.set(key, pathEl);
+        }
+        pathEl.classList.add('is-active');
+        if (animate) pathEl.classList.add('is-flow');
+      });
+
+      overlay.update();
+    };
+
+    const driver = {
+      stage,
+      overlay,
+      clearNodeHighlights,
+      highlightNodes,
+      setNodeMarkers,
+      clearActiveRoutes,
+      setActiveRoutes,
+    };
+    mount.__opAivDriver = driver;
+    return driver;
+  }
+
+  function hydrateAivViz(root) {
+    const helper = window.PtoAivCorePattern;
+    if (!helper || !root) return;
+    root.querySelectorAll('[data-aiv-viz]').forEach((panel) => {
+      const playbackHelper = window.PtoFloatingPlaybackControl;
+      const recId = panel.dataset.rec;
+      if (!recId || !AIV_VIZ[recId]) return;
+      const mount = panel.querySelector('[data-aiv-core]');
+      const playbackMount = panel.querySelector('[data-aiv-playback]');
+      const metricsRow = panel.querySelector('[data-aiv-metrics]');
+      const notesList = panel.querySelector('[data-aiv-notes]');
+      const stepsList = panel.querySelector('[data-aiv-steps]');
+      const playbackStateKey = `aivPlaybackState_${recId}`;
+
+      const applyPhase = (phase) => {
+        const resolvedPhase = phase === 'after' ? 'after' : 'before';
+        panel.dataset.phase = resolvedPhase;
+
+        panel.querySelectorAll('[data-aiv-toggle]').forEach((btn) => {
+          const active = btn.dataset.aivToggle === resolvedPhase;
+          btn.classList.toggle('is-selected', active);
+          btn.setAttribute('aria-selected', String(active));
+          btn.setAttribute('aria-pressed', String(active));
+        });
+
+        const phaseConfig = AIV_VIZ[recId]?.[resolvedPhase];
+        if (!phaseConfig) return;
+        const steps = Array.isArray(phaseConfig.steps) ? phaseConfig.steps : [];
+
+        if (metricsRow) {
+          metricsRow.innerHTML = (phaseConfig.metrics || [])
+            .map((text) => `<span class="op-arch-chip">${esc(text)}</span>`)
+            .join('');
+        }
+        if (notesList) {
+          notesList.innerHTML = (phaseConfig.notes || [])
+            .map((text) => `<li>${esc(text)}</li>`)
+            .join('');
+        }
+        if (stepsList) {
+          stepsList.innerHTML = (phaseConfig.steps || [])
+            .map((step, index) => `<li class="op-arch-step" data-aiv-step="${index}">
+              <button class="btn btn-ghost op-arch-step__btn" type="button" data-aiv-step-btn="${index}">${esc(step.title || '')}</button>
+            </li>`)
+            .join('');
+        }
+        if (mount) {
+          if (mount.dataset.aivRendered !== 'true') {
+            helper.render(mount, 'aivOfficialV1');
+            mount.dataset.aivRendered = 'true';
+          }
+          const driver = ensureAivDriver(mount);
+          helper.setBufferBlocks(mount, phaseConfig.blocks || []);
+          driver?.setNodeMarkers(phaseConfig.markers || []);
+          driver?.highlightNodes([]);
+          driver?.clearActiveRoutes();
+        }
+
+        if (playbackMount) {
+          playbackMount.innerHTML = '';
+          delete playbackMount.dataset.aivPlaybackReady;
+          delete panel.dataset.aivPlaybackIds;
+        }
+
+        const state = panel[playbackStateKey] || { step: 0, playing: false, timer: null };
+        panel[playbackStateKey] = state;
+        state.step = 0;
+        state.playing = false;
+        if (state.timer) {
+          clearInterval(state.timer);
+          state.timer = null;
+        }
+
+        const ensurePlaybackControl = () => {
+          if (!playbackHelper || !playbackMount) return null;
+          if (playbackMount.dataset.aivPlaybackReady === 'true') return playbackMount.firstElementChild || playbackMount;
+          const uid = `${recId}_${Math.random().toString(16).slice(2)}`;
+          const ids = {
+            shell: `floating-shell-${uid}`,
+            toggle: `floating-toggle-${uid}`,
+            collapsedButton: `floating-collapsed-btn-${uid}`,
+            collapsedIcon: `floating-collapsed-icon-${uid}`,
+            controls: `controls-row-${uid}`,
+            stepBack: `step-back-btn-${uid}`,
+            play: `play-btn-${uid}`,
+            stepForward: `step-fwd-btn-${uid}`,
+            replay: `replay-btn-${uid}`,
+            scrubber: `scrubber-${uid}`,
+            scrubberLabel: `scrubber-label-${uid}`,
+            scrubberOpname: `scrubber-opname-${uid}`,
+            scrubberHover: `scrubber-hover-${uid}`,
+          };
+          panel.dataset.aivPlaybackIds = JSON.stringify(ids);
+          const control = playbackHelper.createControl({
+            className: 'pto-floating-playback--preview op-aiv-playback__control',
+            ids,
+            showTimeline: true,
+          });
+          playbackMount.innerHTML = '';
+          playbackMount.appendChild(control);
+          playbackHelper.init({ root: control, isPlaying: () => state.playing });
+          playbackHelper.initScrubberHover({
+            root: control,
+            getTotalSteps: () => steps.length || 1,
+            getLabelForStep: (nextStep) => steps[nextStep]?.title || `Step ${nextStep + 1}`,
+          });
+          playbackMount.dataset.aivPlaybackReady = 'true';
+          return control;
+        };
+
+        const applyStep = (nextStep, options = {}) => {
+          if (!mount) return;
+          const driver = ensureAivDriver(mount);
+          const clamped = Math.max(0, Math.min(steps.length - 1, Number(nextStep) || 0));
+          state.step = clamped;
+          const step = steps[clamped];
+          driver?.highlightNodes(step?.nodes || []);
+          driver?.setActiveRoutes(step?.routes || [], { animate: true });
+
+          if (stepsList) {
+            stepsList.querySelectorAll('[data-aiv-step]').forEach((row) => {
+              row.classList.toggle('is-selected', Number(row.dataset.aivStep) === clamped);
+            });
+          }
+
+          const control = ensurePlaybackControl();
+          const ids = panel.dataset.aivPlaybackIds ? JSON.parse(panel.dataset.aivPlaybackIds) : null;
+          if (control && ids) {
+            const scrubber = control.querySelector(`#${ids.scrubber}`);
+            const label = control.querySelector(`#${ids.scrubberLabel}`);
+            const opname = control.querySelector(`#${ids.scrubberOpname}`);
+            const playBtn = control.querySelector(`#${ids.play}`);
+            if (scrubber) {
+              scrubber.max = String(Math.max(0, steps.length - 1));
+              scrubber.value = String(clamped);
+            }
+            if (label) label.textContent = `${clamped + 1} / ${Math.max(1, steps.length)}`;
+            if (opname) opname.textContent = (step?.title || '').replace(/^\d+\)\s*/, '');
+            if (playBtn) playBtn.innerHTML = state.playing ? playbackHelper.iconLabel('pause', 'Pause') : playbackHelper.iconLabel('play', 'Play');
+          }
+
+          if (!options.silent) {
+            const status = els?.statusLeft;
+            if (status) status.textContent = `${AIV_VIZ[recId].name} · ${resolvedPhase === 'before' ? '融合前' : '融合后'} · Step ${clamped + 1}/${Math.max(1, steps.length)}`;
+          }
+        };
+
+        const bindPlaybackEvents = () => {
+          const control = ensurePlaybackControl();
+          const ids = panel.dataset.aivPlaybackIds ? JSON.parse(panel.dataset.aivPlaybackIds) : null;
+          if (!control || !ids) return;
+          if (control.dataset.aivPlaybackBound === 'true') return;
+
+          const playBtn = control.querySelector(`#${ids.play}`);
+          const backBtn = control.querySelector(`#${ids.stepBack}`);
+          const forwardBtn = control.querySelector(`#${ids.stepForward}`);
+          const replayBtn = control.querySelector(`#${ids.replay}`);
+          const scrubber = control.querySelector(`#${ids.scrubber}`);
+
+          const stop = () => {
+            state.playing = false;
+            if (state.timer) {
+              clearInterval(state.timer);
+              state.timer = null;
+            }
+          };
+
+          const tick = () => {
+            if (steps.length <= 0) return;
+            if (state.step >= steps.length - 1) {
+              stop();
+              applyStep(state.step);
+              return;
+            }
+            applyStep(state.step + 1);
+          };
+
+          const start = () => {
+            stop();
+            state.playing = true;
+            state.timer = setInterval(tick, 1200);
+          };
+
+          playBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (state.playing) stop();
+            else start();
+            applyStep(state.step);
+          });
+          backBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            stop();
+            applyStep(state.step - 1);
+          });
+          forwardBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            stop();
+            applyStep(state.step + 1);
+          });
+          replayBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            stop();
+            applyStep(0);
+          });
+          scrubber?.addEventListener('input', (event) => {
+            event.stopPropagation();
+            stop();
+            applyStep(Number(scrubber.value) || 0);
+          });
+
+          control.dataset.aivPlaybackBound = 'true';
+        };
+
+        bindPlaybackEvents();
+        applyStep(0, { silent: true });
+
+        if (stepsList && mount) {
+          stepsList.querySelectorAll('[data-aiv-step-btn]').forEach((button) => {
+            const stepIndex = Number(button.dataset.aivStepBtn);
+            const step = phaseConfig.steps?.[stepIndex];
+            const nodes = Array.isArray(step?.nodes) ? step.nodes : [];
+            const highlight = () => {
+              const driver = ensureAivDriver(mount);
+              driver?.highlightNodes(nodes);
+              driver?.setActiveRoutes(step?.routes || [], { animate: true });
+            };
+            const clear = () => {
+              const driver = ensureAivDriver(mount);
+              driver?.highlightNodes([]);
+              driver?.clearActiveRoutes();
+            };
+            button.addEventListener('mouseenter', highlight);
+            button.addEventListener('mouseleave', clear);
+            button.addEventListener('focus', highlight);
+            button.addEventListener('blur', clear);
+            button.addEventListener('click', (event) => {
+              event.stopPropagation();
+              panel[playbackStateKey].playing = false;
+              if (panel[playbackStateKey].timer) {
+                clearInterval(panel[playbackStateKey].timer);
+                panel[playbackStateKey].timer = null;
+              }
+              applyStep(Number(button.dataset.aivStepBtn) || 0);
+            });
+          });
+        }
+      };
+
+      panel.querySelectorAll('[data-aiv-toggle]').forEach((btn) => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          applyPhase(btn.dataset.aivToggle);
+        });
+      });
+
+      applyPhase(panel.dataset.phase || 'before');
+    });
   }
 
   function renderRecommendations(model) {
@@ -2106,6 +2882,7 @@
             <div class="op-detail-section__head">推荐理由</div>
             <div class="op-reason">${rec.reason}</div>
           </section>
+          ${aivVizSectionHtml(id)}
           <section class="op-detail-section">
             <div class="op-detail-section__head">代码对照 · vLLM -> Ascend</div>
             <div class="op-code-grid">${codeBlock('V · vLLM 原始实现', rec.vllm)}${codeBlock('A · 昇腾融合算子', rec.asc)}</div>
@@ -2154,6 +2931,7 @@
         else highlightRecommendation(chip.dataset.rec);
       });
     });
+    hydrateAivViz(els.rbody);
   }
 
   function syncExpander(card) {
@@ -2325,6 +3103,37 @@
     els.sourceClose?.addEventListener('click', hideSourcePanel);
     renderThemeToggle();
     initCursorFollow();
+
+    // 页签切换交互
+    const tabButtons = document.querySelectorAll('.op-tab[role="tab"]');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('aria-controls');
+        const targetPanel = document.getElementById(targetId);
+
+        if (!targetPanel) return;
+
+        // 更新所有页签按钮状态
+        tabButtons.forEach(b => {
+          b.classList.remove('is-active');
+          b.setAttribute('aria-selected', 'false');
+        });
+
+        // 激活当前页签
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-selected', 'true');
+
+        // 更新所有面板状态
+        document.querySelectorAll('.op-tab-panel').forEach(panel => {
+          panel.classList.remove('is-active');
+          panel.setAttribute('hidden', '');
+        });
+
+        // 显示目标面板
+        targetPanel.classList.add('is-active');
+        targetPanel.removeAttribute('hidden');
+      });
+    });
 
     els.zin.addEventListener('click', () => {
       view.z = Math.min(2.4, view.z * 1.18);
