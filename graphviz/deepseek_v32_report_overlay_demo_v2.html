@@ -450,6 +450,60 @@
       min-height: 0 !important;
     }
 
+    .architecture-pane-root .logo_8738e552-e764-4a57-839a-6321bc3ae7d3,
+    .architecture-pane-root .source-validation_8738e552-e764-4a57-839a-6321bc3ae7d3,
+    .architecture-pane-root .modelviz-toolbar_8738e552-e764-4a57-839a-6321bc3ae7d3 {
+      display: none !important;
+    }
+
+    .architecture-pane-root {
+      --deepseek-side-node-fill: #313131;
+      --deepseek-side-node-stroke: #6f6f6f;
+      --deepseek-side-node-text: rgba(255, 255, 255, 0.88);
+      --deepseek-side-node-muted: rgba(255, 255, 255, 0.48);
+      --deepseek-side-edge: rgba(255, 255, 255, 0.66);
+    }
+
+    .architecture-pane-root .deepseek-side-input-layer {
+      pointer-events: none;
+    }
+
+    .architecture-pane-root .deepseek-side-input-edge {
+      fill: none;
+      stroke: var(--deepseek-side-edge);
+      stroke-width: 1.25px;
+      stroke-dasharray: 7 7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .architecture-pane-root .deepseek-side-input-node rect {
+      fill: var(--deepseek-side-node-fill);
+      stroke: var(--deepseek-side-node-stroke);
+      stroke-width: 0.9px;
+      rx: 7px;
+      ry: 7px;
+    }
+
+    .architecture-pane-root .deepseek-side-input-node text {
+      font-family: var(--font-sans);
+      text-anchor: middle;
+      dominant-baseline: central;
+      letter-spacing: 0;
+    }
+
+    .architecture-pane-root .deepseek-side-input-label {
+      fill: var(--deepseek-side-node-text);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .architecture-pane-root .deepseek-side-input-type {
+      fill: var(--deepseek-side-node-muted);
+      font-size: 8px;
+      font-weight: var(--font-weight-medium);
+    }
+
     .architecture-pane-root .popup_8738e552-e764-4a57-839a-6321bc3ae7d3 {
       width: min(520px, calc(100% - 32px)) !important;
       min-width: min(320px, calc(100% - 32px)) !important;
@@ -1126,6 +1180,19 @@
       const COLLAPSE_CLASS = "collapse-button_8738e552-e764-4a57-839a-6321bc3ae7d3";
       const COLLAPSE_ICON_CLASS = "collapse-icon_8738e552-e764-4a57-839a-6321bc3ae7d3";
       const POPUP_ID = "popup_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const GRAPH_ID = "graph_8738e552-e764-4a57-839a-6321bc3ae7d3";
+      const SIDE_LAYER_CLASS = "deepseek-side-input-layer";
+
+      const sideInputs = [
+        { id: "embedding-weight", label: "Embedding Weight", typeLabel: "Parameter", side: "left", targets: ["Parallel Embedding"] },
+        { id: "attention-proj-weights", label: "Attention Projection Weights", typeLabel: "Parameter", side: "left", targets: ["Query Projection Path", "KV Projection Path", "Attention Output Linear"] },
+        { id: "dense-mlp-weights", label: "Dense MLP Weights", typeLabel: "Parameter", side: "left", targets: ["MLP Gate and Up Linear", "MLP Down Linear"] },
+        { id: "router-weight", label: "Router Weight", typeLabel: "Parameter", side: "left", targets: ["Router Linear"] },
+        { id: "routed-expert-weights", label: "Routed Expert Weights", typeLabel: "Parameter", side: "left", targets: ["Routed Experts"] },
+        { id: "shared-expert-weight", label: "Shared Expert Weight", typeLabel: "Parameter", side: "left", targets: ["Shared Expert"] },
+        { id: "lm-head-weight", label: "LM Head Weight", typeLabel: "Parameter", side: "left", targets: ["LM Head Linear"] },
+        { id: "rope-cache", label: "RoPE Cache", typeLabel: "State", side: "right", targets: ["Query Projection Path"] }
+      ];
 
       const state = {
         data: null,
@@ -1140,6 +1207,7 @@
         sourceDimEnabled: false,
         observer: null,
         decorateTimer: 0,
+        sideInputTimer: 0,
         focusRequestToken: 0,
         activeLeftTab: "streams",
         playbackPlaying: false,
@@ -2185,6 +2253,224 @@
         return node;
       }
 
+      function graphSvg() {
+        return els.architectureRoot.querySelector(`#${GRAPH_ID} svg`) || els.architectureRoot.querySelector("svg");
+      }
+
+      function graphInner(svg) {
+        return svg?.querySelector(":scope > g") || null;
+      }
+
+      function renderedNodeLabel(group) {
+        return (group.querySelector(`.${LABEL_CLASS}`)?.textContent || "").trim();
+      }
+
+      function renderedNodeBounds(group) {
+        const data = Array.isArray(group.__data__) ? group.__data__[1] : null;
+        if (data?.position) {
+          return {
+            cx: Number(data.position.x),
+            cy: Number(data.position.y),
+            width: Number(data.width) || 150,
+            height: Number(data.height) || 38
+          };
+        }
+
+        const box = groupBounds(group);
+        if (!box) return null;
+        return {
+          cx: box.x + box.width / 2,
+          cy: box.y + box.height / 2,
+          width: box.width || 150,
+          height: box.height || 38
+        };
+      }
+
+      function findSideTargets(labels) {
+        const wanted = new Set(labels.map((label) => label.toLowerCase()));
+        return graphGroups().filter((group) => {
+          return group.classList.contains(NODE_CLASS) && wanted.has(renderedNodeLabel(group).toLowerCase());
+        });
+      }
+
+      function getSideInputWidth(label) {
+        return Math.max(166, Math.min(252, label.length * 6.8 + 60));
+      }
+
+      function snapSideInputY(value) {
+        return Math.round(value / 56) * 56;
+      }
+
+      function sideTargetAggregate(boundsList) {
+        const minLeft = Math.min(...boundsList.map((item) => item.cx - item.width / 2));
+        const maxRight = Math.max(...boundsList.map((item) => item.cx + item.width / 2));
+        const avgY = boundsList.reduce((sum, item) => sum + item.cy, 0) / boundsList.length;
+        return { minLeft, maxRight, avgY };
+      }
+
+      function sideInputGraphBounds() {
+        const bounds = graphGroups().map(renderedNodeBounds).filter(Boolean);
+        if (!bounds.length) return null;
+        return {
+          minLeft: Math.min(...bounds.map((item) => item.cx - item.width / 2)),
+          maxRight: Math.max(...bounds.map((item) => item.cx + item.width / 2))
+        };
+      }
+
+      function computeSideInputPlacements(entries) {
+        const bySide = new Map();
+        const graphBounds = sideInputGraphBounds();
+        entries.forEach((entry) => {
+          const side = entry.config.side || "left";
+          if (!bySide.has(side)) bySide.set(side, []);
+          bySide.get(side).push(entry);
+        });
+
+        bySide.forEach((sideEntries) => {
+          const side = sideEntries[0]?.config.side || "left";
+          const laneGap = 116;
+          const maxWidth = Math.max(...sideEntries.map((entry) => entry.width));
+          const minLeft = Math.min(...sideEntries.map((entry) => entry.aggregate.minLeft));
+          const maxRight = Math.max(...sideEntries.map((entry) => entry.aggregate.maxRight));
+          const laneX = side === "right"
+            ? maxRight + laneGap + maxWidth / 2
+            : minLeft - laneGap - maxWidth / 2;
+          const clampedLaneX = graphBounds
+            ? (side === "right"
+              ? Math.min(laneX, graphBounds.maxRight - maxWidth / 2 - 28)
+              : Math.max(laneX, graphBounds.minLeft + maxWidth / 2 + 28))
+            : laneX;
+
+          sideEntries.sort((a, b) => a.baseY - b.baseY);
+          const spacing = 64;
+          sideEntries.forEach((entry) => {
+            entry.x = clampedLaneX;
+            entry.y = snapSideInputY(entry.baseY);
+          });
+
+          for (let i = 1; i < sideEntries.length; i += 1) {
+            if (sideEntries[i].y - sideEntries[i - 1].y < spacing) {
+              sideEntries[i].y = sideEntries[i - 1].y + spacing;
+            }
+          }
+          for (let i = sideEntries.length - 2; i >= 0; i -= 1) {
+            if (sideEntries[i + 1].y - sideEntries[i].y < spacing) {
+              sideEntries[i].y = sideEntries[i + 1].y - spacing;
+            }
+          }
+        });
+      }
+
+      function ensureSideInputMarker(svg) {
+        let defs = svg.querySelector("defs");
+        if (!defs) {
+          defs = svgElement("defs");
+          svg.insertBefore(defs, svg.firstChild);
+        }
+
+        const markerId = "deepseek-side-input-arrow";
+        let marker = defs.querySelector(`#${markerId}`);
+        if (!marker) {
+          marker = svgElement("marker", {
+            id: markerId,
+            viewBox: "0 -4 8 8",
+            refX: 7,
+            refY: 0,
+            markerWidth: 5,
+            markerHeight: 5,
+            orient: "auto"
+          });
+          marker.appendChild(svgElement("path", {
+            d: "M0,-4L8,0L0,4",
+            fill: "var(--deepseek-side-edge)"
+          }));
+          defs.appendChild(marker);
+        }
+        return markerId;
+      }
+
+      function sideInputEdgePath(fromX, fromY, toX, toY, side) {
+        const gap = Math.abs(toX - fromX);
+        const curve = Math.max(52, Math.min(140, gap * 0.45));
+        const c1x = side === "right" ? fromX - curve : fromX + curve;
+        const c2x = side === "right" ? toX + curve : toX - curve;
+        return `M ${fromX} ${fromY} C ${c1x} ${fromY}, ${c2x} ${toY}, ${toX} ${toY}`;
+      }
+
+      function drawSideInput(layer, entry, markerId) {
+        const config = entry.config;
+        const side = config.side || "left";
+        const width = entry.width;
+        const height = 38;
+        const cx = entry.x;
+        const cy = entry.y;
+
+        const node = svgElement("g", {
+          class: "deepseek-side-input-node",
+          "data-side-input-id": config.id,
+          transform: `translate(${cx}, ${cy})`
+        });
+        node.appendChild(svgElement("rect", {
+          x: -width / 2,
+          y: -height / 2,
+          width,
+          height
+        }));
+        node.appendChild(svgElement("text", { class: "deepseek-side-input-label", x: 0, y: -5 }, config.label));
+        node.appendChild(svgElement("text", { class: "deepseek-side-input-type", x: 0, y: 10 }, config.typeLabel));
+
+        entry.boundsList.forEach((target) => {
+          const fromX = side === "right" ? cx - width / 2 : cx + width / 2;
+          const toX = side === "right" ? target.cx + target.width / 2 + 3 : target.cx - target.width / 2 - 3;
+          layer.appendChild(svgElement("path", {
+            class: "deepseek-side-input-edge",
+            d: sideInputEdgePath(fromX, cy, toX, target.cy, side),
+            "marker-end": `url(#${markerId})`
+          }));
+        });
+
+        layer.appendChild(node);
+      }
+
+      function augmentSideInputs() {
+        const svg = graphSvg();
+        const inner = graphInner(svg);
+        if (!svg || !inner || !graphGroups().length) return;
+
+        inner.querySelectorAll(`.${SIDE_LAYER_CLASS}`).forEach((node) => node.remove());
+
+        const markerId = ensureSideInputMarker(svg);
+        const layer = svgElement("g", {
+          class: SIDE_LAYER_CLASS,
+          "aria-hidden": "true"
+        });
+
+        const entries = sideInputs.map((config) => {
+          const targets = findSideTargets(config.targets);
+          if (!targets.length) return null;
+          const boundsList = targets.map(renderedNodeBounds).filter(Boolean);
+          if (!boundsList.length) return null;
+          const aggregate = sideTargetAggregate(boundsList);
+          return {
+            config,
+            aggregate,
+            boundsList,
+            width: getSideInputWidth(config.label),
+            baseY: aggregate.avgY,
+            y: aggregate.avgY
+          };
+        }).filter(Boolean);
+
+        computeSideInputPlacements(entries);
+        entries.forEach((entry) => drawSideInput(layer, entry, markerId));
+        inner.appendChild(layer);
+      }
+
+      function scheduleAugmentSideInputs() {
+        window.clearTimeout(state.sideInputTimer);
+        state.sideInputTimer = window.setTimeout(augmentSideInputs, 120);
+      }
+
       function estimateTextWidth(text, minWidth, maxWidth) {
         return Math.max(minWidth, Math.min(maxWidth, String(text).length * 5.8 + 18));
       }
@@ -2405,6 +2691,7 @@
         window.clearTimeout(state.decorateTimer);
         state.decorateTimer = window.setTimeout(() => {
           decorateSourceGraph();
+          augmentSideInputs();
           applySelectedState();
         }, 80);
       }
@@ -2520,7 +2807,14 @@
 
       function installSourceObserver() {
         state.observer?.disconnect();
-        state.observer = new MutationObserver(scheduleDecorate);
+        state.observer = new MutationObserver((mutations) => {
+          const onlySideLayer = mutations.every((mutation) => {
+            return Array.from(mutation.addedNodes)
+              .concat(Array.from(mutation.removedNodes))
+              .every((node) => node.nodeType === 1 && node.classList?.contains(SIDE_LAYER_CLASS));
+          });
+          if (!onlySideLayer) scheduleDecorate();
+        });
         state.observer.observe(els.architectureRoot, {
           childList: true,
           subtree: true
@@ -2534,6 +2828,7 @@
           els.architectureLoading?.remove();
           installSourceObserver();
           decorateSourceGraph();
+          augmentSideInputs();
           applySelectedState();
           updateCounts();
           setStatus("inline architecture graph ready");
@@ -2547,6 +2842,120 @@
           return;
         }
         window.setTimeout(() => waitForSourceGraph(attempt + 1), 120);
+      }
+
+      function injectSourceGraphLayoutConstraints(html) {
+        const createGraphMarker = "    function createGraph(graphvizData) {";
+        const renderMarker = "            createGraph(extractedGraphData);";
+
+        const postLayout = [
+          '    function applyGalleryVerticalSpine(graphvizData) {',
+          '        const nodes = graphvizData.nodes || {};',
+          '        const clusters = graphvizData.clusters || {};',
+          '        const ids = {',
+          '            ffnChoice: "dsv32arch_ffn_choice_710c2f62",',
+          '            denseDown: "dsv32arch_dense_w2_8e01455d",',
+          '            moeSum: "dsv32arch_moe_sum_50118d9a",',
+          '            blockOut: "dsv32arch_block_out_821a34da",',
+          '            finalNorm: "dsv32arch_final_norm_2010d80f",',
+          '            lmHead: "dsv32arch_lm_head_2b98b847",',
+          '            logits: "dsv32arch_logits_c7d6c722"',
+          '        };',
+          '        const ffnChoice = nodes[ids.ffnChoice];',
+          '        const blockOut = nodes[ids.blockOut];',
+          '        if (!ffnChoice || !blockOut) return;',
+          '',
+          '        const blockInSources = graphvizData.edges',
+          '            .filter((edge) => edge.target === ids.blockOut && nodes[edge.source])',
+          '            .map((edge) => nodes[edge.source]);',
+          '        const visibleBranchNodes = [',
+          '            ...blockInSources,',
+          '            nodes[ids.denseDown],',
+          '            nodes[ids.moeSum],',
+          '            nodes[ids.ffnChoice]',
+          '        ].filter(Boolean);',
+          '        const branchBottom = Math.max(...visibleBranchNodes.map((node) => node.position.y + node.height / 2));',
+          '        const centerX = ffnChoice.position.x;',
+          '        const firstY = branchBottom + blockOut.height / 2 + 78;',
+          '        const sequence = [',
+          '            [ids.blockOut, firstY],',
+          '            [ids.finalNorm, firstY + 90],',
+          '            [ids.lmHead, firstY + 180],',
+          '            [ids.logits, firstY + 270]',
+          '        ];',
+          '        sequence.forEach(([nodeId, y]) => {',
+          '            if (!nodes[nodeId]) return;',
+          '            nodes[nodeId].position.x = centerX;',
+          '            nodes[nodeId].position.y = y;',
+          '        });',
+          '',
+          '        function includeNodes(clusterId, nodeIds, pad = 44) {',
+          '            const cluster = clusters[clusterId];',
+          '            if (!cluster || !cluster.bb) return;',
+          '            let [x1, y1, x2, y2] = cluster.bb.split(",").map(Number);',
+          '            nodeIds.forEach((nodeId) => {',
+          '                const node = nodes[nodeId];',
+          '                if (!node) return;',
+          '                x1 = Math.min(x1, node.position.x - node.width / 2 - pad);',
+          '                y1 = Math.min(y1, node.position.y - node.height / 2 - pad);',
+          '                x2 = Math.max(x2, node.position.x + node.width / 2 + pad);',
+          '                y2 = Math.max(y2, node.position.y + node.height / 2 + pad);',
+          '            });',
+          '            cluster.bb = [x1, y1, x2, y2].join(",");',
+          '        }',
+          '        includeNodes("dsv32arch_block_0214b4b3", [ids.blockOut]);',
+          '        includeNodes("dsv32arch_transformer_9236e026", [ids.blockOut, ids.finalNorm, ids.lmHead]);',
+          '',
+          '        function anchor(node, side) {',
+          '            const cx = node.position.x;',
+          '            const cy = node.position.y;',
+          '            if (side === "left") return { x: cx - node.width / 2, y: cy };',
+          '            if (side === "right") return { x: cx + node.width / 2, y: cy };',
+          '            if (side === "top") return { x: cx, y: cy - node.height / 2 };',
+          '            return { x: cx, y: cy + node.height / 2 };',
+          '        }',
+          '',
+          '        function reroute(sourceId, targetId) {',
+          '            const source = nodes[sourceId];',
+          '            const target = nodes[targetId];',
+          '            if (!source || !target) return;',
+          '            const dx = target.position.x - source.position.x;',
+          '            const dy = target.position.y - source.position.y;',
+          '            const vertical = Math.abs(dy) >= Math.abs(dx);',
+          '            const start = vertical',
+          '                ? anchor(source, dy >= 0 ? "bottom" : "top")',
+          '                : anchor(source, dx >= 0 ? "right" : "left");',
+          '            const end = vertical',
+          '                ? anchor(target, dy >= 0 ? "top" : "bottom")',
+          '                : anchor(target, dx >= 0 ? "left" : "right");',
+          '            const control = vertical',
+          '                ? [{ x: start.x, y: (start.y + end.y) / 2 }, { x: end.x, y: (start.y + end.y) / 2 }]',
+          '                : [{ x: (start.x + end.x) / 2, y: start.y }, { x: (start.x + end.x) / 2, y: end.y }];',
+          '            graphvizData.edges.forEach((edge) => {',
+          '                if (edge.source !== sourceId || edge.target !== targetId) return;',
+          '                edge.path = [start, ...control, end];',
+          '                edge.labelPos = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };',
+          '            });',
+          '        }',
+          '',
+          '        graphvizData.edges',
+          '            .filter((edge) => edge.target === ids.blockOut && nodes[edge.source])',
+          '            .forEach((edge) => reroute(edge.source, edge.target));',
+          '        reroute(ids.blockOut, ids.finalNorm);',
+          '        reroute(ids.finalNorm, ids.lmHead);',
+          '        reroute(ids.lmHead, ids.logits);',
+          '    }',
+          ''
+        ].join("\n");
+
+        let nextHtml = html;
+        if (nextHtml.includes(createGraphMarker) && !nextHtml.includes("function applyGalleryVerticalSpine")) {
+          nextHtml = nextHtml.replace(createGraphMarker, `${postLayout}\n${createGraphMarker}`);
+        }
+        if (nextHtml.includes(renderMarker) && !nextHtml.includes("applyGalleryVerticalSpine(extractedGraphData);")) {
+          nextHtml = nextHtml.replace(renderMarker, "            applyGalleryVerticalSpine(extractedGraphData);\n            createGraph(extractedGraphData);");
+        }
+        return nextHtml;
       }
 
       async function executeEmbeddedScripts(root) {
@@ -2571,7 +2980,7 @@
       async function loadArchitectureGraph() {
         const response = await fetch("./deepseek_v32_source_graph.html");
         if (!response.ok) throw new Error(`source graph fetch failed: ${response.status}`);
-        const html = await response.text();
+        const html = injectSourceGraphLayoutConstraints(await response.text());
         els.architectureRoot.innerHTML = html;
         await executeEmbeddedScripts(els.architectureRoot);
         waitForSourceGraph();
