@@ -1,0 +1,1432 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+/* training-metrics-chart 组件用 getComputedStyle(document.documentElement) 读取 colorVar,
+   不会向下取 .train-twin-page 上定义的同名变量,故在 :root/html 上镜像一份供其解析 */
+:root {
+  --twin-chart-loss: var(--success);
+  --twin-chart-mfu: var(--highlight-l0a-violet-300);
+  --twin-chart-acc: var(--highlight-ub-green-source);
+  --twin-chart-precision: var(--highlight-mte-amber-source);
+  --twin-chart-recall: var(--highlight-accum-orange-source);
+  --twin-chart-gradnorm: var(--highlight-l0b-deep-violet-source);
+  --twin-chart-corr: var(--danger);
+}
+
+html[data-theme="light"] {
+  --twin-chart-loss: color-mix(in srgb, var(--success) 72%, black);
+  --twin-chart-mfu: color-mix(in srgb, var(--highlight-l0a-violet-300) 72%, black);
+  --twin-chart-acc: color-mix(in srgb, var(--highlight-ub-green-source) 72%, black);
+  --twin-chart-precision: color-mix(in srgb, var(--highlight-mte-amber-source) 72%, black);
+  --twin-chart-recall: color-mix(in srgb, var(--highlight-accum-orange-source) 72%, black);
+  --twin-chart-gradnorm: color-mix(in srgb, var(--highlight-l0b-deep-violet-source) 72%, black);
+  --twin-chart-corr: color-mix(in srgb, var(--danger) 82%, black);
+}
+
+.train-twin-page {
+  --model-graphviz-bg: var(--background);
+  --model-graphviz-surface: color-mix(in srgb, var(--panel-shell-bg) 94%, transparent);
+  --model-graphviz-surface-soft: color-mix(in srgb, var(--surface-3) 48%, transparent);
+  --model-graphviz-stage-bg: var(--background);
+  --model-graphviz-line: var(--foreground);
+  --model-graphviz-line-soft: var(--border-strong);
+  --model-graphviz-node-label: var(--foreground);
+  --model-graphviz-node-type: var(--foreground-secondary);
+  --model-graphviz-cluster-label: color-mix(in srgb, var(--foreground) 86%, transparent);
+  --model-graphviz-toggle-bg: var(--state-focus);
+  --model-graphviz-toggle-border: var(--border-strong);
+  --model-graphviz-toggle-icon: var(--foreground);
+  --model-graphviz-tensor-fill: color-mix(in srgb, var(--surface-4) 72%, var(--foreground));
+  --model-graphviz-tensor-stroke: var(--border-strong);
+  --model-graphviz-panel-bg: color-mix(in srgb, var(--panel-shell-bg) 94%, transparent);
+  --model-graphviz-panel-header-bg: color-mix(in srgb, var(--panel-shell-bg) 96%, transparent);
+  --model-graphviz-panel-body-bg: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 66%, transparent), color-mix(in srgb, var(--panel-shell-bg) 94%, transparent));
+  --model-graphviz-code-bg: color-mix(in srgb, var(--background) 88%, black);
+  --model-graphviz-code-text: var(--foreground);
+  --model-graphviz-code-string: var(--highlight-copy-blue-300);
+  --model-graphviz-code-number: var(--highlight-l0a-violet-300);
+  --model-graphviz-code-punctuation: var(--foreground-secondary);
+  --model-graphviz-report-p0: var(--danger);
+  --model-graphviz-report-p1: var(--warning);
+  --model-graphviz-report-p2: var(--highlight-mte-amber-source);
+  --model-graphviz-report-priority-on-dark: var(--foreground);
+  --model-graphviz-report-priority-on-light: var(--background);
+  --model-graphviz-node-shadow: none;
+  --model-graphviz-parent-shadow: none;
+  --model-graphviz-panel-shadow: none;
+
+  --twin-chart-loss: var(--success);
+  --twin-chart-mfu: var(--highlight-l0a-violet-300);
+  --twin-chart-acc: var(--highlight-ub-green-source);
+  --twin-chart-precision: var(--highlight-mte-amber-source);
+  --twin-chart-recall: var(--highlight-accum-orange-source);
+  --twin-chart-gradnorm: var(--highlight-l0b-deep-violet-source);
+  --twin-chart-corr: var(--danger);
+  --twin-util-low: color-mix(in srgb, var(--highlight-copy-blue-300) 42%, var(--background));
+  --twin-util-mid: color-mix(in srgb, var(--success) 54%, var(--background));
+  --twin-util-high: color-mix(in srgb, var(--success) 72%, var(--highlight-copy-blue-300) 14%);
+  --twin-thermal-risk: color-mix(in srgb, var(--danger) 88%, white 8%);
+
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: var(--line-height-body);
+}
+
+html[data-theme="light"] .train-twin-page {
+  --model-graphviz-surface: color-mix(in srgb, var(--panel-shell-bg) 96%, white);
+  --model-graphviz-surface-soft: color-mix(in srgb, var(--surface-1) 88%, white);
+  --model-graphviz-line: color-mix(in srgb, var(--foreground-secondary) 72%, transparent);
+  --model-graphviz-line-soft: color-mix(in srgb, var(--border-strong) 58%, transparent);
+  --model-graphviz-toggle-bg: color-mix(in srgb, var(--highlight-copy-blue-300) 24%, white);
+  --model-graphviz-tensor-fill: color-mix(in srgb, var(--highlight-copy-blue-300) 18%, white);
+  --model-graphviz-code-bg: color-mix(in srgb, var(--surface-1) 94%, white);
+  --twin-chart-loss: color-mix(in srgb, var(--success) 72%, black);
+  --twin-chart-mfu: color-mix(in srgb, var(--highlight-l0a-violet-300) 72%, black);
+  --twin-chart-acc: color-mix(in srgb, var(--highlight-ub-green-source) 72%, black);
+  --twin-chart-precision: color-mix(in srgb, var(--highlight-mte-amber-source) 72%, black);
+  --twin-chart-recall: color-mix(in srgb, var(--highlight-accum-orange-source) 72%, black);
+  --twin-chart-gradnorm: color-mix(in srgb, var(--highlight-l0b-deep-violet-source) 72%, black);
+  --twin-chart-corr: color-mix(in srgb, var(--danger) 82%, black);
+  --twin-util-low: color-mix(in srgb, var(--highlight-copy-blue-300) 18%, white);
+  --twin-util-mid: color-mix(in srgb, var(--success) 34%, white);
+  --twin-util-high: color-mix(in srgb, var(--success) 54%, white);
+  --twin-thermal-risk: color-mix(in srgb, var(--danger) 72%, white);
+}
+
+html[data-theme="light"] .train-twin-page .panel-shell,
+html[data-theme="light"] .train-twin-page .twin-graph-card,
+html[data-theme="light"] .train-twin-page .twin-monitor-card,
+html[data-theme="light"] .train-twin-page .twin-locate-chain {
+  border-color: transparent;
+  background: #fff;
+  box-shadow: none;
+}
+
+html[data-theme="light"] .train-twin-page .panel-shell-header {
+  border-bottom-color: transparent;
+}
+
+html[data-theme="light"] .train-twin-page .twin-side-pane {
+  background: #fff;
+}
+
+html[data-theme="light"] .train-twin-page .twin-center-pane,
+html[data-theme="light"] .train-twin-page .twin-monitor-pane {
+  background: #fff;
+}
+
+html[data-theme="light"] .train-twin-page .twin-center-scroll {
+  padding: 0;
+}
+
+html[data-theme="light"] .train-twin-page .twin-graph-card {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html[data-theme="light"] .train-twin-page .twin-architecture-stage,
+html[data-theme="light"] .train-twin-page .twin-model-training-graphviz {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+html[data-theme="light"] .train-twin-page .twin-option,
+html[data-theme="light"] .train-twin-page .twin-check,
+html[data-theme="light"] .train-twin-page .twin-vitals article,
+html[data-theme="light"] .train-twin-page .twin-hardware-kpis div,
+html[data-theme="light"] .train-twin-page .twin-outgrid div {
+  border-color: transparent;
+  background: #fff;
+}
+
+html[data-theme="light"] .train-twin-page .twin-vitals article,
+html[data-theme="light"] .train-twin-page .twin-hardware-kpis div,
+html[data-theme="light"] .train-twin-page .twin-outgrid div {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.035);
+}
+
+html[data-theme="light"] .train-twin-page .twin-option:hover {
+  background: color-mix(in srgb, var(--surface-2) 44%, white);
+}
+
+html[data-theme="light"] .train-twin-page .twin-option:focus,
+html[data-theme="light"] .train-twin-page .twin-option:focus-visible,
+html[data-theme="light"] .train-twin-page .twin-segment .btn:focus,
+html[data-theme="light"] .train-twin-page .twin-segment .btn:focus-visible {
+  outline: none;
+}
+
+html[data-theme="light"] .train-twin-page .twin-option.is-selected,
+html[data-theme="light"] .train-twin-page .twin-segment .btn.is-selected,
+.train-twin-page[data-theme="light"] .twin-option.is-selected,
+.train-twin-page[data-theme="light"] .twin-segment .btn.is-selected {
+  border-color: transparent;
+  background: var(--highlight-copy-blue-100, #dde8fd);
+  box-shadow: none;
+  color: var(--foreground);
+}
+
+html[data-theme="light"] .train-twin-page .twin-option.is-selected:hover,
+html[data-theme="light"] .train-twin-page .twin-segment .btn.is-selected:hover,
+.train-twin-page[data-theme="light"] .twin-option.is-selected:hover,
+.train-twin-page[data-theme="light"] .twin-segment .btn.is-selected:hover {
+  background: color-mix(in srgb, var(--highlight-copy-blue-100, #dde8fd) 82%, var(--highlight-copy-blue-200, #b1cafc));
+}
+
+html[data-theme="light"] .train-twin-page .twin-dim,
+html[data-theme="light"] .train-twin-page .stat-chip,
+html[data-theme="light"] .train-twin-page .twin-status,
+html[data-theme="light"] .train-twin-page .twin-progress-status {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--foreground) 7%, white);
+}
+
+.twin-topbar {
+  min-height: 68px;
+  padding: 0 var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: transparent;
+  border: 0;
+}
+
+.twin-title-block {
+  min-width: 0;
+}
+
+.twin-kicker {
+  color: var(--foreground-secondary);
+  font-size: 14px;
+  line-height: var(--line-height-label);
+  font-weight: var(--font-weight-medium);
+}
+
+.twin-title-block h1 {
+  margin: 2px 0 0;
+  color: var(--foreground);
+  font-size: var(--font-size-title-md);
+  line-height: 1.25;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.twin-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.twin-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.twin-theme-toggle-icon {
+  position: relative;
+  width: 26px;
+  height: 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.twin-theme-toggle-icon::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--foreground-secondary);
+  transition: transform var(--duration-fast) var(--easing-default), background var(--duration-fast) var(--easing-default);
+}
+
+html[data-theme="light"] .twin-theme-toggle-icon {
+  background: color-mix(in srgb, var(--warning) 18%, white);
+}
+
+html[data-theme="light"] .twin-theme-toggle-icon::after {
+  background: color-mix(in srgb, var(--warning) 78%, black);
+  transform: translateX(12px);
+}
+
+.train-twin-page .btn {
+  font-size: 14px;
+}
+
+.twin-status,
+.twin-dim,
+.twin-swatch,
+.stat-chip {
+  flex: 0 0 auto;
+}
+
+.twin-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  color: var(--success);
+  font: var(--text-mono);
+  font-size: 14px;
+}
+
+.twin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  animation: twinBlink 1.6s infinite;
+}
+
+@keyframes twinBlink {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* 顶栏「训练进度」组件：替换原 TRAINING 状态标签，承载进度总览卡片挪上来的 step/epoch/进度条 */
+.twin-progress-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 6px var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--success);
+}
+
+.twin-progress-status .twin-dot {
+  flex: none;
+}
+
+.twin-progress-status-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 210px;
+}
+
+.twin-progress-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--foreground-secondary);
+  white-space: nowrap;
+}
+
+.twin-progress-status-row strong {
+  margin-right: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+}
+
+.twin-progress-status-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.twin-progress-status-fill {
+  position: relative;
+  overflow: hidden;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: #3b82f6;
+  transition: width 0.6s ease;
+}
+
+.twin-progress-status-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 65%, transparent), transparent);
+  transform: translateX(-120%);
+  animation: twinProgressFlow 1.8s linear infinite;
+}
+
+.twin-progress-status-pct {
+  flex: none;
+  min-width: 44px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--foreground);
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .twin-progress-status-info {
+    min-width: 160px;
+  }
+}
+
+.twin-shell {
+  height: calc(100vh - 68px);
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+  overflow: hidden;
+}
+
+.twin-side-pane,
+.twin-center-pane,
+.twin-monitor-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.twin-pane-header {
+  min-height: 58px;
+}
+
+.twin-pane-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.panel-shell-meta {
+  color: var(--foreground-secondary);
+  font-size: 14px;
+}
+
+.twin-pane-scroll,
+.twin-center-scroll,
+.twin-monitor-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4);
+}
+
+.twin-pane-scroll,
+.twin-monitor-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.twin-center-scroll {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.twin-control-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.twin-control-section h2,
+.twin-card-heading h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--font-size-title-sm);
+  line-height: 1.3;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.twin-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.twin-option {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  transition: background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
+}
+
+.twin-option:hover {
+  border-color: var(--border-default);
+  background: var(--surface-2);
+}
+
+.twin-option.is-selected {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.twin-option span {
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+}
+
+.twin-option small,
+.twin-check small,
+.twin-vitals small,
+.twin-outgrid small {
+  color: var(--foreground-secondary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.twin-segment {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.twin-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.twin-check {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.twin-check::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--success);
+}
+
+.twin-check[data-state="warn"]::before {
+  background: var(--warning);
+}
+
+.twin-check[data-state="danger"]::before {
+  background: var(--danger);
+}
+
+.twin-check strong {
+  display: block;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.twin-graph-card,
+.twin-monitor-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.twin-graph-card,
+.twin-monitor-card {
+  padding: var(--space-4);
+}
+
+.twin-graph-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+}
+
+.twin-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.twin-card-heading p {
+  margin: 4px 0 0;
+  color: var(--foreground-secondary);
+  font-size: 14px;
+  line-height: var(--line-height-body);
+}
+
+.twin-dim {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--foreground-secondary);
+  font: var(--text-mono);
+  font-size: 14px;
+}
+
+.twin-architecture-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  overflow: hidden;
+}
+
+.twin-model-training-graphviz {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--background);
+}
+
+.twin-model-training-graphviz .pto-model-training-hover {
+  font-size: 14px;
+}
+
+@keyframes twinProgressFlow {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(350%); }
+}
+
+.twin-vitals span,
+.twin-outgrid span {
+  color: var(--foreground-secondary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.twin-vitals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.twin-vitals article,
+.twin-outgrid div {
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.twin-vitals strong {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.twin-accuracy-card {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: var(--space-2);
+}
+
+/* 精度指标:本页直出的合成时序图卡组(loss/acc/precision/recall/F1/corr),
+   复用 pangu-moe-trainviz 的 training-metrics-chart 组件(window.PtoTrainingMetricsChart),
+   数据与卡片布局本页独立生成,不再经 iframe 内嵌整页 */
+.twin-accuracy-charts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 640px;
+  min-height: 0;
+}
+
+.twin-accuracy-smooth {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--foreground-secondary);
+  white-space: nowrap;
+}
+
+.twin-accuracy-smooth input[type="range"] {
+  width: 120px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--highlight-copy-blue-source);
+  cursor: pointer;
+}
+
+.twin-accuracy-smooth output {
+  min-width: 30px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.twin-accuracy-cards {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.twin-accuracy-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+
+.twin-accuracy-metric-card__head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.twin-accuracy-metric-card__name {
+  font-size: 11px;
+  color: var(--foreground-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.twin-accuracy-metric-card__val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+  flex: none;
+}
+
+.twin-accuracy-metric-card__note {
+  font-size: 9px;
+  color: var(--foreground-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twin-accuracy-legend {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+}
+
+.twin-accuracy-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--foreground-secondary);
+  white-space: nowrap;
+}
+
+.twin-accuracy-legend i {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.twin-accuracy-metric-card__chart {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+@media (max-width: 920px) {
+  .twin-accuracy-charts {
+    height: auto;
+  }
+  .twin-accuracy-cards {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+  .twin-accuracy-metric-card__chart {
+    min-height: 120px;
+  }
+}
+
+/* training-metrics-chart 组件自绘 SVG 的样式作用域(.pto-tmchart*),随本卡组一起独立演进 */
+.pto-tmchart { position: relative; width: 100%; font-family: var(--font-sans); user-select: none; }
+.pto-tmchart__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.pto-tmchart__grid line { stroke: var(--border-subtle); stroke-width: 1; }
+.pto-tmchart__axis line { stroke: var(--border-default); stroke-width: 1; }
+.pto-tmchart__axis text,
+.pto-tmchart__tick text { font-family: var(--font-mono); font-size: 10px; fill: var(--foreground-muted); }
+.pto-tmchart__line { fill: none; stroke-width: 1; stroke-linejoin: round; stroke-linecap: round; }
+.pto-tmchart__line--emph { stroke-width: 1.3; }
+.pto-tmchart__anomaly-band { fill: var(--danger); opacity: .10; }
+.pto-tmchart__anomaly-dot { fill: var(--danger); stroke: var(--background); stroke-width: 1.5; }
+.pto-tmchart__brush { fill: var(--primary); opacity: .10; }
+.pto-tmchart__brush-edge { stroke: var(--primary); stroke-width: 1; opacity: .55; }
+.pto-tmchart__cursor { stroke: var(--foreground-secondary); stroke-width: 1; stroke-dasharray: 3 3; }
+.pto-tmchart__cursor-chip { fill: var(--surface-4); stroke: var(--border-strong); stroke-width: 1; }
+.pto-tmchart__cursor-chip-text { font-family: var(--font-mono); font-size: 10px; fill: var(--foreground); }
+.pto-tmchart__cursor-tip-bg { fill: var(--surface-4); stroke: var(--border-strong); stroke-width: 1; filter: drop-shadow(0 4px 12px rgba(0,0,0,.28)); }
+.pto-tmchart__cursor-tip-step { font-family: var(--font-mono); font-size: 10px; font-weight: 700; fill: var(--foreground); }
+.pto-tmchart__cursor-tip-val { font-family: var(--font-mono); font-size: 10px; fill: var(--foreground-secondary); }
+.pto-tmchart__cursor-tip-tag-bg { fill: var(--danger); }
+.pto-tmchart__cursor-tip-tag { font-family: var(--font-sans); font-size: 9px; font-weight: 700; fill: #fff; }
+.pto-tmchart__plot-hit { fill: transparent; cursor: crosshair; }
+.pto-tmchart__legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.pto-tmchart__legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--foreground-secondary); }
+.pto-tmchart__legend-swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+.twin-hardware-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.twin-hardware-kpis div {
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.twin-hardware-kpis span {
+  display: block;
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.twin-hardware-kpis strong {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twin-heat {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.twin-heat-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--twin-util-mid);
+  cursor: help;
+}
+
+.twin-heat-cell::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+}
+
+.twin-heat-cell::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: 240px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-1) 96%, black);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(3px);
+  transition: opacity var(--duration-fast) var(--easing-default), transform var(--duration-fast) var(--easing-default);
+  white-space: pre-line;
+}
+
+.twin-heat-cell:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.twin-heat-cell.is-util-low {
+  background: var(--twin-util-low);
+}
+
+.twin-heat-cell.is-util-mid {
+  background: var(--twin-util-mid);
+}
+
+.twin-heat-cell.is-util-high {
+  background: var(--twin-util-high);
+}
+
+.twin-heat-cell.is-thermal-risk::before {
+  background: var(--twin-thermal-risk);
+}
+
+.twin-heat-cell.is-straggler {
+  box-shadow: inset 0 0 0 2px var(--twin-thermal-risk);
+}
+
+/* infra 问题热力图高亮 */
+.twin-heat-cell.is-infra-hot {
+  outline: 2px solid #dc2626;
+  outline-offset: 1px;
+  z-index: 2;
+  position: relative;
+}
+.twin-heat-cell.is-infra-warm {
+  outline: 2px solid #ea580c;
+  outline-offset: 1px;
+  z-index: 1;
+  position: relative;
+}
+
+.twin-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  color: var(--foreground-secondary);
+  font-size: 14px;
+}
+
+.twin-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.twin-legend strong {
+  margin-left: auto;
+  color: var(--foreground-secondary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+}
+
+.twin-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.twin-swatch-util-low {
+  background: var(--twin-util-low);
+}
+
+.twin-swatch-util-mid {
+  background: var(--twin-util-mid);
+}
+
+.twin-swatch-util-high {
+  background: var(--twin-util-high);
+}
+
+.twin-swatch-thermal {
+  position: relative;
+  background: var(--surface-2);
+}
+
+.twin-swatch-thermal::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--twin-thermal-risk);
+}
+
+.twin-monitor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.twin-artifact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.twin-artifact:last-child {
+  border-bottom: 0;
+}
+
+.twin-artifact-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.twin-artifact-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+  font-weight: var(--font-weight-semibold);
+  font-size: 14px;
+}
+
+.twin-artifact-meta {
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.twin-artifact-badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+
+.twin-feed {
+  max-height: 208px;
+  overflow: auto;
+}
+
+.twin-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-2) 0;
+  color: var(--foreground-secondary);
+  font-size: 14px;
+}
+
+.twin-event::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 1px;
+  background: var(--border-subtle);
+}
+
+.twin-event:first-child::before {
+  top: 13px;
+}
+
+.twin-event:last-child::before {
+  bottom: calc(100% - 13px);
+}
+
+.twin-event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.twin-event time {
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.twin-event i {
+  position: relative;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  margin-left: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--foreground-muted);
+}
+
+.twin-event[data-sev="crit"] span {
+  color: var(--danger);
+}
+
+.twin-whatif {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.twin-whatif label {
+  color: var(--foreground-secondary);
+  font-size: 14px;
+}
+
+.twin-whatif b {
+  float: right;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.twin-whatif input[type="range"] {
+  width: 100%;
+  margin-top: var(--space-2);
+  accent-color: var(--primary);
+}
+
+.twin-subhead {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.twin-outgrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.twin-outgrid strong {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+@media (max-width: 1320px) {
+  .twin-shell {
+    grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .twin-monitor-grid,
+  .twin-whatif,
+  .twin-outgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .train-twin-page {
+    overflow: auto;
+  }
+
+  .twin-shell {
+    height: auto;
+    min-height: calc(100vh - 68px);
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .twin-side-pane,
+  .twin-center-pane,
+  .twin-monitor-pane {
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .twin-pane-scroll,
+  .twin-center-scroll,
+  .twin-monitor-scroll {
+    overflow: visible;
+  }
+
+  .twin-center-scroll {
+    grid-template-rows: auto;
+  }
+
+  .twin-architecture-stage {
+    height: 420px;
+  }
+}
+
+@media (max-width: 720px) {
+  .twin-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    min-height: auto;
+    padding: var(--space-4);
+  }
+
+  .twin-shell {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+
+  .twin-vitals,
+  .twin-monitor-grid,
+  .twin-whatif,
+  .twin-outgrid,
+  .twin-hardware-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .twin-architecture-stage {
+    height: 360px;
+  }
+
+  .twin-heat {
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+  }
+}
+
+html[data-theme="light"] .train-twin-page .twin-option.is-selected,
+html[data-theme="light"] .train-twin-page .twin-segment .btn.is-selected,
+.train-twin-page[data-theme="light"] .twin-option.is-selected,
+.train-twin-page[data-theme="light"] .twin-segment .btn.is-selected {
+  border-color: transparent;
+  background: var(--highlight-copy-blue-100, #dde8fd);
+  box-shadow: none;
+  color: var(--foreground);
+}
+
+html[data-theme="light"] .train-twin-page .twin-option.is-selected:hover,
+html[data-theme="light"] .train-twin-page .twin-segment .btn.is-selected:hover,
+.train-twin-page[data-theme="light"] .twin-option.is-selected:hover,
+.train-twin-page[data-theme="light"] .twin-segment .btn.is-selected:hover {
+  background: color-mix(in srgb, var(--highlight-copy-blue-100, #dde8fd) 82%, var(--highlight-copy-blue-200, #b1cafc));
+}
+
+html[data-theme="light"] .train-twin-page .twin-option:focus,
+html[data-theme="light"] .train-twin-page .twin-option:focus-visible,
+html[data-theme="light"] .train-twin-page .twin-segment .btn:focus,
+html[data-theme="light"] .train-twin-page .twin-segment .btn:focus-visible,
+.train-twin-page[data-theme="light"] .twin-option:focus,
+.train-twin-page[data-theme="light"] .twin-option:focus-visible,
+.train-twin-page[data-theme="light"] .twin-segment .btn:focus,
+.train-twin-page[data-theme="light"] .twin-segment .btn:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+/* 内嵌模式（?embed=hardware）：外部页面只取「算力占用 · 基础设施层」卡片，隐藏顶栏/侧栏/架构中栏与其余监控卡片 */
+html[data-embed="hardware"] .twin-topbar {
+  display: none;
+}
+
+html[data-embed="hardware"] .twin-shell {
+  height: 100vh;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+
+html[data-embed="hardware"] .twin-side-pane,
+html[data-embed="hardware"] .twin-center-pane {
+  display: none;
+}
+
+html[data-embed="hardware"] .twin-monitor-pane {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+html[data-embed="hardware"] .twin-monitor-pane > .panel-shell-header {
+  display: none;
+}
+
+html[data-embed="hardware"] .twin-monitor-scroll {
+  padding: var(--space-3);
+}
+
+html[data-embed="hardware"] .twin-monitor-scroll > *:not([aria-label="硬件多卡热力图"]) {
+  display: none;
+}
+
+html[data-embed="hardware"] .twin-monitor-scroll > [aria-label="硬件多卡热力图"] {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+html[data-embed="hardware"] .twin-heat {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
+}
+
+/* 嵌入侧栏通常窄于 720px，会命中下方 @media (max-width:720px) 把 KPI 行折成单列——
+   内嵌场景就是要一行铺满 4 项，强制保留 4 列不换行 */
+html[data-embed="hardware"] .twin-hardware-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* ── 模型层展开图(复用 ep-expert-parallel-2d.html 上方「层视图」的视觉,按 DeepSeek-V3.2 架构校准) ──
+   非嵌入:不用 iframe,直接在定位链「模型层」内容区里用同款配色/几何画一份 DeepSeek MoE 层展开图。
+   js/training-run-twin.js 的 renderTwinLayerViews() 负责生成 SVG。 */
+.twin-layerview {
+  width: 100%;
+  margin: 0 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 74% 16%, color-mix(in srgb, #4f6df6 9%, transparent), transparent 36%),
+    color-mix(in srgb, var(--foreground) 2.5%, transparent);
+  overflow: hidden;
+}
+.twin-layerview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.twin-layerview text {
+  fill: color-mix(in srgb, var(--foreground) 74%, transparent);
+  font-family: var(--font-sans);
+}
+.twin-layerview .mono { font-family: var(--font-mono); }
+.twin-layerview .lv-lane { fill: color-mix(in srgb, var(--foreground) 78%, transparent); font-size: 15px; font-weight: 700; }
+.twin-layerview .lv-tiny { fill: color-mix(in srgb, var(--foreground-muted) 90%, transparent); font-size: 11px; font-weight: 600; }
+.twin-layerview .lv-title { fill: var(--foreground); font-size: 17px; font-weight: 800; }
+.twin-layerview .lv-sub { fill: color-mix(in srgb, var(--foreground-muted) 92%, transparent); font-size: 12px; font-weight: 600; }
+.twin-layerview [data-lv-layer] { cursor: pointer; }
+.twin-layerview [data-lv-layer]:hover rect { opacity: 0.9; }
+.twin-layerview .lv-hot { fill: #dc2626; }
+.twin-layerview .lv-legend { fill: color-mix(in srgb, var(--foreground-muted) 88%, transparent); font-size: 11px; font-weight: 600; }
+
+/* top-8 专家 all-to-all 动画(体现 定位链.md L128):all-to-all 发生在该 token 命中的 8 个专家(所在 rank)之间。
+   ① dispatch:8 个专家互相收发 token → 每个被输入的 rank「变红」(recv 到数据);
+   ② combine:7 个专家完成输出 → 恢复原色,而 rank 23 send=0 无法输出 → 保持红色(死锁)。
+   蓝色 mesh 连线的描边生长与红色节点态由 js/training-run-twin.js 的 startLayerA2A() 用 rAF 逐帧驱动;
+   这里只定义初始态与配色。lv-a2a-node 是盖在参与 rank(卡)上的红色状态层,lv-a2a-ring 是标出 8 个参与者的高亮环。 */
+.twin-layerview .lv-a2a-mesh {
+  fill: none;
+  stroke: #4f6df6;
+  stroke-linecap: round;
+  stroke-dasharray: var(--lv-dash);
+  stroke-dashoffset: var(--lv-dash);
+  opacity: 0;
+}
+.twin-layerview .lv-a2a-ring { fill: none; stroke: #4f6df6; stroke-width: 1.4; opacity: 0.55; }
+.twin-layerview .lv-a2a-node { fill: #dc2626; opacity: 0; }
+.twin-layerview .lv-a2a-label { transition: opacity 0.2s ease; }
+/* 尊重「减少动态效果」偏好:不做动画,静态展示 mesh 淡蓝 + 仅 rank 23 保持红(终态) */
+@media (prefers-reduced-motion: reduce) {
+  .twin-layerview .lv-a2a-mesh { stroke-dashoffset: 0; opacity: 0.25; }
+  .twin-layerview .lv-a2a-node[data-hot="1"] { opacity: 0.8; }
+}
+
+/* 模型层展开图右上角「最大化」按钮 + 全屏态。逻辑见 js/training-run-twin.js 的 setLayerMax()。
+   最大化用 position:fixed 铺满(带背板),动画仍跑在同一个 host 上,只是被 CSS 放大。 */
+.twin-layerview { position: relative; }
+.twin-layerview-max {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 4;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
+  color: var(--foreground-secondary);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.twin-layerview-max:hover { background: var(--state-hover); color: var(--foreground); }
+.twin-layerview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+.twin-layerview-backdrop[hidden] { display: none; }
+.twin-layerview.is-maximized {
+  position: fixed;
+  inset: 3vh 3vw;
+  z-index: 1000;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-1);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.twin-layerview.is-maximized svg { width: 100%; height: 100%; }

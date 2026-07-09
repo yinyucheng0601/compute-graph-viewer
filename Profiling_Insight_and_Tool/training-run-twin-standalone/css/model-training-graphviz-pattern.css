@@ -1,0 +1,287 @@
+.pto-model-training-graphviz {
+  --model-graphviz-line: var(--foreground);
+  --model-graphviz-line-soft: color-mix(in srgb, var(--foreground) 20%, transparent);
+  --model-graphviz-node-label: var(--foreground);
+  --model-graphviz-node-type: var(--foreground-secondary);
+  --model-graphviz-cluster-label: color-mix(in srgb, var(--foreground) 82%, transparent);
+  --model-graphviz-toggle-bg: var(--surface-1);
+  --model-graphviz-toggle-border: color-mix(in srgb, var(--foreground) 24%, transparent);
+  --model-graphviz-toggle-icon: var(--foreground);
+  --model-graphviz-tensor-fill: color-mix(in srgb, var(--surface-4) 72%, var(--foreground));
+  --model-graphviz-tensor-stroke: var(--border-strong);
+  --model-training-graphviz-hover-bg: color-mix(in srgb, var(--surface-1) 96%, black);
+  --model-training-graphviz-hover-border: var(--border-default);
+  --model-training-graphviz-hover-shadow: none;
+  --model-training-graphviz-active-stroke: color-mix(in srgb, var(--foreground) 90%, transparent);
+  --model-training-graphviz-related-stroke: color-mix(in srgb, var(--foreground) 42%, transparent);
+  --model-training-graphviz-edge-tag-bg: color-mix(in srgb, var(--surface-1) 94%, var(--background));
+  --model-training-graphviz-edge-tag-fg: var(--foreground-secondary);
+  --model-training-graphviz-edge-tag-border: var(--border-default);
+  --model-training-graphviz-cluster-fill: transparent;
+  --model-training-graphviz-cluster-stroke: color-mix(in srgb, var(--foreground) 20%, transparent);
+
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--model-graphviz-stage-bg, var(--background));
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+:root[data-theme='light'] .pto-model-training-graphviz {
+  --model-graphviz-line: rgba(0, 0, 0, 0.74);
+  --model-graphviz-line-soft: rgba(0, 0, 0, 0.14);
+  --model-graphviz-cluster-label: rgba(0, 0, 0, 0.72);
+  --model-graphviz-toggle-bg: rgba(255, 255, 255, 0.92);
+  --model-graphviz-toggle-border: rgba(0, 0, 0, 0.18);
+  --model-graphviz-toggle-icon: rgba(0, 0, 0, 0.70);
+  --model-graphviz-tensor-fill: color-mix(in srgb, #f3f4f6 82%, #000000);
+  --model-graphviz-tensor-stroke: rgba(0, 0, 0, 0.18);
+  --model-training-graphviz-hover-bg: rgba(255, 255, 255, 0.98);
+  --model-training-graphviz-hover-border: rgba(0, 0, 0, 0.10);
+  --model-training-graphviz-hover-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+  --model-training-graphviz-active-stroke: rgba(0, 0, 0, 0.72);
+  --model-training-graphviz-related-stroke: rgba(0, 0, 0, 0.30);
+  --model-training-graphviz-edge-tag-bg: rgba(255, 255, 255, 0.94);
+  --model-training-graphviz-edge-tag-fg: rgba(0, 0, 0, 0.62);
+  --model-training-graphviz-edge-tag-border: rgba(0, 0, 0, 0.10);
+  --model-training-graphviz-cluster-fill: transparent;
+  --model-training-graphviz-cluster-stroke: rgba(0, 0, 0, 0.16);
+}
+
+.pto-model-training-graphviz.is-panning {
+  cursor: grabbing;
+}
+
+.pto-model-training-graphviz-svg {
+  display: block;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node,
+.pto-model-training-graphviz .pto-model-graphviz-edge,
+.pto-model-training-graphviz .pto-model-training-edge-tag {
+  transition: opacity var(--duration-fast, 100ms) var(--easing-default, ease),
+    stroke var(--duration-fast, 100ms) var(--easing-default, ease);
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node {
+  cursor: pointer;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster {
+  cursor: pointer;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster > rect {
+  fill: var(--model-training-graphviz-cluster-fill);
+  fill-opacity: 1;
+  stroke: var(--model-training-graphviz-cluster-stroke);
+  stroke-width: 1.4px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster.is-training-selected > rect {
+  fill: transparent;
+  stroke: var(--model-training-graphviz-active-stroke);
+  stroke-width: 2.4px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster.is-training-related > rect {
+  fill: transparent;
+  stroke: var(--model-training-graphviz-related-stroke);
+  stroke-width: 1.7px;
+}
+
+:root[data-theme='light'] .pto-model-training-graphviz .pto-model-graphviz-cluster.is-training-selected > rect {
+  fill: transparent;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster .pto-model-graphviz-toggle {
+  fill: var(--model-graphviz-toggle-bg);
+  stroke: var(--model-graphviz-toggle-border);
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-cluster .pto-model-graphviz-toggle-icon {
+  fill: var(--model-graphviz-toggle-icon);
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node:focus,
+.pto-model-training-graphviz .pto-model-graphviz-node:focus-visible {
+  outline: none;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-training-selected rect {
+  stroke: var(--model-training-graphviz-active-stroke);
+  stroke-width: 3px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-training-related rect {
+  stroke: var(--model-training-graphviz-related-stroke);
+  stroke-width: 1.4px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.has-training-evidence .pto-model-graphviz-node-label {
+  font-weight: var(--font-weight-bold, 700);
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-parameter-object rect {
+  fill: var(--model-graphviz-tensor-fill);
+  stroke: var(--model-graphviz-tensor-stroke);
+  stroke-width: 0.8px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-state-object rect {
+  fill: color-mix(in srgb, var(--surface-1) 88%, #ffffff);
+  stroke: color-mix(in srgb, var(--foreground) 22%, transparent);
+  stroke-width: 1px;
+}
+
+:root[data-theme='light'] .pto-model-training-graphviz .pto-model-graphviz-node.is-state-object rect {
+  fill: color-mix(in srgb, var(--surface-1) 92%, #ffffff);
+  stroke: rgba(0, 0, 0, 0.16);
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-parameter-object .pto-model-graphviz-node-type,
+.pto-model-training-graphviz .pto-model-graphviz-node.is-state-object .pto-model-graphviz-node-type {
+  display: none;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node.is-parameter-object .pto-model-graphviz-node-label,
+.pto-model-training-graphviz .pto-model-graphviz-node.is-state-object .pto-model-graphviz-node-label {
+  font-size: 13px;
+}
+
+.pto-model-training-graphviz .pto-model-graphviz-node-label {
+  fill: var(--model-graphviz-node-label);
+  stroke: color-mix(in srgb, var(--background) 30%, transparent);
+  stroke-width: 0.4px;
+  paint-order: stroke;
+}
+
+:root[data-theme='light'] .pto-model-training-graphviz .pto-model-graphviz-node-label {
+  stroke: rgba(255, 255, 255, 0.45);
+}
+
+.pto-model-training-edge-tags {
+  pointer-events: none;
+}
+
+.pto-model-training-edge-tag rect {
+  fill: var(--model-training-graphviz-edge-tag-bg);
+  stroke: var(--model-training-graphviz-edge-tag-border);
+  stroke-width: 0.75px;
+}
+
+.pto-model-training-edge-tag text {
+  fill: var(--model-training-graphviz-edge-tag-fg);
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.pto-model-training-edge-tag[data-edge-type='communication'] rect,
+.pto-model-training-edge-tag[data-edge-type='comm'] rect,
+.pto-model-training-edge-tag[data-edge-type='all-to-all'] rect {
+  fill: color-mix(in srgb, var(--highlight-copy-blue-300) 16%, var(--model-training-graphviz-edge-tag-bg));
+}
+
+.pto-model-training-edge-tag[data-edge-type='parameter'] rect,
+.pto-model-training-edge-tag[data-edge-type='weight'] rect {
+  fill: color-mix(in srgb, var(--highlight-l0a-violet-300) 14%, var(--model-training-graphviz-edge-tag-bg));
+}
+
+.pto-model-training-edge-tag[data-edge-type='gradient'] rect,
+.pto-model-training-edge-tag[data-edge-type='update'] rect {
+  fill: color-mix(in srgb, var(--warning) 16%, var(--model-training-graphviz-edge-tag-bg));
+}
+
+.pto-model-training-edge-tag[data-edge-type='cache'] rect,
+.pto-model-training-edge-tag[data-edge-type='state'] rect {
+  fill: color-mix(in srgb, var(--success) 12%, var(--model-training-graphviz-edge-tag-bg));
+}
+
+.pto-model-training-hover {
+  position: absolute;
+  z-index: var(--z-overlay, 200);
+  display: none;
+  width: min(340px, calc(100% - 24px));
+  max-width: 340px;
+  padding: var(--space-3);
+  border: 1px solid var(--model-training-graphviz-hover-border);
+  border-radius: var(--radius-lg);
+  background: var(--model-training-graphviz-hover-bg);
+  box-shadow: var(--model-training-graphviz-hover-shadow);
+  color: var(--foreground);
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.pto-model-training-hover.is-visible {
+  display: block;
+}
+
+.pto-model-training-hover-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.pto-model-training-hover-title small {
+  display: block;
+  color: var(--foreground-muted);
+  font: var(--text-mono);
+}
+
+.pto-model-training-hover-title strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--foreground);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.pto-model-training-hover p {
+  margin: var(--space-2) 0 0;
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pto-model-training-hover p b {
+  color: var(--foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pto-model-training-hover ul {
+  margin: var(--space-2) 0 0;
+  padding-left: 17px;
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pto-model-training-hover-chips,
+.pto-model-training-hover-source {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+
+.pto-model-training-hover-chips span,
+.pto-model-training-hover-source span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--state-muted);
+  color: var(--foreground-secondary);
+  font-size: 11px;
+  line-height: 1;
+}

@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Training Run Explainable Twin</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get("theme");
+      if (theme === "dark" || theme === "light") {
+        document.documentElement.dataset.theme = theme;
+      }
+      // 内嵌模式(?embed=hardware):外部页面只取「算力占用 · 基础设施层」卡片,见 training-run-twin.css 对应规则
+      if (params.get("embed") === "hardware") {
+        document.documentElement.dataset.embed = "hardware";
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./css/foundation.css">
+  <link rel="stylesheet" href="./css/semantic.css">
+  <link rel="stylesheet" href="./css/components.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <link rel="stylesheet" href="./css/model-graphviz-pattern.css">
+  <link rel="stylesheet" href="./css/model-training-graphviz-pattern.css">
+  <link rel="stylesheet" href="./css/training-run-twin.css">
+  <link rel="stylesheet" href="./css/timeline-swimlane.css">
+  <style>
+    /* 「问题诊断」卡片复用 .twin-option 的选中/悬停视觉,点击后联动左侧架构图节点高亮 */
+    .diagnosis-card {
+      align-items: flex-start;
+      min-height: auto;
+      gap: 6px;
+    }
+    .diagnosis-card-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .diagnosis-card strong {
+      font-weight: var(--font-weight-semibold);
+      color: var(--foreground);
+    }
+    .diagnosis-desc {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--foreground-secondary);
+      position: relative;
+      cursor: default;
+    }
+    /* 悬浮气泡 — 由 JS 驱动挂到 body,避免被 overflow 祖先截断 */
+    .diagnosis-bubble {
+      position: fixed;
+      max-width: 260px;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      background: var(--foreground);
+      color: var(--surface-1);
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 4px 16px rgba(0,0,0,.28);
+      z-index: 1000;
+      pointer-events: none;
+    }
+    .diagnosis-bubble[hidden] {
+      display: none;
+    }
+    /* 设计系统尚未收录 .badge,此处按 quick-reference.md 的 retrofit 约定使用 token 内联实现 */
+    .diagnosis-severity {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 8px;
+      border-radius: var(--radius-pill);
+      color: var(--surface-1);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+    }
+    .diagnosis-severity.is-p0 { background: #dc2626; }
+    .diagnosis-severity.is-p1 { background: #ea580c; }
+    .diagnosis-severity.is-p2 { background: #ca8a04; }
+    .diagnosis-category {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground-secondary) 18%, transparent);
+      color: var(--foreground-secondary);
+      font-size: 10px;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+      letter-spacing: 0.04em;
+    }
+    /* 「问题诊断」挪到最右侧,固定列宽跟随 DOM 顺序调整到第三列 */
+    .twin-shell {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 280px;
+    }
+    @media (max-width: 1320px) {
+      .twin-shell {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 280px;
+      }
+    }
+    /* 点击右侧诊断卡片后,在架构图上方提示概念对应的层/分支;图为通用层模板,不代表真实的第 N 层实例 */
+    .twin-diagnosis-locator {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-2);
+      margin-bottom: var(--space-2);
+      padding: 6px 10px;
+      border-radius: var(--radius-md);
+      border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border-subtle));
+      background: color-mix(in srgb, var(--danger) 10%, transparent);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .twin-diagnosis-locator[hidden] {
+      display: none;
+    }
+    .twin-diagnosis-locator strong {
+      flex: none;
+      color: var(--danger);
+      font-weight: var(--font-weight-semibold);
+    }
+    .twin-diagnosis-locator span {
+      color: var(--foreground-secondary);
+    }
+    /* ── 进度条诊断标记点 ── */
+    /* 进度条下方三角箭头,指向问题首个出现的 step;挂载在 .twin-progress-status-info 上 */
+    .twin-progress-status-info { position: relative; }
+    .progress-diagnosis-marker {
+      position: absolute;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 7px solid transparent;
+      z-index: 2;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .progress-diagnosis-marker.is-p0 { border-bottom-color: #dc2626; filter: drop-shadow(0 1px 2px rgba(220,38,38,.4)); }
+    .progress-diagnosis-marker.is-p1 { border-bottom-color: #ea580c; filter: drop-shadow(0 1px 2px rgba(234,88,12,.35)); }
+    .progress-diagnosis-marker:hover { transform: translateX(-50%) scale(1.4); }
+
+    /* 诊断案例命中的节点/连线默认(无需点击)就用 danger 描边标出,和训练阶段联动的默认蓝色高亮区分开 */
+    .pto-model-graphviz-node.pto-diagnosis-active rect:not(.pto-diagnosis-pulse-ring) {
+      stroke: var(--danger);
+      stroke-width: 6px;
+    }
+    .pto-model-graphviz-edge.pto-diagnosis-active {
+      stroke: var(--danger);
+      stroke-width: 5.2px;
+    }
+    /* 命中节点的红色呼吸涟漪:克隆自身矩形做描边环,持续放大淡出 */
+    @keyframes pto-diagnosis-pulse {
+      0% { transform: scale(1); opacity: 0.75; }
+      70% { transform: scale(1.45); opacity: 0; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+    .pto-diagnosis-pulse-ring {
+      fill: none;
+      stroke: var(--danger);
+      stroke-width: 2px;
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: pto-diagnosis-pulse 1.8s ease-out infinite;
+      pointer-events: none;
+    }
+    /* 点击某张诊断卡片进入「聚焦」模式:除该问题命中的节点/连线外,整网图其余部分淡出到 50% */
+    .pto-model-graphviz-node,
+    .pto-model-graphviz-edge,
+    .pto-model-graphviz-cluster {
+      transition: opacity 160ms ease;
+    }
+    #modelGraphStage.is-diagnosis-focus .pto-model-graphviz-node:not(.pto-diagnosis-focus-active),
+    #modelGraphStage.is-diagnosis-focus .pto-model-graphviz-edge:not(.pto-diagnosis-focus-active),
+    #modelGraphStage.is-diagnosis-focus .pto-model-graphviz-cluster:not(.pto-diagnosis-focus-active) {
+      opacity: 0.5;
+    }
+
+    /* 点击「问题诊断」卡片后,Run Twin 面板切换为「定位链面板」:顶部定位链栏 sticky 吸顶,兼作锚点导航;
+
+    /* 监控区卡片去掉 padding */
+    .twin-monitor-scroll .twin-monitor-card,
+    .twin-monitor-scroll .twin-accuracy-card { padding: 0; }
+
+    /* 定位链返回按钮：默认显示 hover 态灰底 */
+    #locateChainBack { background: var(--surface-2); }
+
+    /* 图表中 NaN / inf 红字 */
+    .pto-tmchart__val--danger { fill: var(--danger, #dc2626); font-weight: 700; }
+    .twin-accuracy-metric-card__val.is-danger { color: var(--danger, #dc2626); font-weight: 700; }
+
+    /* 点击「问题诊断」卡片后,Run Twin 面板切换为「定位链面板」:顶部定位链栏 sticky 吸顶,兼作锚点导航;
+       下方按层渲染内容区,滚动时通过 IntersectionObserver 联动定位链栏高亮当前所在层 */
+    .twin-locate-chain-view {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .twin-locate-chain-view[hidden] {
+      display: none;
+    }
+    .twin-locate-chain {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 0;
+      margin: var(--space-4) var(--space-4) 0;
+      padding: 0 0 12px;
+      border-radius: 0;
+      border: 1px solid var(--border-subtle);
+      background: var(--surface-1);
+      box-shadow: 0 6px 16px -10px rgba(0, 0, 0, .3);
+    }
+    /* 选中态底色是独立图层,z-index 压在连线下方,避免盖住经过该节点的连线;
+       JS 在节点激活时把它挪到对应节点的位置和尺寸上 */
+    .twin-locate-highlight {
+      position: absolute;
+      z-index: -1;
+      border-radius: var(--radius-md);
+      background: var(--highlight-copy-blue-100, #dde8fd);
+      opacity: 0;
+      pointer-events: none;
+      transition: left 160ms ease, top 160ms ease, width 160ms ease, height 160ms ease, opacity 160ms ease;
+    }
+    .twin-locate-highlight.is-visible {
+      opacity: 1;
+    }
+    /* 悬浮底色同样是独立图层,z-index 压在连线下方(挂载/定位方式与选中态底色一致),避免盖住经过该节点的连线 */
+    .twin-locate-hover {
+      position: absolute;
+      z-index: -1;
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      opacity: 0;
+      pointer-events: none;
+      transition: left 120ms ease, top 120ms ease, width 120ms ease, height 120ms ease, opacity 120ms ease;
+    }
+    .twin-locate-hover.is-visible {
+      opacity: 1;
+    }
+    /* 连线改由 JS 量出每个圆点的真实坐标后用 SVG 一次性画出,避免 flex 间隔造成的断线/错位 */
+    .twin-locate-track-svg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .twin-locate-line {
+      stroke: var(--border-strong);
+      stroke-width: 2;
+      fill: none;
+    }
+    .twin-locate-line.is-dashed {
+      stroke-dasharray: 4 4;
+    }
+    .twin-locate-line.is-current {
+      stroke: var(--highlight-copy-blue-500, #3b6fe0);
+    }
+    /* 「绕过通信调度层」等分叉旁路:从起点弧线下探,绕开中间被跳过的节点,回落到目标点 */
+    .twin-locate-bypass {
+      stroke: var(--foreground-secondary);
+      stroke-width: 1.5;
+      stroke-dasharray: 3 4;
+      fill: none;
+      opacity: 0.7;
+    }
+    .twin-locate-node {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      min-width: 88px;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+    }
+    .twin-locate-node-label {
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--foreground);
+      white-space: nowrap;
+    }
+    .twin-locate-node-sub {
+      margin-top: 2px;
+      color: var(--foreground-secondary);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .twin-locate-node-dot-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 18px;
+      margin-top: 4px;
+    }
+    .twin-locate-node-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 2px solid var(--border-strong);
+      background: var(--surface-1);
+      transition: all 120ms ease;
+    }
+    .twin-locate-node.is-active .twin-locate-node-dot {
+      border-color: var(--highlight-copy-blue-500, #3b6fe0);
+      background: var(--highlight-copy-blue-500, #3b6fe0);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--highlight-copy-blue-500, #3b6fe0) 25%, transparent);
+    }
+    #locateChainContent {
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .twin-locate-section {
+      scroll-margin-top: 112px;
+    }
+    .twin-locate-section-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--foreground);
+      transition: color 120ms ease;
+    }
+    /* 迭代层等标题右侧需要挂 smoothing 滑条时,用行容器把标题挤到左侧 */
+    .twin-locate-section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin: 0 0 8px;
+    }
+    .twin-locate-section-title-row .twin-locate-section-title {
+      margin: 0;
+    }
+    .twin-locate-section-content {
+      width: 100%;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .twin-locate-section.is-active .twin-locate-section-title {
+      color: var(--highlight-copy-blue-500, #3b6fe0);
+    }
+    /* 「迭代层」内容区复用「关键指标」的 loss / grad_norm 图表(同一份事故重演数据),
+       见 js/training-run-twin.js 的 mountLocateMetricCharts() */
+    .twin-locate-metric-block {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .twin-locate-metric-charts {
+      width: 100%;
+      display: flex;
+      gap: var(--space-3);
+    }
+    .twin-locate-metric-note {
+      margin: 0;
+      color: var(--foreground-secondary);
+    }
+    .twin-locate-metric-card {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: var(--space-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+    }
+    .twin-locate-metric-card__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      font-size: 11px;
+      color: var(--foreground-muted);
+    }
+    /* 图表容器高度固定,不随内容自适应——engine 内置图例已关闭(见 renderMetricChart),
+       图例改用 buildAccLegend 挂在 head 里,避免"测量高度→追加图例→高度变大→再测量"的循环增长 */
+    .twin-locate-metric-card__chart {
+      height: 170px;
+      width: 100%;
+    }
+
+    /* 「训练信息」改用属性-值列表(参考 ep-expert-parallel-2d.html 的「选中对象」面板),
+       每组一个带边框的盒子,行内左侧属性名 muted、右侧值,值后可跟 small 备注 */
+    .twin-info-box {
+      display: grid;
+      gap: 6px;
+      margin-top: 6px;
+      padding: 9px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--foreground) 3%, transparent);
+    }
+    .twin-info-line {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      align-items: baseline;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .twin-info-line > span:first-child {
+      color: var(--foreground-muted);
+    }
+    .twin-info-line > span:last-child {
+      color: var(--foreground);
+    }
+    .twin-info-line small {
+      margin-left: 6px;
+      color: var(--foreground-secondary);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body class="train-twin-page" data-theme="light" data-model="deepseek" data-task="pretrain" data-hardware="cluster2048">
+  <header class="twin-topbar">
+    <div class="twin-title-block">
+      <span class="twin-kicker">Model Training Monitoring Dashboard</span>
+      <h1>模型训练监控大盘</h1>
+    </div>
+    <div class="twin-topbar-actions">
+      <div class="twin-progress-status" id="progressTopbar" title="训练进度">
+        <div class="twin-progress-status-info">
+          <div class="twin-progress-status-row">
+            <span class="twin-progress-status-label">Step</span>
+            <strong id="progressStep">-- / --</strong>
+            <span class="twin-progress-status-label">Epoch</span>
+            <strong id="progressEpoch">-- / --</strong>
+          </div>
+          <div class="twin-progress-status-track" aria-hidden="true">
+            <div class="twin-progress-status-fill" id="progressFill"></div>
+          </div>
+        </div>
+        <span class="twin-progress-status-pct" id="progressPct">--</span>
+      </div>
+      <button class="btn btn-ghost twin-theme-toggle" id="themeToggle" type="button" aria-pressed="false" title="切换浅色模式">
+        <span class="twin-theme-toggle-icon" aria-hidden="true"></span>
+        <span id="themeToggleLabel">浅色模式</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="twin-shell">
+    <section class="panel-shell twin-center-pane" aria-label="架构与脚本解释">
+      <div class="panel-shell-header twin-pane-header">
+        <div>
+          <div class="panel-shell-title" id="architectureTitle">DeepSeek V3.2 整网图</div>
+          <div class="panel-shell-meta" id="architectureMeta">params=671B/37B · MoE=256+1(top-8) · MLA=128h · MTP=1 · TP=1 · PP=16 · EP=64 · CP=1 · DP=2 · ranks=2048</div>
+        </div>
+      </div>
+
+      <div class="twin-center-scroll">
+        <section class="twin-graph-card" aria-label="模型架构图">
+          <div class="twin-diagnosis-locator" id="diagnosisLocator" hidden>
+            <strong id="diagnosisLocatorLayer">--</strong>
+            <span id="diagnosisLocatorNote">--</span>
+          </div>
+          <div class="twin-architecture-stage">
+            <div
+              id="modelGraphStage"
+              class="twin-model-training-graphviz"
+              aria-label="Model Graphviz training architecture"
+            ></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="panel-shell twin-monitor-pane" aria-label="实时数据监控">
+      <div class="panel-shell-header twin-pane-header">
+        <div class="twin-pane-header-title-row">
+          <button class="btn btn-ghost btn-icon btn-sm" id="locateChainBack" type="button" hidden aria-label="返回 Run Twin" title="返回 Run Twin">←</button>
+          <div>
+            <div class="panel-shell-title" id="runTwinTitle">训练监控</div>
+            <div class="panel-shell-meta" id="runTwinMeta"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="twin-locate-chain-view" id="runTwinLocateView" hidden>
+        <div class="twin-locate-chain" id="locateChainTop"></div>
+        <div id="locateChainContent"></div>
+      </div>
+
+      <div class="twin-monitor-scroll" id="runTwinDefaultView">
+        <section class="twin-monitor-card twin-accuracy-card" aria-label="训练动态曲线">
+          <div class="twin-card-heading">
+            <div>
+              <h2>关键指标</h2>
+            </div>
+            <div id="accuracySmoothSlot"></div>
+          </div>
+          <div class="twin-accuracy-charts" id="accuracyCharts"></div>
+        </section>
+
+        <section class="twin-monitor-card" aria-label="硬件多卡热力图">
+          <div class="twin-card-heading">
+            <div>
+              <h2>算力占用 · 基础设施层</h2>
+              <p id="hardwareSummary">2048 × H800 · 256 节点，每格为 H800 GPU 卡槽，底色表示算力占用率，角标表示温度/异常风险。</p>
+            </div>
+            <span class="twin-dim">DIM 1</span>
+          </div>
+          <div class="twin-hardware-kpis" aria-label="硬件操作摘要">
+            <div><span>Avg util</span><strong id="hwUtil">--</strong></div>
+            <div><span>Low util</span><strong id="hwLow">--</strong></div>
+            <div><span>Thermal risk</span><strong id="hwThermal">--</strong></div>
+            <div><span>Action</span><strong id="hwAction">--</strong></div>
+          </div>
+          <div class="twin-heat" id="heat"></div>
+          <div class="twin-legend">
+            <span><i class="twin-swatch twin-swatch-util-low"></i>&lt;70% util</span>
+            <span><i class="twin-swatch twin-swatch-util-mid"></i>70-92% util</span>
+            <span><i class="twin-swatch twin-swatch-util-high"></i>&gt;92% util</span>
+            <span><i class="twin-swatch twin-swatch-thermal"></i>温度/异常</span>
+            <strong id="heatStat">util -- · peak -- · 异常 --</strong>
+          </div>
+        </section>
+
+        <section class="twin-monitor-grid" aria-label="风险和事件">
+          <article class="twin-monitor-card">
+            <div class="twin-card-heading">
+              <div>
+                <h2>制品</h2>
+                <p>训练 checkpoint 产出,标记验证集最佳权重。</p>
+              </div>
+            </div>
+            <div class="twin-artifacts" id="artifacts"></div>
+          </article>
+
+          <article class="twin-monitor-card">
+            <div class="twin-card-heading">
+              <div>
+                <h2>事件流</h2>
+                <p>checkpoint、HCCL、straggler 和 dataloader 事件。</p>
+              </div>
+            </div>
+            <div class="twin-feed" id="feed"></div>
+          </article>
+        </section>
+
+        <section class="twin-monitor-card" aria-label="训练信息">
+          <div class="twin-card-heading">
+            <div>
+              <h2>训练信息</h2>
+              <p>DeepSeek-V3 关键参数与预训练配置。</p>
+            </div>
+          </div>
+
+          <p class="twin-subhead" style="margin-top:2px">关键参数 · 模型结构</p>
+          <div class="twin-info-box">
+            <div class="twin-info-line"><span>层数</span><span>61<small>3 Dense + 58 MoE</small></span></div>
+            <div class="twin-info-line"><span>hidden</span><span>7168<small>FFN 18432 / expert 2048</small></span></div>
+            <div class="twin-info-line"><span>MoE</span><span>256+1<small>top-8 路由, n_group=8</small></span></div>
+            <div class="twin-info-line"><span>注意力</span><span>MLA<small>128 heads · q_lora 1536 / kv_lora 512</small></span></div>
+            <div class="twin-info-line"><span>参数量</span><span>671B<small>激活 37B / token</small></span></div>
+            <div class="twin-info-line"><span>精度</span><span>FP8<small>训练 · BF16 推理</small></span></div>
+            <div class="twin-info-line"><span>vocab</span><span>129280<small>MTP 1 层 (~14B)</small></span></div>
+            <div class="twin-info-line"><span>max seq</span><span>163840<small>128K 上下文</small></span></div>
+          </div>
+
+          <p class="twin-subhead">集群规模 · 2048×H800</p>
+          <div class="twin-info-box">
+            <div class="twin-info-line"><span>GPU 总数</span><span>2048<small>H800 · 256 节点×8</small></span></div>
+            <div class="twin-info-line"><span>并行策略</span><span>PP16×EP64<small>ZeRO-1 DP · 无 TP</small></span></div>
+            <div class="twin-info-line"><span>节点内</span><span>NVLink<small>NVSwitch 160 GB/s</small></span></div>
+            <div class="twin-info-line"><span>跨节点</span><span>IB 50GB/s<small>EP64 跨 8 节点</small></span></div>
+          </div>
+
+          <p class="twin-subhead">预训练超参</p>
+          <div class="twin-info-box">
+            <div class="twin-info-line"><span>训练 token</span><span>14.8T<small>≈ 1 epoch 单遍</small></span></div>
+            <div class="twin-info-line"><span>序列长度</span><span>4096<small>预训练 4K</small></span></div>
+            <div class="twin-info-line"><span>Batch</span><span>15360<small>3072 渐增至 15360</small></span></div>
+            <div class="twin-info-line"><span>优化器</span><span>AdamW<small>β 0.9/0.95 · wd 0.1</small></span></div>
+            <div class="twin-info-line"><span>学习率</span><span>2.2e-4<small>2K warmup → cos 2.2e-5</small></span></div>
+            <div class="twin-info-line"><span>Grad clip</span><span>1.0<small>balance α 1e-4</small></span></div>
+          </div>
+
+          <p class="twin-subhead">步数与 Epoch · 推算</p>
+          <div class="twin-info-box">
+            <div class="twin-info-line"><span>每步 token</span><span>62.9M<small>15360×4096 稳态</small></span></div>
+            <div class="twin-info-line"><span>总步数</span><span>≈24 万<small>含前期 batch 渐增</small></span></div>
+            <div class="twin-info-line"><span>Epoch</span><span>≈1<small>14.8T 基本单遍</small></span></div>
+            <div class="twin-info-line"><span>LR 分段</span><span>3 段<small>warmup + 恒定 + cosine</small></span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <aside class="panel-shell twin-side-pane" aria-label="问题诊断">
+      <div class="panel-shell-header twin-pane-header">
+        <div>
+          <div class="panel-shell-title">问题诊断</div>
+        </div>
+      </div>
+      <div class="twin-pane-scroll">
+        <section class="twin-control-section" aria-label="诊断案例列表">
+          <div class="twin-option-list">
+            <div class="twin-option diagnosis-card" data-diagnosis="moe-a2a" role="button" tabindex="0">
+              <div class="diagnosis-card-head">
+                <span>问题一</span>
+                <span class="diagnosis-severity is-p0">P0</span>
+                <span class="diagnosis-category">精度</span>
+              </div>
+              <small><strong>MoE all-to-all 超时导致 loss NaN</strong></small>
+              <small class="diagnosis-desc" data-tooltip="layer 38 router 将 98% token 集中路由到 expert 193,EP rank 23 all-to-all send/recv 不匹配触发死锁">layer 38 router 将 98% token 集中路由到 expert 193,EP rank 23 all-to-all send/recv 不匹配触发死锁</small>
+            </div>
+            <div class="twin-option diagnosis-card" data-diagnosis="q-lora-fp8" role="button" tabindex="0">
+              <div class="diagnosis-card-head">
+                <span>问题二</span>
+                <span class="diagnosis-severity is-p1">P1</span>
+                <span class="diagnosis-category">精度</span>
+              </div>
+              <small><strong>q_lora FP8 溢出导致 grad_norm 缓慢发散</strong></small>
+              <small class="diagnosis-desc" data-tooltip="layer 42 q_lora 输入 3.2% 元素超出 FP8 E4M3 表示范围(max=448),经低秩压缩放大误差">layer 42 q_lora 输入 3.2% 元素超出 FP8 E4M3 表示范围(max=448),经低秩压缩放大误差</small>
+            </div>
+            <div class="twin-option diagnosis-card" data-diagnosis="nvlink" role="button" tabindex="0">
+              <div class="diagnosis-card-head">
+                <span>问题三</span>
+                <span class="diagnosis-severity is-p1">P1</span>
+                <span class="diagnosis-category">Infra</span>
+              </div>
+              <small><strong>NVLINK 链路掉线导致 MFU 骤降</strong></small>
+              <small class="diagnosis-desc" data-tooltip="node2 GPU 3 NVLINK lane 5 inactive,CRC error 突增,NCCL 回退至 IB 慢路径拖慢 PP pipeline">node2 GPU 3 NVLINK lane 5 inactive,CRC error 突增,NCCL 回退至 IB 慢路径拖慢 PP pipeline</small>
+            </div>
+            <div class="twin-option diagnosis-card" data-diagnosis="perf-compute-bottleneck" role="button" tabindex="0">
+              <div class="diagnosis-card-head">
+                <span>问题四</span>
+                <span class="diagnosis-severity is-p1">P1</span>
+                <span class="diagnosis-category">性能</span>
+              </div>
+              <small><strong>整网耗时下钻：算子带宽瓶颈 + AICPU 回退导致步耗时超标 42%</strong></small>
+              <small class="diagnosis-desc" data-tooltip="lm_head MatMulV2 vocab 非对齐致 cube_util 仅 49%,CE loss 手写算子链走 AICPU 回退(526ms),PP stage 7 过载 1.82×,MFU 仅 38%">lm_head MatMulV2 vocab 非对齐致 cube_util 仅 49%,CE loss 手写算子链走 AICPU 回退(526ms),PP stage 7 过载 1.82×,MFU 仅 38%</small>
+            </div>
+            <div class="twin-option diagnosis-card" data-diagnosis="perf-comm-straggler" role="button" tabindex="0">
+              <div class="diagnosis-card-head">
+                <span>问题五</span>
+                <span class="diagnosis-severity is-p1">P1</span>
+                <span class="diagnosis-category">性能</span>
+              </div>
+              <small><strong>MoE all-to-all 快慢卡：步耗时周期性尖峰、尾延迟恶化</strong></small>
+              <small class="diagnosis-desc" data-tooltip="router gate bias 漂移致 rank 17/23/41 承接 5× expert token,all-to-all 耗时暴增 32×,其余 61 rank 空等,步耗时 CV=27%">router gate bias 漂移致 rank 17/23/41 承接 5× expert token,all-to-all 耗时暴增 32×,其余 61 rank 空等,步耗时 CV=27%</small>
+            </div>
+          </div>
+        </section>
+      </div>
+    </aside>
+  </main>
+
+  <div id="diagnosisTooltip" class="diagnosis-bubble" hidden></div>
+  <script>
+    (() => {
+      const bubble = document.getElementById('diagnosisTooltip');
+      if (!bubble) return;
+      let activeDesc = null;
+
+      function show(e) {
+        const desc = e.currentTarget;
+        const tip = desc.dataset.tooltip;
+        if (!tip) return;
+        activeDesc = desc;
+        bubble.textContent = tip;
+        bubble.hidden = false;
+        position(e);
+      }
+
+      function position(e) {
+        const rect = activeDesc.getBoundingClientRect();
+        bubble.style.left = Math.max(6, rect.left - 6) + 'px';
+        bubble.style.top = (rect.bottom + 4) + 'px';
+      }
+
+      function hide() {
+        activeDesc = null;
+        bubble.hidden = true;
+      }
+
+      document.querySelectorAll('.diagnosis-desc').forEach((desc) => {
+        desc.addEventListener('mouseenter', show);
+        desc.addEventListener('mouseleave', hide);
+        desc.addEventListener('mousemove', position);
+      });
+    })();
+  </script>
+  <script src="./js/model-graphviz-pattern.js"></script>
+  <script src="./js/model-training-graphviz-pattern.js"></script>
+  <script src="./js/training-metrics-chart.js"></script>
+  <script src="./js/swimlane-task.js"></script>
+  <script src="./js/timeline-swimlane.js"></script>
+  <script src="./js/training-run-twin.js"></script>
+</body>
+</html>
