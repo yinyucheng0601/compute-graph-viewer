@@ -624,8 +624,10 @@
       viewBox: '0 0 10 10',
       refX: '8.6',
       refY: '5',
-      markerWidth: '8',
-      markerHeight: '8',
+      markerWidth: '9',
+      markerHeight: '9',
+      // 固定箭头尺寸,不随 stroke-width 缩放——否则被标红(stroke-width 3px)的连线箭头会异常放大
+      markerUnits: 'userSpaceOnUse',
       orient: 'auto-start-reverse',
     });
     marker.appendChild(createSvgElement('path', {

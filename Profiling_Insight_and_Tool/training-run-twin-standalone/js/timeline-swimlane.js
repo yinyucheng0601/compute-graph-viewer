@@ -311,14 +311,19 @@
     );
   }
 
-  function render(host) {
+  // options.rankFilter: { from, to } 可覆盖 RUNTIME_CONFIG 里的默认范围。
+  // 底部 Timeline 面板走全量(16-23);问题一「通信调度层」只需 r22/r23,故传 {from:22,to:23}。
+  function render(host, options = {}) {
     if (!host) return;
     const SW = window.PtoSwimlaneTaskPattern;
     if (!SW) {
       host.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--foreground-secondary)">swimlane-task.js 未加载</div>';
       return;
     }
-    const RT = buildSimulated1F1BRuntime(RUNTIME_CONFIG);
+    const cfg = options.rankFilter
+      ? { ...RUNTIME_CONFIG, rankFilter: options.rankFilter }
+      : RUNTIME_CONFIG;
+    const RT = buildSimulated1F1BRuntime(cfg);
 
     // 主题相关色值/文字色（port 自原页 lightT()/txtMuted() 等）
     let cc;

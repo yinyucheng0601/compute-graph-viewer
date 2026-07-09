@@ -17,6 +17,7 @@ body {
   --twin-chart-recall: var(--highlight-accum-orange-source);
   --twin-chart-gradnorm: var(--highlight-l0b-deep-violet-source);
   --twin-chart-corr: var(--danger);
+  --twin-chart-mem: var(--highlight-ub-blue-source);
 }
 
 html[data-theme="light"] {
@@ -27,6 +28,7 @@ html[data-theme="light"] {
   --twin-chart-recall: color-mix(in srgb, var(--highlight-accum-orange-source) 72%, black);
   --twin-chart-gradnorm: color-mix(in srgb, var(--highlight-l0b-deep-violet-source) 72%, black);
   --twin-chart-corr: color-mix(in srgb, var(--danger) 82%, black);
+  --twin-chart-mem: color-mix(in srgb, var(--highlight-ub-blue-source) 72%, black);
 }
 
 .train-twin-page {
@@ -124,6 +126,27 @@ html[data-theme="light"] .train-twin-page .twin-side-pane {
 html[data-theme="light"] .train-twin-page .twin-center-pane,
 html[data-theme="light"] .train-twin-page .twin-monitor-pane {
   background: #fff;
+}
+
+/* 浅色模式:合并大面板本体给白底,内部两块子面板改透明,避免叠出接缝 */
+html[data-theme="light"] .train-twin-page .twin-work-area.is-merged {
+  background: #fff;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+html[data-theme="light"] .train-twin-page .twin-work-area.is-merged > .panel-shell {
+  background: transparent;
+}
+
+/* 浅色模式:头部栏白底,底部用可见的浅色分隔线,让头部栏从正文里划分出来 */
+html[data-theme="light"] .train-twin-page .twin-work-area.is-merged .twin-locate-chain {
+  background: #fff;
+  border-bottom-color: var(--border-subtle);
+}
+
+html[data-theme="light"] .train-twin-page .twin-work-area.is-merged .twin-center-pane > .panel-shell-header {
+  border-bottom-color: var(--border-subtle);
 }
 
 html[data-theme="light"] .train-twin-page .twin-center-scroll {
@@ -402,9 +425,63 @@ html[data-theme="light"] .twin-theme-toggle-icon::after {
   height: calc(100vh - 68px);
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr);
+  /* 第 1 行:工作区 + 诊断列;第 2 行:底部横向 Timeline 面板(高度由面板自身撑开) */
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-4);
   padding: 0 var(--space-4) var(--space-4);
   overflow: hidden;
+}
+
+/* 底部横向「Timeline」面板:跨满所有列,顶部有拖拽手柄可调高度,默认 200px */
+.twin-timeline-pane {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 200px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.twin-timeline-resizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  cursor: ns-resize;
+  z-index: 6;
+}
+
+.twin-timeline-resizer::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background 120ms ease;
+}
+
+.twin-timeline-resizer:hover::before {
+  background: var(--foreground-secondary);
+}
+
+.twin-timeline-body {
+  flex: 1;
+  min-height: 0;
+  /* 泳道图(.opv-swimlane)自带内部横/纵向滚动,这里交给它管理,避免叠出两层滚动条 */
+  overflow: hidden;
+}
+
+.twin-timeline-subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--foreground-secondary);
+  line-height: 1.4;
 }
 
 .twin-side-pane,
@@ -415,6 +492,58 @@ html[data-theme="light"] .twin-theme-toggle-icon::after {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 「整网图」列与「监控 / 定位链」列的外层容器:默认作为两块独立面板并排(整网图 | 训练监控),
+   进入问题后加 .is-merged 合并为一块大面板——整网图在左、定位链在右,不再是独立面板 */
+.twin-work-area {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.twin-work-area.is-merged {
+  gap: 0;
+  background: var(--panel-shell-bg);
+  border: 1px solid var(--panel-shell-border);
+  border-radius: var(--panel-shell-radius);
+  box-shadow: var(--panel-shell-shadow);
+}
+
+/* 合并后,内部两块子面板去掉各自的边框/圆角/底色/阴影,读起来是同一块面板 */
+.twin-work-area.is-merged > .panel-shell {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* 左侧「整网图 / 问题一」标题头 + 右侧定位链导航,拼成一条贯通整块面板的头部栏:
+   两者等高、共用一条底部分隔线,下方才是图 / 图表正文 */
+.twin-work-area.is-merged .twin-center-pane > .panel-shell-header,
+.twin-work-area.is-merged .twin-locate-chain {
+  height: 78px;
+  min-height: 78px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.twin-work-area.is-merged .twin-locate-chain {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 0 var(--space-4);
+  align-items: center;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: var(--panel-shell-bg);
+  box-shadow: none;
 }
 
 .twin-pane-header {
@@ -438,7 +567,8 @@ html[data-theme="light"] .twin-theme-toggle-icon::after {
 .twin-monitor-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: var(--space-4);
 }
 
@@ -720,6 +850,21 @@ html[data-theme="light"] .twin-theme-toggle-icon::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
+}
+
+.twin-infra-charts {
+  flex: none;
+  min-height: 0;
+  margin-bottom: var(--space-2);
+}
+
+.twin-infra-charts .twin-accuracy-cards {
+  grid-template-rows: 1fr;
+  min-height: 140px;
+}
+
+.twin-infra-charts .twin-accuracy-metric-card__chart {
+  min-height: 100px;
 }
 
 .twin-accuracy-metric-card {
@@ -1200,6 +1345,11 @@ html[data-theme="light"] .twin-theme-toggle-icon::after {
     overflow: visible;
   }
 
+  .twin-work-area {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
   .twin-side-pane,
   .twin-center-pane,
   .twin-monitor-pane {
@@ -1430,3 +1580,101 @@ html[data-embed="hardware"] .twin-hardware-kpis {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 .twin-layerview.is-maximized svg { width: 100%; height: 100%; }
+
+/* ── 模型层展开图搬到整网图区域展示 ──────────────────────────────────────
+   定位链「模型层」的「查看」按钮触发,#modelLayerStage 覆盖在 .twin-architecture-stage 上。
+   打开时整网图(#modelGraphStage)对准 MoE(router)节点放大淡出,展开图从该处放大淡入,
+   左右层列由中心向两侧逐渐出现(JS 逐个设 animation-delay),两图切换有连续观感。逻辑见
+   js/training-run-twin.js 的 openModelLayerView() / closeModelLayerView()。 */
+#modelGraphStage {
+  transition: transform 0.52s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.42s ease;
+  transform-origin: var(--twin-zoom-ox, 60%) var(--twin-zoom-oy, 52%);
+}
+.twin-architecture-stage.is-layer-active #modelGraphStage {
+  transform: scale(2.1);
+  opacity: 0;
+  pointer-events: none;
+}
+.twin-layer-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+}
+.twin-layer-stage[hidden] { display: none; }
+.twin-layer-stage .twin-layerview {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.twin-layer-stage .twin-layerview svg { width: 100%; height: 100%; }
+.twin-layer-stage.is-entering .twin-layerview {
+  animation: twinLayerStageIn 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.twin-layer-stage.is-leaving .twin-layerview {
+  animation: twinLayerStageOut 0.38s ease both;
+}
+@keyframes twinLayerStageIn {
+  from { opacity: 0; transform: scale(1.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes twinLayerStageOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.3); }
+}
+/* 左右层列逐渐出现:to 缺省回落到层列自身的 opacity(.6),配合 JS 设的 animation-delay 做扩散 */
+@keyframes twinLayerTickIn {
+  from { opacity: 0; }
+}
+.twin-layer-stage-back {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 6;
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  color: var(--foreground-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.twin-layer-stage-back:hover { background: var(--state-hover); color: var(--foreground); }
+
+/* 「模型层」内容区里替换原内嵌大图的「查看」CTA */
+.twin-layerview-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at 88% 20%, color-mix(in srgb, #4f6df6 12%, transparent), transparent 42%),
+    color-mix(in srgb, var(--foreground) 3%, transparent);
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.twin-layerview-cta:hover { border-color: color-mix(in srgb, #4f6df6 50%, var(--border-subtle)); }
+.twin-layerview-cta-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.twin-layerview-cta-text strong { font-size: 13px; font-weight: 700; color: var(--foreground); }
+.twin-layerview-cta-text span { font-size: 11px; color: var(--foreground-secondary); line-height: 1.4; }
+.twin-layerview-cta-btn { flex: none; }
+
+/* 整网图上的紧凑问题徽标(见 js/training-run-twin.js 的 applyProblemMarkers):
+   序号圆点 + 白色描边环 + 轻投影,悬浮再显示完整标签,取代原来的大红卡片以减少遮挡。 */
+.pto-problem-badge { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28)); transition: opacity 160ms ease; }
+.pto-problem-badge text { pointer-events: none; }
+/* 选中某个问题后,只保留该问题徽标,其余淡出(见 highlightProblemBadge) */
+.pto-problem-badge.is-dimmed { opacity: 0.12; }

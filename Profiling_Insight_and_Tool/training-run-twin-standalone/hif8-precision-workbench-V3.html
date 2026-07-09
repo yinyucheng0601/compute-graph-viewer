@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HiF8 精度诊断工作台 · Ascend A5</title>
+<style>
+:root{
+  --bg-void:#0a0d16; --bg-panel:#10141f; --bg-elev:#161c2b; --bg-inset:#0c1019;
+  --stroke:#232c40; --stroke-soft:#1a2131;
+  --ink:#dfe4f0; --ink-mute:#8a93a9; --ink-dim:#545d74;
+  --signal:#35e0d0;   /* reference / clean */
+  --signal-2:#5b9dff; /* quantized */
+  --grad:#b98cff;     /* backward pass */
+  --ok:#3ddc84; --warn:#f5b544; --crit:#ff5a6a;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg-void); color:var(--ink); font-family:var(--sans);
+  font-size:13px; overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:var(--mono)}
+button{font-family:inherit;color:inherit;cursor:pointer;background:none;border:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#232c40;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#2f3a54}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ shell ============ */
+.app{display:flex;flex-direction:column;height:100vh}
+.titlebar{
+  height:38px;flex:0 0 38px;display:flex;align-items:center;gap:14px;
+  padding:0 14px;background:linear-gradient(180deg,#12172400,#0a0d16),var(--bg-panel);
+  border-bottom:1px solid var(--stroke);
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.2px}
+.brand .glyph{width:20px;height:20px;display:grid;place-items:center}
+.brand small{color:var(--ink-dim);font-weight:400;font-size:11px}
+.tb-run{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--ink-mute)}
+.tb-run .chip{background:var(--bg-inset);border:1px solid var(--stroke);padding:2px 9px;border-radius:5px;color:var(--ink)}
+.live{display:flex;align-items:center;gap:6px;color:var(--ok);font-size:11px;font-family:var(--mono)}
+.live .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.tb-spacer{flex:1}
+.tb-meta{font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* activity bar */
+.activity{width:50px;flex:0 0 50px;background:var(--bg-void);border-right:1px solid var(--stroke);
+  display:flex;flex-direction:column;align-items:center;padding-top:8px;gap:4px}
+.act-btn{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;color:var(--ink-dim);position:relative}
+.act-btn:hover{color:var(--ink-mute);background:var(--bg-elev)}
+.act-btn.on{color:var(--signal)}
+.act-btn.on::before{content:'';position:absolute;left:-8px;top:8px;bottom:8px;width:2px;background:var(--signal);border-radius:2px}
+.act-sp{flex:1}
+
+/* explorer */
+.explorer{width:238px;flex:0 0 238px;background:var(--bg-panel);border-right:1px solid var(--stroke);
+  display:flex;flex-direction:column;overflow:hidden}
+.xp-head{padding:10px 12px 6px;font-size:11px;letter-spacing:.6px;color:var(--ink-dim);text-transform:uppercase}
+.xp-run{padding:6px 12px 10px;border-bottom:1px solid var(--stroke-soft)}
+.xp-run .name{font-family:var(--mono);font-size:12px;color:var(--ink);display:flex;align-items:center;gap:6px}
+.xp-run .sub{font-size:11px;color:var(--ink-dim);margin-top:3px;font-family:var(--mono)}
+.tree{flex:1;overflow-y:auto;padding:6px 0}
+.tree-sec{padding:7px 12px 3px;font-size:10.5px;letter-spacing:.5px;color:var(--ink-dim);text-transform:uppercase;
+  display:flex;justify-content:space-between}
+.node{display:flex;align-items:center;gap:7px;padding:3px 12px 3px 20px;font-family:var(--mono);font-size:11.5px;
+  color:var(--ink-mute);cursor:pointer;position:relative;white-space:nowrap}
+.node:hover{background:var(--bg-elev)}
+.node.sel{background:#182338;color:var(--ink)}
+.node.sel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--signal-2)}
+.node .sev{width:7px;height:7px;border-radius:2px;flex:0 0 7px}
+.node .nm{overflow:hidden;text-overflow:ellipsis}
+.node .rd{margin-left:auto;font-size:10.5px;color:var(--ink-dim)}
+
+/* main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg-void)}
+.tabs{height:38px;flex:0 0 38px;display:flex;align-items:stretch;background:var(--bg-panel);border-bottom:1px solid var(--stroke)}
+.tab{padding:0 16px;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-mute);
+  border-right:1px solid var(--stroke-soft);position:relative}
+.tab:hover{color:var(--ink);background:var(--bg-elev)}
+.tab.on{color:var(--ink);background:var(--bg-void)}
+.tab.on::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--signal)}
+.tab .badge{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:9px;background:#2a1620;color:var(--crit);border:1px solid #4a1f2a}
+
+/* scrubber bar (signature control) */
+.scrub{height:52px;flex:0 0 52px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:linear-gradient(180deg,var(--bg-panel),#0c1019);border-bottom:1px solid var(--stroke)}
+.play{width:32px;height:32px;border-radius:8px;background:var(--bg-elev);border:1px solid var(--stroke);
+  display:grid;place-items:center;color:var(--signal)}
+.play:hover{border-color:var(--signal);box-shadow:0 0 0 1px var(--signal) inset}
+.scrub-wrap{flex:1;display:flex;flex-direction:column;gap:5px}
+.scrub-top{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.scrub-top b{color:var(--signal);font-weight:500}
+.track{position:relative;height:16px;display:flex;align-items:center}
+.track input[type=range]{width:100%;-webkit-appearance:none;background:transparent;position:relative;z-index:3;margin:0}
+.track input[type=range]::-webkit-slider-runnable-track{height:4px;background:linear-gradient(90deg,#2a3550,#232c40);border-radius:3px}
+.track input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--signal);margin-top:-5px;box-shadow:0 0 8px var(--signal);cursor:pointer}
+.track-bg{position:absolute;left:0;right:0;top:6px;height:4px;background:var(--bg-inset);border-radius:3px;z-index:1;overflow:hidden}
+.track-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#1c6b64,var(--signal));z-index:2}
+.track-marker{position:absolute;top:1px;width:2px;height:14px;background:var(--crit);z-index:2;box-shadow:0 0 6px var(--crit)}
+.scrub-read{display:flex;gap:18px;font-family:var(--mono);font-size:11px;text-align:right}
+.scrub-read div span{display:block;color:var(--ink-dim);font-size:9.5px;letter-spacing:.4px}
+.scrub-read div b{font-weight:500;font-size:13px}
+
+.view{flex:1;overflow-y:auto;padding:16px;position:relative}
+.view[hidden]{display:none}
+
+/* generic pieces */
+.grid{display:grid;gap:14px}
+.card{background:var(--bg-panel);border:1px solid var(--stroke);border-radius:10px;padding:14px}
+.card h3{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim);
+  font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h3 .hint{margin-left:auto;font-size:10.5px;color:var(--ink-dim);text-transform:none;letter-spacing:0;font-family:var(--mono)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.kpi{background:var(--bg-panel);border:1px solid var(--stroke);border-radius:10px;padding:13px 14px;position:relative;overflow:hidden}
+.kpi .lab{font-size:11px;color:var(--ink-mute);letter-spacing:.3px}
+.kpi .val{font-family:var(--mono);font-size:26px;font-weight:500;margin-top:6px;line-height:1}
+.kpi .val small{font-size:13px;color:var(--ink-dim);font-weight:400}
+.kpi .delta{font-family:var(--mono);font-size:11px;margin-top:6px}
+.kpi .spark{position:absolute;right:10px;top:12px;opacity:.6}
+.kpi::after{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.k-ok::after{background:var(--ok)} .kpi.k-warn::after{background:var(--warn)} .kpi.k-crit::after{background:var(--crit)}
+.up{color:var(--crit)} .down{color:var(--ok)}
+canvas{display:block;width:100%}
+
+/* distribution readouts */
+.readgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.read{background:var(--bg-inset);border:1px solid var(--stroke-soft);border-radius:7px;padding:9px 11px}
+.read .l{font-size:10.5px;color:var(--ink-dim);letter-spacing:.3px}
+.read .v{font-family:var(--mono);font-size:16px;margin-top:3px}
+.seg{display:inline-flex;background:var(--bg-inset);border:1px solid var(--stroke);border-radius:7px;overflow:hidden}
+.seg button{padding:5px 12px;font-size:11.5px;color:var(--ink-mute);font-family:var(--mono)}
+.seg button.on{background:#182338;color:var(--signal)}
+.legend{display:flex;gap:16px;font-size:11px;color:var(--ink-mute);flex-wrap:wrap}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.taper-key{display:flex;gap:0;margin-top:12px;border-radius:6px;overflow:hidden;border:1px solid var(--stroke-soft);font-family:var(--mono);font-size:10px}
+.taper-key div{flex:1;padding:6px 8px;text-align:center;color:#0a0d16;font-weight:600}
+
+/* error table */
+.etable{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+.etable th{text-align:right;padding:7px 10px;color:var(--ink-dim);font-weight:500;font-size:10.5px;
+  letter-spacing:.4px;border-bottom:1px solid var(--stroke);cursor:pointer;user-select:none;white-space:nowrap}
+.etable th:first-child{text-align:left}
+.etable th.sorted{color:var(--signal)}
+.etable td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--stroke-soft);white-space:nowrap}
+.etable td:first-child{text-align:left;color:var(--ink)}
+.etable tr:hover td{background:var(--bg-elev)}
+.etable tr.sel td{background:#182338}
+.cell{display:inline-block;padding:2px 7px;border-radius:5px;min-width:52px;text-align:center}
+.tag{font-size:9.5px;padding:1px 6px;border-radius:4px;margin-right:7px;font-family:var(--mono)}
+.tag.attn{background:#16283a;color:#5b9dff} .tag.mlp{background:#2a2016;color:#f5b544}
+.tag.norm{background:#1c2a20;color:#3ddc84} .tag.io{background:#241a30;color:#b98cff}
+
+/* propagation */
+.prop-flow{display:flex;gap:6px;align-items:flex-end;height:150px;padding:8px 0;overflow-x:auto}
+.pcol{flex:1;min-width:52px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer}
+.pcol .bars{width:100%;height:110px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
+.pcol .b{border-radius:2px 2px 0 0;transition:height .25s}
+.pcol .lbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-dim);writing-mode:horizontal-tb}
+.pcol:hover .lbl{color:var(--ink)}
+
+/* attribution */
+.suspect{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--stroke);
+  border-radius:9px;background:var(--bg-inset);margin-bottom:9px}
+.suspect .rank{font-family:var(--mono);font-size:18px;color:var(--ink-dim);width:26px;text-align:center}
+.suspect .info{flex:1;min-width:0}
+.suspect .info .n{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.suspect .info .m{font-size:11px;color:var(--ink-mute);margin-top:3px}
+.suspect .bar{width:120px;height:6px;background:var(--bg-void);border-radius:4px;overflow:hidden}
+.suspect .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--warn),var(--crit))}
+.suspect .act{font-size:11px;color:var(--signal);font-family:var(--mono);white-space:nowrap;
+  border:1px solid #1c4a45;padding:4px 9px;border-radius:6px;background:#0d1f1d}
+
+/* status bar */
+.status{height:24px;flex:0 0 24px;display:flex;align-items:center;gap:0;background:var(--signal);
+  color:#06231f;font-family:var(--mono);font-size:11px;font-weight:500}
+.status .s{padding:0 12px;height:100%;display:flex;align-items:center;gap:6px}
+.status .s.dark{background:#0a3730;color:#8ff0e4}
+.status .sp{flex:1}
+.status .s.crit-s{background:var(--crit);color:#2a0308}
+
+/* inspector */
+.inspector{width:260px;flex:0 0 260px;background:var(--bg-panel);border-left:1px solid var(--stroke);
+  overflow-y:auto;padding:14px}
+.insp-title{font-family:var(--mono);font-size:13px;color:var(--ink);word-break:break-all}
+.insp-sub{font-size:11px;color:var(--ink-dim);margin:4px 0 14px;font-family:var(--mono)}
+.irow{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--stroke-soft);
+  font-family:var(--mono);font-size:11.5px}
+.irow .k{color:var(--ink-mute)} .irow .v{color:var(--ink)}
+.mini{margin-top:14px}
+.mini h4{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px}
+.pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:5px;font-family:var(--mono);margin-top:4px}
+
+.tip{position:fixed;pointer-events:none;background:#050710;border:1px solid var(--stroke);border-radius:6px;
+  padding:7px 9px;font-family:var(--mono);font-size:11px;color:var(--ink);z-index:99;opacity:0;transition:opacity .1s;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);max-width:220px}
+@media (max-width:1180px){.inspector{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- titlebar -->
+  <div class="titlebar">
+    <div class="brand">
+      <span class="glyph">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 13 L6 5 L9 11 L12 3 L16 13" fill="none" stroke="#35e0d0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="3" r="1.6" fill="#ff5a6a"/></svg>
+      </span>
+      HiF8 精度诊断工作台 <small>Ascend A5 · Precision Forensics</small>
+    </div>
+    <div class="tb-run">
+      <span>run</span><span class="chip">llama2-7b · hif8-e2e</span>
+      <span class="live"><span class="dot"></span>ATTACHED</span>
+    </div>
+    <div class="tb-spacer"></div>
+    <div class="tb-meta" id="tbMeta">reference=BF16 · 采样步长 50 · 层数 46</div>
+  </div>
+
+  <div class="body">
+    <!-- activity bar -->
+    <div class="activity">
+      <button class="act-btn on" title="诊断工作台">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 17 L8 9 L12 13 L16 5 L21 15"/></svg>
+      </button>
+      <button class="act-btn" title="张量浏览">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="act-btn" title="断点 / 数值守卫">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      </button>
+      <div class="act-sp"></div>
+      <button class="act-btn" title="设置">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+      </button>
+    </div>
+
+    <!-- explorer -->
+    <div class="explorer">
+      <div class="xp-head">诊断资源管理器</div>
+      <div class="xp-run">
+        <div class="name"><span class="live"><span class="dot"></span></span> llama2-7b · hif8-e2e</div>
+        <div class="sub" id="xpSub">step 10000/10000 · ckpt#20</div>
+      </div>
+      <div class="tree" id="tree">
+        <div class="tree-sec">网络层 / 算子 <span id="treeCount"></span></div>
+        <!-- nodes injected -->
+      </div>
+    </div>
+
+    <!-- main -->
+    <div class="main">
+      <div class="tabs" id="tabs">
+        <button class="tab on" data-v="overview">概览</button>
+        <button class="tab" data-v="dist">张量分布</button>
+        <button class="tab" data-v="error">量化误差 <span class="badge" id="errBadge">3</span></button>
+        <button class="tab" data-v="prop">误差传播</button>
+        <button class="tab" data-v="attr">归因分析</button>
+      </div>
+
+      <!-- signature: global training-step scrubber -->
+      <div class="scrub">
+        <button class="play" id="playBtn" title="回放误差累积过程">
+          <svg id="playIcon" width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2 L12 7 L3 12 Z"/></svg>
+        </button>
+        <div class="scrub-wrap">
+          <div class="scrub-top">
+            <span>训练步回放 · 观察量化误差的传播与累积</span>
+            <span>发散点 <b id="divLabel">step 3150</b></span>
+          </div>
+          <div class="track">
+            <div class="track-bg"><div class="track-fill" id="trackFill"></div></div>
+            <div class="track-marker" id="trackMarker"></div>
+            <input type="range" id="stepRange" min="0" max="199" value="199">
+          </div>
+        </div>
+        <div class="scrub-read">
+          <div><span>STEP</span><b class="mono" id="rdStep">10000</b></div>
+          <div><span>ΔLOSS</span><b class="mono" id="rdLoss">—</b></div>
+          <div><span>均值 SQNR</span><b class="mono" id="rdSqnr">—</b></div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: OVERVIEW ============ -->
+      <div class="view" id="v-overview">
+        <div class="kpis" id="kpis" style="margin-bottom:14px"></div>
+        <!-- 候选低精度格式收敛状态 -->
+        <div class="card" style="margin-bottom:14px;padding:12px 14px">
+          <h3 style="margin-bottom:10px">候选低精度格式 · 收敛状态 <span class="hint">同权重/同数据下多格式对照 · 依据洞察点 9</span></h3>
+          <div id="fmtStatus" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+        </div>
+        <div class="grid" style="grid-template-columns:1.55fr 1fr">
+          <div class="card">
+            <h3>训练损失 · 多格式对照 <span class="hint">发散自动检测 · 阈值 |Δloss| &gt; 0.05</span></h3>
+            <canvas id="lossCanvas" height="240"></canvas>
+            <div class="legend" style="margin-top:10px">
+              <span><i style="background:var(--signal-2)"></i>候选 FP8/HiF8</span>
+              <span><i style="background:var(--signal)"></i>BF16 基线</span>
+              <span><i style="background:var(--ok)"></i>MXFP8(正常)</span>
+              <span><i style="background:var(--warn)"></i>loss spike</span>
+              <span><i style="background:var(--crit)"></i>发散区间</span>
+            </div>
+          </div>
+          <div class="card">
+            <h3>损失偏差 Δloss = 候选 − BF16 <span class="hint">累积漂移</span></h3>
+            <canvas id="deltaCanvas" height="176"></canvas>
+            <div class="readgrid" style="grid-template-columns:1fr 1fr">
+              <div class="read"><div class="l">当前 Δloss</div><div class="v" id="ovDelta">—</div></div>
+              <div class="read"><div class="l">首次超阈步</div><div class="v" style="color:var(--crit)">step 3150</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1.55fr;margin-top:14px">
+          <div class="card">
+            <h3>batch logit 分布 · 打散度 <span class="hint">对标 DeepSeek · 防 spike</span></h3>
+            <canvas id="logitCanvas" height="88"></canvas>
+            <div class="readgrid" style="grid-template-columns:1fr 1fr">
+              <div class="read"><div class="l">当前打散度</div><div class="v" id="ovUnif">—</div></div>
+              <div class="read"><div class="l">早期 spike 次数</div><div class="v" style="color:var(--warn)" id="ovSpike">3</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>诊断事件时间线 <span class="hint">数值守卫触发记录</span></h3>
+            <canvas id="timelineCanvas" height="88"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: DISTRIBUTION ============ -->
+      <div class="view" id="v-dist" hidden>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+          <div class="seg" id="tensorSeg">
+            <button class="on" data-t="weight">权重</button>
+            <button data-t="act">激活</button>
+            <button data-t="grad">梯度</button>
+          </div>
+          <div class="mono" style="color:var(--ink-mute);font-size:12px">当前张量 · <b id="distLayer" style="color:var(--ink)">—</b></div>
+          <div class="tb-spacer" style="flex:1"></div>
+          <div class="mono" style="font-size:11px;color:var(--ink-dim)">HiF8 (1-3-3-1 锥形) · scale=<span id="distScale">—</span></div>
+        </div>
+        <div class="grid" style="grid-template-columns:1.6fr 1fr">
+          <div class="card">
+            <h3>数值分布 · 原始 vs HiF8 量化后 <span class="hint">灰色刻度=可表示栅格(近零更密) · 红区=截断/溢出</span></h3>
+            <canvas id="histCanvas" height="300"></canvas>
+            <div class="legend" style="margin-top:10px">
+              <span><i style="background:var(--signal)"></i>原始 FP32 密度</span>
+              <span><i style="background:var(--signal-2)"></i>HiF8 量化后</span>
+              <span><i style="background:#3a4560"></i>可表示栅格</span>
+              <span><i style="background:#3a1620"></i>溢出区(clip)</span>
+            </div>
+            <div class="taper-key">
+              <div style="background:#2a6b64">次正规 · 密</div>
+              <div style="background:#35e0d0">高精度带 M3</div>
+              <div style="background:#5b9dff">中段 M2</div>
+              <div style="background:#f5b544">大值 M1 · 疏</div>
+              <div style="background:#ff5a6a">溢出 &gt; ±448</div>
+            </div>
+          </div>
+          <div class="grid" style="align-content:start">
+            <div class="card">
+              <h3>动态范围利用率 <span class="hint">HiF8 可表示区间占用</span></h3>
+              <canvas id="rangeCanvas" height="76"></canvas>
+              <div class="readgrid">
+                <div class="read"><div class="l">min / max</div><div class="v" id="dMinMax">—</div></div>
+                <div class="read"><div class="l">mean / std</div><div class="v" id="dMeanStd">—</div></div>
+                <div class="read"><div class="l">溢出率 (overflow)</div><div class="v" id="dOver">—</div></div>
+                <div class="read"><div class="l">下溢率 (underflow→0)</div><div class="v" id="dUnder">—</div></div>
+                <div class="read"><div class="l">有效比特 (ENOB)</div><div class="v" id="dEnob">—</div></div>
+                <div class="read"><div class="l">量化 SNR</div><div class="v" id="dSqnr">—</div></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>分布形态 · 量化适配度 <span class="hint">峰度/偏度判断是否适合量化 · 依据洞察点 9</span></h3>
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+                <div style="flex:0 0 84px;text-align:center">
+                  <div class="mono" id="qScore" style="font-size:30px;line-height:1">—</div>
+                  <div style="font-size:10px;color:var(--ink-dim);margin-top:2px">量化适配度</div>
+                </div>
+                <div style="flex:1">
+                  <div style="height:8px;background:var(--bg-void);border-radius:5px;overflow:hidden">
+                    <i id="qScoreBar" style="display:block;height:100%;width:0"></i>
+                  </div>
+                  <div id="fitVerdict" style="font-size:11px;color:var(--ink-mute);margin-top:9px;line-height:1.5"></div>
+                </div>
+              </div>
+              <div class="readgrid" style="grid-template-columns:1fr 1fr">
+                <div class="read"><div class="l">最佳拟合分布</div><div class="v" id="dFit" style="font-size:14px">—</div></div>
+                <div class="read"><div class="l">峰度 kurtosis</div><div class="v" id="dKurt">—</div></div>
+                <div class="read"><div class="l">偏度 skewness</div><div class="v" id="dSkew">—</div></div>
+                <div class="read"><div class="l">离群(尾部)占比</div><div class="v" id="dTail">—</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: ERROR ============ -->
+      <div class="view" id="v-error" hidden>
+        <div class="grid" style="grid-template-columns:1.3fr 1fr">
+          <div class="card">
+            <h3>层 / 算子级量化误差指标 <span class="hint">点击表头排序 · 点击行钻取</span></h3>
+            <div style="overflow-x:auto">
+              <table class="etable" id="etable">
+                <thead><tr>
+                  <th data-s="name">层 / 算子</th>
+                  <th data-s="sqnr" class="sorted">SQNR↑<br><span style="font-weight:400">dB</span></th>
+                  <th data-s="cos">余弦相似度</th>
+                  <th data-s="mse">MSE</th>
+                  <th data-s="maxerr">最大误差</th>
+                  <th data-s="over">溢出率</th>
+                </tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="grid" style="align-content:start">
+            <div class="card">
+              <h3>选中层指标随训练步演化 <span class="hint" id="errSel">—</span></h3>
+              <canvas id="metricCanvas" height="150"></canvas>
+              <div class="legend" style="margin-top:8px">
+                <span><i style="background:var(--signal)"></i>SQNR (dB)</span>
+                <span><i style="background:var(--crit)"></i>溢出率</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3>层 × 步 误差热力图 <span class="hint">SQNR 塌陷 = 亮</span></h3>
+              <canvas id="heatCanvas" height="220"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: PROPAGATION ============ -->
+      <div class="view" id="v-prop" hidden>
+        <div class="card" style="margin-bottom:14px">
+          <h3>误差沿网络深度的传播与累积 <span class="hint">前向左→右 · 柱高=该处单层量化误差 · 折线=累积误差</span></h3>
+          <div class="prop-flow" id="propFlow"></div>
+          <canvas id="propLine" height="120" style="margin-top:6px"></canvas>
+          <div class="legend" style="margin-top:10px">
+            <span><i style="background:var(--signal-2)"></i>前向激活误差</span>
+            <span><i style="background:var(--grad)"></i>反向梯度误差</span>
+            <span><i style="background:var(--crit)"></i>累积误差 (随深度)</span>
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div class="card">
+            <h3>累积放大分析 <span class="hint">相对输入层的误差放大倍数</span></h3>
+            <div class="readgrid" style="grid-template-columns:1fr 1fr" id="propReads"></div>
+          </div>
+          <div class="card">
+            <h3>误差注入源定位 <span class="hint">首个越过 SQNR 30dB 红线的算子</span></h3>
+            <div id="propSource" style="font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--ink-mute)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ VIEW: ATTRIBUTION ============ -->
+      <div class="view" id="v-attr" hidden>
+        <div class="card" style="margin-bottom:14px">
+          <h3>精度分叉定位流程 <span class="hint">标杆(golden)比对 SOP · 对标月之暗面自动化五步法</span></h3>
+          <div id="sopStrip" style="display:flex;align-items:stretch;gap:0"></div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+          <div class="card">
+            <h3>各层对全局 Δloss 的敏感度 <span class="hint">扰动归因 · Σ = 100%</span></h3>
+            <canvas id="attrCanvas" height="240"></canvas>
+          </div>
+          <div class="card">
+            <h3>层 SQNR 塌陷 与 Δloss 尖峰 的相关性 <span class="hint">时序对齐验证</span></h3>
+            <canvas id="corrCanvas" height="240"></canvas>
+            <div class="read" style="margin-top:10px"><div class="l">Pearson 相关系数 r</div><div class="v" style="color:var(--crit)" id="corrR">—</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>可疑算子清单 · 处置建议 <span class="hint">按 loss 贡献排序</span></h3>
+          <div id="suspects"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- inspector -->
+    <div class="inspector" id="inspector">
+      <div class="insp-title" id="insTitle">—</div>
+      <div class="insp-sub" id="insSub">选择一个层查看详情</div>
+      <div id="insBody"></div>
+      <div class="mini">
+        <h4>该层 SQNR 走势</h4>
+        <canvas id="insCanvas" height="60"></canvas>
+      </div>
+      <div class="mini" id="insVerdict"></div>
+    </div>
+  </div>
+
+  <!-- status bar -->
+  <div class="status">
+    <div class="s"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17 L8 9 L12 13 L16 5 L21 15" fill="none" stroke="currentColor" stroke-width="2"/></svg> 诊断中</div>
+    <div class="s dark" id="stStep">step 10000 / 10000</div>
+    <div class="s dark" id="stSqnr">均值 SQNR 33.8 dB</div>
+    <div class="s crit-s" id="stDiv">⚠ 发散 @ step 3150</div>
+    <div class="sp"></div>
+    <div class="s dark" id="stTop">主嫌 blk4.mlp.down_proj</div>
+    <div class="s">HiF8 · Ascend A5</div>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+"use strict";
+/* ---------- seeded RNG ---------- */
+let _s=1337; function rnd(){_s=(_s*1103515245+12345)&0x7fffffff;return _s/0x7fffffff;}
+function gauss(){return (rnd()+rnd()+rnd()+rnd()-2)/2;}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ---------- model / data generation ---------- */
+const N=200;                 // sampled points (every 50 real steps → 10000)
+const stepOf=i=>i*50;
+const DIV=63;                // divergence sample index (~step 3150)
+const BLOCKS=6;
+
+// build layer list
+const layers=[];
+layers.push({name:'embed_tokens',type:'io',depth:0});
+for(let b=0;b<BLOCKS;b++){
+  const d=1+b;
+  ['attn.q_proj','attn.k_proj','attn.v_proj','attn.o_proj','mlp.gate_proj','mlp.up_proj','mlp.down_proj']
+   .forEach(op=>{
+      const t = op.startsWith('attn')?'attn':'mlp';
+      layers.push({name:`blk${b}.${op}`,type:t,depth:d,block:b,op});
+   });
+  layers.push({name:`blk${b}.input_norm`,type:'norm',depth:d,block:b});
+}
+layers.push({name:'lm_head',type:'io',depth:BLOCKS+1});
+
+// culprits: these degrade after divergence and drive the loss spike
+const CULPRIT={'blk4.mlp.down_proj':1.0,'blk3.attn.o_proj':0.72,'blk5.mlp.down_proj':0.45};
+
+// per-layer per-step metrics
+layers.forEach(L=>{
+  const base = L.type==='norm'?42 : L.type==='io'?38 : 35 + gauss()*2;
+  const cul = CULPRIT[L.name]||0;
+  L.sqnr=[]; L.over=[]; L.under=[]; L.cos=[]; L.mse=[]; L.maxerr=[]; L.util=[];
+  for(let i=0;i<N;i++){
+    // healthy baseline slowly settles
+    let sq = base - 1.5*Math.exp(-i/40) + gauss()*0.6;
+    let ov = clamp(0.002 + Math.abs(gauss())*0.004 + L.depth*0.0004, 0, 1);
+    // culprit degradation kicks in near divergence, worsens over time
+    if(cul>0 && i>DIV-4){
+      const prog = clamp((i-(DIV-4))/(N-DIV),0,1);
+      sq -= cul*(6 + 12*prog) + gauss()*0.8;
+      ov += cul*(0.01 + 0.09*prog);
+    }
+    sq=clamp(sq,14,48); ov=clamp(ov,0,0.6);
+    L.sqnr.push(sq);
+    L.over.push(ov);
+    L.under.push(clamp(0.01+L.depth*0.001+Math.abs(gauss())*0.008,0,0.3));
+    L.cos.push(clamp(1-Math.pow(10,-sq/20)*3.2,0.90,0.99999));
+    L.mse.push(Math.pow(10,-sq/10)*(0.5+Math.abs(gauss())*0.1));
+    L.maxerr.push(Math.pow(10,-sq/20)*(1.6+Math.abs(gauss())*0.3));
+    L.util.push(clamp(0.55 + L.depth*0.02 - (cul>0&&i>DIV? cul*0.15:0) + gauss()*0.03,0.2,0.98));
+  }
+  // sensitivity ~ how much this layer explains loss deviation
+  L.sens = cul>0 ? cul*(0.9+rnd()*0.2) : (0.02+rnd()*0.05)*(L.type==='mlp'?1.4:1);
+});
+// normalise sensitivity
+const sSum=layers.reduce((a,L)=>a+L.sens,0);
+layers.forEach(L=>L.sensPct=L.sens/sSum);
+
+// global loss — multi-format convergence:
+//   BF16 (lossRef) 参考基线 ✔  |  MXFP8 (lossMx) 收敛正常 ✔  |  候选 FP8/HiF8 (lossHif) 发散 ✘
+// 依据清单洞察点 9：BF16、MXFP8 训练 OK，部分 FP8 格式收敛失败。
+const lossRef=[],lossMx=[],lossHif=[],dloss=[];
+const spikes=[];                  // FP8 早期 loss spike（对标 DeepSeek 实践）
+const logitUnif=[];               // 每 batch logit 分布打散度（越低=越易 spike）
+for(let i=0;i<N;i++){
+  const ref = 4.6*Math.exp(-i/32)+1.55+gauss()*0.02;
+  lossRef.push(ref);
+  lossMx.push(ref + gauss()*0.015);           // MXFP8 与基线基本重合
+  let dv=0;
+  if(i>=DIV){const p=(i-DIV)/(N-DIV); dv=0.02+0.55*p*p+ (0.03*Math.sin(i/3))*p;}
+  // FP8 早期偶发 loss spike（离群 batch 触发数值不稳）
+  let sp=0;
+  if(i<DIV && (i===14||i===27||i===41)){ sp=0.18+rnd()*0.12; spikes.push(i); }
+  lossHif.push(ref+dv+sp+ (i>=DIV?gauss()*0.02:gauss()*0.008));
+  dloss.push(lossHif[i]-lossRef[i]);
+  // logit 打散度：spike 处骤降，发散后整体走低
+  let u=0.86+gauss()*0.02 - (i>=DIV?0.15*(i-DIV)/(N-DIV):0);
+  if(sp>0) u-=0.22;
+  logitUnif.push(clamp(u,0.35,0.95));
+}
+
+// mean sqnr per step (weighted by sensitivity — culprits pull it down)
+const meanSqnr=[];
+for(let i=0;i<N;i++){let s=0;layers.forEach(L=>s+=L.sqnr[i]);meanSqnr.push(s/layers.length);}
+
+/* ---------- state ---------- */
+let cur=N-1;                 // current step index
+let selLayer=layers.find(l=>l.name==='blk4.mlp.down_proj');
+let tensorType='weight';
+let sortKey='sqnr', sortAsc=true;
+let playing=false, playTimer=null;
+
+const sevOf=sq=> sq<26?'crit': sq<32?'warn':'ok';
+const sevColor={ok:'#3ddc84',warn:'#f5b544',crit:'#ff5a6a'};
+
+/* ---------- DOM refs ---------- */
+const $=id=>document.getElementById(id);
+const tip=$('tip');
+function showTip(x,y,html){tip.innerHTML=html;tip.style.opacity=1;
+  tip.style.left=Math.min(x+12,innerWidth-230)+'px';tip.style.top=(y+12)+'px';}
+function hideTip(){tip.style.opacity=0;}
+
+/* ---------- canvas helper ---------- */
+function ctxOf(cv){
+  // capture the intended CSS height ONCE, before any backing-store mutation pollutes the attribute
+  if(!cv.dataset.h){ cv.dataset.h = cv.getAttribute('height') || '150'; }
+  const cssH=+cv.dataset.h;
+  // pin display box explicitly so height never derives from the intrinsic aspect ratio
+  cv.style.width='100%'; cv.style.height=cssH+'px';
+  const w=cv.clientWidth || cv.getBoundingClientRect().width || 1;
+  const dpr=devicePixelRatio||1;
+  cv.width=Math.max(1,Math.round(w*dpr));
+  cv.height=Math.max(1,Math.round(cssH*dpr));
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+  return {c,w,h:cssH};
+}
+function grid(c,w,h,rows){c.strokeStyle='#1a2131';c.lineWidth=1;
+  for(let i=0;i<=rows;i++){const y=h*i/rows+.5;c.beginPath();c.moveTo(0,y);c.lineTo(w,y);c.stroke();}}
+
+/* ---------- explorer tree ---------- */
+function buildTree(){
+  const tree=$('tree'); $('treeCount').textContent=layers.length;
+  let html='<div class="tree-sec">网络层 / 算子 <span>'+layers.length+'</span></div>';
+  layers.forEach((L,idx)=>{
+    const sq=L.sqnr[cur];const sv=sevOf(sq);
+    html+=`<div class="node ${L===selLayer?'sel':''}" data-i="${idx}">
+      <span class="sev" style="background:${sevColor[sv]}"></span>
+      <span class="nm">${L.name}</span>
+      <span class="rd">${sq.toFixed(1)}</span></div>`;
+  });
+  tree.innerHTML=html;
+  tree.querySelectorAll('.node').forEach(n=>n.onclick=()=>{selectLayer(layers[+n.dataset.i]);});
+}
+function refreshTreeReadouts(){
+  $('tree').querySelectorAll('.node').forEach(n=>{
+    const L=layers[+n.dataset.i];const sq=L.sqnr[cur];
+    n.querySelector('.rd').textContent=sq.toFixed(1);
+    n.querySelector('.sev').style.background=sevColor[sevOf(sq)];
+    n.classList.toggle('sel',L===selLayer);
+  });
+}
+
+/* ---------- OVERVIEW ---------- */
+function renderKpis(){
+  const dl=dloss[cur], ms=meanSqnr[cur];
+  const totOver = layers.reduce((a,L)=>a+L.over[cur],0)/layers.length;
+  const totUnder= layers.reduce((a,L)=>a+L.under[cur],0)/layers.length;
+  const health = clamp(100 - (dl>0?dl*90:0) - (35-ms)*3 - totOver*120, 0,100);
+  const hSev = health>70?'ok':health>45?'warn':'crit';
+  const cards=[
+    {lab:'精度健康分',val:health.toFixed(0),unit:'/100',sev:hSev,delta: cur>DIV?'▼ 训练已发散':'▲ 稳定'},
+    {lab:'首次发散步',val:'3150',unit:'step',sev:'crit',delta:'|Δloss|>0.05'},
+    {lab:'均值 SQNR',val:ms.toFixed(1),unit:'dB',sev:ms>32?'ok':ms>28?'warn':'crit',delta:(ms-35).toFixed(1)+' vs 目标'},
+    {lab:'平均溢出率',val:(totOver*100).toFixed(2),unit:'%',sev:totOver<0.01?'ok':totOver<0.03?'warn':'crit',delta: cur>DIV?'↑ 上升中':'平稳'},
+    {lab:'平均下溢率',val:(totUnder*100).toFixed(2),unit:'%',sev:totUnder<0.03?'ok':'warn',delta:'→0 截断'},
+  ];
+  $('kpis').innerHTML=cards.map(k=>`
+    <div class="kpi k-${k.sev}">
+      <div class="lab">${k.lab}</div>
+      <div class="val">${k.val}<small>${k.unit}</small></div>
+      <div class="delta ${k.sev==='crit'?'up':'down'}">${k.delta}</div>
+    </div>`).join('');
+}
+function renderLoss(){
+  const {c,w,h}=ctxOf($('lossCanvas'));c.clearRect(0,0,w,h);
+  const pad=30; const lo=1.4,hi=3.2;
+  const X=i=>pad+(w-pad-8)*i/(N-1), Y=v=>h-18-(h-30)*(v-lo)/(hi-lo);
+  grid(c,w,h,4);
+  // divergence band
+  c.fillStyle='rgba(255,90,106,.08)';c.fillRect(X(DIV),0,w-X(DIV)-8,h-18);
+  c.strokeStyle='#ff5a6a';c.setLineDash([4,4]);c.beginPath();c.moveTo(X(DIV),0);c.lineTo(X(DIV),h-18);c.stroke();c.setLineDash([]);
+  const line=(arr,col,wid,dash)=>{c.strokeStyle=col;c.lineWidth=wid;c.setLineDash(dash||[]);c.beginPath();
+    arr.forEach((v,i)=>{const x=X(i),y=Y(v);i?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();c.setLineDash([]);};
+  line(lossMx,'#3ddc84',1.3,[5,3]);   // MXFP8 收敛正常
+  line(lossRef,'#35e0d0',1.6);        // BF16 参考基线
+  line(lossHif,'#5b9dff',1.8);        // 候选 FP8/HiF8
+  // loss spike 标记（发散前）
+  spikes.forEach(si=>{c.fillStyle='#f5b544';c.beginPath();c.arc(X(si),Y(lossHif[si]),3,0,7);c.fill();
+    c.fillStyle='#f5b544';c.font='9px '+MONO;c.fillText('spike',X(si)-11,Y(lossHif[si])-7);});
+  // current marker
+  c.strokeStyle='#fff';c.globalAlpha=.5;c.beginPath();c.moveTo(X(cur),0);c.lineTo(X(cur),h-18);c.stroke();c.globalAlpha=1;
+  c.fillStyle='#5b9dff';c.beginPath();c.arc(X(cur),Y(lossHif[cur]),3.5,0,7);c.fill();
+  // axis labels
+  c.fillStyle='#545d74';c.font='10px '+MONO;
+  c.fillText('loss',4,12);c.fillText('step '+stepOf(cur),X(cur)-18,h-4);
+}
+function renderDelta(){
+  const {c,w,h}=ctxOf($('deltaCanvas'));c.clearRect(0,0,w,h);
+  const pad=8;const mx=Math.max(...dloss)*1.1;
+  const X=i=>pad+(w-pad*2)*i/(N-1), Y=v=>h-16-(h-24)*v/mx;
+  grid(c,w,h,4);
+  c.strokeStyle='#f5b544';c.setLineDash([3,4]);c.beginPath();c.moveTo(pad,Y(0.05));c.lineTo(w-pad,Y(0.05));c.stroke();c.setLineDash([]);
+  c.fillStyle='#f5b544';c.font='9px '+MONO;c.fillText('阈值 0.05',w-58,Y(0.05)-4);
+  // area
+  const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(255,90,106,.35)');g.addColorStop(1,'rgba(255,90,106,0)');
+  c.beginPath();c.moveTo(X(0),Y(0));dloss.forEach((v,i)=>c.lineTo(X(i),Y(v)));c.lineTo(X(N-1),Y(0));c.closePath();c.fillStyle=g;c.fill();
+  c.strokeStyle='#ff5a6a';c.lineWidth=1.6;c.beginPath();dloss.forEach((v,i)=>{i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v));});c.stroke();
+  c.strokeStyle='#fff';c.globalAlpha=.4;c.beginPath();c.moveTo(X(cur),8);c.lineTo(X(cur),h-16);c.stroke();c.globalAlpha=1;
+  $('ovDelta').textContent = dloss[cur].toFixed(4);
+  $('ovDelta').style.color = dloss[cur]>0.05?'var(--crit)':'var(--ink)';
+}
+// 候选格式收敛状态卡（多格式对照）
+function renderFmtStatus(){
+  const fmts=[
+    {n:'BF16',fmt:'1-8-7',st:'ok',note:'参考基线 · 收敛正常'},
+    {n:'MXFP8',fmt:'E4M3+block scale',st:'ok',note:'收敛正常 · 与基线重合'},
+    {n:'HiF8 / FP8（候选）',fmt:'1-3-3-1 锥形',st: cur>=DIV?'crit':'warn',
+      note: cur>=DIV?('发散 @ step '+stepOf(DIV)+' · 需诊断'):'早期 '+spikes.length+' 次 loss spike'},
+  ];
+  const ic={ok:'✔',warn:'⚠',crit:'✘'};
+  $('fmtStatus').innerHTML=fmts.map(f=>`
+    <div style="flex:1;min-width:190px;background:var(--bg-inset);border:1px solid var(--stroke);
+      border-left:3px solid ${sevColor[f.st]};border-radius:8px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-family:var(--mono);font-size:12.5px">${f.n}</b>
+        <span style="color:${sevColor[f.st]};font-family:var(--mono);font-size:13px">${ic[f.st]}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--ink-dim);margin-top:3px">${f.fmt}</div>
+      <div style="font-size:11px;color:var(--ink-mute);margin-top:5px">${f.note}</div>
+    </div>`).join('');
+}
+// batch logit 打散度监测（防 spike）
+function renderLogit(){
+  const {c,w,h}=ctxOf($('logitCanvas'));c.clearRect(0,0,w,h);
+  const pad=8;const X=i=>pad+(w-pad*2)*i/(N-1),Y=v=>h-14-(h-22)*(v-0.3)/(0.95-0.3);
+  grid(c,w,h,3);
+  // 稳定阈值线
+  c.strokeStyle='rgba(245,181,68,.5)';c.setLineDash([3,3]);c.beginPath();c.moveTo(pad,Y(0.6));c.lineTo(w-pad,Y(0.6));c.stroke();c.setLineDash([]);
+  c.strokeStyle='#5b9dff';c.lineWidth=1.5;c.beginPath();logitUnif.forEach((v,i)=>{i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v));});c.stroke();
+  spikes.forEach(si=>{c.fillStyle='#f5b544';c.beginPath();c.arc(X(si),Y(logitUnif[si]),2.5,0,7);c.fill();});
+  c.strokeStyle='#fff';c.globalAlpha=.4;c.beginPath();c.moveTo(X(cur),8);c.lineTo(X(cur),h-14);c.stroke();c.globalAlpha=1;
+  const u=logitUnif[cur];
+  $('ovUnif').textContent=u.toFixed(2);
+  $('ovUnif').style.color=u<0.6?'var(--warn)':'var(--ink)';
+}
+const EVENTS=[
+  {i:14,sev:'warn',t:'FP8 loss spike（logit 打散度骤降）'},
+  {i:52,sev:'warn',t:'blk4.mlp.down_proj 溢出率 >1%'},
+  {i:63,sev:'crit',t:'Δloss 越过阈值 0.05'},
+  {i:66,sev:'crit',t:'blk4.mlp.down_proj SQNR<26dB'},
+  {i:78,sev:'warn',t:'blk3.attn.o_proj SQNR 塌陷'},
+  {i:120,sev:'warn',t:'blk5.mlp.down_proj 溢出扩散'},
+  {i:170,sev:'crit',t:'累积 Δloss 达 0.55'},
+];
+function renderTimeline(){
+  const {c,w,h}=ctxOf($('timelineCanvas'));c.clearRect(0,0,w,h);
+  const X=i=>10+(w-20)*i/(N-1),y=h/2;
+  c.strokeStyle='#232c40';c.beginPath();c.moveTo(10,y);c.lineTo(w-10,y);c.stroke();
+  EVENTS.forEach(e=>{
+    const x=X(e.i);c.strokeStyle=sevColor[e.sev];c.globalAlpha=e.i<=cur?1:.25;
+    c.beginPath();c.moveTo(x,y-16);c.lineTo(x,y+16);c.stroke();
+    c.fillStyle=sevColor[e.sev];c.beginPath();c.arc(x,y-16,3,0,7);c.fill();
+    c.save();c.translate(x+4,y-20);c.fillStyle=e.i<=cur?'#dfe4f0':'#545d74';c.font='9.5px '+MONO;
+    c.fillText(e.t,0,0);c.restore();c.globalAlpha=1;
+  });
+  c.strokeStyle='#fff';c.globalAlpha=.5;c.beginPath();c.moveTo(X(cur),4);c.lineTo(X(cur),h-4);c.stroke();c.globalAlpha=1;
+}
+
+/* ---------- DISTRIBUTION ---------- */
+// synth histogram for a layer/step/tensortype
+function histFor(L,step,type){
+  const cul=(CULPRIT[L.name]||0);
+  const spreadBase = type==='grad'?0.6: type==='act'?1.1:0.8;
+  const drift = cul>0 && step>DIV ? cul*(step-DIV)/(N-DIV) : 0;
+  const std = spreadBase*(1+drift*1.4);
+  const clip = type==='grad'?448: 448; // HiF8 max ~ ±448
+  const bins=90, lohi=clip*1.15, bw=2*lohi/bins;
+  const raw=new Array(bins).fill(0), q=new Array(bins).fill(0);
+  let over=0,under=0,tot=6000;
+  // hif8-like representable grid (log/taper): denser near 0
+  const reps=[]; for(let e=-9;e<=8.8;e+=0.34){const m=Math.pow(2,e);[m,-m].forEach(v=>{if(Math.abs(v)<=clip)reps.push(v);});}
+  reps.push(0);reps.sort((a,b)=>a-b);
+  const quant=v=>{if(Math.abs(v)>clip)return v>0?clip:-clip;let best=reps[0],bd=1e9;for(const r of reps){const d=Math.abs(v-r);if(d<bd){bd=d;best=r;}}return best;};
+  // tail heaviness scales with LAYER HEALTH: healthy → near-Gaussian, culprit(post-divergence) → heavy-tailed.
+  // Moments are computed from the IN-RANGE distribution shape; overflow is tracked separately (a clip
+  // pile-up), so a handful of ±clip samples can't distort the kurtosis used to judge quantizability.
+  const heavy = cul>0 ? (0.12*cul + cul*drift*1.2) : 0.015;    // 0(健康)~1.3(严重)
+  const tailP = clamp(0.006 + heavy*0.13, 0, 0.4);
+  const outSigma = 3 + heavy*7;                                 // 尾部离群倍数(以 σ 计，有界→峰度可控)
+  const asym  = type==='act' ? 0.32 : 0;                        // 激活轻微偏态 → 偶发贝塔
+  const ovRate = cul>0 ? clamp(L.over[step]*0.9, 0, 0.2) : 0;   // 溢出(越界截断)率，健康层为 0
+  const bulkSd = std*0.289;                                     // gauss() 实际标准差(4 均匀和)
+  let s1=0,s2=0,s3=0,s4=0,vmin=1e9,vmax=-1e9;
+  for(let n=0;n<tot;n++){
+    let v=gauss()*std;
+    if(rnd()<tailP){ const sign=(rnd()<0.5+asym*0.5)?1:-1; v+=sign*bulkSd*outSigma*(0.6+rnd()*0.8); }
+    s1+=v; s2+=v*v; s3+=v*v*v; s4+=v*v*v*v;
+    if(v<vmin)vmin=v; if(v>vmax)vmax=v;
+    const bi=Math.floor((v+lohi)/bw);
+    if(bi>=0&&bi<bins)raw[bi]++;
+    const qv=quant(v); if(qv===0&&v!==0)under++;
+    const qi=Math.floor((clamp(qv,-lohi+bw,lohi-bw)+lohi)/bw);
+    if(qi>=0&&qi<bins)q[qi]++;
+  }
+  // overflow pile-up at the clip edges (visualized separately from the bulk moments)
+  const ovN=Math.round(tot*ovRate); over=ovN;
+  for(let k=0;k<ovN;k++){ const b=(rnd()<0.5+asym*0.5)? bins-2:1; raw[b]++; q[b]++; }
+  // distribution moments (in-range shape only)
+  const m1=s1/tot, varr=Math.max(s2/tot-m1*m1,1e-9), sd=Math.sqrt(varr);
+  const skew=(s3/tot-3*m1*(s2/tot)+2*m1*m1*m1)/(sd*sd*sd);
+  const kurt=(s4/tot-4*m1*(s3/tot)+6*m1*m1*(s2/tot)-3*m1*m1*m1*m1)/(varr*varr)-3; // excess kurtosis
+  // best-fit family among 正态 / t / 贝塔（依据洞察点 9）
+  let fit,fitNote;
+  if(kurt>2.2){fit='t 分布';fitNote='重尾 · 离群值多';}
+  else if(Math.abs(skew)>0.55){fit='贝塔分布';fitNote='明显偏态';}
+  else {fit='正态分布';fitNote='近高斯 · 对称';}
+  // 量化适配度评分：重尾(峰度)/溢出/偏态越强越低
+  const qScore=clamp(100 - Math.max(0,kurt)*6 - ovRate*100*3.2 - Math.abs(skew)*14, 0,100);
+  return {raw,q,bins,lohi,bw,reps,clip,over:ovRate,under:under/tot,std,
+    min: ovRate>0?-clip*1.04:vmin, max: ovRate>0?clip*1.04:vmax, skew, kurt, fit, fitNote, qScore};
+}
+function renderDist(){
+  const L=selLayer; $('distLayer').textContent=L.name+' · '+({weight:'权重',act:'激活',grad:'梯度'}[tensorType]);
+  const H=histFor(L,cur,tensorType);
+  const scale=(H.clip/(H.max*1.2)).toFixed(1);$('distScale').textContent=scale;
+  const {c,w,h}=ctxOf($('histCanvas'));c.clearRect(0,0,w,h);
+  const pad=8,baseY=h-20;
+  const X=b=>pad+(w-pad*2)*b/H.bins;
+  const mx=Math.max(...H.raw,...H.q);
+  const Y=v=>baseY-(baseY-8)*v/mx;
+  grid(c,w,h,4);
+  // clip zones
+  const clipB0=Math.floor((-H.clip+H.lohi)/H.bw), clipB1=Math.floor((H.clip+H.lohi)/H.bw);
+  c.fillStyle='rgba(255,90,106,.10)';
+  c.fillRect(pad,8,X(clipB0)-pad,baseY-8); c.fillRect(X(clipB1),8,w-pad-X(clipB1),baseY-8);
+  // representable grid ticks (taper): draw subset
+  c.strokeStyle='rgba(90,110,140,.25)';c.lineWidth=1;
+  H.reps.forEach(r=>{if(Math.abs(r)>H.lohi)return;const bx=X((r+H.lohi)/H.bw);c.beginPath();c.moveTo(bx,baseY);c.lineTo(bx,baseY-6);c.stroke();});
+  // quantized bars
+  c.fillStyle='rgba(91,157,255,.55)';
+  H.q.forEach((v,b)=>{const x=X(b),bw=(w-pad*2)/H.bins;c.fillRect(x,Y(v),bw*0.9,baseY-Y(v));});
+  // original density line
+  c.strokeStyle='#35e0d0';c.lineWidth=1.8;c.beginPath();
+  H.raw.forEach((v,b)=>{const x=X(b)+ (w-pad*2)/H.bins/2,y=Y(v);b?c.lineTo(x,y):c.moveTo(x,y);});c.stroke();
+  // clip lines
+  c.strokeStyle='#ff5a6a';c.setLineDash([3,3]);
+  [clipB0,clipB1].forEach(b=>{c.beginPath();c.moveTo(X(b),8);c.lineTo(X(b),baseY);c.stroke();});c.setLineDash([]);
+  c.fillStyle='#545d74';c.font='10px '+MONO;
+  c.fillText('−448',X(clipB0)-14,h-6);c.fillText('+448',X(clipB1)-14,h-6);c.fillText('0',X(H.bins/2)-3,h-6);
+  // range bar
+  drawRangeBar(H);
+  // readouts
+  const sq=L.sqnr[cur];
+  $('dMinMax').textContent=H.min.toFixed(2)+' / '+H.max.toFixed(2);
+  $('dMeanStd').textContent='0.00 / '+H.std.toFixed(2);
+  $('dOver').innerHTML=`<span style="color:${H.over>0.01?'var(--crit)':'var(--ink)'}">${(H.over*100).toFixed(2)}%</span>`;
+  $('dUnder').textContent=(H.under*100).toFixed(2)+'%';
+  $('dEnob').textContent=(sq/6.02).toFixed(2)+' bit';
+  $('dSqnr').innerHTML=`<span style="color:${sevColor[sevOf(sq)]}">${sq.toFixed(1)} dB</span>`;
+  // 分布形态 · 量化适配度
+  const qs=H.qScore, qsev=qs>70?'ok':qs>45?'warn':'crit';
+  $('qScore').textContent=qs.toFixed(0);
+  $('qScore').style.color=sevColor[qsev];
+  const bar=$('qScoreBar'); bar.style.width=qs+'%';
+  bar.style.background=`linear-gradient(90deg,${sevColor[qsev]}88,${sevColor[qsev]})`;
+  $('dFit').innerHTML=`<span style="color:${H.fit==='正态分布'?'var(--ok)':H.fit==='t 分布'?'var(--crit)':'var(--warn)'}">${H.fit}</span>`;
+  $('dKurt').innerHTML=`<span style="color:${H.kurt>2.5?'var(--crit)':'var(--ink)'}">${H.kurt.toFixed(2)}</span>`;
+  $('dSkew').textContent=H.skew.toFixed(2);
+  $('dTail').innerHTML=`<span style="color:${H.over>0.01?'var(--crit)':'var(--ink)'}">${(H.over*100).toFixed(2)}%</span>`;
+  $('fitVerdict').innerHTML = qs>70
+    ? `拟合为<b style="color:var(--ok)">${H.fit}</b>(${H.fitNote}),峰度接近 0、尾部轻,<b>适合直接量化</b>。`
+    : qs>45
+    ? `拟合为<b style="color:var(--warn)">${H.fit}</b>(${H.fitNote}),存在一定重尾/偏态,建议 <b>per-channel 缩放</b>后量化。`
+    : `拟合为<b style="color:var(--crit)">${H.fit}</b>(${H.fitNote}),峰度 ${H.kurt.toFixed(1)}、离群值多,<b>不适合直接量化</b> → 保留 BF16 或裁剪重尾离群值。`;
+}
+function drawRangeBar(H){
+  const {c,w,h}=ctxOf($('rangeCanvas'));c.clearRect(0,0,w,h);
+  const y=h/2,barH=20;
+  c.fillStyle='#0c1019';c.fillRect(0,y-barH/2,w,barH);
+  // full hif8 range
+  c.strokeStyle='#232c40';c.strokeRect(0.5,y-barH/2+.5,w-1,barH-1);
+  // used range
+  const util=selLayer.util[cur];
+  const uw=w*util; const g=c.createLinearGradient(0,0,uw,0);
+  g.addColorStop(0,'#2a6b64');g.addColorStop(1, util>0.85?'#ff5a6a':'#35e0d0');
+  c.fillStyle=g;c.fillRect((w-uw)/2,y-barH/2+2,uw,barH-4);
+  c.fillStyle='#dfe4f0';c.font='11px '+MONO;c.textAlign='center';
+  c.fillText((util*100).toFixed(1)+'% 利用', w/2, y+3);c.textAlign='left';
+  c.fillStyle='#545d74';c.font='9px '+MONO;c.fillText('−448',2,h-4);c.textAlign='right';c.fillText('+448',w-2,h-4);c.textAlign='left';
+}
+
+/* ---------- ERROR ---------- */
+const fmtE=v=> v>=0.01? v.toFixed(3): v.toExponential(1);
+function cellColor(v,good,bad){ // good→ok, bad→crit
+  const t=clamp((v-good)/(bad-good),0,1);
+  const r=Math.round(lerp(61,255,t)),g=Math.round(lerp(220,90,t)),b=Math.round(lerp(132,106,t));
+  return `rgba(${r},${g},${b},.16)`;
+}
+function renderErrorTable(){
+  const rows=[...layers].sort((a,b)=>{
+    let av,bv;
+    switch(sortKey){
+      case'name':return sortAsc?a.name.localeCompare(b.name):b.name.localeCompare(a.name);
+      case'sqnr':av=a.sqnr[cur];bv=b.sqnr[cur];break;
+      case'cos':av=a.cos[cur];bv=b.cos[cur];break;
+      case'mse':av=a.mse[cur];bv=b.mse[cur];break;
+      case'maxerr':av=a.maxerr[cur];bv=b.maxerr[cur];break;
+      case'over':av=a.over[cur];bv=b.over[cur];break;
+    }
+    return sortAsc?av-bv:bv-av;
+  });
+  const tag={attn:'attn',mlp:'mlp',norm:'norm',io:'io'};
+  const tb=$('etable').querySelector('tbody');
+  tb.innerHTML=rows.map(L=>{
+    const sq=L.sqnr[cur];
+    return `<tr class="${L===selLayer?'sel':''}" data-n="${L.name}">
+      <td><span class="tag ${L.type}">${tag[L.type]}</span>${L.name}</td>
+      <td><span class="cell" style="background:${cellColor(sq,40,22)};color:${sevColor[sevOf(sq)]}">${sq.toFixed(1)}</span></td>
+      <td>${L.cos[cur].toFixed(4)}</td>
+      <td>${fmtE(L.mse[cur])}</td>
+      <td>${fmtE(L.maxerr[cur])}</td>
+      <td><span class="cell" style="background:${cellColor(L.over[cur],0.005,0.05)}">${(L.over[cur]*100).toFixed(2)}%</span></td>
+    </tr>`;}).join('');
+  tb.querySelectorAll('tr').forEach(tr=>tr.onclick=()=>selectLayer(layers.find(l=>l.name===tr.dataset.n)));
+  // badge = count below 26dB
+  const bad=layers.filter(L=>L.sqnr[cur]<26).length;
+  $('errBadge').textContent=bad; $('errBadge').style.display=bad?'inline-block':'none';
+}
+function renderMetricChart(){
+  $('errSel').textContent=selLayer.name;
+  const {c,w,h}=ctxOf($('metricCanvas'));c.clearRect(0,0,w,h);
+  const pad=8;const X=i=>pad+(w-pad*2)*i/(N-1);
+  grid(c,w,h,3);
+  // sqnr (left)
+  const slo=14,shi=48;const Ys=v=>h-14-(h-22)*(v-slo)/(shi-slo);
+  c.strokeStyle='#35e0d0';c.lineWidth=1.6;c.beginPath();selLayer.sqnr.forEach((v,i)=>{i?c.lineTo(X(i),Ys(v)):c.moveTo(X(i),Ys(v));});c.stroke();
+  c.strokeStyle='rgba(255,90,106,.4)';c.setLineDash([3,3]);c.beginPath();c.moveTo(pad,Ys(30));c.lineTo(w-pad,Ys(30));c.stroke();c.setLineDash([]);
+  c.fillStyle='rgba(255,90,106,.6)';c.font='9px '+MONO;c.fillText('30dB 红线',w-56,Ys(30)-3);
+  // overflow (right, scaled)
+  const omx=Math.max(0.02,...selLayer.over);const Yo=v=>h-14-(h-22)*v/omx;
+  c.strokeStyle='#ff5a6a';c.lineWidth=1.4;c.beginPath();selLayer.over.forEach((v,i)=>{i?c.lineTo(X(i),Yo(v)):c.moveTo(X(i),Yo(v));});c.stroke();
+  // divergence + cursor
+  c.strokeStyle='rgba(255,90,106,.5)';c.setLineDash([4,4]);c.beginPath();c.moveTo(X(DIV),8);c.lineTo(X(DIV),h-14);c.stroke();c.setLineDash([]);
+  c.strokeStyle='#fff';c.globalAlpha=.5;c.beginPath();c.moveTo(X(cur),8);c.lineTo(X(cur),h-14);c.stroke();c.globalAlpha=1;
+}
+function renderHeat(){
+  const {c,w,h}=ctxOf($('heatCanvas'));c.clearRect(0,0,w,h);
+  // show culprits + a few — top 12 by current badness
+  const show=[...layers].sort((a,b)=>a.sqnr[cur]-b.sqnr[cur]).slice(0,12);
+  const rowH=(h-14)/show.length, colW=(w-70)/N;
+  show.forEach((L,r)=>{
+    for(let i=0;i<N;i++){
+      const sq=L.sqnr[i];const t=clamp((40-sq)/(40-16),0,1);
+      c.fillStyle=`rgba(${Math.round(lerp(20,255,t))},${Math.round(lerp(30,90,t))},${Math.round(lerp(50,106,t))},${0.15+0.85*t})`;
+      c.fillRect(70+i*colW, r*rowH, colW+0.5, rowH-1);
+    }
+    c.fillStyle='#8a93a9';c.font='9px '+MONO;c.textAlign='right';
+    c.fillText(L.name.replace('_proj','').slice(0,10),66,r*rowH+rowH/2+3);c.textAlign='left';
+  });
+  c.strokeStyle='#fff';c.globalAlpha=.6;c.beginPath();c.moveTo(70+cur*colW,0);c.lineTo(70+cur*colW,h-14);c.stroke();c.globalAlpha=1;
+  c.fillStyle='#545d74';c.font='9px '+MONO;c.fillText('step 0',70,h-3);c.fillText('10000',w-30,h-3);
+}
+
+/* ---------- PROPAGATION ---------- */
+function renderProp(){
+  const flow=$('propFlow');
+  // aggregate by depth: for each depth take max (single-layer) error = (40-sqnr)
+  const byDepth={};
+  layers.forEach(L=>{(byDepth[L.depth]=byDepth[L.depth]||[]).push(L);});
+  const depths=Object.keys(byDepth).map(Number).sort((a,b)=>a-b);
+  let cumF=0,cumG=0;const cum=[];
+  flow.innerHTML=depths.map(d=>{
+    const g=byDepth[d];
+    const fwd=Math.max(...g.map(L=>Math.max(0,40-L.sqnr[cur])));   // forward single error
+    const grd=fwd*0.7*(1+d*0.05);
+    cumF+=fwd*0.6; // accumulate
+    cum.push(cumF);
+    const fH=clamp(fwd/24,0,1)*100, gH=clamp(grd/24,0,1)*60;
+    const worst=g.reduce((a,L)=>L.sqnr[cur]<a.sqnr[cur]?L:a);
+    return `<div class="pcol" data-n="${worst.name}" title="${worst.name}">
+      <div class="bars">
+        <div class="b" style="height:${gH}px;background:var(--grad);opacity:.7"></div>
+        <div class="b" style="height:${fH}px;background:var(--signal-2)"></div>
+      </div>
+      <div class="lbl">${d===0?'emb':d===depths.length-1?'head':'blk'+(d-1)}</div>
+    </div>`;
+  }).join('');
+  flow.querySelectorAll('.pcol').forEach(p=>p.onclick=()=>selectLayer(layers.find(l=>l.name===p.dataset.n)));
+  // cumulative line
+  const {c,w,h}=ctxOf($('propLine'));c.clearRect(0,0,w,h);
+  const mx=Math.max(...cum,1);const X=i=>10+(w-20)*i/(cum.length-1),Y=v=>h-14-(h-22)*v/mx;
+  grid(c,w,h,3);
+  const g2=c.createLinearGradient(0,0,0,h);g2.addColorStop(0,'rgba(255,90,106,.3)');g2.addColorStop(1,'rgba(255,90,106,0)');
+  c.beginPath();c.moveTo(X(0),Y(0));cum.forEach((v,i)=>c.lineTo(X(i),Y(v)));c.lineTo(X(cum.length-1),Y(0));c.closePath();c.fillStyle=g2;c.fill();
+  c.strokeStyle='#ff5a6a';c.lineWidth=2;c.beginPath();cum.forEach((v,i)=>{i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v));});c.stroke();
+  cum.forEach((v,i)=>{c.fillStyle='#ff5a6a';c.beginPath();c.arc(X(i),Y(v),2.5,0,7);c.fill();});
+  c.fillStyle='#545d74';c.font='9px '+MONO;c.fillText('累积误差',12,12);
+  // reads
+  const amp=(cum[cum.length-1]/(cum[1]||1)).toFixed(1);
+  $('propReads').innerHTML=`
+    <div class="read"><div class="l">输入端单层误差</div><div class="v">${(cum[1]||0).toFixed(2)}</div></div>
+    <div class="read"><div class="l">输出端累积误差</div><div class="v" style="color:var(--crit)">${cum[cum.length-1].toFixed(2)}</div></div>
+    <div class="read"><div class="l">累积放大倍数</div><div class="v" style="color:var(--crit)">×${amp}</div></div>
+    <div class="read"><div class="l">主要放大深度</div><div class="v">blk3–blk5</div></div>`;
+  // source
+  const firstBad=[...layers].filter(L=>L.sqnr[cur]<30).sort((a,b)=>a.depth-b.depth)[0];
+  $('propSource').innerHTML = firstBad ? `
+    <div>▸ 最浅层越红线算子:<br>&nbsp;&nbsp;<b style="color:var(--crit)">${firstBad.name}</b> @ SQNR ${firstBad.sqnr[cur].toFixed(1)}dB</div>
+    <div style="margin-top:8px">▸ 误差在其下游 <b style="color:var(--warn)">${layers.length-layers.indexOf(firstBad)}</b> 个算子中逐级累积</div>
+    <div style="margin-top:8px;color:var(--ink-dim)">该算子权重分布出现重尾,超出 HiF8 ±448 表示范围,<br>触发截断 → 前向激活失真 → 反向梯度污染 → loss 偏移。</div>`
+    : '<div style="color:var(--ok)">当前步无算子越过 30dB 红线。</div>';
+}
+
+/* ---------- ATTRIBUTION ---------- */
+function renderSOP(){
+  // 五步分叉定位法（对标月之暗面）：阈值熔断→双端同权重前反向→Tensor Hook 逐层拦截→余弦<0.999 锁层→算子级下钻
+  const steps=[
+    {n:'① 阈值熔断',d:'|Δloss|>0.05 触发', done: cur>=DIV},
+    {n:'② 双端同权重前反向',d:'BF16/候选同载入', done: cur>=DIV},
+    {n:'③ Tensor Hook 逐层拦截',d:'不破坏计算图', done: cur>=DIV},
+    {n:'④ 余弦<0.999 锁层',d:'逐层相似度比对', done: cur>=DIV},
+    {n:'⑤ 算子级下钻',d:'定位注入源+处置', done: cur>=DIV},
+  ];
+  $('sopStrip').innerHTML=steps.map((s,i)=>{
+    const col=s.done?'var(--signal)':'var(--ink-dim)';
+    const bg=s.done?'#0d1f1d':'var(--bg-inset)';
+    return `<div style="flex:1;background:${bg};border:1px solid var(--stroke);
+        ${i?'border-left:none;':''}${i===0?'border-radius:8px 0 0 8px;':''}${i===steps.length-1?'border-radius:0 8px 8px 0;':''}
+        padding:10px 12px;position:relative">
+      <div style="font-family:var(--mono);font-size:11.5px;color:${col}">${s.n}</div>
+      <div style="font-size:10.5px;color:var(--ink-dim);margin-top:4px">${s.d}</div>
+      <div style="position:absolute;right:8px;top:9px;color:${col};font-size:11px">${s.done?'●':'○'}</div>
+    </div>`;
+  }).join('');
+}
+function renderAttr(){
+  renderSOP();
+  const {c,w,h}=ctxOf($('attrCanvas'));c.clearRect(0,0,w,h);
+  const top=[...layers].sort((a,b)=>b.sensPct-a.sensPct).slice(0,9);
+  const mx=Math.max(...top.map(L=>L.sensPct));
+  const bh=(h-20)/top.length;
+  top.forEach((L,i)=>{
+    const y=10+i*bh; const bw=(w-160)*L.sensPct/mx;
+    c.fillStyle= CULPRIT[L.name]?'#ff5a6a':'#5b9dff';
+    c.globalAlpha=CULPRIT[L.name]?1:.6;
+    c.fillRect(150,y+3,bw,bh-8);c.globalAlpha=1;
+    c.fillStyle='#8a93a9';c.font='10px '+MONO;c.textAlign='right';c.fillText(L.name.replace('_proj',''),144,y+bh/2+3);c.textAlign='left';
+    c.fillStyle='#dfe4f0';c.fillText((L.sensPct*100).toFixed(1)+'%',150+bw+6,y+bh/2+3);
+  });
+  // correlation scatter
+  const {c:cc,w:cw,h:ch}=ctxOf($('corrCanvas'));cc.clearRect(0,0,cw,ch);
+  grid(cc,cw,ch,4);
+  const cul=selLayer && CULPRIT[selLayer.name]? selLayer : layers.find(l=>l.name==='blk4.mlp.down_proj');
+  // x = sqnr drop, y = dloss, over steps
+  const pad=26;
+  const xs=cul.sqnr.map(v=>40-v), ys=dloss;
+  const xmx=Math.max(...xs),ymx=Math.max(...ys);
+  const X=v=>pad+(cw-pad-8)*v/xmx, Y=v=>ch-18-(ch-24)*v/ymx;
+  for(let i=0;i<N;i++){const t=i/N;cc.fillStyle=`rgba(${Math.round(lerp(91,255,i>=DIV?1:.2))},${i>=DIV?90:157},${i>=DIV?106:255},.6)`;
+    cc.beginPath();cc.arc(X(xs[i]),Y(ys[i]),2.3,0,7);cc.fill();}
+  cc.fillStyle='#545d74';cc.font='9px '+MONO;cc.fillText('SQNR塌陷→',pad,ch-4);cc.save();cc.translate(10,ch/2);cc.rotate(-Math.PI/2);cc.fillText('Δloss→',0,0);cc.restore();
+  // pearson
+  const mX=xs.reduce((a,b)=>a+b)/N,mY=ys.reduce((a,b)=>a+b)/N;
+  let sxy=0,sx=0,sy=0;for(let i=0;i<N;i++){sxy+=(xs[i]-mX)*(ys[i]-mY);sx+=(xs[i]-mX)**2;sy+=(ys[i]-mY)**2;}
+  const r=sxy/Math.sqrt(sx*sy);
+  $('corrR').textContent=r.toFixed(3)+' ('+cul.name+')';
+  // suspects
+  const susp=[...layers].sort((a,b)=>b.sensPct-a.sensPct).slice(0,4);
+  const advice={
+    'blk4.mlp.down_proj':'该层保留 BF16 / 提高 per-channel scaling',
+    'blk3.attn.o_proj':'启用动态 scaling · 裁剪重尾离群值',
+    'blk5.mlp.down_proj':'per-tensor→per-channel 量化',
+  };
+  $('suspects').innerHTML=susp.map((L,i)=>`
+    <div class="suspect">
+      <div class="rank">#${i+1}</div>
+      <div class="info">
+        <div class="n">${L.name} <span class="tag ${L.type}">${L.type}</span></div>
+        <div class="m">SQNR ${L.sqnr[cur].toFixed(1)}dB · 溢出 ${(L.over[cur]*100).toFixed(2)}% · loss 贡献 ${(L.sensPct*100).toFixed(1)}%</div>
+      </div>
+      <div class="bar"><i style="width:${L.sensPct/susp[0].sensPct*100}%"></i></div>
+      <div class="act">${advice[L.name]||'检查数值范围'}</div>
+    </div>`).join('');
+}
+
+/* ---------- inspector ---------- */
+function renderInspector(){
+  const L=selLayer;
+  $('insTitle').textContent=L.name;
+  $('insSub').textContent=({attn:'注意力投影',mlp:'前馈网络',norm:'归一化',io:'输入/输出'}[L.type])+' · depth '+L.depth;
+  const sq=L.sqnr[cur],sv=sevOf(sq);
+  $('insBody').innerHTML=`
+    <div class="irow"><span class="k">SQNR</span><span class="v" style="color:${sevColor[sv]}">${sq.toFixed(2)} dB</span></div>
+    <div class="irow"><span class="k">余弦相似度</span><span class="v">${L.cos[cur].toFixed(5)}</span></div>
+    <div class="irow"><span class="k">MSE</span><span class="v">${fmtE(L.mse[cur])}</span></div>
+    <div class="irow"><span class="k">最大绝对误差</span><span class="v">${fmtE(L.maxerr[cur])}</span></div>
+    <div class="irow"><span class="k">溢出率</span><span class="v" style="color:${L.over[cur]>0.01?'var(--crit)':'var(--ink)'}">${(L.over[cur]*100).toFixed(3)}%</span></div>
+    <div class="irow"><span class="k">下溢率</span><span class="v">${(L.under[cur]*100).toFixed(3)}%</span></div>
+    <div class="irow"><span class="k">范围利用率</span><span class="v">${(L.util[cur]*100).toFixed(1)}%</span></div>
+    <div class="irow"><span class="k">loss 贡献度</span><span class="v" style="color:${L.sensPct>0.1?'var(--crit)':'var(--ink)'}">${(L.sensPct*100).toFixed(1)}%</span></div>`;
+  // mini sqnr
+  const {c,w,h}=ctxOf($('insCanvas'));c.clearRect(0,0,w,h);
+  const X=i=>2+(w-4)*i/(N-1),Y=v=>h-4-(h-8)*(v-14)/(48-14);
+  c.strokeStyle='rgba(255,90,106,.3)';c.setLineDash([2,3]);c.beginPath();c.moveTo(2,Y(30));c.lineTo(w-2,Y(30));c.stroke();c.setLineDash([]);
+  c.strokeStyle=sevColor[sv];c.lineWidth=1.4;c.beginPath();L.sqnr.forEach((v,i)=>{i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v));});c.stroke();
+  c.fillStyle=sevColor[sv];c.beginPath();c.arc(X(cur),Y(sq),2.5,0,7);c.fill();
+  // verdict
+  const isCul=CULPRIT[L.name];
+  const kurt=histFor(L,cur,'weight').kurt;
+  $('insVerdict').innerHTML = isCul
+    ? `<h4>诊断结论</h4><span class="pill" style="background:#2a1620;color:var(--crit)">高风险 · 误差注入源</span>
+       <div style="font-size:11px;color:var(--ink-mute);margin-top:8px;line-height:1.6">权重分布重尾(峰度 ${kurt.toFixed(1)})、超出 HiF8 ±448 触发截断,拟合 t 分布不适合直接量化,与全局 loss 偏差强相关。建议保留 BF16 或改 per-channel scaling。</div>`
+    : `<h4>诊断结论</h4><span class="pill" style="background:#1c2a20;color:var(--ok)">正常 · 精度充足</span>
+       <div style="font-size:11px;color:var(--ink-mute);margin-top:8px;line-height:1.6">分布近高斯(峰度 ${kurt.toFixed(1)})、量化误差在预期范围内,对全局 loss 偏差贡献较小。</div>`;
+}
+
+/* ---------- scrub / status ---------- */
+const MONO="'JetBrains Mono',ui-monospace,monospace";
+function updateScrubUI(){
+  const pct=cur/(N-1)*100;
+  $('trackFill').style.width=pct+'%';
+  $('trackMarker').style.left=(DIV/(N-1)*100)+'%';
+  $('rdStep').textContent=stepOf(cur);
+  $('rdLoss').textContent=dloss[cur].toFixed(3);
+  $('rdLoss').style.color=dloss[cur]>0.05?'var(--crit)':'var(--ink)';
+  $('rdSqnr').textContent=meanSqnr[cur].toFixed(1)+'dB';
+  $('rdSqnr').style.color=sevColor[meanSqnr[cur]>32?'ok':meanSqnr[cur]>28?'warn':'crit'];
+  $('xpSub').textContent='step '+stepOf(cur)+'/10000 · ckpt#'+Math.floor(cur/10);
+  $('stStep').textContent='step '+stepOf(cur)+' / 10000';
+  $('stSqnr').textContent='均值 SQNR '+meanSqnr[cur].toFixed(1)+' dB';
+  $('stDiv').style.display=cur>=DIV?'flex':'none';
+}
+
+/* ---------- master render ---------- */
+let activeView='overview';
+function renderActive(){
+  if(activeView==='overview'){renderKpis();renderFmtStatus();renderLoss();renderDelta();renderLogit();renderTimeline();}
+  else if(activeView==='dist'){renderDist();}
+  else if(activeView==='error'){renderErrorTable();renderMetricChart();renderHeat();}
+  else if(activeView==='prop'){renderProp();}
+  else if(activeView==='attr'){renderAttr();}
+}
+function renderAll(){updateScrubUI();refreshTreeReadouts();renderActive();renderInspector();}
+
+function selectLayer(L){selLayer=L;renderAll();}
+
+/* ---------- events ---------- */
+$('stepRange').oninput=e=>{cur=+e.target.value;renderAll();};
+function setView(v){
+  activeView=v;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+  document.querySelectorAll('.view').forEach(el=>el.hidden = el.id!=='v-'+v);
+  renderActive();
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>setView(t.dataset.v));
+document.querySelectorAll('#tensorSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tensorSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');tensorType=b.dataset.t;renderDist();});
+document.querySelectorAll('#etable th').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.s;
+  if(k===sortKey)sortAsc=!sortAsc; else{sortKey=k;sortAsc=(k==='sqnr'||k==='cos');}
+  document.querySelectorAll('#etable th').forEach(x=>x.classList.toggle('sorted',x.dataset.s===sortKey));
+  renderErrorTable();});
+$('playBtn').onclick=()=>{
+  playing=!playing;
+  $('playIcon').innerHTML= playing? '<rect x="3" y="2" width="3" height="10"/><rect x="8" y="2" width="3" height="10"/>' : '<path d="M3 2 L12 7 L3 12 Z"/>';
+  if(playing){ if(cur>=N-1)cur=0;
+    playTimer=setInterval(()=>{cur++; if(cur>=N-1){cur=N-1;$('playBtn').onclick();} $('stepRange').value=cur;renderAll();},90);
+  } else clearInterval(playTimer);
+};
+addEventListener('resize',()=>renderActive());
+
+/* ---------- init ---------- */
+$('divLabel').textContent='step '+stepOf(DIV);
+buildTree();
+setView('overview');
+renderAll();
+</script>
+</body>
+</html>
