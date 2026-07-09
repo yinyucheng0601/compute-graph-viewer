@@ -452,10 +452,15 @@
   .opv-ep-label.opv-tp-label span{color:color-mix(in srgb,#1d4ed8 64%,var(--foreground-muted))}
   :root[data-theme='dark'] .opv-ep-label.opv-tp-label{color:#dbeafe;background:rgba(30,64,175,.76);border-color:rgba(147,197,253,.62)}
   :root[data-theme='dark'] .opv-ep-label.opv-tp-label span{color:#bfdbfe}
-  .opv-ep-label.opv-pp-label{border-color:color-mix(in srgb,#16a34a 64%,transparent);
-    background:color-mix(in srgb,var(--ide-frame-pane-bg) 82%,#16a34a 18%);color:#166534;
-    transform:translate(-50%,-50%);pointer-events:auto;cursor:help}
-  .opv-ep-label.opv-pp-label span{color:color-mix(in srgb,#166534 64%,var(--foreground-muted))}
+  .opv-ep-label.opv-pp-label{border-color:color-mix(in srgb,#16a34a 78%,transparent);
+    background:color-mix(in srgb,var(--ide-frame-pane-bg) 70%,#16a34a 30%);color:#14532d;
+    transform:translate(-50%,0);pointer-events:auto;cursor:help;box-sizing:border-box;border-width:2px;
+    box-shadow:0 10px 24px rgba(22,163,74,.18),0 0 0 1px color-mix(in srgb,#16a34a 14%,transparent) inset;
+    min-width:0;width:var(--opv-pp-label-width,240px);max-width:calc(100vw - 24px);
+    white-space:normal;line-height:1.15}
+  .opv-ep-label.opv-pp-label b{display:block;font:850 13.5px/1.1 var(--font-mono);white-space:nowrap}
+  .opv-ep-label.opv-pp-label span{color:color-mix(in srgb,#166534 64%,var(--foreground-muted));
+    line-height:1.2;white-space:normal;overflow-wrap:anywhere}
   .opv-ep-label.opv-pp-label:hover,
   .opv-ep-label.opv-pp-label.is-hovered{border-color:#16a34a;box-shadow:0 12px 30px rgba(22,163,74,.28);filter:saturate(1.08)}
   :root[data-theme='dark'] .opv-ep-label.opv-pp-label{color:#dcfce7;background:rgba(22,101,52,.76);border-color:rgba(134,239,172,.62)}
@@ -483,13 +488,15 @@
   .opv-transfer-point.is-hovered circle,
   .opv-transfer-point.is-selected circle{opacity:1;stroke:var(--primary);stroke-width:2}
   .opv-transfer-hit{pointer-events:all;cursor:pointer;fill:transparent;stroke:none}
-  .opv-transfer-stage-line{display:none;stroke:color-mix(in srgb,var(--success) 72%,transparent);stroke-width:1.25;stroke-dasharray:4 4;opacity:.6;pointer-events:none}
+  .opv-transfer-stage-line{visibility:hidden;stroke:color-mix(in srgb,#16a34a 70%,transparent);stroke-width:3.2;opacity:.72;pointer-events:none}
   .opv-transfer-stage-line.is-hovered,
-  .opv-transfer-stage-line.is-selected{opacity:1;stroke:var(--primary)}
+  .opv-transfer-stage-line.is-selected{opacity:.9;stroke:#16a34a;stroke-width:3.8}
   .opv-layer-axis-mark{position:absolute;z-index:2;display:none;transform:translate(-50%,0);
     pointer-events:none;color:var(--foreground-muted);font:800 10px/1 var(--font-mono);letter-spacing:0;text-align:center;
     text-shadow:0 1px 4px var(--ide-frame-pane-bg),0 0 8px var(--ide-frame-pane-bg)}
   .opv-layer-axis-mark::after{content:"";display:block;width:0;height:var(--opv-axis-line-height,84px);margin:4px auto 0;border-left:1px dashed color-mix(in srgb,var(--foreground-muted) 58%,transparent)}
+  .opv-layer-axis-mark.is-pp-boundary{color:color-mix(in srgb,#166534 70%,var(--foreground-muted));font-weight:900}
+  .opv-layer-axis-mark.is-pp-boundary::after{border-left-width:2px;border-left-style:solid;border-left-color:color-mix(in srgb,#16a34a 48%,transparent);opacity:.56}
   @keyframes opvBadgePulse{0%,100%{box-shadow:0 4px 14px rgba(0,0,0,.34)}50%{box-shadow:0 0 16px 3px var(--danger)}}
   .opv-loss-readout .regime.is-clickable{cursor:pointer}
   .opv-loss-readout .regime.is-clickable:hover{filter:brightness(1.1)}
@@ -895,7 +902,6 @@
           <div class="pto-ide-frame__pane-body">
             <div id="analysisDock" class="opv-analysis-dock">
               <section id="analysisPanelLoss" class="opv-analysis-panel" data-analysis-panel="loss"></section>
-              <section id="analysisPanelObjectFlow" class="opv-analysis-panel" data-analysis-panel="object-flow"></section>
               <section id="analysisPanelTimeline" class="opv-analysis-panel" data-analysis-panel="timeline">
                 <div id="swimlaneView" class="opv-swimlane"></div>
               </section>
@@ -1424,7 +1430,6 @@ function trainObjectAnalysisLinks(obj){
   const isMoe=/moe|expert|gate|a2a/.test(anchor)||tags.includes('ep');
   const isTimeline=['activation','residual','gradient','comm','opt'].includes(obj.type);
   return [
-    {id:'object-flow',label:'Objects',reason:'查看这个对象与同源 weight / gradient / optimizer state 以及前向、反向、通信流的关系。'},
     {id:'loss',label:'Monitor',reason:['loss','metric','lr','scale'].includes(obj.type)?'直接对应训练稳定性曲线、loss scale 或学习率状态。':'作为训练 step 上下文，观察该对象被选中时 loss / acc / MFU / NPU 是否同步异常。'},
     {id:'timeline',label:'Timeline',reason:isTimeline?'查看它在 1F1B 中何时产生、被消费、跨 PP/TP/EP/DP 通信。':'查看该参数对应的 forward/backward/update 时间位置。'},
     {id:'moe-load',label:'MoE Load',reason:isMoe?'直接关联 router、expert 或 A2A dispatch/combine 的负载热力。':'弱关联：用于判断同层 MoE 负载是否影响这个对象所在路径。'},
@@ -1529,7 +1534,8 @@ function setTrainingObjectFlowPhase(id){
 }
 function activateTrainingObjectAnalysis(viewId,obj=selectedTrainingObject()){
   if(!viewId)return;
-  analysisDockController?.setActiveView?.(viewId);
+  const dockViewId=viewId==='object-flow'?'timeline':viewId;
+  analysisDockController?.setActiveView?.(dockViewId);
   if(viewId==='timeline'){
     const phaseByType={activation:'activation',residual:'activation',gradient:'gradient',comm:'communication',opt:'optimizer'};
     if(phaseByType[obj?.type])trainingObjectState.flowPhase=phaseByType[obj.type];
@@ -1541,11 +1547,11 @@ function activateTrainingObjectAnalysis(viewId,obj=selectedTrainingObject()){
   }else if(viewId==='card-load'){
     setObjectFocus(RANK_RENDER_VISIBLE?'hw:cards':'comm:pp');
   }else if(viewId==='object-flow'){
-    renderTrainingObjectFlow();
+    setInspectorTab('object');
   }
   renderSelectedDetailInspector();
   renderTrainingObjectFlow();
-  if(statusRight)statusRight.textContent=`Bottom pane · ${viewId} · ${obj?trainObjectPlacement(obj):'object context'}`;
+  if(statusRight)statusRight.textContent=`Bottom pane · ${dockViewId} · ${obj?trainObjectPlacement(obj):'object context'}`;
 }
 function selectTrainingObject(id,{focus=true,openInspector=true}={}){
   if(!TRAIN_OBJECT_BY_ID.has(id))return;
@@ -1555,7 +1561,7 @@ function selectTrainingObject(id,{focus=true,openInspector=true}={}){
   if(focus||openInspector)trainingObjectState.revealed=true;
   const obj=selectedTrainingObject();
   if(focus){
-    analysisDockController?.setActiveView?.('object-flow');
+    analysisDockController?.setActiveView?.('timeline');
     const mode=trainObjectFocus(obj);
     if(mode)setObjectFocus(mode);
     const layer=trainObjectLayer(obj);
@@ -2548,18 +2554,6 @@ function renderTrainingObjectFlow(){
     if(statusRight)statusRight.textContent=`Object flow microbatch · mb:${trainingObjectState.microbatch}`;
   });
 }
-function createTrainingObjectFlowView(panel){
-  return {
-    id:'object-flow',
-    label:'Objects',
-    title:'Object Flow / Identifier Topology',
-    meta:()=>`${TRAIN_OBJECTS.length} objects · ${TRAIN_REGISTRY.modelFacts?.scenario||'train.txt spec'}`,
-    panel,
-    mount(){trainingObjectFlowMount=panel;renderTrainingObjectFlow();},
-    render(){renderTrainingObjectFlow();},
-    resize(){}
-  };
-}
 function rememberArch(mesh,id,layer,base,labelOverride,descOverride){
   mesh.userData={
     panel:true,id,layer,
@@ -2749,6 +2743,7 @@ function addArchLabel(text,p,colorHex,scale,renderOrder=7,opts={}){
     viewOnly:opts.viewOnly||null,
     tags:opts.tags||[],
     keepInFront:!!opts.keepInFront,
+    keepInSide:!!opts.keepInSide,
     labelKind:opts.labelKind||null,
     archId:opts.archId??null,
     archLayer:opts.archLayer??null,
@@ -2774,6 +2769,7 @@ function addArchStackLabel(lines,p,colorHex,w=0.26,h=0.72,renderOrder=7,opts={})
     viewOnly:opts.viewOnly||null,
     tags:opts.tags||[],
     keepInFront:!!opts.keepInFront,
+    keepInSide:!!opts.keepInSide,
     labelKind:opts.labelKind||null,
     archId:opts.archId??null,
     archLayer:opts.archLayer??null,
@@ -2909,7 +2905,7 @@ function addExpertPoolPanel(c,layer,{showLabel=true,labelText=null,solid=false}=
   mapExpertAliases(panel,layer);
   if(showLabel)addArchLabel(labelText??`Expert Pool · L${layer}`,p.clone().add(new THREE.Vector3(0,h*0.36,0)),ARCH_LAYER_LABEL(),0.72,layerRenderOrder(layer)+0.2,{tags:archTagsFor('expert_pool',layer),labelKind:'node',frontBoost:1.55,archId:'expert_pool',archLayer:layer});
 }
-function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null,descOverride=null,box=null}={}){
+function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null,descOverride=null,box=null,keepInSide=false,sideBoost=1.25}={}){
   if(!n){
     console.warn('[op-rank-time] skip missing graph node; graph data may be stale', {layer});
     return null;
@@ -2926,7 +2922,7 @@ function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,ARCH_THICK),mat);
   mesh.position.copy(p); scene.add(mesh); rememberArch(mesh,n.id,layer,base,labelText,descOverride);
   const expert=/^expert_group_/.test(n.id);
-  if(showLabel&&!expert)addArchLabel(labelText??n.label,p,nodeLabelColor(),Math.min(expert?0.28:0.76,w*0.92),layerRenderOrder(layer)+0.2,{tags:archTagsFor(n.id,layer),labelKind:'node',frontBoost:1.45,sideBoost:1.25,archId:n.id,archLayer:layer});
+  if(showLabel&&!expert)addArchLabel(labelText??n.label,p,nodeLabelColor(),Math.min(expert?0.28:0.76,w*0.92),layerRenderOrder(layer)+0.2,{tags:archTagsFor(n.id,layer),labelKind:'node',frontBoost:1.45,sideBoost,keepInSide,archId:n.id,archLayer:layer});
   return mesh;
 }
 function addArchLine(a,b,color,opacity,layerA=0,layerB=layerA,tags=null){
@@ -3105,8 +3101,8 @@ function addMoeLayer(layer){
   addLayerMarker(layer,`L${layer} MoE`,0xa78bfa,major||solid);
 }
 function drawStaticInputOutput(){
-  STATIC_INPUT_IDS.forEach(id=>addNode(byId.get(id),'input',{opaque:true,showLabel:true}));
-  STATIC_OUTPUT_IDS.forEach(id=>addNode(byId.get(id),'output',{opaque:true,showLabel:true}));
+  STATIC_INPUT_IDS.forEach(id=>addNode(byId.get(id),'input',{opaque:true,showLabel:true,keepInSide:true,sideBoost:1.45}));
+  STATIC_OUTPUT_IDS.forEach(id=>addNode(byId.get(id),'output',{opaque:true,showLabel:true,keepInSide:true,sideBoost:1.6}));
   addArchLine('token_ids','embedding',EDGE_COL.activation,0.62,'input','input');
   addArchLine('embedding_weight','embedding',EDGE_COL.parameter,0.25,'input','input');
   addArchLine('embedding','dense_block',EDGE_COL.activation,0.72,'input',0);
@@ -5260,7 +5256,6 @@ function renderSwimlane(){if(activeAnalysisView==='timeline')paintSwimlane();}
 /* ===== Analysis Dock：Timeline / MoE Load / Rank Load / Card Load ===== */
 const analysisPanels={
   loss:document.getElementById('analysisPanelLoss'),
-  objectFlow:document.getElementById('analysisPanelObjectFlow'),
   timeline:document.getElementById('analysisPanelTimeline'),
   moe:document.getElementById('analysisPanelMoe'),
   card:document.getElementById('analysisPanelCard')
@@ -5561,7 +5556,6 @@ function handleAnalysisSelection(selection){
 }
 const moeView=createMoeLoadView({panel:analysisPanels.moe,viewModel:moeLoadViewModel,onSelect:handleAnalysisSelection});
 const cardView=createCardLoadView({panel:analysisPanels.card,viewModel:cardLoadViewModel,onSelect:handleAnalysisSelection});
-const objectFlowView=createTrainingObjectFlowView(analysisPanels.objectFlow);
 // step(主时间) → MoE 热力/异常派生：loop 内按帧合并，重 DOM 重挂只在 MoE tab 活动时做
 let moeStepPending=focusContext.step, moeStepApplied=null, moeViewDirty=false;
 // 坍缩强度 = load_balance_loss 从健康基线(0.42)掉了多少 → 0(均衡)..1(坍缩)。loss 与 MoE 同源。
@@ -5585,14 +5579,15 @@ onContext(()=>{moeStepPending=focusContext.step;});
 function refreshCardLoad(){cardLoadViewModel=buildCardLoadViewModel(rankLoadViewModel,collapseIntensity(focusContext.step));cardView.setViewModel(cardLoadViewModel);}
 onContext(refreshCardLoad);
 refreshCardLoad();
+const storedAnalysisView=localStorage.getItem('op-rank-time-analysis-view');
+const initialAnalysisView=storedAnalysisView==='object-flow'?'loss':(storedAnalysisView||'loss');
 analysisDockController=createAnalysisDock({
   tabsRoot:document.getElementById('analysisTabs'),
   titleEl:document.getElementById('analysisTitle'),
   metaEl:document.getElementById('analysisMeta'),
-  initialView:localStorage.getItem('op-rank-time-analysis-view')||'loss',
+  initialView:initialAnalysisView,
   views:[
     lossView,
-    objectFlowView,
     {
       id:'timeline',
       label:'Timeline',
@@ -6010,6 +6005,13 @@ function refreshTransferGapHighlights(){
     el.classList.toggle('is-selected',key===selectedTransferKey);
   });
   const active=transferGapFromKey(hoveredTransferKey||selectedTransferKey);
+  table?.querySelectorAll('.opv-transfer-stage-line[data-pp-boundary]').forEach(el=>{
+    const boundaryStage=Number(el.dataset.ppBoundary);
+    const hoverInfo=transferGapFromKey(hoveredTransferKey);
+    const selectedInfo=transferGapFromKey(selectedTransferKey);
+    el.classList.toggle('is-hovered',!!hoverInfo?.metric?.boundary&&hoverInfo.stage===boundaryStage);
+    el.classList.toggle('is-selected',!!selectedInfo?.metric?.boundary&&selectedInfo.stage===boundaryStage);
+  });
   if(typeof ppLabelEls!=='undefined'){
     ppLabelEls.forEach(({el,anchor})=>{
       el.classList.toggle('is-hovered',!!active&&anchor.stage===active.stage);
@@ -6106,13 +6108,16 @@ function transferLineChartHtml(gaps){
   const labels=TRANSFER_CHART_KINDS.map(kind=>
     `<text class="opv-transfer-lane-name" data-lane-label="${kind}">${esc(TRANSFER_CHART_LABELS[kind])}</text>`
   ).join('');
+  const stageLines=Array.from({length:Math.max(0,DEMO.pp-1)},(_,stage)=>
+    `<line class="opv-transfer-stage-line" data-pp-boundary="${stage}"></line>`
+  ).join('');
   const points=gaps.map(g=>{
     const risk=g.metric.grad.overflow==='watch'?'high':'normal';
     const circles=TRANSFER_CHART_KINDS.map(kind=>`<circle class="opv-transfer-point--${kind}" data-kind="${kind}" r="2.4"></circle>`).join('');
     return `<g class="opv-transfer-point" data-transfer-key="${esc(g.key)}" data-transfer-risk="${risk}">${circles}</g>`+
       `<rect class="opv-transfer-hit" data-transfer-key="${esc(g.key)}" data-transfer-risk="${risk}"></rect>`;
   }).join('');
-  return `<svg class="opv-transfer-line-chart" aria-label="Layer transfer line charts">${focusUnderlay}${lanes}${labels}${points}</svg>`;
+  return `<svg class="opv-transfer-line-chart" aria-label="Layer transfer line charts">${focusUnderlay}${stageLines}${lanes}${labels}${points}</svg>`;
 }
 function refreshTransferFocusOverlay(table=document.getElementById('layerTransferTable')){
   const svg=table?.querySelector('.opv-transfer-line-chart');
@@ -6168,7 +6173,7 @@ function syncTransferGapCells(){
   svg.setAttribute('width',String(width));
   svg.setAttribute('height',String(height));
   const pointEls=new Map(Array.from(root.querySelectorAll('.opv-transfer-point[data-transfer-key]')).map(el=>[el.dataset.transferKey,el]));
-  const stageLineEls=new Map(Array.from(root.querySelectorAll('.opv-transfer-stage-line[data-transfer-key]')).map(el=>[el.dataset.transferKey,el]));
+  const stageBoundaryLineEls=new Map(Array.from(root.querySelectorAll('.opv-transfer-stage-line[data-pp-boundary]')).map(el=>[Number(el.dataset.ppBoundary),el]));
   const projectPoint=world=>{
     const p=world.clone().project(camera);
     return {
@@ -6184,7 +6189,6 @@ function syncTransferGapCells(){
     if(!rec?.left||!rec?.right||!rec?.center){
       el.style.display='none';
       pointEls.get(key)?.setAttribute('display','none');
-      stageLineEls.get(key)?.setAttribute('display','none');
       return;
     }
     const left=projectPoint(rec.left);
@@ -6193,7 +6197,6 @@ function syncTransferGapCells(){
     if(!(left.inView||right.inView||center.inView)){
       el.style.display='none';
       pointEls.get(key)?.setAttribute('display','none');
-      stageLineEls.get(key)?.setAttribute('display','none');
       return;
     }
     const info=transferGapFromKey(key);
@@ -6254,6 +6257,54 @@ function syncTransferGapCells(){
       chartTop:layerRect.top+chartTop,
       chartBottom:layerRect.top+chartBottom
     });
+  });
+  if(transferModelYBounds){
+    DEMO_STAGE_RANGES.forEach(([lo,hi],stage)=>{
+      if(transferStageScreenAnchors.has(stage))return;
+      const loP=projectPoint(new THREE.Vector3(transferModelYBounds.x,transferModelYBounds.yMax,archDepth(lo)));
+      const hiP=projectPoint(new THREE.Vector3(transferModelYBounds.x,transferModelYBounds.yMax,archDepth(hi)));
+      const xs=[loP.x,hiP.x].filter(Number.isFinite);
+      if(!xs.length)return;
+      const stageX0=Math.min(...xs);
+      const stageX1=Math.max(...xs);
+      transferStageScreenAnchors.set(stage,{
+        x:layerRect.left+(stageX0+stageX1)/2,
+        y:layerRect.top+clampValue(chartTop-54,28,Math.max(28,height-24)),
+        x0:layerRect.left+stageX0,
+        x1:layerRect.left+stageX1,
+        chartTop:layerRect.top+chartTop,
+        chartBottom:layerRect.top+chartBottom
+      });
+    });
+  }
+  const stageAnchorTops=Array.from(transferStageScreenAnchors.values())
+    .map(anchor=>anchor.y-layerRect.top)
+    .filter(Number.isFinite);
+  const ppLineTop=stageAnchorTops.length
+    ? clampValue(Math.min(...stageAnchorTops)-52,4,Math.max(4,height-42))
+    : clampValue(chartTop-10,4,Math.max(4,height-42));
+  stageBoundaryLineEls.forEach((line,stage)=>{
+    const leftStage=transferStageScreenAnchors.get(stage);
+    const rightStage=transferStageScreenAnchors.get(stage+1);
+    let x=NaN;
+    if(leftStage&&rightStage)x=((leftStage.x1+rightStage.x0)/2)-layerRect.left;
+    else if(leftStage)x=leftStage.x1-layerRect.left;
+    else if(rightStage)x=rightStage.x0-layerRect.left;
+    if(!Number.isFinite(x)){
+      line.style.visibility='hidden';
+      line.setAttribute('visibility','hidden');
+      line.removeAttribute('display');
+      return;
+    }
+    const lineTop=ppLineTop;
+    const lineBottom=clampValue(Math.max(chartBottom+12,modelBottomY+8,height-28),lineTop+32,height-8);
+    line.style.visibility='visible';
+    line.setAttribute('visibility','visible');
+    line.removeAttribute('display');
+    line.setAttribute('x1',String(clampValue(x,0,width)));
+    line.setAttribute('x2',String(clampValue(x,0,width)));
+    line.setAttribute('y1',String(lineTop));
+    line.setAttribute('y2',String(lineBottom));
   });
   TRANSFER_CHART_KINDS.forEach((kind,index)=>{
     const laneTop=chartTop+index*(laneHeight+laneGap);
@@ -6321,14 +6372,6 @@ function syncTransferGapCells(){
         circle.classList.toggle('is-warning',transferPointIsWarning(item.info.metric,kind,value,maxByKind[kind]));
       });
     }
-    const stageLine=stageLineEls.get(item.key);
-    if(stageLine){
-      stageLine.removeAttribute('display');
-      stageLine.setAttribute('x1',String(item.x));
-      stageLine.setAttribute('x2',String(item.x));
-      stageLine.setAttribute('y1',String(chartTop-6));
-      stageLine.setAttribute('y2',String(chartTop+totalLaneHeight+6));
-    }
   });
   root.querySelectorAll('.opv-layer-axis-mark').forEach(el=>{
     const rec=transferLayerAxisPoints.get(el.dataset.axisKey);
@@ -6342,6 +6385,9 @@ function syncTransferGapCells(){
       return;
     }
     el.style.display='block';
+    const axisInfo=transferGapFromKey(el.dataset.axisKey);
+    const stageRange=DEMO_STAGE_RANGES[axisInfo?.stage]||[];
+    el.classList.toggle('is-pp-boundary',axisInfo?.layer===stageRange[1]&&axisInfo.stage<DEMO.pp-1);
     el.style.left=p.x+'px';
     const axisTop=clampValue(chartTop-34,4,Math.max(4,height-42));
     el.style.top=axisTop+'px';
@@ -6521,7 +6567,7 @@ function ensureEpOverlayLabels(){
     ppOverlayAnchors.forEach(anchor=>{
       const el=document.createElement('div');
       el.className='opv-ep-label opv-pp-label';
-      el.innerHTML=`${esc(ppLabel(anchor.stage))}<span>${esc(ppTransferSummaryLabel(anchor))}</span>`;
+      el.innerHTML=`<b>${esc(ppLabel(anchor.stage))}</b><span>${esc(ppTransferSummaryLabel(anchor))}</span>`;
       const showFromLabel=event=>{
         event.stopPropagation();
         if(!anchor.hitBox)return;
@@ -6564,16 +6610,47 @@ function syncEpOverlayPositions(){
   if(!showEp&&!showTp&&!showPp&&!showDp)return;
   const canvasRect=renderer.domElement.getBoundingClientRect();
   const layerRect=epLabelLayer.getBoundingClientRect();
+  const ppLayouts=new Map();
+  if(showPp&&ppLabelEls.length){
+    const ppSlots=ppLabelEls.map(({anchor})=>{
+      const stageScreen=transferStageScreenAnchors.get(anchor.stage);
+      if(!stageScreen)return null;
+      const prevStage=transferStageScreenAnchors.get(anchor.stage-1);
+      const nextStage=transferStageScreenAnchors.get(anchor.stage+1);
+      const rawLeft=prevStage?((prevStage.x1+stageScreen.x0)/2):stageScreen.x0;
+      const rawRight=nextStage?((stageScreen.x1+nextStage.x0)/2):stageScreen.x1;
+      const padLeft=anchor.stage===0?150:18;
+      const safeLeft=clampValue(rawLeft,layerRect.left+padLeft,layerRect.right-118);
+      const safeRight=clampValue(rawRight,Math.max(safeLeft+116,layerRect.left+padLeft+116),layerRect.right-18);
+      return {
+        stage:anchor.stage,
+        x:clampValue((safeLeft+safeRight)/2,layerRect.left+68,layerRect.right-68),
+        y:stageScreen.y,
+        slotWidth:Math.max(112,safeRight-safeLeft)
+      };
+    }).filter(Boolean);
+    if(ppSlots.length){
+      const commonWidth=clampValue(Math.min(...ppSlots.map(slot=>slot.slotWidth-14)),128,340);
+      const commonTop=clampValue(Math.min(...ppSlots.map(slot=>slot.y))-24,layerRect.top+10,layerRect.bottom-86);
+      ppSlots.forEach(slot=>{
+        const x=clampValue(slot.x,layerRect.left+commonWidth/2+12,layerRect.right-commonWidth/2-12);
+        ppLayouts.set(slot.stage,{x,y:commonTop,width:commonWidth});
+      });
+    }
+  }
   const syncList=(items,show)=>{
     if(!show)return;
     items.forEach(({el,anchor})=>{
       const stageScreen=el.classList.contains('opv-pp-label')?transferStageScreenAnchors.get(anchor.stage):null;
-      if(stageScreen){
+      const ppLayout=el.classList.contains('opv-pp-label')?ppLayouts.get(anchor.stage):null;
+      if(stageScreen&&ppLayout){
         el.style.display='block';
-        el.style.left=(stageScreen.x-layerRect.left)+'px';
-        el.style.top=(stageScreen.y-layerRect.top)+'px';
+        el.style.setProperty('--opv-pp-label-width',`${ppLayout.width}px`);
+        el.style.left=(ppLayout.x-layerRect.left)+'px';
+        el.style.top=(ppLayout.y-layerRect.top)+'px';
         return;
       }
+      el.style.removeProperty('--opv-pp-label-width');
       const p=anchor.pos.clone().project(camera);
       const inView=p.z<1&&p.x>=-1.08&&p.x<=1.08&&p.y>=-1.08&&p.y<=1.08;
       if(!inView){el.style.display='none';el.classList.remove('is-hovered');return;}
