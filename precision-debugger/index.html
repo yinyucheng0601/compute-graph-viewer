@@ -85,6 +85,9 @@ body{margin:0;font:var(--text-body);background:var(--surface-3);color:var(--fore
 .ide-crumb span{opacity:.45}
 .ide-winactions{display:flex;align-items:center;gap:3px;flex:0 0 auto;margin-left:auto}
 .ide-wbtn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;color:var(--foreground-muted);cursor:pointer}
+.ide-wbtn.is-on{color:var(--foreground)}   /* 面板打开：图标提亮为前景色（中性，不用蓝） */
+.ide-wbtn .panel-fill{stroke:none;fill:transparent}
+.ide-wbtn.is-on .panel-fill{fill:currentColor}   /* 打开时把对应侧栏那一格填实，表达面板状态 */
 .ide-wbtn:hover{background:var(--state-hover);color:var(--foreground)}
 .ide-wbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .op-theme .ic-sun{display:none}.op-theme .ic-moon{display:block}
@@ -170,8 +173,14 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .btn-icon svg{width:17px;height:17px}
 
 /* ===================== body / panes ===================== */
-.work{flex:1 1 auto;display:flex;min-height:0;gap:7px;background:transparent}
-.workmain{position:relative;flex:1 1 auto;min-width:0;min-height:0;display:flex;gap:7px}
+.work{flex:1 1 auto;display:flex;min-height:0;gap:0;background:transparent}
+/* 可拖动分隔条：静止透明、悬停/拖动显示高亮线（不占多余间距，命中区 8px） */
+.splitter{flex:0 0 8px;align-self:stretch;position:relative;cursor:col-resize;z-index:6;touch-action:none}
+.splitter[hidden]{display:none}
+.splitter::after{content:"";position:absolute;top:9px;bottom:9px;left:50%;width:2px;transform:translateX(-50%);border-radius:2px;background:transparent;transition:background var(--duration-fast) var(--easing-default),box-shadow var(--duration-fast)}
+.splitter:hover::after,.splitter.dragging::after{background:var(--primary);box-shadow:0 0 7px color-mix(in srgb,var(--primary) 55%,transparent)}
+body.col-resizing{cursor:col-resize;user-select:none}
+.workmain{position:relative;flex:1 1 auto;min-width:0;min-height:0;display:flex;gap:0}
 .center{position:relative;flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0;
   background:var(--ide-pane-bg);border:1px solid var(--border-subtle);border-radius:var(--radius-xl);overflow:hidden}
 .inspector{flex:0 0 380px;display:flex;flex-direction:column;min-height:0;
@@ -504,11 +513,12 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .isec:last-child{margin-bottom:0}
 .ikick{font:var(--text-label);letter-spacing:.5px;text-transform:uppercase;color:var(--foreground-muted);margin-bottom:8px}
 .icard{background:var(--surface-1);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:8px}
-.icard.crit{border-color:color-mix(in srgb,var(--danger) 30%,var(--border-subtle));background:linear-gradient(180deg,color-mix(in srgb,var(--danger) 7%,var(--surface-1)),var(--surface-1) 42%)}
+/* 首错/根因卡：中性描边 + 顶部柔和红晕（inset 光晕，非硬边/色条），配合「首错/根因」红标表达状态，不被误读成选中态 */
+.icard.crit{border-color:var(--border-subtle);background:color-mix(in srgb,var(--danger) 3.5%,var(--surface-1));box-shadow:inset 0 14px 28px -26px color-mix(in srgb,var(--danger) 42%,transparent)}
 .crit-tag{display:inline-flex;align-items:center;gap:6px;font:700 10px/1 var(--font-sans);letter-spacing:.4px;color:var(--danger);background:var(--tone-critical-bg);border:1px solid color-mix(in srgb,var(--danger) 32%,transparent);padding:5px 9px;border-radius:var(--radius-pill);margin-bottom:10px}
 .crit-tag .crit-dot{width:6px;height:6px;border-radius:50%;background:var(--danger);box-shadow:0 0 5px var(--danger)}
-.icard.high{border-color:color-mix(in srgb,var(--warning) 42%,transparent);background:color-mix(in srgb,var(--warning) 6%,var(--surface-1))}
-.icard.ok{border-color:color-mix(in srgb,var(--success) 40%,transparent)}
+.icard.high{border-color:var(--border-subtle);background:color-mix(in srgb,var(--warning) 3%,var(--surface-1));box-shadow:inset 0 14px 26px -26px color-mix(in srgb,var(--warning) 38%,transparent)}
+.icard.ok{border-color:var(--border-subtle);background:color-mix(in srgb,var(--success) 2.5%,var(--surface-1))}
 .inode-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
 .inode-swatch{width:12px;height:12px;border-radius:4px;margin-top:3px;flex:0 0 auto}
 .inode-title{font:var(--text-title-1);font-size:16px}
@@ -571,7 +581,7 @@ header{display:flex;align-items:center;gap:var(--space-3);height:52px;flex:0 0 5
 .drill-top .dt-sub{font:var(--text-mono);font-size:10.5px;color:var(--foreground-muted);margin-top:1px}
 .drill-top .dt-tag{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 11px;border-radius:var(--radius-pill);
   font:var(--text-mono);font-weight:700;background:var(--tone-critical-bg);color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 40%,transparent)}
-.drill-body{flex:1 1 auto;min-height:0;display:flex;gap:12px;padding:12px 14px;overflow:hidden}
+.drill-body{flex:1 1 auto;min-height:0;display:flex;gap:0;padding:12px 14px;overflow:hidden}
 .drill-left{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .drill-right{flex:0 0 420px;min-height:0;overflow-y:auto;padding-right:2px}
 .drill-right::-webkit-scrollbar{width:8px}.drill-right::-webkit-scrollbar-thumb{background:var(--surface-4);border-radius:8px}
@@ -808,7 +818,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
 .rankmx{display:flex;gap:4px;margin-top:8px}
 .rk-cell{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:6px;border:1px solid var(--border-subtle);background:var(--surface-1);cursor:pointer}
 .rk-cell:hover{border-color:var(--border-strong)}
-.rk-cell.cur{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.rk-cell.cur{border-color:var(--danger)}   /* 当前 rank：红色描边（首错命中态），不再用蓝色选中环 */
 .rk-cell.bad{background:var(--tone-critical-bg)}
 .rk-cell .rk-r{font:var(--text-mono);font-size:8.5px;color:var(--foreground-muted)}
 .rk-cell .rk-v{font:700 11px/1 var(--font-mono)}
@@ -855,8 +865,8 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
     <div class="ide-winactions">
       <span class="ide-wbtn" id="frameBack" title="后退 · 返回整网侧视图" onclick="frameBack()"><svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg></span>
       <span class="ide-wbtn" title="前进"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
-      <span class="ide-wbtn" title="左侧面板（配置）" onclick="toggleSide()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></span>
-      <span class="ide-wbtn" title="右侧面板（概览 Inspector）" onclick="toggleInspector()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></span>
+      <span class="ide-wbtn is-on" id="leftPanelBtn" title="左侧面板（配置）" onclick="toggleSide()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><rect class="panel-fill" x="4" y="4" width="4.5" height="16" rx="1"/></svg></span>
+      <span class="ide-wbtn is-on" id="rightPanelBtn" title="右侧面板（概览 Inspector）" onclick="toggleInspector()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/><rect class="panel-fill" x="15.5" y="4" width="4.5" height="16" rx="1"/></svg></span>
       <span class="ide-wbtn op-theme" id="themeBtn" title="切换深浅色">
         <svg class="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
         <svg class="ic-moon" viewBox="0 0 24 24"><path d="M20.98 13.05A8 8 0 1 1 10.95 3.02 6 6 0 0 0 20.98 13.05Z"/></svg>
@@ -921,6 +931,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
         </section>
       </div>
     </aside>
+    <div class="splitter" id="splitSide" title="拖动调整左侧面板宽度（双击复位）"></div>
     <div class="workmain" id="workMain">
     <section class="center">
       <div class="pane-head">
@@ -1027,7 +1038,7 @@ table.diff td{padding:4px 8px;border-bottom:1px solid var(--border-subtle);color
         </div>
       </div>
     </section>
-
+    <div class="splitter" id="splitInsp" title="拖动调整右侧面板宽度（双击复位）"></div>
     <aside class="inspector" id="inspector">
       <div class="pane-head">
         <div style="display:flex;align-items:center;gap:10px;min-width:0">
@@ -3742,19 +3753,45 @@ function showHelp(el) {
   tip.style.top = (r.bottom + 6) + 'px';
 }
 function hideHelp() { const t = document.getElementById('helpTip'); if (t) t.classList.remove('on'); }
+function refitCurrent() { if (mainView === 'side') { side3d ? fitOrbit() : fitSide(); } else fit(); }
 function toggleSide() {
   const p = document.getElementById('sidePane');
   if (!p) return;
   p.hidden = !p.hidden;
-  const rb = document.getElementById('railTool');
-  if (rb) rb.classList.toggle('is-selected', !p.hidden);
-  requestAnimationFrame(fit);
+  const sp = document.getElementById('splitSide'); if (sp) sp.hidden = p.hidden;
+  const rb = document.getElementById('railTool'); if (rb) rb.classList.toggle('is-selected', !p.hidden);
+  const hb = document.getElementById('leftPanelBtn'); if (hb) hb.classList.toggle('is-on', !p.hidden);
+  requestAnimationFrame(refitCurrent);
 }
 function toggleInspector() {
   const el = document.getElementById('inspector');
   if (!el) return;
   el.hidden = !el.hidden;
-  requestAnimationFrame(fit);
+  const sp = document.getElementById('splitInsp'); if (sp) sp.hidden = el.hidden;
+  const hb = document.getElementById('rightPanelBtn'); if (hb) hb.classList.toggle('is-on', !el.hidden);
+  requestAnimationFrame(refitCurrent);
+}
+/* 面板宽度可拖动：min/max 限位保证中间主体阅读区不被压瘪；双击复位默认宽度 */
+function makeSplitter(splitId, target, min, max, dir) {
+  const sp = document.getElementById(splitId); if (!sp || !target) return;
+  let st = null, raf = 0;
+  const onMove = (e) => {
+    if (!st) return;
+    let w = st.w + (e.clientX - st.x) * dir;
+    w = Math.max(min, Math.min(max, w));
+    target.style.flexBasis = w + 'px';
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; refitCurrent(); });
+  };
+  const onUp = (e) => { if (!st) return; st = null; sp.classList.remove('dragging'); document.body.classList.remove('col-resizing'); try { sp.releasePointerCapture(e.pointerId); } catch (_) {} refitCurrent(); };
+  sp.addEventListener('pointerdown', (e) => {
+    st = { x: e.clientX, w: target.getBoundingClientRect().width };
+    sp.classList.add('dragging'); document.body.classList.add('col-resizing');
+    try { sp.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault();
+  });
+  sp.addEventListener('pointermove', onMove);
+  sp.addEventListener('pointerup', onUp);
+  sp.addEventListener('pointercancel', onUp);
+  sp.addEventListener('dblclick', () => { target.style.flexBasis = ''; refitCurrent(); });
 }
 function setRank(v) {
   S.rank = parseInt(v, 10) || 0;
@@ -4025,6 +4062,7 @@ const OPDRILL = {
 };
 let drillId = null, drillSel = null, drillTab = 'judge', drillLock = true;
 let drillView = { tx: 0, ty: 0, z: 1 }, drillFit = true, drillPan = null;
+let _drillRightW = 420;   /* 算子下钻右侧面板宽度（可拖动，320–700，考虑大屏）*/
 
 function opDrillable(id) { return id in OPDRILL; }
 /* drill micro-graph canvas ops (zoom / pan / fit) */
@@ -4044,12 +4082,33 @@ function fitDrill() {
       minX = Math.min(minX, l); minY = Math.min(minY, t); maxX = Math.max(maxX, l + w); maxY = Math.max(maxY, t + h);
     });
   } else { minX = 0; minY = 0; maxX = 980; maxY = 520; }
-  const pad = 24, cw = Math.max(1, maxX - minX), ch = Math.max(1, maxY - minY);
-  const z = Math.min((r.width - pad * 2) / cw, (r.height - pad * 2) / ch, 1.1);
+  const pad = 16, cw = Math.max(1, maxX - minX), ch = Math.max(1, maxY - minY);
+  const z = Math.min((r.width - pad * 2) / cw, (r.height - pad * 2) / ch, 1.6);   /* 提高上限，让下钻图尽量填满画布 */
   drillView.z = Math.max(z, 0.3);
   drillView.tx = (r.width - cw * drillView.z) / 2 - minX * drillView.z;    /* 水平居中 */
   drillView.ty = (r.height - ch * drillView.z) / 2 - minY * drillView.z;   /* 垂直居中 */
   applyDrillView();
+}
+/* 算子下钻：graph ⇄ 判定面板 的可拖动分隔条（右侧面板 320–700，考虑大屏；双击复位 420） */
+function bindDrillSplitter() {
+  const sp = document.getElementById('drillSplit'); if (!sp || !els.drill) return;
+  const right = els.drill.querySelector('.drill-right'); if (!right) return;
+  let st = null, raf = 0;
+  sp.addEventListener('pointerdown', (e) => {
+    st = { x: e.clientX, w: right.getBoundingClientRect().width };
+    sp.classList.add('dragging'); document.body.classList.add('col-resizing');
+    try { sp.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault();
+  });
+  sp.addEventListener('pointermove', (e) => {
+    if (!st) return;
+    _drillRightW = Math.max(320, Math.min(700, st.w - (e.clientX - st.x)));
+    right.style.flexBasis = _drillRightW + 'px';
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; fitDrill(); });
+  });
+  const up = (e) => { if (!st) return; st = null; sp.classList.remove('dragging'); document.body.classList.remove('col-resizing'); try { sp.releasePointerCapture(e.pointerId); } catch (_) {} fitDrill(); };
+  sp.addEventListener('pointerup', up);
+  sp.addEventListener('pointercancel', up);
+  sp.addEventListener('dblclick', () => { _drillRightW = 420; right.style.flexBasis = '420px'; fitDrill(); });
 }
 function drillZoom(f) { drillView.z = Math.max(0.3, Math.min(2.4, drillView.z * f)); applyDrillView(); }
 function drillFitBtn() { fitDrill(); }
@@ -4189,9 +4248,11 @@ function renderDrill() {
           </div>
         </div>
       </div>
-      <div class="drill-right">${drillRight(d)}</div>
+      <div class="splitter" id="drillSplit" title="拖动调整右侧面板宽度（双击复位）"></div>
+      <div class="drill-right" style="flex-basis:${_drillRightW}px">${drillRight(d)}</div>
     </div>`;
   bindDrillCanvas();
+  bindDrillSplitter();
   requestAnimationFrame(() => { if (drillFit) { fitDrill(); drillFit = false; } else applyDrillView(); });
 }
 function drillRight(d) {
@@ -4614,6 +4675,8 @@ function init() {
 
   bindSideView();
   bindSide3D();
+  makeSplitter('splitSide', document.getElementById('sidePane'), 210, 380, 1);    /* 左栏 210–380 */
+  makeSplitter('splitInsp', document.getElementById('inspector'), 300, 680, -1);  /* 右栏 300–680（大屏更宽），中间主体不被压瘪 */
   renderLegend();
   syncViewDom();          /* default mainView = 'side' */
   renderActiveGraph();
