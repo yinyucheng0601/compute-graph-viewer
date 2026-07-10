@@ -4,700 +4,815 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>算子矩阵 · 大模型算子昇腾硬件支持查询</title>
+<script>
+  (() => {
+    const storageKey = 'pto.operatorMatrix.theme';
+    const params = new URLSearchParams(window.location.search);
+    const requestedTheme = params.get('theme');
+    let savedTheme = null;
+    try{
+      savedTheme = localStorage.getItem(storageKey);
+    }catch(_err){}
+    const theme = requestedTheme === 'light' || requestedTheme === 'dark'
+      ? requestedTheme
+      : (savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark');
+    document.documentElement.dataset.theme = theme;
+    window.__OPERATOR_MATRIX_INITIAL_THEME__ = theme;
+  })();
+</script>
 <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css" />
 <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css" />
 <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css" />
 <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css" />
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css" />
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css" />
+<link rel="stylesheet" href="../vendor/pto-design-system/patterns/model-graphviz/pattern.css" />
 <style>
-  :root{
-    --bg: var(--app-background, var(--background));
-    --surface: var(--surface-1);
-    --surface-2: var(--surface-2);
-    --surface-3: var(--surface-3);
-    --ink: var(--foreground);
-    --ink-2: var(--foreground-secondary);
-    --ink-3: var(--foreground-muted);
-    --line: var(--border-subtle);
-    --line-2: var(--border-default);
-    --brand: var(--primary);
-    --brand-dark: var(--primary-hover);
-    --brand-tint: var(--tone-info-bg);
-    --ok: var(--success);
-    --ok-bg: color-mix(in srgb, var(--success) 18%, transparent);
-    --ok-line: color-mix(in srgb, var(--success) 28%, transparent);
-    --warn: var(--warning);
-    --warn-bg: color-mix(in srgb, var(--warning) 18%, transparent);
-    --warn-line: color-mix(in srgb, var(--warning) 28%, transparent);
-    --none: var(--accent);
-    --none-bg: var(--surface-disabled);
-    --font-display: var(--font-sans);
-    --font-body: var(--font-sans);
-    --font-mono: var(--font-mono);
-    --radius: var(--radius-lg);
-    --shadow: var(--shadow-sm);
-    --shadow-lg: var(--shadow-lg);
-  }
-
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    font-family:var(--font-body);
-    background:var(--bg);
-    color:var(--ink);
-    font-size:var(--font-size-body-md);
-    line-height:1.5;
-    -webkit-font-smoothing:antialiased;
-    height:auto;
+  html,body{width:100%;height:100%;margin:0;min-height:100%;}
+  body.operator-matrix-page{
+    width:100%;
+    height:100%;
     min-height:100vh;
-    overflow:auto;
+    overflow:hidden;
+    display:block;
+    padding:0;
+    color:var(--foreground);
+    background:var(--ide-frame-page-bg);
+    font:var(--text-body);
+  }
+  .operator-matrix-frame{
+    position:fixed;
+    inset:0;
+    width:100%;
+    max-width:none;
+    height:100%;
+    min-height:0;
+    aspect-ratio:auto;
+    margin:0;
+    border-radius:0;
+  }
+  .om-top-title{
+    display:inline-flex;
+    align-items:center;
+    gap:var(--space-2);
+    min-width:0;
+  }
+  .om-title-main{color:var(--foreground);font:var(--ide-frame-title-font);}
+  .om-title-sub{color:var(--foreground-muted);font:var(--ide-frame-meta-font);}
+  .om-pane-header-main{
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .operator-inspector-header{
+    align-items:flex-start;
+    padding-block:var(--space-2);
+  }
+  .om-pane-actions{
+    display:inline-flex;
+    align-items:center;
+    gap:var(--space-2);
+    min-width:0;
+  }
+  .operator-theme-toggle [data-theme-icon]{display:none;}
+  :root[data-theme="dark"] .operator-theme-toggle [data-theme-icon="light"],
+  :root[data-theme="light"] .operator-theme-toggle [data-theme-icon="dark"]{
     display:block;
   }
-  button{font-family:inherit;cursor:pointer;}
-  ::selection{background:var(--brand-tint);}
-
-  /* ---------- App shell ---------- */
-  .app{max-width:1500px;margin:0 auto;padding:0 22px 60px;}
-
-  header.top{
-    display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
-    padding:26px 0 22px;flex-wrap:wrap;
+  .om-scroll{
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    overflow:auto;
+    padding:var(--space-3);
   }
-  .brand{display:flex;align-items:center;gap:14px;}
-  .brand .glyph{
-    width:44px;height:44px;flex:0 0 44px;border-radius:11px;
-    background:linear-gradient(150deg,var(--brand) 0%,var(--brand-dark) 100%);
-    display:grid;place-items:center;position:relative;box-shadow:0 6px 16px rgba(189,42,60,.28);
+  .om-filter-stack{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-4);
+    padding:var(--space-3);
   }
-  .brand .glyph::before,.brand .glyph::after{
-    content:"";position:absolute;border-radius:2px;
+  .fsec{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-2);
+    padding-bottom:var(--space-4);
+    border-bottom:1px solid var(--border-subtle);
   }
-  .brand .glyph i{
-    display:grid;grid-template-columns:repeat(3,5px);grid-template-rows:repeat(3,5px);gap:3px;
-  }
-  .brand .glyph i span{width:5px;height:5px;border-radius:1.5px;background:rgba(255,255,255,.55);}
-  .brand .glyph i span.on{background:#fff;}
-  .brand h1{
-    font-family:var(--font-display);font-weight:700;font-size:22px;letter-spacing:-.01em;margin:0;line-height:1.1;
-  }
-  .brand p{margin:2px 0 0;color:var(--ink-2);font-size:12.5px;}
-
-  .headmeta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .ctx-pill{
-    display:inline-flex;align-items:center;gap:9px;background:var(--surface);
-    border:1px solid var(--line);border-radius:999px;padding:7px 14px 7px 12px;box-shadow:var(--shadow);
-  }
-  .ctx-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);}
-  .ctx-pill b{font-family:var(--font-mono);font-weight:600;font-size:13px;}
-  .ctx-pill span{color:var(--ink-3);font-size:11.5px;}
-
-  /* ---------- Layout grid ---------- */
-  .grid{display:grid;grid-template-columns:262px minmax(0,1fr) 352px;gap:20px;align-items:start;}
-  .hierarchy .panel{position:sticky;top:16px;}
-
-  /* ---------- Sidebar ---------- */
-  .panel{
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;
-    box-shadow:var(--shadow);position:sticky;top:16px;overflow:hidden;
-  }
-  .panel-head{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:15px 16px 13px;border-bottom:1px solid var(--line);
-  }
-  .panel-head h2{font-family:var(--font-display);font-size:13px;font-weight:600;margin:0;letter-spacing:.02em;}
-  .reset-btn{
-    background:transparent;border:none;color:var(--brand);font-size:12px;font-weight:600;
-    padding:4px 6px;border-radius:6px;
-  }
-  .reset-btn:hover{background:var(--brand-tint);}
-  .fsec{padding:15px 16px;border-bottom:1px solid var(--line);}
-  .fsec:last-child{border-bottom:none;}
-  .fsec > label.lbl{
-    display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--ink-3);margin-bottom:9px;
+  .fsec:last-child{border-bottom:0;padding-bottom:0;}
+  .lbl{
+    color:var(--foreground-muted);
+    font:var(--text-label);
+    letter-spacing:var(--letter-spacing-label);
+    text-transform:uppercase;
   }
   select,.txt{
-    width:100%;font-family:var(--font-body);font-size:13.5px;color:var(--ink);
-    background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;
-    padding:9px 11px;appearance:none;
+    width:100%;
+    min-height:var(--input-height-md);
+    padding:0 var(--space-3);
+    border:1px solid var(--input-border);
+    border-radius:var(--input-radius);
+    background:var(--input-bg);
+    color:var(--foreground);
+    font:var(--text-body-sm);
   }
-  select{
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%2346586E' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
-    background-repeat:no-repeat;background-position:right 11px center;padding-right:30px;cursor:pointer;
+  select:focus-visible,.txt:focus-visible{
+    outline:none;
+    box-shadow:0 0 0 3px var(--focus-ring);
   }
-  select:focus-visible,.txt:focus-visible{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint);}
-  select + select{margin-top:9px;}
-
-  .hw-list{display:flex;flex-direction:column;gap:2px;}
-  .hw-row{
-    display:flex;align-items:center;gap:10px;padding:8px 9px;border-radius:8px;cursor:pointer;user-select:none;
+  select + select{margin-top:var(--space-2);}
+  .search-wrap{position:relative;color:var(--foreground-muted);}
+  .search-wrap svg{
+    position:absolute;
+    left:var(--space-3);
+    top:50%;
+    transform:translateY(-50%);
+    pointer-events:none;
   }
-  .hw-row:hover{background:var(--surface-2);}
-  .hw-row input{position:absolute;opacity:0;pointer-events:none;}
-  .chk{
-    width:17px;height:17px;flex:0 0 17px;border:1.5px solid var(--line-2);border-radius:5px;background:#fff;
-    display:grid;place-items:center;transition:.12s;
+  .search-wrap .txt{padding-left:34px;}
+  .hw-list,.filter-options{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-1);
   }
-  .hw-row input:checked + .chk{background:var(--brand);border-color:var(--brand);}
-  .chk svg{opacity:0;transition:.12s;}
-  .hw-row input:checked + .chk svg{opacity:1;}
-  .hw-row input:focus-visible + .chk{box-shadow:0 0 0 3px var(--brand-tint);}
-  .hw-name{font-family:var(--font-mono);font-weight:500;font-size:13px;}
-  .hw-role{margin-left:auto;font-size:10.5px;color:var(--ink-3);background:var(--surface-3);padding:2px 7px;border-radius:5px;}
-
-  .chips{display:flex;flex-wrap:wrap;gap:6px;}
-  .chip{
-    font-family:var(--font-mono);font-size:11.5px;font-weight:500;color:var(--ink-2);
-    background:var(--surface-2);border:1px solid var(--line-2);border-radius:7px;padding:5px 9px;transition:.12s;
+  .hw-row,.toggle-row{
+    min-height:32px;
+    display:flex;
+    align-items:center;
+    gap:var(--space-2);
+    padding:0 var(--space-2);
+    border-radius:var(--radius-md);
+    color:var(--foreground-secondary);
+    font:var(--text-body-sm);
+    cursor:pointer;
+    user-select:none;
   }
-  .chip:hover{border-color:var(--ink-3);}
-  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff;}
-  .chip:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .chip.cat.on{background:var(--ink);border-color:var(--ink);}
-
-  .search-wrap{position:relative;}
-  .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;}
-  .search-wrap .txt{padding-left:33px;}
-
-  .toggle-row{display:flex;align-items:center;gap:9px;margin-top:12px;cursor:pointer;user-select:none;}
-  .toggle-row input{position:absolute;opacity:0;}
-  .switch{width:34px;height:19px;border-radius:999px;background:var(--line-2);position:relative;transition:.15s;flex:0 0 34px;}
-  .switch::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
-  .toggle-row input:checked + .switch{background:var(--brand);}
-  .toggle-row input:checked + .switch::after{transform:translateX(15px);}
-  .toggle-row input:focus-visible + .switch{box-shadow:0 0 0 3px var(--brand-tint);}
-  .toggle-row span{font-size:12.5px;color:var(--ink-2);}
-
-  /* ---------- Main ---------- */
-  .main{min-width:0;}
-
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
-  .stat-card{
-    background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;box-shadow:var(--shadow);
+  .hw-row:hover,.toggle-row:hover{background:var(--state-hover);color:var(--foreground);}
+  input[type="checkbox"]{accent-color:var(--primary);}
+  .hw-name{font-family:var(--font-mono);font-weight:var(--font-weight-medium);color:var(--foreground);}
+  .hw-role{
+    margin-left:auto;
+    color:var(--foreground-muted);
+    font:var(--text-label);
   }
-  .stat-card .sc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
-  .stat-card .sc-name{font-family:var(--font-mono);font-weight:600;font-size:13px;}
-  .stat-card .sc-role{font-size:10px;color:var(--ink-3);background:var(--surface-3);padding:2px 6px;border-radius:5px;}
-  .stat-card .sc-rate{font-family:var(--font-display);font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1;}
-  .stat-card .sc-rate small{font-size:13px;color:var(--ink-3);font-weight:500;margin-left:2px;}
-  .sc-bar{display:flex;height:6px;border-radius:4px;overflow:hidden;margin:11px 0 8px;background:var(--none-bg);}
+  .chips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:var(--space-2);
+  }
+  .dt-tier{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-2);
+  }
+  .dt-tier + .dt-tier{margin-top:var(--space-3);}
+  .dt-tier-lbl{
+    justify-content:flex-start;
+    color:var(--foreground-muted);
+    min-height:24px;
+    padding-inline:0;
+  }
+  .dt-tier-lbl.is-partial{color:var(--foreground-secondary);}
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+    gap:var(--space-3);
+    margin-bottom:var(--space-3);
+  }
+  .support-stat{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-2);
+    padding:var(--inspector-soft-card-padding);
+    border-radius:var(--inspector-soft-card-radius);
+    background:var(--inspector-soft-card-bg);
+  }
+  .sc-top,.sc-legend,.matrix-toolbar,.legend,.legend .lg{
+    display:flex;
+    align-items:center;
+  }
+  .sc-top{justify-content:space-between;gap:var(--space-2);}
+  .sc-name{font-family:var(--font-mono);font-weight:var(--font-weight-semibold);}
+  .sc-role,.result-count,.legend .lg,.footnote,.pane-note,.no-cond{
+    color:var(--foreground-muted);
+    font:var(--text-body-sm);
+  }
+  .sc-rate{
+    color:var(--foreground);
+    font:var(--text-title-1);
+  }
+  .sc-rate small{color:var(--foreground-muted);font:var(--text-body-sm);margin-left:var(--space-1);}
+  .sc-bar{
+    display:flex;
+    height:6px;
+    overflow:hidden;
+    border-radius:var(--radius-pill);
+    background:var(--surface-disabled);
+  }
   .sc-bar i{display:block;height:100%;}
-  .sc-bar i.f{background:var(--ok);}
-  .sc-bar i.p{background:var(--warn);}
-  .sc-bar i.n{background:var(--line-2);}
-  .sc-legend{display:flex;gap:12px;font-size:10.5px;color:var(--ink-2);}
-  .sc-legend span{display:flex;align-items:center;gap:4px;}
-  .sc-legend b{font-family:var(--font-mono);color:var(--ink);}
-
+  .sc-bar i.f{background:var(--success);}
+  .sc-bar i.p{background:var(--warning);}
+  .sc-bar i.n{background:var(--border-strong);}
+  .sc-legend{gap:var(--space-3);color:var(--foreground-secondary);font:var(--text-label);}
+  .sc-legend b{font-family:var(--font-mono);color:var(--foreground);}
   .matrix-toolbar{
-    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    background:var(--surface);border:1px solid var(--line);border-radius:12px;
-    padding:11px 15px;margin-bottom:14px;box-shadow:var(--shadow);
+    gap:var(--space-3);
+    justify-content:space-between;
+    flex-wrap:wrap;
+    margin-bottom:var(--space-3);
   }
-  .result-count{font-size:13px;color:var(--ink-2);}
-  .result-count b{color:var(--ink);font-family:var(--font-mono);}
-  .legend{display:flex;align-items:center;gap:16px;margin-left:auto;flex-wrap:wrap;}
-  .legend .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);}
-  .status-glyph{
-    width:18px;height:18px;flex:0 0 18px;border-radius:5px;display:grid;place-items:center;
-    font-family:var(--font-mono);font-size:12px;font-weight:600;
+  .mobile-filter-toggle{display:none;}
+  .result-count b{color:var(--foreground);font-family:var(--font-mono);}
+  .legend{gap:var(--space-3);flex-wrap:wrap;}
+  .legend .lg{gap:var(--space-1);}
+  .matrix-surface{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border-radius:var(--radius-lg);
+    background:var(--workbench-pane-body-bg);
   }
-  .status-glyph.full{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-line);}
-  .status-glyph.partial{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line);}
-  .status-glyph.none{background:var(--none-bg);color:var(--none);border:1px solid var(--line);}
-  .status-glyph.unused{background:transparent;color:var(--ink-3);border:1px dashed var(--line-2);}
-
-  /* ---------- Matrix ---------- */
-  .matrix-shell{
-    background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;
+  .matrix-wrap{
+    flex:1 1 auto;
+    min-height:0;
+    overflow:auto;
   }
-  .matrix-wrap{overflow:auto;max-height:70vh;}
-  table.matrix{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;}
+  table.matrix{
+    width:100%;
+    min-width:690px;
+    border-collapse:separate;
+    border-spacing:0;
+  }
   table.matrix th,table.matrix td{text-align:center;white-space:nowrap;}
-
   table.matrix thead th{
-    position:sticky;top:0;z-index:2;background:var(--surface-2);
-    border-bottom:1px solid var(--line-2);padding:11px 12px;
+    position:sticky;
+    top:0;
+    z-index:2;
+    padding:10px var(--space-3);
+    background:var(--surface-2);
+    border-bottom:1px solid var(--table-border);
   }
   table.matrix thead th.corner{
-    left:0;z-index:3;text-align:left;border-right:1px solid var(--line-2);
+    left:0;
+    z-index:3;
+    text-align:left;
   }
   .hw-head{display:flex;flex-direction:column;align-items:center;gap:2px;}
-  .hw-head b{font-family:var(--font-mono);font-size:12.5px;font-weight:600;}
-  .hw-head small{font-size:9.5px;color:var(--ink-3);letter-spacing:.02em;}
-  .corner-lbl{font-family:var(--font-display);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);}
-
+  .hw-head b,.corner-lbl,.cell-dtypes,.op-name{font-family:var(--font-mono);}
+  .hw-head b{font-size:12px;}
+  .hw-head small,.op-cat{color:var(--foreground-muted);font:var(--text-label);}
+  .corner-lbl{color:var(--foreground-muted);font-size:11px;text-transform:uppercase;}
   table.matrix tbody th.opcell{
-    position:sticky;left:0;z-index:1;background:var(--surface);
-    text-align:left;padding:0;border-right:1px solid var(--line-2);border-bottom:1px solid var(--line);
+    position:sticky;
+    left:0;
+    z-index:1;
     min-width:238px;
+    padding:0;
+    text-align:left;
+    background:var(--surface-1);
+    border-bottom:1px solid var(--table-border);
   }
-  .op-btn{
-    display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;
-    padding:11px 14px;text-align:left;color:inherit;
-    box-shadow:none;transform:none;min-height:auto;
+  table.matrix tbody td{
+    padding:var(--space-1);
+    background:var(--surface-1);
+    border-bottom:1px solid var(--table-border);
   }
-  .op-btn:hover{background:var(--surface-2);}
-  .op-btn:focus-visible{outline:none;box-shadow:inset 3px 0 0 var(--brand),0 0 0 3px var(--brand-tint) inset;}
-  .cat-tick{width:3px;height:26px;border-radius:2px;flex:0 0 3px;}
-  .op-meta{min-width:0;}
-  .op-name{font-family:var(--font-mono);font-weight:600;font-size:13px;display:block;line-height:1.25;}
-  .op-cat{font-size:10.5px;color:var(--ink-3);display:block;}
-  .op-btn .arrow{margin-left:auto;color:var(--line-2);transition:.12s;flex:0 0 auto;}
-  .op-btn:hover .arrow{color:var(--brand);transform:translateX(2px);}
+  table.matrix tbody tr:hover td,
+  table.matrix tbody tr:hover th.opcell{background:var(--state-hover);}
   .op-cell-inner{display:flex;align-items:stretch;}
   .op-cell-inner .op-btn{flex:1;min-width:0;}
+  .op-btn{
+    width:100%;
+    justify-content:flex-start;
+    min-height:40px;
+    padding-inline:var(--space-3);
+    text-align:left;
+  }
+  .op-meta{min-width:0;}
+  .op-name{
+    display:block;
+    overflow:hidden;
+    color:var(--foreground);
+    font-weight:var(--font-weight-semibold);
+    text-overflow:ellipsis;
+  }
+  .cat-tick{
+    width:8px;
+    height:8px;
+    flex:0 0 8px;
+    border-radius:var(--radius-pill);
+    background:var(--category-color,var(--accent));
+  }
   .op-repo-link{
-    display:flex;align-items:center;justify-content:center;padding:0 12px;flex:0 0 auto;
-    border-left:1px solid var(--line);color:var(--ink-3);transition:.12s;
-    box-shadow:none;transform:none;min-height:auto;width:auto;min-width:auto;border-radius:0;
+    align-self:center;
+    margin-inline-end:var(--space-1);
   }
-  .op-repo-link:hover{color:var(--brand);background:var(--brand-tint);}
-  .op-repo-link:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint) inset;color:var(--brand);}
-
-  table.matrix tbody td{
-    border-bottom:1px solid var(--line);padding:6px;background:var(--surface);
-  }
-  table.matrix tbody tr:hover td{background:var(--surface-2);}
-  table.matrix tbody tr:hover th.opcell{background:var(--surface-2);}
   .cell-btn{
-    width:100%;min-width:64px;border:none;background:transparent;padding:6px 4px;border-radius:8px;
-    display:flex;flex-direction:column;align-items:center;gap:3px;color:inherit;transition:.12s;
-    box-shadow:none;transform:none;min-height:auto;
+    width:100%;
+    min-width:66px;
+    min-height:42px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
   }
-  .cell-btn:hover{background:var(--surface-3);}
-  .cell-btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .cell-btn.hit{box-shadow:0 0 0 2px var(--brand) inset;}
-  .cell-dtypes{font-family:var(--font-mono);font-size:9.5px;color:var(--ink-3);letter-spacing:-.01em;}
-
-  .empty{padding:60px 20px;text-align:center;color:var(--ink-2);}
-  .empty h3{font-family:var(--font-display);color:var(--ink);margin:0 0 6px;font-size:16px;}
-  .empty p{margin:0;font-size:13px;}
-
-  .footnote{margin-top:16px;font-size:11.5px;color:var(--ink-3);line-height:1.6;}
-  .footnote b{color:var(--ink-2);font-weight:600;}
-
-  /* ---------- Drawer ---------- */
-  .backdrop{
-    position:fixed;inset:0;background:rgba(16,26,43,.42);opacity:0;pointer-events:none;transition:.2s;z-index:40;
-    backdrop-filter:blur(1px);
+  .cell-btn.hit{background:var(--state-selected);color:var(--foreground);}
+  .btn.op-btn.is-selected,
+  .btn.cell-btn.is-selected{
+    background:color-mix(in srgb,var(--foreground) 10%,transparent);
+    color:var(--foreground);
+    box-shadow:none;
   }
-  .backdrop.open{opacity:1;pointer-events:auto;}
-  .drawer{
-    position:fixed;top:0;right:0;height:100%;width:min(540px,94vw);background:var(--surface);
-    box-shadow:var(--shadow-lg);z-index:50;transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
-    display:flex;flex-direction:column;
+  .btn.op-btn.is-selected:hover,
+  .btn.cell-btn.is-selected:hover{
+    background:color-mix(in srgb,var(--foreground) 14%,transparent);
   }
-  .drawer.open{transform:translateX(0);}
-  .drawer-head{padding:20px 22px 16px;border-bottom:1px solid var(--line);}
-  .drawer-head .dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
-  .drawer-head .dh-cat{
-    display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--ink-2);
-    background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;margin-bottom:10px;
+  .cell-dtypes{color:var(--foreground-muted);font-size:10px;}
+  .status-glyph{
+    width:18px;
+    height:18px;
+    display:inline-grid;
+    place-items:center;
+    border-radius:var(--radius-sm);
+    font:var(--text-mono);
   }
-  .drawer-head h3{font-family:var(--font-mono);font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em;}
-  .drawer-head .dh-desc{color:var(--ink-2);font-size:13px;margin:7px 0 0;}
-  .close-btn{
-    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;width:32px;height:32px;
-    display:grid;place-items:center;color:var(--ink-2);flex:0 0 32px;
+  .status-glyph.full{background:color-mix(in srgb,var(--success) 16%,transparent);color:var(--success);}
+  .status-glyph.partial{background:color-mix(in srgb,var(--warning) 16%,transparent);color:var(--warning);}
+  .status-glyph.none{background:var(--surface-disabled);color:var(--accent);}
+  .status-glyph.unused{background:transparent;color:var(--foreground-muted);}
+  .empty{padding:var(--space-6);text-align:center;color:var(--foreground-secondary);}
+  .empty h3{margin:0 0 var(--space-2);font:var(--text-title-2);color:var(--foreground);}
+  .empty p{margin:0;font:var(--text-body-sm);}
+  .footnote{margin:var(--space-3) 0 0;line-height:1.6;}
+  .footnote b{color:var(--foreground-secondary);}
+  .operator-inspector-body{
+    display:flex;
+    overflow:hidden;
   }
-  .close-btn:hover{background:var(--brand-tint);color:var(--brand);border-color:var(--warn-line);}
-  .close-btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .drawer-body{overflow:auto;padding:16px 22px 28px;}
-  .repo-card{
-    display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit;
-    background:var(--surface-2);border:1px solid var(--line);border-radius:11px;
-    padding:13px 14px;margin-bottom:16px;transition:.14s;
+  .operator-inspector-split{
+    width:100%;
+    height:100%;
   }
-  .repo-card:hover{border-color:var(--brand);background:var(--brand-tint);}
-  .repo-card:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .repo-ico{width:36px;height:36px;flex:0 0 36px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;}
-  .repo-meta{display:flex;flex-direction:column;min-width:0;gap:1px;}
-  .repo-label{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);}
-  .repo-name{font-family:var(--font-mono);font-weight:600;font-size:14px;color:var(--ink);}
-  .repo-note{font-size:11.5px;color:var(--ink-2);}
-  .repo-ext{margin-left:auto;color:var(--ink-3);flex:0 0 auto;}
-  .repo-card:hover .repo-ext{color:var(--brand);}
-  .dblk{margin-bottom:12px;border:1px solid var(--line);border-radius:11px;overflow:hidden;}
-  .dblk.dim{opacity:.62;}
-  .dblk-head{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface-2);}
-  .dblk-head .hwn{font-family:var(--font-mono);font-weight:600;font-size:13.5px;}
-  .dblk-head .hwr{font-size:10.5px;color:var(--ink-3);}
-  .sbadge{margin-left:auto;font-size:11px;font-weight:600;padding:4px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;}
-  .sbadge.full{background:var(--ok-bg);color:var(--ok);}
-  .sbadge.partial{background:var(--warn-bg);color:var(--warn);}
-  .sbadge.none{background:var(--none-bg);color:var(--none);}
-  .sbadge.unused{background:var(--surface-3);color:var(--ink-3);}
-  .dblk-body{padding:12px 14px;}
-  .dt-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin:0 0 7px;}
-  .dt-chips{display:flex;flex-wrap:wrap;gap:6px;}
-  .dt{font-family:var(--font-mono);font-size:11.5px;font-weight:500;padding:4px 9px;border-radius:6px;background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-line);}
-  .dt.na{background:var(--surface-2);color:var(--ink-3);border-color:var(--line);}
-  .conds{list-style:none;margin:12px 0 0;padding:0;}
-  .conds li{position:relative;padding:4px 0 4px 20px;font-size:12px;color:var(--ink-2);line-height:1.5;}
-  .conds li::before{content:"";position:absolute;left:4px;top:10px;width:5px;height:5px;border-radius:50%;background:var(--warn);}
-  .conds li.good::before{background:var(--ok);}
-  .no-cond{font-size:12px;color:var(--ink-3);margin:10px 0 0;}
-
-  /* drawer tabs */
-  .drawer-tabs{position:sticky;top:0;background:var(--surface);z-index:3;margin:-16px -22px 16px;padding:6px 22px 8px;border-bottom:1px solid var(--line);}
+  .operator-inspector-split[data-detail-open="false"] .pto-workbench-shell__split-gutter,
+  .operator-inspector-split[data-detail-open="false"] [data-ide-pane="detail-inspector"]{
+    display:none;
+  }
+  .operator-inspector-split[data-detail-open="false"] [data-ide-pane="graph-inspector"]{
+    flex:1 1 auto!important;
+  }
+  .operator-inspector-pane{
+    min-width:0;
+    min-height:0;
+    overflow:hidden;
+  }
+  .graph-pane{
+    height:auto;
+    min-height:0;
+    padding:var(--space-3);
+    display:flex;
+    flex-direction:column;
+  }
+  .operator-graph-stage{
+    width:100%;
+    flex:1 1 auto;
+    height:auto;
+    min-height:0;
+    border:0;
+    border-radius:var(--radius-md);
+    overflow:hidden;
+  }
+  .operator-graph-frame{
+    display:block;
+    width:100%;
+    height:100%;
+    border:0;
+    background:var(--model-graphviz-stage-bg);
+  }
+  .context-list{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-2);
+  }
+  .context-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:var(--space-2);
+    color:var(--foreground-secondary);
+    font:var(--text-body-sm);
+  }
+  .context-row b{
+    min-width:0;
+    overflow:hidden;
+    color:var(--foreground);
+    font:var(--text-label);
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .operator-detail-shell{
+    display:flex;
+    flex-direction:column;
+    gap:var(--space-3);
+    min-height:0;
+    overflow:auto;
+    padding:var(--space-3);
+  }
+  .operator-detail-heading{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:var(--space-3);
+  }
+  .dh-cat,.dh-phase,.pill,.sbadge,.ratio,.grade,.dt{
+    display:inline-flex;
+    align-items:center;
+    gap:var(--space-1);
+    width:max-content;
+    max-width:100%;
+    min-height:var(--tag-height);
+    padding:0 var(--tag-padding-x);
+    border-radius:var(--tag-radius);
+    background:var(--comp-tag-bg);
+    color:var(--comp-tag-fg);
+    font:var(--text-label);
+  }
+  .dh-cat{margin-bottom:var(--space-2);}
+  .drawer-head h3,.operator-detail-heading h3{
+    margin:0;
+    color:var(--foreground);
+    font:var(--text-title-1);
+    font-family:var(--font-mono);
+  }
+  .dh-desc{margin:var(--space-2) 0 0;color:var(--foreground-secondary);font:var(--text-body-sm);}
+  .operator-detail-empty{
+    padding:var(--space-4) 0;
+    text-align:left;
+  }
+  .operator-detail-empty h3{font:var(--text-title-2);}
+  .drawer-tabs{
+    position:sticky;
+    top:0;
+    z-index:2;
+    padding-bottom:var(--space-2);
+    background:var(--ide-frame-pane-fill);
+  }
   .dpane{display:none;}
-  .dpane.is-active{display:block;animation:fadeUp .22s ease both;}
-
-  /* metric tables */
-  .mtable{width:100%;border-collapse:collapse;font-size:12px;margin-top:2px;}
-  .mtable th,.mtable td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
-  .mtable th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);font-weight:600;}
-  .mtable td.num{font-family:var(--font-mono);text-align:right;white-space:nowrap;}
-  .mtable td.hwc{font-family:var(--font-mono);font-weight:600;}
-  .ratio{font-family:var(--font-mono);font-weight:600;padding:2px 7px;border-radius:6px;font-size:11px;}
-  .ratio.up{background:var(--ok-bg);color:var(--ok);}
-  .ratio.mid{background:var(--warn-bg);color:var(--warn);}
-  .ratio.down{background:var(--none-bg);color:var(--ink-2);}
-  .grade{font-weight:600;font-size:11px;padding:2px 9px;border-radius:999px;}
-  .grade.good{background:var(--ok-bg);color:var(--ok);}
-  .grade.warn{background:var(--warn-bg);color:var(--warn);}
-  .util-bar{display:inline-block;width:44px;height:5px;border-radius:3px;background:var(--none-bg);position:relative;vertical-align:middle;margin-left:7px;}
-  .util-bar > i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--brand);}
-  .perf-meta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
-  .pill{font-size:11px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;}
-  .pane-note{font-size:11px;color:var(--ink-3);margin:13px 0 0;line-height:1.6;}
-  .pane-note b{color:var(--ink-2);font-weight:600;}
-
-  /* definition pane */
-  .def-desc{font-size:13px;color:var(--ink-2);line-height:1.7;margin:0;}
+  .dpane.is-active{display:block;}
+  .api-sec{
+    padding:var(--space-3) 0;
+    border-bottom:1px solid var(--border-subtle);
+  }
+  .api-sec:last-child{border-bottom:0;}
+  .api-sec > .k,.dt-label{
+    margin:0 0 var(--space-2);
+    color:var(--foreground-muted);
+    font:var(--text-label);
+    letter-spacing:var(--letter-spacing-label);
+    text-transform:uppercase;
+  }
+  .def-desc,.pane-note{margin:0;color:var(--foreground-secondary);line-height:1.65;}
+  .muted-cell,.perf-dtype{color:var(--foreground-muted);}
+  .perf-dtype{font-size:10px;}
+  .mono-inline{font-family:var(--font-mono);}
+  .formula,.code{
+    overflow:auto;
+    border-radius:var(--radius-md);
+    background:var(--model-graphviz-code-bg);
+    color:var(--model-graphviz-code-text);
+  }
   .formula{
-    background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:8px;
-    padding:14px 16px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:var(--ink);line-height:2;overflow-x:auto;
+    padding:var(--space-3);
+    font-family:Georgia,"Times New Roman",serif;
+    font-size:14px;
+    line-height:1.9;
   }
   .formula .var{font-style:italic;}
-  .formula .op{color:var(--ink-3);padding:0 2px;font-style:normal;}
-  .formula sub,.formula sup{font-size:.7em;font-style:normal;}
-  .io-table{width:100%;border-collapse:collapse;font-size:12px;}
-  .io-table th,.io-table td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
-  .io-table th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-3);font-weight:600;}
-  .io-table td.n{font-family:var(--font-mono);font-weight:600;color:var(--brand-dark);white-space:nowrap;}
-  .io-table td.sh{font-family:var(--font-mono);color:var(--ink);white-space:nowrap;}
-  .io-table td.dt{font-family:var(--font-mono);color:var(--ink-2);font-size:11px;white-space:nowrap;}
-  .io-table td:last-child{color:var(--ink-2);}
-
-  /* API pane */
-  .api-name{font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 12px;display:inline-block;margin-bottom:16px;}
-  .api-sec{margin-bottom:18px;}
-  .api-sec > .k{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px;}
-  .api-params{list-style:none;margin:0;padding:0;}
-  .api-params li{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:12px;}
-  .api-params li:last-child{border-bottom:none;}
-  .api-params li code{font-family:var(--font-mono);color:var(--brand-dark);flex:0 0 40%;font-weight:500;}
-  .api-params li span{color:var(--ink-2);}
-  .code{background:color-mix(in srgb, var(--background) 76%, var(--primary) 14%);color:var(--foreground);border-radius:10px;padding:14px 15px;font-family:var(--font-mono);font-size:11.5px;line-height:1.75;overflow-x:auto;white-space:pre;border:1px solid var(--border-subtle);}
+  .formula .op{color:var(--foreground-muted);font-style:normal;}
+  .formula sub,.formula sup{font-size:.72em;font-style:normal;}
+  .code{
+    padding:var(--space-3);
+    font:var(--text-mono);
+    line-height:1.7;
+    white-space:pre;
+  }
   .code .c{color:var(--foreground-muted);}
-  .code .f{color:var(--success);font-weight:600;}
-  .learn-links{display:flex;flex-direction:column;gap:8px;}
-  .learn-link{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:10px;padding:10px 12px;transition:.12s;background:var(--surface-2);}
-  .learn-link:hover{border-color:var(--brand);background:var(--brand-tint);}
-  .learn-link:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .learn-link .li-ic{width:28px;height:28px;flex:0 0 28px;border-radius:7px;background:var(--ink);color:#fff;display:grid;place-items:center;}
-  .learn-link .li-meta{display:flex;flex-direction:column;min-width:0;}
-  .learn-link .li-t{font-weight:600;font-size:12.5px;}
-  .learn-link .li-s{font-size:11px;color:var(--ink-3);}
-  .learn-link .li-ext{margin-left:auto;color:var(--ink-3);flex:0 0 auto;}
-  .learn-link:hover .li-ext{color:var(--brand);}
-
-  /* precision-tier chips in sidebar */
-  .dt-tier{margin-bottom:11px;}
-  .dt-tier:last-child{margin-bottom:0;}
-  .dt-tier-lbl{display:block;width:100%;text-align:left;padding:0 0 6px;font-size:11px;font-weight:600;color:var(--ink-3);cursor:pointer;transition:.12s;}
-  .dt-tier-lbl::before{content:"◆";font-size:8px;margin-right:5px;opacity:.4;vertical-align:middle;}
-  .dt-tier-lbl:hover{color:var(--ink);}
-  .dt-tier-lbl.is-partial{color:var(--ink-2);}
-  .dt-tier-lbl.is-selected{color:var(--brand);}
-  .dt-tier-lbl.is-selected::before,.dt-tier-lbl.is-partial::before{opacity:1;}
-
-  /* ---------- Phase segmented ---------- */
-  .seg{display:flex;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:3px;gap:3px;}
-  .seg button{
-    flex:1;border:none;background:transparent;border-radius:6px;padding:7px 4px;font-size:12.5px;font-weight:600;
-    color:var(--ink-2);font-family:var(--font-body);transition:.12s;
+  .code .f{color:var(--success);}
+  .mtable,.io-table{
+    width:100%;
+    border-collapse:collapse;
+    font:var(--text-body-sm);
   }
-  .seg button:hover{color:var(--ink);}
-  .seg button.on{background:var(--surface);color:var(--brand);box-shadow:var(--shadow);}
-  .seg button:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-
-  .dh-phase{
-    display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--ink-2);
-    background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;margin:0 0 10px 8px;
+  .mtable th,.mtable td,.io-table th,.io-table td{
+    padding:7px var(--space-2);
+    border-bottom:1px solid var(--border-subtle);
+    text-align:left;
+    vertical-align:top;
   }
-  .dh-phase::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink-3);}
-  .dh-phase.train::before{background:#2563C9;}
-  .dh-phase.infer::before{background:#0E8A8A;}
-
-  /* ---------- Hierarchy panel ---------- */
-  .hier-panel .panel-head .hier-badge{
-    font-size:11px;font-weight:600;color:var(--brand);background:var(--brand-tint);border-radius:999px;padding:4px 11px;
+  .mtable th,.io-table th{
+    color:var(--foreground-muted);
+    font:var(--text-label);
+    text-transform:uppercase;
   }
-  .hier-inner{padding:14px;min-height:720px;}
-  .hier-graph{
-    position:relative;display:flex;flex-direction:column;align-items:center;gap:0;
-    min-height:calc(100vh - 144px);padding:6px 4px 18px;overflow:auto;
-    background:
-      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--line-2) 34%, transparent) 1px, transparent 0) 0 0/18px 18px,
-      linear-gradient(180deg,color-mix(in srgb,var(--surface-2) 42%,transparent),transparent 180px);
+  .mtable td.num{text-align:right;white-space:nowrap;font-family:var(--font-mono);}
+  .mtable td.hwc,.io-table td.n,.io-table td.sh,.io-table td.dt{font-family:var(--font-mono);}
+  .io-table td.n{color:var(--primary-hover);font-weight:var(--font-weight-semibold);}
+  .io-table td:last-child{color:var(--foreground-secondary);}
+  .dt-chips,.perf-meta,.learn-links{display:flex;flex-wrap:wrap;gap:var(--space-2);}
+  .learn-links{flex-direction:column;}
+  .dblk{
+    padding:var(--space-3);
+    border-radius:var(--radius-md);
+    background:var(--inspector-soft-card-bg);
   }
-  .hier-node{
-    width:100%;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface) 94%,transparent);
-    box-shadow:var(--shadow);overflow:hidden;position:relative;
+  .dblk.is-focus{box-shadow:0 0 0 3px var(--focus-ring);}
+  .dblk.dim{opacity:.58;}
+  .dblk + .dblk{margin-top:var(--space-2);}
+  .dblk-head{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);}
+  .hwn{font-family:var(--font-mono);font-weight:var(--font-weight-semibold);}
+  .hwr{color:var(--foreground-muted);font:var(--text-label);}
+  .sbadge{margin-left:auto;}
+  .sbadge.full,.dt:not(.na),.grade.good,.ratio.up{color:var(--success);}
+  .sbadge.partial,.grade.warn,.ratio.mid{color:var(--warning);}
+  .sbadge.none,.ratio.down{color:var(--accent);}
+  .sbadge.unused,.dt.na{color:var(--foreground-muted);}
+  .conds{margin:var(--space-2) 0 0;padding-left:18px;color:var(--foreground-secondary);font:var(--text-body-sm);}
+  .learn-link{
+    display:flex;
+    align-items:center;
+    gap:var(--space-2);
+    min-height:42px;
+    padding:var(--space-2);
+    border-radius:var(--radius-md);
+    background:var(--inspector-soft-card-bg);
+    color:inherit;
+    text-decoration:none;
   }
-  .hier-node.accent{border-color:color-mix(in srgb,var(--brand) 46%,var(--line));}
-  .hier-node-head{display:flex;align-items:flex-start;gap:10px;padding:11px 12px;background:color-mix(in srgb,var(--surface-2) 76%,transparent);}
-  .hier-node-ico{width:24px;height:24px;flex:0 0 24px;border-radius:7px;display:grid;place-items:center;background:var(--ink);color:var(--surface);font-family:var(--font-mono);font-size:12px;font-weight:700;}
-  .hier-node.accent .hier-node-ico{background:var(--brand);color:#fff;}
-  .hier-node-title{min-width:0;flex:1;}
-  .hier-node-title b{display:block;font-family:var(--font-display);font-size:13px;font-weight:700;line-height:1.25;color:var(--ink);}
-  .hier-node-title small{display:block;margin-top:2px;color:var(--ink-3);font-size:10.5px;line-height:1.35;}
-  .hier-node-body{padding:10px 12px 12px;}
-  .hier-edge{width:2px;height:22px;background:var(--line-2);position:relative;flex:0 0 auto;}
-  .hier-edge::after{content:"";position:absolute;left:50%;bottom:-1px;width:7px;height:7px;border-right:2px solid var(--line-2);border-bottom:2px solid var(--line-2);transform:translateX(-50%) rotate(45deg);background:transparent;}
-  .hier-layer{
-    width:100%;border:1.5px solid color-mix(in srgb,var(--brand) 62%,var(--line));border-radius:14px;
-    background:color-mix(in srgb,var(--surface) 96%,transparent);box-shadow:var(--shadow);padding:12px;position:relative;
+  .learn-link:hover{background:var(--inspector-soft-card-bg-hover);}
+  .li-ic{
+    width:28px;
+    height:28px;
+    flex:0 0 28px;
+    display:grid;
+    place-items:center;
+    border-radius:var(--radius-sm);
+    background:var(--surface-4);
+    color:var(--foreground);
   }
-  .hier-layer-badge{position:absolute;right:12px;top:-11px;background:var(--brand);color:#fff;border-radius:999px;padding:3px 10px;font-family:var(--font-mono);font-size:10.5px;font-weight:700;box-shadow:0 4px 10px rgba(189,42,60,.24);}
-  .hier-branches{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px;}
-  .hier-branch{border:1px solid var(--line);border-radius:11px;background:var(--surface-2);overflow:hidden;}
-  .hier-branch-head{padding:9px 10px;border-bottom:1px solid var(--line);}
-  .hier-branch-head b{display:block;font-size:12px;font-weight:700;color:var(--ink);}
-  .hier-branch-head small{display:block;margin-top:1px;color:var(--ink-3);font-size:10.5px;line-height:1.35;}
-  .hier-subnodes{display:flex;flex-direction:column;align-items:stretch;padding:9px;}
-  .hier-subnode{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:8px 9px;}
-  .hier-subnode b{display:block;font-size:11.5px;font-weight:700;color:var(--ink);}
-  .hier-subnode small{display:block;margin-top:1px;color:var(--ink-3);font-size:10px;line-height:1.35;}
-  .hier-subedge{align-self:center;width:2px;height:12px;background:var(--line-2);}
-  .hier-op-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-  .hier-op-row:empty{display:none;}
-  .hier-comm-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line-2);}
-  .hier-comm-row:empty{display:none;}
-  .hier-comm-row::before{content:"COMM";font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--ink-3);align-self:center;}
-  .hier-empty{padding:36px 14px;text-align:center;color:var(--ink-2);font-size:12px;}
-  .hier-summary{
-    display:flex;flex-wrap:wrap;gap:10px 18px;padding:0 2px 14px;margin-bottom:4px;border-bottom:1px dashed var(--line-2);
+  .li-meta{display:flex;flex-direction:column;min-width:0;}
+  .li-t{font-weight:var(--font-weight-semibold);}
+  .li-s{color:var(--foreground-muted);font:var(--text-label);}
+  .li-ext{margin-left:auto;color:var(--foreground-muted);}
+  .util-bar{
+    display:inline-block;
+    width:44px;
+    height:5px;
+    margin-left:var(--space-2);
+    border-radius:var(--radius-pill);
+    background:var(--surface-disabled);
+    vertical-align:middle;
   }
-  .hier-summary .hs{display:flex;flex-direction:column;gap:1px;}
-  .hier-summary .hs .k{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:600;}
-  .hier-summary .hs .v{font-family:var(--font-mono);font-weight:600;font-size:13px;color:var(--ink);}
-  .hier-hint{font-size:11px;color:var(--ink-3);margin:12px 0 4px;display:flex;align-items:center;gap:6px;}
-
-  .connector{display:flex;justify-content:center;height:20px;}
-  .connector i{width:2px;height:100%;background:var(--line-2);}
-  .stage-card{border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:11px 13px;position:relative;}
-  .stage-card.accent{border-left:3px solid var(--brand);}
-  .stage-head{display:flex;align-items:baseline;gap:8px;}
-  .stage-head b{font-family:var(--font-display);font-size:13px;font-weight:600;}
-  .stage-head small{color:var(--ink-3);font-size:11px;}
-  .op-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
-  .hchip{
-    display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11.5px;font-weight:500;
-    padding:4px 9px;border:1px solid var(--line-2);border-radius:7px;background:var(--surface-2);color:var(--ink);cursor:pointer;transition:.12s;
+  .util-bar > i{
+    display:block;
+    height:100%;
+    border-radius:inherit;
+    background:var(--primary);
   }
-  .hchip:hover{border-color:var(--brand);background:var(--brand-tint);}
-  .hchip:focus-visible{outline:none;box-shadow:0 0 0 3px var(--brand-tint);}
-  .hdot{width:8px;height:8px;border-radius:50%;flex:0 0 8px;}
-  .hdot.full{background:var(--ok);}
-  .hdot.partial{background:var(--warn);}
-  .hdot.none{background:var(--brand);}
-  .hdot.neutral{background:var(--none);}
-
-  .layer-wrap{position:relative;margin:0;}
-  .layer-wrap::before,.layer-wrap::after{
-    content:"";position:absolute;left:0;right:0;top:0;bottom:0;border:1px solid var(--line-2);border-radius:13px;background:var(--surface);z-index:0;
+  @media (max-width:980px){
+    .operator-matrix-frame{min-height:100vh;}
+    .mobile-filter-toggle{display:inline-flex;}
   }
-  .layer-wrap::after{transform:translate(4px,4px);opacity:.45;}
-  .layer-wrap::before{transform:translate(2px,2px);opacity:.7;}
-  .layer-card{
-    position:relative;z-index:1;border:1.5px solid var(--brand);border-radius:13px;background:var(--surface);
-    padding:12px 13px 13px;box-shadow:var(--shadow);
-  }
-  .layer-card > .stage-head b{color:var(--brand-dark);}
-  .layer-badge{
-    position:absolute;top:-11px;right:12px;z-index:2;font-family:var(--font-mono);font-size:11px;font-weight:600;
-    color:#fff;background:var(--brand);border-radius:999px;padding:3px 11px;box-shadow:0 4px 10px rgba(189,42,60,.28);
-  }
-  .sub-block{border:1px solid var(--line);border-radius:9px;background:var(--surface-2);padding:9px 11px;margin-top:9px;}
-  .sub-block:first-of-type{margin-top:11px;}
-  .sub-block .sub-block{margin-left:8px;background:var(--surface);}
-  .sub-arrow{display:flex;justify-content:center;height:12px;}
-  .sub-arrow i{width:2px;height:100%;background:var(--line-2);}
-  .sub-head{display:flex;align-items:baseline;gap:7px;}
-  .sub-head b{font-size:12px;font-weight:600;}
-  .sub-head small{font-size:10.5px;color:var(--ink-3);}
-  .comm-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line-2);}
-  .comm-lbl{font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--ink-3);text-transform:uppercase;}
-  .hchip.comm{background:transparent;border-style:dashed;}
-
-  /* ---------- Mobile ---------- */
-  .mobile-filter-toggle{display:none;}
-  @media (max-width:1180px){
-    .grid{grid-template-columns:262px minmax(0,1fr);}
-    .hierarchy{grid-column:1 / -1;}
-    .hierarchy .panel{position:static;}
-    .hier-inner{max-width:none;margin:0;}
-  }
-  @media (max-width:940px){
-    .grid{grid-template-columns:1fr;}
-    .hierarchy{grid-column:auto;}
-    .panel{position:static;}
-    .mobile-filter-toggle{
-      display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
-      background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;
-      font-weight:600;font-size:13.5px;color:var(--ink);box-shadow:var(--shadow);margin-bottom:14px;
-    }
-    .sidebar-collapse{display:none;}
-    .sidebar-collapse.show{display:block;}
-    .stats{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
-  }
-
-  /* reveal */
-  @keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-  .anim{animation:fadeUp .3s ease both;}
-
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important;}
   }
 </style>
 </head>
-<body>
-<div class="app">
-  <header class="top">
-    <div class="brand">
-      <div class="glyph"><i><span></span><span class="on"></span><span></span><span class="on"></span><span class="on"></span><span></span><span></span><span class="on"></span><span></span></i></div>
-      <div>
-        <h1>算子矩阵</h1>
-        <p>大模型算子 · 昇腾硬件支持情况查询</p>
+<body class="operator-matrix-page pto-model-graphviz-pattern-page">
+<section class="pto-ide-frame operator-matrix-frame" data-ide-frame data-host="standalone" aria-label="Ascend operator matrix workbench">
+  <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+    <div class="pto-ide-frame__topbar-left">
+      <div class="pto-ide-frame__host-chip">
+        <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+          <path d="M8 12h8"></path>
+          <path d="M12 8v8"></path>
+        </svg>
+        Operator Matrix
+      </div>
+      <div class="pto-ide-frame__workspace">
+        <span class="om-title-main">算子矩阵</span>
+        <span class="om-title-sub">大模型算子 · 昇腾硬件支持查询</span>
       </div>
     </div>
-    <div class="headmeta">
-      <div class="ctx-pill">
-        <span class="dot"></span>
-        <b id="ctxVersion">DeepSeek-V3</b>
-        <span id="ctxHw">· 3 项硬件</span>
+    <div class="pto-ide-frame__topbar-center">
+      <div class="pto-ide-frame__search">
+        <svg class="pto-ide-frame__search-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-4.5-4.5"></path>
+        </svg>
+        <span>模型 / 硬件 / 算子支持矩阵</span>
+      </div>
+    </div>
+    <div class="pto-ide-frame__topbar-right">
+      <span class="pto-ide-frame__crumbs"><b id="ctxVersion">DeepSeek-V3</b> <span id="ctxHw">· 3 项硬件</span></span>
+      <div class="pto-ide-frame__window-actions" aria-label="Window controls">
+        <button class="pto-ide-frame__window-action" type="button" aria-label="Back">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"></path></svg>
+        </button>
+        <button class="pto-ide-frame__window-action" type="button" aria-label="Forward">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
+        <span class="pto-ide-frame__window-separator" aria-hidden="true"></span>
+        <button class="pto-ide-frame__window-action is-selected" type="button" id="topExplorerToggle" aria-label="Query pane" title="Explorer">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path></svg>
+        </button>
+        <button class="pto-ide-frame__window-action is-selected" type="button" aria-label="Inspector" title="Inspector">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M15 3v18"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__window-action operator-theme-toggle" type="button" id="themeToggle" aria-label="切换到浅色模式" aria-pressed="false" title="切换到浅色模式">
+          <svg class="pto-ide-frame__window-icon" data-theme-icon="light" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path><path d="M12 20v2"></path><path d="M4.93 4.93l1.41 1.41"></path><path d="M17.66 17.66l1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="M4.93 19.07l1.41-1.41"></path><path d="M17.66 6.34l1.41-1.41"></path>
+          </svg>
+          <svg class="pto-ide-frame__window-icon" data-theme-icon="dark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3a6.5 6.5 0 0 0 7.8 8.8A8 8 0 1 1 12 3z"></path>
+          </svg>
+        </button>
+        <button class="pto-ide-frame__window-action" type="button" aria-label="Settings" title="Settings">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+        <button class="pto-ide-frame__window-action" type="button" aria-label="Open window">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="pto-ide-frame__window-action pto-ide-frame__window-action--danger" type="button" aria-label="Close window">
+          <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+        </button>
       </div>
     </div>
   </header>
 
-  <button class="mobile-filter-toggle" id="mobileToggle" aria-expanded="false">
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-    筛选条件
-  </button>
-
-  <div class="grid">
-    <!-- Sidebar -->
-    <aside>
-      <div class="panel sidebar-collapse" id="sidebar">
-        <div class="panel-head">
-          <h2>查询条件</h2>
-          <button class="btn btn-sm btn-ghost" id="resetBtn">重置</button>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl" for="modelSel">模型与版本</label>
-          <select id="modelSel" aria-label="选择模型"></select>
-          <select id="versionSel" aria-label="选择版本"></select>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl">目标硬件</label>
-          <div class="hw-list" id="hwList"></div>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl">场景 / 阶段</label>
-          <div class="segmented-control segmented-control-muted" id="phaseSeg">
-            <button data-phase="all" class="btn btn-compact is-selected">全部</button>
-            <button data-phase="train" class="btn btn-compact">训练</button>
-            <button data-phase="infer" class="btn btn-compact">推理</button>
-          </div>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl">数据类型 · 按精度分类</label>
-          <div class="chips" id="dtypeChips"></div>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl">算子类别</label>
-          <div class="chips" id="catChips"></div>
-        </div>
-
-        <div class="fsec">
-          <label class="lbl" for="searchInput">搜索算子</label>
-          <div class="search-wrap">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#8091A6" stroke-width="1.5"/><path d="M11 11l3 3" stroke="#8091A6" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <input class="txt" id="searchInput" type="text" placeholder="如 MatMul、Attention、量化…" autocomplete="off" />
-          </div>
-          <label class="toggle-row">
-            <input type="checkbox" id="showUnused" />
-            <span class="switch"></span>
-            <span>显示该模型未使用的算子</span>
-          </label>
-        </div>
-      </div>
-    </aside>
-
-    <!-- Main -->
-    <main class="main">
-      <div class="stats" id="stats"></div>
-
-      <div class="matrix-toolbar">
-        <div class="result-count" id="resultCount"></div>
-        <div class="legend">
-          <div class="lg"><span class="status-glyph full">●</span>满支持</div>
-          <div class="lg"><span class="status-glyph partial">◐</span>部分/受限</div>
-          <div class="lg"><span class="status-glyph none">—</span>不支持</div>
-        </div>
-      </div>
-
-      <div class="matrix-shell">
-        <div class="matrix-wrap" id="matrixWrap"></div>
-      </div>
-
-      <p class="footnote">
-        <b>说明：</b>单元格内小字为该硬件上已支持的数据类型摘要，点击任意算子或单元格查看逐硬件的完整数据类型与约束条件。
-        算子行右侧 <span style="font-family:var(--font-mono)">&lt;/&gt;</span> 图标可跳转至该类算子在 GitCode 上的
-        <b>华为 CANN 官方算子库</b>（gitcode.com/cann），链接指向仓库根目录。
-        本页支持情况为<b>演示用示例数据</b>，非华为官方兼容性结论；实际支持情况请以对应 CANN 版本官方算子清单为准。
-      </p>
-    </main>
-
-    <!-- Right: model hierarchy -->
-    <aside class="hierarchy">
-      <div class="panel hier-panel">
-        <div class="panel-head">
-          <h2>模型层级结构</h2>
-          <span class="hier-badge" id="hierPhase">训练 / 推理</span>
-        </div>
-        <div class="hier-inner" id="hierInner"></div>
-      </div>
-    </aside>
-  </div>
-</div>
-
-<!-- Drawer -->
-<div class="backdrop" id="backdrop"></div>
-<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-  <div class="drawer-head">
-    <div class="dh-top">
-      <div>
-        <span class="dh-cat" id="drawerCat"></span>
-        <h3 id="drawerTitle"></h3>
-        <p class="dh-desc" id="drawerDesc"></p>
-      </div>
-      <button class="btn btn-icon btn-ghost" id="closeDrawer" aria-label="关闭">
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  <div class="pto-ide-frame__body">
+    <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" aria-label="Activity rail">
+      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle query pane" aria-controls="sidebar" aria-expanded="true" aria-pressed="true" title="Explorer">
+        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
       </button>
+      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
+        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      </button>
+      <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Source control" title="Source control">
+        <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path><path d="M6 9v12"></path></svg>
+      </button>
+    </nav>
+    <div class="pto-ide-frame__workarea">
+      <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="18,47,35" data-pixel-sizes="288" data-min-size="240,520,460" data-storage-key="ascend-operator-matrix-v3-main">
+            <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="sidebar">
+          <header class="pto-ide-frame__pane-header operator-inspector-header">
+            <span class="pto-ide-frame__pane-title">查询条件</span>
+            <button class="btn btn-sm btn-ghost" id="resetBtn">重置</button>
+          </header>
+          <div class="pto-ide-frame__pane-body">
+            <div class="om-filter-stack">
+              <div class="fsec">
+                <label class="lbl" for="modelSel">模型与版本</label>
+                <select id="modelSel" aria-label="选择模型"></select>
+                <select id="versionSel" aria-label="选择版本"></select>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl">当前上下文</label>
+                <div class="context-list">
+                  <span class="context-row">模型 <b id="dockModel">DeepSeek-V3</b></span>
+                  <span class="context-row">硬件 <b id="dockHw">3 项硬件</b></span>
+                  <span class="context-row">矩阵 <b id="dockOps">24 个算子</b></span>
+                  <span class="context-row">架构 <b id="dockAsset">deepseek-v32</b></span>
+                </div>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl">目标硬件</label>
+                <div class="hw-list" id="hwList"></div>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl">场景 / 阶段</label>
+                <div class="segmented-control segmented-control-muted" id="phaseSeg">
+                  <button data-phase="all" class="btn btn-compact is-selected">全部</button>
+                  <button data-phase="train" class="btn btn-compact">训练</button>
+                  <button data-phase="infer" class="btn btn-compact">推理</button>
+                </div>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl">数据类型 · 按精度分类</label>
+                <div class="chips" id="dtypeChips"></div>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl">算子类别</label>
+                <div class="chips" id="catChips"></div>
+              </div>
+
+              <div class="fsec">
+                <label class="lbl" for="searchInput">搜索算子</label>
+                <div class="search-wrap">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  <input class="txt" id="searchInput" type="text" placeholder="如 MatMul、Attention、量化…" autocomplete="off" />
+                </div>
+                <label class="toggle-row">
+                  <input type="checkbox" id="showUnused" />
+                  <span>显示该模型未使用的算子</span>
+                </label>
+              </div>
+            </div>
+          </div>
+            </aside>
+
+            <main class="pto-ide-frame__pane" data-ide-pane="editor-preview">
+          <div class="pto-ide-frame__tabstrip">
+            <div class="tab-control" role="tablist" aria-label="主视图">
+              <button class="tab-control-item is-selected" type="button">Support Matrix</button>
+            </div>
+          </div>
+          <header class="pto-ide-frame__pane-header">
+            <div class="om-pane-header-main">
+              <span class="pto-ide-frame__pane-title">算子支持矩阵</span>
+              <span class="pto-ide-frame__pane-meta" id="resultCount"></span>
+            </div>
+            <button class="btn btn-sm btn-ghost mobile-filter-toggle" id="mobileToggle" type="button" aria-expanded="true">查询条件</button>
+            <div class="legend">
+              <div class="lg"><span class="status-glyph full">●</span>满支持</div>
+              <div class="lg"><span class="status-glyph partial">◐</span>部分/受限</div>
+              <div class="lg"><span class="status-glyph none">—</span>不支持</div>
+            </div>
+          </header>
+          <div class="pto-ide-frame__pane-body om-scroll">
+            <div class="stats" id="stats"></div>
+            <div class="matrix-toolbar">
+              <div class="result-count">点击算子或单元格，在右侧 Inspector 查看定义、支持、性能、精度和 API。</div>
+            </div>
+            <div class="matrix-surface">
+              <div class="matrix-wrap" id="matrixWrap"></div>
+            </div>
+            <p class="footnote">
+              <b>说明：</b>单元格内小字为该硬件上已支持的数据类型摘要，点击任意算子或单元格查看逐硬件的完整数据类型与约束条件。
+              算子行右侧 <span class="mono-inline">&lt;/&gt;</span> 图标可跳转至该类算子在 GitCode 上的
+              <b>华为 CANN 官方算子库</b>（gitcode.com/cann），链接指向仓库根目录。
+              本页支持情况为<b>演示用示例数据</b>，非华为官方兼容性结论；实际支持情况请以对应 CANN 版本官方算子清单为准。
+            </p>
+          </div>
+            </main>
+
+            <aside class="pto-ide-frame__pane" data-ide-pane="inspector">
+          <header class="pto-ide-frame__pane-header">
+            <div class="om-pane-header-main">
+              <span class="pto-ide-frame__pane-title" id="inspectorTitle">模型结构 / 算子详情</span>
+              <span class="pto-ide-frame__pane-meta" id="hierPhase">DeepSeek-V3 · 训练 / 推理</span>
+            </div>
+          </header>
+          <div class="pto-ide-frame__pane-body operator-inspector-body">
+            <div class="pto-ide-frame__split operator-inspector-split" data-ide-split="operator-inspector" data-split-direction="horizontal" data-sizes="54,46" data-min-size="220,220" data-storage-key="ascend-operator-matrix-v3-inspector-horizontal" data-detail-open="false">
+            <section class="operator-inspector-pane graph-pane" data-ide-pane="graph-inspector">
+              <div class="pto-model-graphviz-stage operator-graph-stage" aria-label="模型结构图">
+                <iframe id="modelGraphFrame" class="operator-graph-frame" title="模型结构图"></iframe>
+              </div>
+            </section>
+            <section class="operator-inspector-pane operator-detail-shell" data-ide-pane="detail-inspector" aria-hidden="true">
+              <div class="operator-detail-heading">
+                <div>
+                  <span class="dh-cat" id="drawerCat">未选择</span>
+                  <h3 id="drawerTitle">选择一个算子</h3>
+                  <p class="dh-desc" id="drawerDesc">点击矩阵单元格或模型结构图中的算子查看详细信息。</p>
+                </div>
+                <button class="btn btn-icon btn-ghost" id="closeDrawer" aria-label="清除选择">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+              <div id="drawerBody">
+                <div class="empty operator-detail-empty">
+                  <h3>未选择算子</h3>
+                  <p>点击矩阵单元格或模型结构图中的节点后，这里显示定义、支持、性能、精度和 API。</p>
+                </div>
+              </div>
+            </section>
+            </div>
+          </div>
+            </aside>
+      </div>
+
+      <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome">
+        <span>示例数据 · CANN 版本以官方清单为准</span>
+        <span>PTO design-system · ide-frame / workbench-shell / model-graphviz</span>
+      </footer>
     </div>
   </div>
-  <div class="drawer-body" id="drawerBody"></div>
-</aside>
+</section>
 
+<script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+<script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+<script src="../vendor/pto-design-system/patterns/model-graphviz/pattern.js"></script>
 <script>
 /* ============ 数据模型 ============ */
 const HARDWARE = [
@@ -1039,10 +1154,13 @@ const state = {
   cats:new Set(),
   search:'',
   showUnused:false,
+  selectedOpId:null,
+  selectedHwId:null,
 };
 
 const GLYPH = {full:'●', partial:'◐', none:'—', unused:'·'};
 const STATUS_TEXT = {full:'满支持', partial:'部分支持', none:'不支持', unused:'未使用'};
+const THEME_STORAGE_KEY = 'pto.operatorMatrix.theme';
 
 /* ============ 派生 ============ */
 function selectedHw(){ return HARDWARE.filter(h=>state.hw.has(h.id)); }
@@ -1118,7 +1236,6 @@ function renderHwList(){
   document.getElementById('hwList').innerHTML = HARDWARE.map(h=>`
     <label class="hw-row">
       <input type="checkbox" data-hw="${h.id}" ${state.hw.has(h.id)?'checked':''}/>
-      <span class="chk"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       <span class="hw-name">${h.short}</span>
       <span class="hw-role">${h.role}</span>
     </label>`).join('');
@@ -1146,151 +1263,314 @@ function renderPhaseSeg(){
   });
 }
 
-/* ============ 渲染：模型层级结构 ============ */
-function opChip(opId){
-  const op = OPERATORS.find(o=>o.id===opId);
-  if(!op) return '';
-  const st = worstStatus(op);
-  return `<button class="hchip" data-op="${op.id}" title="${op.name} · ${op.cat} · ${PHASE_LABEL[op.phase]}">
-    <span class="hdot ${st}"></span>${op.name}</button>`;
-}
-function commChip(opId){
-  const op = OPERATORS.find(o=>o.id===opId);
-  if(!op || !phaseAllows(op)) return '';
-  const st = worstStatus(op);
-  return `<button class="hchip comm" data-op="${op.id}" title="${op.name} · 并行通信"><span class="hdot ${st}"></span>${op.name}</button>`;
-}
+/* ============ 渲染：模型结构图（model-graphviz assets） ============ */
+const MODEL_GRAPH_ASSETS = {
+  deepseek: {
+    id:'deepseek-v32',
+    file:'deepseek_v32_modelviz.html',
+    label:'DeepSeek V3.2 Clean Architecture',
+  },
+  qwen: {
+    id:'qwen7b',
+    file:'qwen7b_modelviz.html',
+    label:'Qwen-7B',
+  },
+  glm: {
+    id:'qwen7b',
+    file:'qwen7b_modelviz.html',
+    label:'Qwen-7B dense transformer fallback',
+  },
+  panguFlash: {
+    id:'openpangu-2-0-flash',
+    file:'openpangu_2_0_flash_modelviz.html',
+    label:'openPangu-2.0-Flash',
+  },
+  panguMoER: {
+    id:'openpangu-r-72b',
+    file:'pangu_moe_modelviz.html',
+    variant:'r72b',
+    label:'openPangu-R-72B MoE',
+  },
+  panguPro: {
+    id:'pangu-pro-moe-72ba16b',
+    file:'pangu_moe_modelviz.html',
+    variant:'pro72ba16b',
+    label:'Pangu Pro MoE 72BA16B',
+  },
+};
 
-function buildStages(){
-  const normId = MODEL_RMS[state.modelId] ? 'rmsnorm' : 'layernorm';
-  const actId  = state.modelId==='glm' ? 'gelu' : 'silu';
-  const moe    = isMoE(state.modelId, state.version);
-  const isPangu = state.modelId === 'pangu';
-  const qkNorm = state.modelId === 'qwen' && /Qwen3/i.test(state.version);
-  const layers = layersOf(state.version);
-  const wantTrain = state.phase!=='infer';
-  const wantInfer = state.phase!=='train';
-
-  const stages = [];
-  stages.push({
-    kind:'stage',
-    accent:true,
-    title:'Token IDs → Parallel Embedding',
-    sub:'Input / VocabParallelEmbedding',
-    ops:['embedding','gather']
-  });
-
-  if(isPangu){
-    const attentionBlocks = [
-      {title:'mHC Sandwich Norm', sub:'mHC Pre Mix → Input RMSNorm → Post Attention RMSNorm', ops:[normId,'add']},
-      {title:'Q Latent Lane', sub:'Q A Linear → Causal Conv1D → Local Add → Latent Norm → Q Up Linear', ops:['matmul','add',normId,'matmul']},
-      {title:'KV Latent Lane', sub:'KV A Linear → Causal Conv1D → Local Add → Latent Norm → KV Up Linear', ops:['matmul','add',normId,'matmul']},
-      {title:'Sparse Core', sub:'RoPE → DSA Indexer → Sparse FlashAttention → O Projection', ops:['rope','promptflashattention','increflashattention','matmul']},
-    ];
-    const ffnBlocks = [
-      {title:'FFN Choice', sub:'dense early layers / routed MoE layers', ops:['matmul','topk']},
-      {title:'Dense MLP', sub:'Dense Gate/Up → SwiGLU → Dense Down', ops:['matmul',actId,'mul','matmul']},
-      {title:'MoE FFN', sub:'Router Gate → TopK Router → Routed Experts + Shared Expert → Combine', ops:['matmul','topk','bmm','add'], comm:['allgather','allreduce']},
-      {title:'Post MLP Norm', sub:'post-ffn / selected block norm', ops:[normId]},
-    ];
-    stages.push({kind:'layer', title:'Transformer Stack', badge:`Decoder Layer × ${layers}`, blocks:[
-      {title:'Sparse MLA Attention', sub:'DSA / SWA + cache states', ops:[], nested:attentionBlocks},
-      {title:'Dense + MoE FFN', sub:'L0-1 Dense · later layers MoE', ops:[], nested:ffnBlocks},
-    ]});
-    stages.push({kind:'stage', title:'Multi Token Predictor', sub:'MTP Input Norms → EH Projection → MTP Decoder Layer × 3', ops:[normId,'matmul','bmm']});
-  } else {
-    const attentionOps = ['matmul'];
-    if(qkNorm) attentionOps.push('rmsnorm');
-    attentionOps.push('rope','concat');
-    if(wantInfer) attentionOps.push('promptflashattention','increflashattention');
-    if(wantTrain) attentionOps.push('fusedattention');
-    attentionOps.push('softmax','bmm','matmul');
-
-    const attentionBlocks = [
-      {title:'Input Norm', sub:'attn RMSNorm / LayerNorm', ops:[normId]},
-      {title:'QKV Projection', sub:'logical Q / K / V lanes · fusion candidate', ops:['matmul']},
-      {title:'Q Lane', sub:qkNorm ? 'Q-Norm → Q RoPE' : 'Q RoPE', ops:qkNorm?['rmsnorm','rope']:['rope']},
-      {title:'K Lane', sub:qkNorm ? 'K-Norm → K RoPE' : 'K RoPE', ops:qkNorm?['rmsnorm','rope']:['rope']},
-      {title:'V Lane', sub:'V projection → paged KV cache update', ops:['matmul','concat']},
-      {title:'Attention Core', sub:'QKᵀ MatMul → Scale/Mask → Softmax → AV MatMul → O Projection', ops:attentionOps},
-    ];
-
-    const ffnBlocks = moe ? [
-      {title:'Router Gate', sub:'token router / top-k selection', ops:['matmul','topk']},
-      {title:'Token Dispatch', sub:'expert token regroup / all-to-all style movement', ops:['gather','concat'], comm:['allgather']},
-      {title:'Experts × E', sub:'GroupedMM expert bank + activation', ops:['bmm',actId,'mul','matmul'], comm:['allreduce']},
-    ] : [
-      {title:'FFN Norm', sub:'ffn RMSNorm / LayerNorm', ops:[normId]},
-      {title:'Gate / Up Projection', sub:'merged column parallel matmul', ops:['matmul']},
-      {title: actId==='silu' ? 'SwiGLU' : 'GeGLU', sub:'activation + elementwise multiply', ops:[actId,'mul']},
-      {title:'Down Projection', sub:'row parallel matmul back to hidden size', ops:['matmul'], comm:['allreduce']},
-    ];
-
-    stages.push({kind:'layer', title:'Transformer Stack', badge:`Decoder Layer × ${layers}`, blocks:[
-      {title:'Attention', sub:`GQA / MHA path${qkNorm?' · QK-Norm':''}`, ops:[], nested:attentionBlocks},
-      {title:moe?'MoE FFN':'SwiGLU MLP', sub:moe?`Experts top-k · ${state.version}`:'Feed-forward', ops:[], nested:ffnBlocks},
-    ]});
+function graphAssetForState(){
+  const base = '../vendor/pto-design-system/patterns/model-graphviz/assets/';
+  let asset = MODEL_GRAPH_ASSETS[state.modelId] || MODEL_GRAPH_ASSETS.qwen;
+  if(state.modelId === 'pangu'){
+    if(/MoE|Ultra|Pro/i.test(state.version)){
+      asset = /Pro/i.test(state.version) ? MODEL_GRAPH_ASSETS.panguPro : MODEL_GRAPH_ASSETS.panguMoER;
+    }else{
+      asset = MODEL_GRAPH_ASSETS.panguFlash;
+    }
   }
+  return {
+    ...asset,
+    src: base + asset.file + '?embed=1'
+  };
+}
 
-  stages.push({kind:'stage', title:'Final Norm', sub:'final RMSNorm / LayerNorm', ops:[normId]});
-  stages.push({kind:'stage', accent:true, title:'LM Head → Logits', sub:'vocab projection / logits processor', ops:['matmul']});
-  if(wantInfer) stages.push({kind:'stage', title:'Sampling Decode', sub:'TopK / token selection', ops:['topk']});
-  return stages;
+function normalizeTheme(theme){
+  return theme === 'light' ? 'light' : 'dark';
+}
+function currentTheme(){
+  return normalizeTheme(document.documentElement.dataset.theme || window.__OPERATOR_MATRIX_INITIAL_THEME__ || 'dark');
+}
+function syncThemeToggle(theme = currentTheme()){
+  const button = document.getElementById('themeToggle');
+  if(!button) return;
+  const nextLabel = theme === 'light' ? '切换到深色模式' : '切换到浅色模式';
+  button.title = nextLabel;
+  button.setAttribute('aria-label', nextLabel);
+  button.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
+}
+function applyUiTheme(theme, options = {}){
+  const nextTheme = normalizeTheme(theme);
+  document.documentElement.dataset.theme = nextTheme;
+  window.__OPERATOR_MATRIX_INITIAL_THEME__ = nextTheme;
+  syncThemeToggle(nextTheme);
+  if(options.persist !== false){
+    try{
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    }catch(_err){}
+  }
+  if(options.refreshGraph !== false){
+    renderHierarchy();
+  }
+}
+
+function normalizedText(value){
+  return String(value || '').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+}
+function normOpForModel(){
+  return MODEL_RMS[state.modelId] ? 'rmsnorm' : 'layernorm';
+}
+function attentionOpForState(text){
+  if(/decode|incre|incremental/.test(text)) return 'increflashattention';
+  if(/train|fused/.test(text) || state.phase === 'train') return 'fusedattention';
+  return 'promptflashattention';
+}
+function addOps(target, ids){
+  ids.forEach(id=>target.add(id));
+}
+function opIdsFromGraphText(rawText){
+  const text = normalizedText(rawText);
+  const ids = new Set();
+  if(!text) return ids;
+  if(/dequant/.test(text)) ids.add('dequantize');
+  if(/quant/.test(text)) ids.add('quantize');
+  if(/all\s*to\s*all|allgather|all gather|all-gather|dispatch/.test(text)) ids.add('allgather');
+  if(/allreduce|all reduce|all-reduce|reduce scatter|reduce-scatter/.test(text)) ids.add('allreduce');
+  if(/top\s*k|topk|sampling|expert select|router/.test(text)) ids.add('topk');
+  if(/rms\s*norm|rmsnorm/.test(text)) ids.add('rmsnorm');
+  if(/layer\s*norm|layernorm/.test(text)) ids.add('layernorm');
+  if(/\bnorm\b/.test(text)) ids.add(normOpForModel());
+  if(/batch\s*matmul|batchmatmul|\bbmm\b|grouped/.test(text)) addOps(ids, ['bmm','matmul']);
+  if(/flash|attention|mla|dsa|scaled attention/.test(text)){
+    addOps(ids, [attentionOpForState(text),'bmm','softmax','rope','matmul','concat']);
+  }
+  if(/softmax/.test(text)) ids.add('softmax');
+  if(/rope|rotary/.test(text)) ids.add('rope');
+  if(/silu|swiglu/.test(text)) addOps(ids, ['silu','mul']);
+  if(/gelu|geglu/.test(text)) addOps(ids, ['gelu','mul']);
+  if(/embedding|embed/.test(text) && !/weight/.test(text)) addOps(ids, ['embedding','gather']);
+  if(/gather|indexer|lookup/.test(text)) ids.add('gather');
+  if(/concat|cache update|kv cache/.test(text)) ids.add('concat');
+  if(/multiply|\bmul\b/.test(text)) ids.add('mul');
+  if(/\badd\b|residual|combine|sum/.test(text)) ids.add('add');
+  if(/feed forward|ffn|mlp|expert|dense/.test(text)){
+    addOps(ids, ['matmul','bmm','silu','gelu','mul','topk','gather','add','allgather','allreduce']);
+  }
+  if(/matmul|linear|projection|proj|lm head|qkv|query|key|value|gate|up|down/.test(text)) ids.add('matmul');
+  return ids;
+}
+function opIdFromGraphText(rawText){
+  const ids = opIdsFromGraphText(rawText);
+  for(const id of ids) return id;
+  return null;
+}
+function graphNodeElement(target){
+  let el = target;
+  for(let i=0; el && i<8; i+=1, el=el.parentElement){
+    const classText = typeof el.className === 'string' ? el.className : (el.getAttribute?.('class') || '');
+    if(el.dataset?.nodeId || /pto-model-graphviz-node|modelviz-schema-node|opv-reference-node|\bnode_[a-z0-9_-]+/.test(classText)){
+      return el;
+    }
+  }
+  return null;
+}
+function graphNodeText(node){
+  if(!node) return '';
+  const title = node.querySelector?.('title')?.textContent || '';
+  return [
+    node.dataset?.nodeId,
+    node.getAttribute?.('aria-label'),
+    title,
+    node.textContent,
+    node.getAttribute?.('class')
+  ].filter(Boolean).join(' ');
+}
+function graphFrameDocument(frame = document.getElementById('modelGraphFrame')){
+  try{
+    return frame?.contentDocument || frame?.contentWindow?.document || null;
+  }catch(_err){
+    return null;
+  }
+}
+function graphNodeClassText(node){
+  return typeof node?.className === 'string'
+    ? node.className
+    : (node?.getAttribute?.('class') || '');
+}
+function graphNodeElements(doc){
+  const nodes = new Set();
+  doc.querySelectorAll('g,[data-node-id]').forEach(el=>{
+    const node = graphNodeElement(el);
+    if(node) nodes.add(node);
+  });
+  return [...nodes];
+}
+function opIdsForHighlightNode(node){
+  const classText = graphNodeClassText(node);
+  if(/tensor-node|constant_|input_|output_/.test(classText)) return new Set();
+  return opIdsFromGraphText(graphNodeText(node));
+}
+function graphNodeIsDimmable(node){
+  const classText = graphNodeClassText(node);
+  if(/tensor-node|constant_|input_|output_/.test(classText)) return false;
+  return /node_|modelviz-schema-node|module-node|op-node|collapsed-module/.test(classText)
+    || !!node.querySelector?.('rect,ellipse');
+}
+function graphSelectionOpSet(opId){
+  const ids = new Set([opId]);
+  if(['promptflashattention','increflashattention','fusedattention','bmm','softmax','rope'].includes(opId)){
+    addOps(ids, ['promptflashattention','increflashattention','fusedattention','bmm','softmax','rope','matmul','concat']);
+  }
+  if(['silu','gelu','mul','topk','gather'].includes(opId)){
+    addOps(ids, ['silu','gelu','mul','topk','gather','matmul','bmm']);
+  }
+  if(opId === 'embedding') addOps(ids, ['embedding','gather']);
+  if(opId === 'matmul') addOps(ids, ['matmul','bmm']);
+  return ids;
+}
+function setsIntersect(a, b){
+  for(const item of a){
+    if(b.has(item)) return true;
+  }
+  return false;
+}
+function injectGraphSelectionStyles(doc){
+  if(!doc || doc.head?.querySelector('[data-operator-matrix-graph-selection-style="true"]')) return;
+  const style = doc.createElement('style');
+  style.dataset.operatorMatrixGraphSelectionStyle = 'true';
+  style.textContent = `
+    .operator-matrix-selection-active .operator-matrix-op-dimmed{
+      opacity:.24;
+      filter:grayscale(1) saturate(.08);
+    }
+    .operator-matrix-selection-active .operator-matrix-op-active{
+      opacity:1;
+      filter:none;
+    }
+    .operator-matrix-selection-active .operator-matrix-op-active rect,
+    .operator-matrix-selection-active .operator-matrix-op-active ellipse{
+      stroke:var(--graphviz-text) !important;
+      stroke-width:2.4px !important;
+    }
+    .operator-matrix-selection-active .operator-matrix-op-active text{
+      fill:var(--graphviz-text) !important;
+      font-weight:700;
+    }
+  `;
+  doc.head?.appendChild(style);
+}
+function applyGraphSelection(frame = document.getElementById('modelGraphFrame')){
+  const doc = graphFrameDocument(frame);
+  if(!doc) return;
+  injectGraphSelectionStyles(doc);
+  const selectedOpId = state.selectedOpId;
+  const selectedOps = selectedOpId ? graphSelectionOpSet(selectedOpId) : new Set();
+  const records = graphNodeElements(doc).map(node=>({
+    node,
+    opIds:opIdsForHighlightNode(node),
+    dimmable:graphNodeIsDimmable(node)
+  }));
+  const hasActive = !!selectedOpId && records.some(record=>setsIntersect(record.opIds, selectedOps));
+  doc.documentElement.classList.toggle('operator-matrix-selection-active', hasActive);
+  records.forEach(({node, opIds, dimmable})=>{
+    const active = hasActive && setsIntersect(opIds, selectedOps);
+    const dimmed = hasActive && dimmable && !active;
+    node.classList.toggle('operator-matrix-op-active', active);
+    node.classList.toggle('operator-matrix-op-dimmed', dimmed);
+  });
+}
+function scheduleGraphSelectionRefresh(frame = document.getElementById('modelGraphFrame')){
+  const doc = graphFrameDocument(frame);
+  if(!doc) return;
+  if(doc.__operatorMatrixHighlightFrame) return;
+  const raf = frame.contentWindow?.requestAnimationFrame?.bind(frame.contentWindow) || window.requestAnimationFrame.bind(window);
+  doc.__operatorMatrixHighlightFrame = raf(()=>{
+    doc.__operatorMatrixHighlightFrame = null;
+    applyGraphSelection(frame);
+  });
+}
+function setupGraphSelectionObserver(frame, doc){
+  if(!doc || doc.__operatorMatrixSelectionObserver || !doc.body) return;
+  const Observer = frame.contentWindow?.MutationObserver || window.MutationObserver;
+  if(!Observer) return;
+  doc.__operatorMatrixSelectionObserver = new Observer(()=>scheduleGraphSelectionRefresh(frame));
+  doc.__operatorMatrixSelectionObserver.observe(doc.body, {childList:true, subtree:true});
+}
+function bindGraphFrameInteractions(frame){
+  const doc = graphFrameDocument(frame);
+  if(!doc) return;
+  injectGraphSelectionStyles(doc);
+  setupGraphSelectionObserver(frame, doc);
+  scheduleGraphSelectionRefresh(frame);
+  if(doc.__operatorMatrixBridge) return;
+  doc.__operatorMatrixBridge = true;
+  const openFromTarget = target => {
+    const node = graphNodeElement(target);
+    if(!node) return false;
+    const opId = opIdFromGraphText(graphNodeText(node));
+    if(!opId) return false;
+    openDrawer(opId, null);
+    return true;
+  };
+  doc.addEventListener('click', event=>{
+    const target = event.target;
+    if(target?.closest?.('button,a,input,select,textarea') && !graphNodeElement(target)) return;
+    openFromTarget(target);
+  });
+  doc.addEventListener('keydown', event=>{
+    if(event.key !== 'Enter' && event.key !== ' ') return;
+    if(openFromTarget(event.target)) event.preventDefault();
+  });
 }
 
 function renderHierarchy(){
-  const inner = document.getElementById('hierInner');
+  const frame = document.getElementById('modelGraphFrame');
   const badge = document.getElementById('hierPhase');
-  const stages = buildStages();
-  badge.textContent = `${state.version} · ${state.phase==='all'?'训练 / 推理':(state.phase==='train'?'训练':'推理')}`;
-
-  const renderOps = ops => (ops||[]).map(opChip).join('');
-  const renderComms = ops => (ops||[]).map(commChip).join('');
-  const renderSubnode = (block, idx) => `
-    ${idx ? '<div class="hier-subedge" aria-hidden="true"></div>' : ''}
-    <div class="hier-subnode">
-      <b>${block.title}</b>
-      <small>${block.sub || ''}</small>
-      <div class="hier-op-row">${renderOps(block.ops)}</div>
-      <div class="hier-comm-row">${renderComms(block.comm)}</div>
-    </div>`;
-  const renderBranch = block => `
-    <div class="hier-branch">
-      <div class="hier-branch-head">
-        <b>${block.title}</b>
-        <small>${block.sub || ''}</small>
-      </div>
-      <div class="hier-subnodes">
-        ${(block.nested && block.nested.length) ? block.nested.map(renderSubnode).join('') : renderSubnode(block, 0)}
-      </div>
-    </div>`;
-  const renderStage = (stage, idx) => {
-    const edge = idx ? '<div class="hier-edge" aria-hidden="true"></div>' : '';
-    if(stage.kind === 'layer'){
-      return `${edge}<section class="hier-layer">
-        <span class="hier-layer-badge">${stage.badge}</span>
-        <div class="hier-node-head">
-          <span class="hier-node-ico">L</span>
-          <span class="hier-node-title"><b>${stage.title}</b><small>参考 Graphviz 的节点 / 子图渲染方式，随左侧模型版本实时生成</small></span>
-        </div>
-        <div class="hier-branches">${(stage.blocks||[]).map(renderBranch).join('')}</div>
-      </section>`;
-    }
-    return `${edge}<section class="hier-node ${stage.accent?'accent':''}">
-      <div class="hier-node-head">
-        <span class="hier-node-ico">${stage.accent?'◆':'◇'}</span>
-        <span class="hier-node-title"><b>${stage.title}</b><small>${stage.sub || ''}</small></span>
-      </div>
-      <div class="hier-node-body">
-        <div class="hier-op-row">${renderOps(stage.ops)}</div>
-        <div class="hier-comm-row">${renderComms(stage.comm)}</div>
-      </div>
-    </section>`;
-  };
-
-  inner.innerHTML = stages.length
-    ? `<div class="hier-graph">${stages.map(renderStage).join('')}</div>`
-    : '<div class="hier-empty">当前筛选条件下没有可展示的模型结构。</div>';
+  const asset = graphAssetForState();
+  const phaseLabel = state.phase==='all' ? '训练 / 推理' : (state.phase==='train' ? '训练' : '推理');
+  if(badge) badge.textContent = `${state.version} · ${phaseLabel} · ${asset.label}`;
+  const assetText = asset.variant ? `${asset.id} · ${asset.variant}` : asset.id;
+  const dockAsset = document.getElementById('dockAsset');
+  if(dockAsset) dockAsset.textContent = assetText;
+  if(!frame) return;
+  const url = new URL(asset.src, window.location.href);
+  if(asset.variant) url.searchParams.set('variant', asset.variant);
+  url.searchParams.set('theme', document.documentElement.dataset.theme || 'dark');
+  if(frame.src !== url.href){
+    frame.src = url.href;
+  }else{
+    bindGraphFrameInteractions(frame);
+  }
 }
 
 /* ============ 渲染：统计卡 ============ */
@@ -1301,7 +1581,7 @@ function renderStats(){
   el.innerHTML = hws.map(hw=>{
     const s = hwStats(hw);
     const w = t => s.total ? (t/s.total*100).toFixed(1)+'%' : '0%';
-    return `<div class="stat-card anim">
+    return `<div class="inspector-soft-card support-stat">
       <div class="sc-top">
         <span class="sc-name">${hw.short}</span>
         <span class="sc-role">${hw.role}</span>
@@ -1329,6 +1609,8 @@ function renderMatrix(){
 
   document.getElementById('resultCount').innerHTML =
     `匹配 <b>${ops.length}</b> 个算子 · <b>${hws.length}</b> 项硬件`;
+  const dockOps = document.getElementById('dockOps');
+  if(dockOps) dockOps.textContent = `${ops.length} 个算子 · ${hws.length} 项硬件`;
 
   if(!hws.length){
     wrap.innerHTML = `<div class="empty"><h3>未选择硬件</h3><p>请在左侧至少勾选一项目标硬件。</p></div>`;
@@ -1346,14 +1628,15 @@ function renderMatrix(){
 
   const wantDt = [...state.dtypes];
   const body = `<tbody>${ops.map(op=>{
-    const color = CAT_COLOR[op.cat] || 'var(--ink-3)';
+    const color = CAT_COLOR[op.cat] || 'var(--accent)';
     const repo = repoFor(op);
+    const selected = state.selectedOpId === op.id;
     const cells = hws.map(hw=>{
       const s = cellFor(op, hw);
       const hit = wantDt.length && s.status!=='none' && s.status!=='unused' && wantDt.every(d=>s.dtypes.includes(d));
       const dtTxt = s.status==='none' ? '' : (s.status==='unused' ? '未使用' : (s.dtypes.slice(0,3).join(' ') + (s.dtypes.length>3?' +'+(s.dtypes.length-3):'')));
       return `<td>
-        <button class="btn btn-ghost btn-compact cell-btn ${hit?'hit':''}" data-op="${op.id}" data-hw="${hw.id}"
+        <button class="btn btn-ghost btn-compact cell-btn ${hit?'hit':''} ${selected?'is-selected':''}" data-op="${op.id}" data-hw="${hw.id}"
           aria-label="${op.name} 在 ${hw.short}：${STATUS_TEXT[s.status]}">
           <span class="status-glyph ${s.status}">${GLYPH[s.status]}</span>
           <span class="cell-dtypes">${dtTxt}</span>
@@ -1363,8 +1646,8 @@ function renderMatrix(){
     return `<tr>
       <th class="opcell">
         <div class="op-cell-inner">
-          <button class="btn btn-ghost op-btn" data-op="${op.id}">
-            <span class="cat-tick" style="background:${color}"></span>
+          <button class="btn btn-ghost op-btn ${selected?'is-selected':''}" data-op="${op.id}">
+            <span class="cat-tick" style="--category-color:${color}"></span>
             <span class="op-meta">
               <span class="op-name">${op.name}</span>
               <span class="op-cat">${op.cat}</span>
@@ -1385,11 +1668,37 @@ function renderMatrix(){
   wrap.innerHTML = `<table class="matrix">${head}${body}</table>`;
 }
 
-/* ============ 抽屉 ============ */
+/* ============ 右侧 Inspector 详情 ============ */
+function setDetailPanelOpen(open){
+  const split = document.querySelector('[data-ide-split="operator-inspector"]');
+  const detail = document.querySelector('[data-ide-pane="detail-inspector"]');
+  if(split) split.dataset.detailOpen = String(!!open);
+  if(detail){
+    detail.setAttribute('aria-hidden', String(!open));
+  }
+  window.requestAnimationFrame(()=>{
+    const frame = document.getElementById('modelGraphFrame');
+    frame?.contentWindow?.dispatchEvent(new Event('resize'));
+    applyGraphSelection(frame);
+  });
+}
+function renderEmptyDetail(){
+  document.getElementById('drawerCat').textContent = '未选择';
+  document.getElementById('drawerTitle').textContent = '选择一个算子';
+  document.getElementById('drawerDesc').textContent = '点击矩阵单元格或模型结构图中的算子查看详细信息。';
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="empty operator-detail-empty">
+      <h3>未选择算子</h3>
+      <p>点击矩阵单元格或模型结构图中的节点后，这里显示定义、支持、性能、精度和 API。</p>
+    </div>`;
+}
 function openDrawer(opId, focusHw){
   const op = OPERATORS.find(o=>o.id===opId);
   if(!op) return;
-  const color = CAT_COLOR[op.cat] || 'var(--ink-3)';
+  state.selectedOpId = op.id;
+  state.selectedHwId = focusHw || null;
+  setDetailPanelOpen(true);
+  const color = CAT_COLOR[op.cat] || 'var(--accent)';
   const repo = repoFor(op);
   document.getElementById('drawerCat').innerHTML =
     `<span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block"></span>${op.cat}` +
@@ -1401,7 +1710,7 @@ function openDrawer(opId, focusHw){
   const supportPane = HARDWARE.map(hw=>{
     const s = cellFor(op, hw);
     const dim = state.hw.has(hw.id) ? '' : 'dim';
-    const focus = (focusHw===hw.id) ? 'style="box-shadow:0 0 0 2px var(--brand)"' : '';
+    const focus = (focusHw===hw.id) ? 'is-focus' : '';
     const supported = s.dtypes;
     const dtChips = (s.status==='none' || s.status==='unused')
       ? `<span class="no-cond">${s.status==='unused'?'该模型未使用此算子':'当前硬件不支持该算子'}</span>`
@@ -1410,7 +1719,7 @@ function openDrawer(opId, focusHw){
       ...(s.good||[]).map(c=>`<li class="good">${c}</li>`),
       ...(s.conds||[]).map(c=>`<li>${c}</li>`)
     ].join('');
-    return `<div class="dblk ${dim}" ${focus}>
+    return `<div class="dblk ${dim} ${focus}">
       <div class="dblk-head">
         <span class="hwn">${hw.short}</span>
         <span class="hwr">${hw.name} · ${hw.role}</span>
@@ -1428,10 +1737,10 @@ function openDrawer(opId, focusHw){
   const fmt = n => n>=100 ? Math.round(n) : n.toFixed(1);
   const perfRows = HARDWARE.map(hw=>{
     const p = perfData(op, hw);
-    if(p.na) return `<tr><td class="hwc">${hw.short}</td><td colspan="5" style="color:var(--ink-3)">该硬件不支持，暂无性能数据</td></tr>`;
+    if(p.na) return `<tr><td class="hwc">${hw.short}</td><td class="muted-cell" colspan="5">该硬件不支持，暂无性能数据</td></tr>`;
     const rc = p.ratio>=1 ? 'up' : (p.ratio>=0.8 ? 'mid' : 'down');
     return `<tr>
-      <td class="hwc">${hw.short}${p.dt?`<br><span style="font-size:10px;color:var(--ink-3)">${p.dt}</span>`:''}</td>
+      <td class="hwc">${hw.short}${p.dt?`<br><span class="perf-dtype">${p.dt}</span>`:''}</td>
       <td class="num">${fmt(p.theo)}</td>
       <td class="num">${fmt(p.act)}</td>
       <td class="num">${Math.round(p.util*100)}%<span class="util-bar"><i style="width:${Math.round(p.util*100)}%"></i></span></td>
@@ -1525,7 +1834,7 @@ aclrtSynchronizeStream(stream);`;
   const doc = docOf(op);
   const ioRows = arr => arr.length
     ? arr.map(r=>`<tr><td class="n">${r[0]}</td><td class="sh">${r[1]}</td><td class="dt">${r[2]}</td><td>${r[3]}</td></tr>`).join('')
-    : `<tr><td colspan="4" style="color:var(--ink-3)">—</td></tr>`;
+    : `<tr><td class="muted-cell" colspan="4">—</td></tr>`;
   const defPane = `
     <div class="api-sec"><p class="k">算子描述</p><p class="def-desc">${doc.desc}</p></div>
     <div class="api-sec"><p class="k">数学公式</p><div class="formula">${doc.formula}</div></div>
@@ -1554,19 +1863,27 @@ aclrtSynchronizeStream(stream);`;
     <div class="dpane" data-pane="prec">${precPane}</div>
     <div class="dpane" data-pane="api">${apiPane}</div>`;
 
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('backdrop').classList.add('open');
-  document.getElementById('closeDrawer').focus();
+  applyGraphSelection();
+  renderMatrix();
+  document.getElementById('closeDrawer').focus({preventScroll:true});
 }
 function closeDrawer(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('backdrop').classList.remove('open');
+  state.selectedOpId = null;
+  state.selectedHwId = null;
+  renderEmptyDetail();
+  setDetailPanelOpen(false);
+  applyGraphSelection();
+  renderMatrix();
 }
 
 /* ============ 头部上下文 ============ */
 function renderCtx(){
   document.getElementById('ctxVersion').textContent = state.version;
   document.getElementById('ctxHw').textContent = '· '+state.hw.size+' 项硬件';
+  const dockModel = document.getElementById('dockModel');
+  const dockHw = document.getElementById('dockHw');
+  if(dockModel) dockModel.textContent = state.version;
+  if(dockHw) dockHw.textContent = `${state.hw.size} 项硬件`;
 }
 
 /* ============ 全量渲染 ============ */
@@ -1626,10 +1943,27 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
   renderHwList(); renderDtypeChips(); renderCatChips(); renderPhaseSeg(); renderAll();
 });
 
-// 层级结构中的算子点击 → 打开详情
-document.getElementById('hierInner').addEventListener('click', e=>{
-  const chip = e.target.closest('.hchip'); if(!chip) return;
-  openDrawer(chip.dataset.op, null);
+function toggleExplorerPane(sourceButton){
+  const toggle = document.querySelector('[data-ide-toggle="explorer"]');
+  toggle?.click();
+  const expanded = toggle?.getAttribute('aria-expanded') || 'true';
+  sourceButton?.setAttribute('aria-expanded', expanded);
+}
+
+document.getElementById('topExplorerToggle').addEventListener('click', e=>{
+  toggleExplorerPane(e.currentTarget);
+});
+
+document.getElementById('mobileToggle').addEventListener('click', e=>{
+  toggleExplorerPane(e.currentTarget);
+});
+
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  applyUiTheme(currentTheme() === 'light' ? 'dark' : 'light');
+});
+
+document.getElementById('modelGraphFrame').addEventListener('load', e=>{
+  bindGraphFrameInteractions(e.currentTarget);
 });
 
 // 矩阵点击（事件委托）
@@ -1641,7 +1975,6 @@ document.getElementById('matrixWrap').addEventListener('click', e=>{
 });
 
 document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
-document.getElementById('backdrop').addEventListener('click', closeDrawer);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
 
 // 抽屉标签页切换
@@ -1653,19 +1986,13 @@ document.getElementById('drawerBody').addEventListener('click', e=>{
   body.querySelectorAll('.dpane').forEach(p=>p.classList.toggle('is-active', p.dataset.pane===key));
 });
 
-// 移动端筛选折叠
-document.getElementById('mobileToggle').addEventListener('click', e=>{
-  const sb = document.getElementById('sidebar');
-  const shown = sb.classList.toggle('show');
-  e.currentTarget.setAttribute('aria-expanded', shown);
-});
-
 /* ============ 初始化 ============ */
 renderModelSelect();
 renderHwList();
 renderDtypeChips();
 renderCatChips();
 renderPhaseSeg();
+applyUiTheme(currentTheme(), {persist:false, refreshGraph:false});
 renderAll();
 </script>
 </body>
