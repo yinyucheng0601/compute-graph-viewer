@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>openPangu-R-72B-MoE · 算子 × 硬件 × 时间</title>
+<title>openPangu-2.0-Flash · 算子 × 硬件 × 时间</title>
 <link rel="icon" href="data:," />
 
 <!-- PTO 设计系统：tokens + 共享 patterns（ide-frame / swimlane-task / floating-playback / workbench-shell） -->
@@ -691,7 +691,6 @@
       <div class="pto-ide-frame__workspace"><span id="traceMeta">training trace</span></div>
     </div>
     <div class="pto-ide-frame__topbar-right">
-      <a class="btn btn-sm btn-ghost" href="./op-rank-time-openpangu-flash.html" title="打开 openPangu-2.0-Flash 训练可视化">Pangu 2.0 Flash</a>
       <div class="pto-ide-frame__window-actions">
         <button id="infoToggle" class="opv-icon-btn" type="button" aria-expanded="false" aria-controls="infoPanel" title="说明 · 图例 · 坐标系" aria-label="说明 · 图例 · 坐标系">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><path d="M12 7.5h.01"></path></svg>
@@ -737,7 +736,7 @@
                 <div id="app"></div>
                 <div class="opv-viewport-title" aria-label="当前模型架构">
                   <span class="opv-viewport-title__text">Pangu模型架构</span>
-                  <span class="opv-viewport-title__tag">openPangu-R-72B-2512</span>
+                  <span class="opv-viewport-title__tag">openPangu-2.0-Flash</span>
                 </div>
                 <div class="opv-anomaly-layer" id="anomalyLayer" aria-label="异常徽标"></div>
                 <div class="opv-ep-label-layer" id="epLabelLayer" aria-label="EP bucket 标注"></div>
@@ -976,8 +975,8 @@
   </div>
   <div>
     <div class="opv-section-label">说明</div>
-    <p class="opv-note">上方是<b>openPangu-R-72B MoE 架构图</b>：local XY 图立成竖板；Embedding 与 Final/Head 只出现一次；中间 <b>L0–L49 全部 decoder layers</b> 沿世界 Y 展开，<b>L0–L3 是 Dense</b>（mlp_only_layers=[0,1,2,3]），<b>L4–L49 是 MoE</b>；config 声明 num_mtp_layers=1，但当前主图仍聚焦 causal LM forward，不画 MTP head。下方 32 卡按 1F1B 流水播放，竖线连到当前算子的卡。</p>
-    <p class="opv-note" style="margin-top:6px">代表配置 <em>DP2 × PP4 × TP2 × EP2 = 32 ranks</em>；这是 72B 训练通信 demo 的缩小切片，DP 为 demo 显式维度，官方论文披露 TP/EP/PP/VPP/CP，完整 DP 只可推导。</p>
+    <p class="opv-note">上方是<b>openPangu-2.0-Flash MoE 架构图</b>：local XY 图立成竖板；Embedding 与 Final/Head 只出现一次；中间 <b>L0–L45 全部 main decoder layers</b> 沿世界 Y 展开，<b>L0–L1 是 Dense</b>（first_k_dense_replace=2），<b>L2–L45 是 MoE</b>；源对象还包含 <b>MTP L46-L48</b>，当前主图聚焦 causal LM forward，并在说明/诊断中保留 MTP 事实。下方 32 卡按 1F1B 流水播放，竖线连到当前算子的卡。</p>
+    <p class="opv-note" style="margin-top:6px">代表配置 <em>DP2 × PP4 × TP2 × EP2 = 32 ranks</em>；这是基于 <code>openpangu_2_0_flash_modelviz.html</code> 的训练通信 demo，保留 TP/EP/PP 通信映射并把 routed experts 改为 256。</p>
   </div>
   <div>
     <div class="opv-section-label">算子语义色</div>
@@ -1024,7 +1023,7 @@
 <script src="./pangu-palette.js"></script>
 
 <!-- 真实架构数据(经典脚本,只读) -->
-<script src="data/graph-openpangu-r-72b.js?v=20260707-r72b-arch"></script>
+<script src="data/graph-openpangu-2-0-flash.js?v=20260710-flash-arch"></script>
 
 <!-- 训练指标时序 + Loss 趋势图（经典脚本，迭代级主时间） -->
 <script src="data/timeseries.js"></script>
@@ -1084,7 +1083,7 @@ try{
   });
 }catch(err){
   console.error('Failed to load simulated 1F1B trace',err);
-  TRACE={schema:'fallback',fidelity:'fallback',defaultTick:0,config:{dp:2,pp:4,tp:2,ep:2,microbatches:1,stageRanges:{0:[0,12],1:[13,25],2:[26,37],3:[38,49]}},lanes:[
+  TRACE={schema:'fallback',fidelity:'fallback',defaultTick:0,config:{dp:2,pp:4,tp:2,ep:2,microbatches:1,stageRanges:{0:[0,11],1:[12,22],2:[23,34],3:[35,45]}},lanes:[
     {id:'d0p0',dp:0,stage:0,label:'D0 · PP0',rankRange:'0-3'},
     {id:'d0p1',dp:0,stage:1,label:'D0 · PP1',rankRange:'4-7'},
     {id:'d0p2',dp:0,stage:2,label:'D0 · PP2',rankRange:'8-11'},
@@ -1093,8 +1092,47 @@ try{
     {id:'d1p1',dp:1,stage:1,label:'D1 · PP1',rankRange:'20-23'},
     {id:'d1p2',dp:1,stage:2,label:'D1 · PP2',rankRange:'24-27'},
     {id:'d1p3',dp:1,stage:3,label:'D1 · PP3',rankRange:'28-31'}
-  ],ticks:[{tick:0,region:'steady',stages:{0:{phase:'F',micro:0,layerRange:[0,12],opFocus:{layer:4,step:'mla'},stepIndex:1,stepTotal:13,label:'F m0 · L0-L12',dependsOn:['input'],produces:['hidden'],explain:'Fallback frame.'},1:{phase:'F',micro:0,layerRange:[13,25],opFocus:{layer:13,step:'gate'},stepIndex:1,stepTotal:13,label:'F m0 · L13-L25',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback frame.'},2:{phase:'F',micro:0,layerRange:[26,37],opFocus:{layer:26,step:'experts'},stepIndex:1,stepTotal:12,label:'F m0 · L26-L37',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback frame.'},3:{phase:'B',micro:0,layerRange:[38,49],opFocus:{layer:49,step:'lm_head'},stepIndex:12,stepTotal:12,label:'B m0 · L49-L38',dependsOn:['loss'],produces:['grad'],explain:'Fallback frame.'}}}]};
+  ],ticks:[{tick:0,region:'steady',stages:{0:{phase:'F',micro:0,layerRange:[0,11],opFocus:{layer:2,step:'mla'},stepIndex:1,stepTotal:12,label:'F m0 · L0-L11',dependsOn:['input'],produces:['hidden'],explain:'Fallback frame.'},1:{phase:'F',micro:0,layerRange:[12,22],opFocus:{layer:12,step:'gate'},stepIndex:1,stepTotal:11,label:'F m0 · L12-L22',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback frame.'},2:{phase:'F',micro:0,layerRange:[23,34],opFocus:{layer:23,step:'experts'},stepIndex:1,stepTotal:12,label:'F m0 · L23-L34',dependsOn:['hidden'],produces:['hidden'],explain:'Fallback frame.'},3:{phase:'B',micro:0,layerRange:[35,45],opFocus:{layer:45,step:'lm_head'},stepIndex:11,stepTotal:11,label:'B m0 · L45-L35',dependsOn:['loss'],produces:['grad'],explain:'Fallback frame.'}}}]};
 }
+const MODEL_GRAPHVIZ_OBJECT={
+  sourceHtml:'/Users/yin/pto-design-system/patterns/model-graphviz/assets/openpangu_2_0_flash_modelviz.html',
+  servedHtml:'../vendor/pto-design-system/patterns/model-graphviz/assets/openpangu_2_0_flash_modelviz.html',
+  model:'openPangu-2.0-Flash',
+  mainLayers:46,
+  denseLayers:[0,1],
+  moeLayers:[2,45],
+  mtpLayers:[46,48],
+  routedExperts:256,
+  topK:8
+};
+const FLASH_STAGE_RANGES=[[0,11],[12,22],[23,34],[35,45]];
+function normalizeTraceForFlash(trace){
+  const out=trace||{};
+  out.config={...(out.config||{}),stageRanges:Object.fromEntries(FLASH_STAGE_RANGES.map((range,stage)=>[stage,range]))};
+  out.config.schedule=out.config.schedule||'1F1B schedule';
+  (out.ticks||[]).forEach(tick=>{
+    Object.entries(tick.stages||{}).forEach(([stageKey,stageEvent])=>{
+      const stage=Number(stageKey);
+      const range=FLASH_STAGE_RANGES[stage];
+      if(!range||!stageEvent)return;
+      stageEvent.layerRange=[...range];
+      stageEvent.stepTotal=range[1]-range[0]+1;
+      if(stageEvent.opFocus){
+        const sourceLayer=Number(stageEvent.opFocus.layer);
+        stageEvent.opFocus.layer=Number.isFinite(sourceLayer)
+          ? Math.max(range[0],Math.min(range[1],sourceLayer))
+          : range[0];
+      }
+      const phase=stageEvent.phase||'F';
+      const micro=stageEvent.micro??0;
+      stageEvent.label=phase==='B'
+        ? `${phase} m${micro} · L${range[1]}-L${range[0]}`
+        : `${phase} m${micro} · L${range[0]}-L${range[1]}`;
+    });
+  });
+  return out;
+}
+TRACE=normalizeTraceForFlash(TRACE);
 document.getElementById('traceMeta').textContent=`${String(TRACE.fidelity||'trace').replace(/simulated/ig,'trace')} · ${TRACE.config.schedule||'1F1B schedule'} · ${TRACE.ticks.length} ticks`;
 
 /* 播放控制 / 状态条 DOM 引用（在 IDE frame 段赋值，此处先声明避免 TDZ） */
@@ -1211,9 +1249,9 @@ document.getElementById('infoClose').addEventListener('click',()=>setInfo(false)
 document.addEventListener('click',e=>{if(!infoPanel.hidden&&!infoPanel.contains(e.target)&&!infoToggle.contains(e.target))setInfo(false);});
 addEventListener('keydown',e=>{if(e.key==='Escape')setInfo(false);});
 
-/* ===== 72B 真实图(全展开,只读) ===== */
-const G = window.buildOpenPanguR72BGraph({moeExpanded:true, expertExpanded:true});
-function augmentPanguR72B3DGraph(graph){
+/* ===== Flash 真实图(全展开,只读) ===== */
+const G = window.buildOpenPanguFlashGraph({moeExpanded:true, expertExpanded:true});
+function augmentOpenPanguFlash3DGraph(graph){
   const nodeById=id=>graph.nodes.find(n=>n.id===id);
   const upsertNode=node=>{
     const existing=nodeById(node.id);
@@ -1228,32 +1266,33 @@ function augmentPanguR72B3DGraph(graph){
 
   const mla=nodeById('mla');
   if(mla){
-    mla.label='Attention(GQA)';
-    mla.desc='Attention(GQA)：论文图中的主注意力计算块；在 3D 主视图中显式补出前置 AllGather 与后置 Reduce-Scatter，避免把 TP 通信藏进单个 Attention 节点。';
+    mla.label='Sparse MLA Attention';
+    mla.x=620; mla.y=470; mla.width=320; mla.height=56;
+    mla.desc='Sparse MLA Attention / GQA 视图：源对象里的主注意力计算块；在 3D 主视图中显式补出前置 AllGather 与后置 Reduce-Scatter，避免把 TP 通信藏进单个 Attention 节点。';
   }
   upsertNode({
     id:'attn_norm',label:'RMSNorm',typeLabel:'Op',kind:'op',
-    x:620,y:366,width:200,height:48,colorKey:'sem:norm',
+    x:620,y:338,width:200,height:48,colorKey:'sem:norm',
     desc:'Attention 前 RMSNorm：对 hidden state 归一化后进入 TP 通信与 Attention 主计算。'
   });
   upsertNode({
     id:'attn_all_gather',label:'AllGather',typeLabel:'Comm',kind:'op',
-    x:366,y:430,width:204,height:48,colorKey:'sem:comm',
+    x:620,y:404,width:204,height:48,colorKey:'sem:comm',
     desc:'Attention AllGather：RMSNorm 后把 TP rank 上的 hidden 分片聚合成 Attention 计算需要的输入视图。'
   });
   upsertNode({
     id:'attn_reduce_scatter',label:'Reduce-Scatter',typeLabel:'Comm',kind:'op',
-    x:914,y:430,width:224,height:48,colorKey:'sem:comm',
+    x:620,y:1326,width:224,height:48,colorKey:'sem:comm',
     desc:'Attention Reduce-Scatter：Attention 输出先规约再切回各 TP rank 的 hidden 分片。'
   });
   upsertNode({
     id:'moe_all_gather',label:'AllGather',typeLabel:'Comm',kind:'op',
-    x:366,y:602,width:204,height:48,colorKey:'sem:comm',
+    x:620,y:1434,width:178,height:34,colorKey:'sem:comm',
     desc:'MoE AllGather：MoE FFN 前聚合 hidden 输入，让 shared expert 和 router/routed expert 分支拿到所需 token 表示。'
   });
   upsertNode({
     id:'moe_reduce_scatter',label:'Reduce-Scatter',typeLabel:'Comm',kind:'op',
-    x:914,y:1235,width:224,height:48,colorKey:'sem:comm',
+    x:620,y:2034,width:224,height:42,colorKey:'sem:comm',
     desc:'MoE Reduce-Scatter：Shared/Routed Expert 输出合并后规约并切回 TP 分片，再进入块级 residual/norm。'
   });
 
@@ -1267,6 +1306,7 @@ function augmentPanguR72B3DGraph(graph){
     {source:'attn_norm',target:'attn_all_gather',tag:'AllGather',edgeType:'communication'},
     {source:'attn_all_gather',target:'mla',tag:'ACT',edgeType:'activation'},
     {source:'mla',target:'attn_reduce_scatter',tag:'ReduceScatter',edgeType:'communication'},
+    {source:'o_proj',target:'attn_reduce_scatter',tag:'ReduceScatter',edgeType:'communication'},
     {source:'attn_reduce_scatter',target:'moe_prenorm',tag:'ACT',edgeType:'activation'},
     {source:'moe_prenorm',target:'moe_all_gather',tag:'AllGather',edgeType:'communication'},
     {source:'moe_all_gather',target:'gate',tag:'ACT',edgeType:'activation'},
@@ -1275,18 +1315,19 @@ function augmentPanguR72B3DGraph(graph){
     {source:'moe_reduce_scatter',target:'moe_residual',tag:'ACT',edgeType:'activation'}
   ].forEach(pushEdge);
 }
-augmentPanguR72B3DGraph(G);
+augmentOpenPanguFlash3DGraph(G);
 const MODEL_CONFIG={
-  name:'openPangu-R-72B-2512',
-  displayName:'openPangu-R-72B MoE',
-  source:'config.json + OmniInfer PanguProMoEV2 source',
-  hiddenLayers:50,
-  denseLayers:[0,1,2,3],
-  firstMoeLayer:4,
-  lastMoeLayer:49,
-  routedExperts:80,
+  name:'openPangu-2.0-Flash',
+  displayName:'openPangu-2.0-Flash MoE',
+  source:`${MODEL_GRAPHVIZ_OBJECT.sourceHtml} · config.json + OpenPanguV2 source`,
+  hiddenLayers:MODEL_GRAPHVIZ_OBJECT.mainLayers,
+  denseLayers:MODEL_GRAPHVIZ_OBJECT.denseLayers,
+  firstMoeLayer:MODEL_GRAPHVIZ_OBJECT.moeLayers[0],
+  lastMoeLayer:MODEL_GRAPHVIZ_OBJECT.moeLayers[1],
+  routedExperts:MODEL_GRAPHVIZ_OBJECT.routedExperts,
   expertsPerTok:8,
-  sharedExpertLabel:'shared expert intermediate 2560',
+  mtpLayers:MODEL_GRAPHVIZ_OBJECT.mtpLayers,
+  sharedExpertLabel:'shared expert intermediate 9216',
   demoParallel:{dp:2,pp:4,tp:2,ep:2,cp:1,vpp:1},
 };
 const DEMO=MODEL_CONFIG.demoParallel;
@@ -1319,9 +1360,9 @@ const TRAIN_OBJECT_GROUPS=TRAIN_OBJECTS.reduce((map,obj)=>{
   return map;
 },new Map());
 const TRAIN_ANCHOR_NODE={
-  qkv_weight:'mla',
-  oproj_weight:'mla',
-  attention:'mla',
+  qkv_weight:'attention_projection_weights',
+  oproj_weight:'o_proj',
+  attention:'attention_core',
   attn_norm:'attn_norm',
   attn_all_gather:'attn_all_gather',
   attn_reduce_scatter:'attn_reduce_scatter',
@@ -1412,7 +1453,11 @@ function trainObjectLabel(obj){
 }
 function trainObjectLayer(obj){
   const m=String(obj?.path||'').match(/layers\.(\d+)/);
-  if(m)return Number(m[1]);
+  if(m){
+    const layer=Number(m[1]);
+    if(Number.isFinite(layer))return Math.max(0,Math.min(LAST_MOE_LAYER,layer));
+    return FIRST_MOE_LAYER;
+  }
   if(['final_norm','lm_head','logits','lm_head_weight'].includes(obj?.anchor))return 'output';
   if(['embedding','embedding_weight'].includes(obj?.anchor))return 'input';
   return FIRST_MOE_LAYER;
@@ -1824,8 +1869,8 @@ function readableSceneColor(colorHex){
 /* ===== 算子步进定义(映射表 §4) ===== */
 const STEP_META={
   embedding:{label:'Parallel Embedding', sem:'sem:embedding', comm:'tp', nodes:['embedding','embedding_weight']},
-  dense:{label:'Dense 解码层 ×3', sem:'module:decoder', comm:'tp', nodes:['dense_block']},
-  mla:{label:'Attention(GQA) + TP AG/RS', sem:'sem:attention', comm:'tp', nodes:['mla','attn_all_gather','attn_reduce_scatter']},
+  dense:{label:`Dense 解码层 ×${MODEL_CONFIG.denseLayers.length}`, sem:'module:decoder', comm:'tp', nodes:['dense_block']},
+  mla:{label:'Sparse MLA detail + TP AG/RS', sem:'sem:attention', comm:'tp', nodes:['attn_norm','attn_all_gather','mla','q_a_proj','q_causal_conv','q_residual_add','q_a_norm','q_b_proj','query_tensor','kv_a_proj','kv_causal_conv','kv_residual_add','kv_a_norm','kv_b_proj','key_tensor','value_tensor','attention_core','o_causal_conv','o_residual_add','o_proj','attn_reduce_scatter','attention_projection_weights']},
   moe_prenorm:{label:'Pre-RMSNorm + AllGather', sem:'sem:norm', comm:'tp', nodes:['moe_prenorm','moe_all_gather']},
   gate:{label:'Router · Top-8', sem:'sem:gate', comm:null, nodes:['gate','w_gate']},
   a2a_dispatch:{label:'All-to-All 分发', sem:'sem:comm', comm:'ep', nodes:['a2a_dispatch']},
@@ -2332,20 +2377,32 @@ function syncAxisCamera(){
 resizeAxisRenderer();
 requestAnimationFrame(resizeAxisRenderer);  // 常驻浮层：布局就绪后兜底定尺寸
 
-/* ===== 上方:真实架构 local XY 竖板 + L0-L49 decode layers 沿世界 Y 全展开 ===== */
+/* ===== 上方:真实架构 local XY 竖板 + L0-L45 decode layers 沿世界 Y 全展开 ===== */
 const clusterById=new Map(G.clusters.map(c=>[c.id,c]));
 const ARCH_PS=0.0056, ARCH_HEIGHT_CENTER=5.15, ARCH_LAYER_FRONT=2.2, BASE_ARCH_LAYER_GAP=0.18, ARCH_LAYER_GAP=BASE_ARCH_LAYER_GAP*sideLayerSpacingScale, ARCH_IO_GAP=0.56*sideLayerSpacingScale, ARCH_THICK=0.012, ARCH_FRONT=0.055, DENSE_MOE_GAP=0.7*sideLayerSpacingScale;
 const EDGE_COL={activation:0x4369ef,communication:0x10b981,parameter:0xf59e0b,gradient:0xef4444};
 const DENSE_LAYER_IDS=[...MODEL_CONFIG.denseLayers];
 const MOE_LAYER_IDS=Array.from({length:LAST_MOE_LAYER-FIRST_MOE_LAYER+1},(_,i)=>FIRST_MOE_LAYER+i);
+const DENSE_LAYER_START=DENSE_LAYER_IDS[0]??0;
+const DENSE_LAYER_END=DENSE_LAYER_IDS[DENSE_LAYER_IDS.length-1]??Math.max(0,FIRST_MOE_LAYER-1);
+const DENSE_LAYER_RANGE_LABEL=DENSE_LAYER_IDS.length===1?`L${DENSE_LAYER_START}`:`L${DENSE_LAYER_START}-L${DENSE_LAYER_END}`;
+const MOE_LAYER_RANGE_LABEL=`L${FIRST_MOE_LAYER}-L${LAST_MOE_LAYER}`;
+const REPRESENTATIVE_MOE_LAYER=Math.max(FIRST_MOE_LAYER,Math.min(LAST_MOE_LAYER,Math.round((FIRST_MOE_LAYER+LAST_MOE_LAYER)/2)));
+const ATTENTION_DETAIL_NODE_IDS=new Set([
+  'attention_projection_weights',
+  'q_a_proj','q_causal_conv','q_residual_add','q_a_norm','q_b_proj','query_tensor',
+  'kv_a_proj','kv_causal_conv','kv_residual_add','kv_a_norm','kv_b_proj','key_tensor','value_tensor',
+  'attention_core','o_causal_conv','o_residual_add','o_proj'
+]);
 const MOE_NODE_IDS=new Set([
   'attn_norm','attn_all_gather','mla','attn_reduce_scatter','moe_prenorm','moe_all_gather',
   'gate','w_gate','a2a_dispatch','shared_expert','w_expert','a2a_combine','moe_reduce_scatter','moe_residual',
+  ...ATTENTION_DETAIL_NODE_IDS,
   ...EXPERT_IDS
 ]);
 const STATIC_INPUT_IDS=['token_ids','position_ids','attn_mask','embedding','embedding_weight'];
 const STATIC_OUTPUT_IDS=['final_norm','lm_head','logits_allgather','logits','lm_head_weight'];
-const DENSE_LAYER_BOX={x:340,y:218,width:560,height:180};
+const DENSE_LAYER_BOX={x:340,y:235,width:560,height:120};
 const archPickables=[], archRecords=[], archByKey=new Map(), archRecordByMesh=new Map();
 const archKey=(layer,id)=>`${layer}:${id}`;
 let hoverArch=null, hoverNeighbors=[], hoverStage=null;
@@ -2360,16 +2417,38 @@ function archLabelSelectionRelated(label){
   if(id==null||layer==null)return false;
   return archSelectionRelated(archByKey.get(archKey(layer,id)));
 }
+function frontPrimaryLayer(){
+  const layer=selectedArch?.userData?.layer;
+  if(typeof layer==='number'&&layer>=FIRST_MOE_LAYER&&layer<=LAST_MOE_LAYER)return layer;
+  return LAST_MOE_LAYER;
+}
+function frontLineVisible(rec, lit=false, selectedLit=false){
+  if(activeView!=='front')return true;
+  if(lit||selectedLit)return true;
+  if(rec.tags?.includes('hidden-main'))return false;
+  if(rec.edgeType==='parameter')return false;
+  if(rec.layerA==='input'||rec.layerB==='input'||rec.layerA==='output'||rec.layerB==='output')return false;
+  if(rec.dashed)return false;
+  if(rec.source==='o_proj'&&rec.target==='attn_reduce_scatter')return false;
+  if(['expert_pool','a2a_combine','moe_reduce_scatter','moe_residual'].includes(rec.source)||['expert_pool','a2a_combine','moe_reduce_scatter','moe_residual'].includes(rec.target))return false;
+  const layers=[rec.layerA,rec.layerB].filter(layer=>typeof layer==='number');
+  if(!layers.length)return true;
+  const primary=frontPrimaryLayer();
+  return layers.every(layer=>layer<FIRST_MOE_LAYER||layer===primary);
+}
 function updateArchLineHover(){
   archLineRecords.forEach(rec=>{
-    if(activeView==='right'&&rec.tags?.includes('hidden-main')){
+    const lit=hoverArch&&(rec.aMesh===hoverArch||rec.bMesh===hoverArch);
+    const selectedLit=selectedArch&&(rec.aMesh===selectedArch||rec.bMesh===selectedArch);
+    if((activeView==='right'&&rec.tags?.includes('hidden-main'))||!frontLineVisible(rec,lit,selectedLit)){
       rec.mat.uniforms.opacity.value=0;
       return;
     }
-    const lit=hoverArch&&(rec.aMesh===hoverArch||rec.bMesh===hoverArch);
-    const selectedLit=selectedArch&&(rec.aMesh===selectedArch||rec.bMesh===selectedArch);
     const selectedRelated=archSelectionActive()&&(archSelectionRelated(rec.aMesh)||archSelectionRelated(rec.bMesh));
     const focusLit=focusActive()&&tagMatchesFocus(rec.tags);
+    const frontDefault=activeView==='front'
+      ? (rec.detailEdge?0.12:(rec.tags?.includes('op:mla')?0.10:0.07))
+      : ARCH_LINE_DIM;
     rec.mat.uniforms.opacity.value=lit
       ? ARCH_LINE_SOLID
       : selectedLit
@@ -2378,10 +2457,10 @@ function updateArchLineHover(){
           ? (selectedRelated?0.36:0.018)
           : (focusActive()
             ? (focusLit?Math.max(ARCH_LINE_SOLID,rec.base):(ppFocusActive()?Math.max(rec.base,ARCH_LINE_DIM):0.035))
-            : ARCH_LINE_DIM));
+            : frontDefault));
   });
 }
-// 深度沿数据流：input/Embedding 最前 → L0-L3(Dense) →（明显间隔）→ L4-L49(MoE) → Final/Head 最后。
+// 深度沿数据流：input/Embedding 最前 → Dense main layers →（明显间隔）→ MoE main layers → Final/Head 最后。
 // 关键：solid 层用 transparent:false + depthWrite:true 写深度缓冲，才能真正遮挡后面的绿色专家池；
 // 否则（depthWrite:false）遮挡只靠 renderOrder=20+layer，靠后的大 MoE 池会画在靠前的 Dense 上面（旧 bug）。
 const archDepth=layer=>{
@@ -2396,7 +2475,7 @@ const nodePos=(id,layer=0)=>{
   const n=byId.get(id);return n?graphPos(n.x,n.y,layer):null;
 };
 const isMoeNode=id=>MOE_NODE_IDS.has(id);
-const isMajorLayer=layer=>layer%10===0||layer===LAST_MOE_LAYER;  // 详细 MoE 层每 10 层一张（前排 MoE 不再抢镜）
+const isMajorLayer=layer=>layer===FIRST_MOE_LAYER||layer%10===0||layer===LAST_MOE_LAYER;  // 详细 MoE 层每 10 层一张，并保留首个 MoE 层
 const SOLID_LAYERS=new Set([0,LAST_MOE_LAYER]);  // 第一层(L0 Dense)+最后一层 MoE 完全 solid：写深度、正确遮挡、完整架构可读
 const isSolidLayer=layer=>typeof layer==='number'&&SOLID_LAYERS.has(layer);
 const layerRenderOrder=layer=>typeof layer==='number'?20+layer:(layer==='output'?90:10);
@@ -2420,7 +2499,8 @@ function archTagsFor(id,layer){
   if(['attn_all_gather','attn_reduce_scatter','moe_all_gather','moe_reduce_scatter'].includes(id)){
     tags.add('comm:tp'); tags.add('data:hidden'); tags.add('layer:moe');
   }
-  if(id==='mla'){tags.add('op:mla'); tags.add('comm:tp'); tags.add('data:hidden');}
+  if(id==='mla'||ATTENTION_DETAIL_NODE_IDS.has(id)){tags.add('op:mla'); tags.add('comm:tp'); tags.add('data:hidden');}
+  if(['query_tensor','key_tensor','value_tensor'].includes(id)){tags.add('data:attention');}
   if(['attn_norm','moe_prenorm','moe_residual','final_norm'].includes(id)){tags.add('op:norm'); tags.add('data:hidden');}
   if(['gate','w_gate'].includes(id)){tags.add('op:router'); tags.add('data:dispatch');}
   if(['a2a_dispatch','a2a_combine'].includes(id)){tags.add('comm:ep'); tags.add('data:dispatch');}
@@ -2444,6 +2524,7 @@ function lineTagsFor(a,b,layerA,layerB){
   const tags=new Set([...archTagsFor(a,layerA),...archTagsFor(b,layerB)]);
   if((a==='a2a_dispatch'||b==='a2a_dispatch'||a==='a2a_combine'||b==='a2a_combine'))tags.add('comm:ep');
   if(['attn_all_gather','attn_reduce_scatter','moe_all_gather','moe_reduce_scatter'].some(id=>a===id||b===id))tags.add('comm:tp');
+  if(a==='mla'||b==='mla'||ATTENTION_DETAIL_NODE_IDS.has(a)||ATTENTION_DETAIL_NODE_IDS.has(b)){tags.add('op:mla');tags.add('comm:tp');tags.add('data:hidden');}
   if((a==='lm_head'&&b==='logits_allgather')||a==='logits_allgather'||b==='logits_allgather')tags.add('comm:logits');
   if((a==='dense_block'&&b==='dense_block')||(a==='dense_block'&&b==='attn_norm')||(a==='dense_block'&&b==='mla')||(a==='moe_residual'&&b==='attn_norm')||(a==='moe_residual'&&b==='mla')||(a==='moe_residual'&&b==='final_norm'))tags.add('data:hidden');
   return [...tags];
@@ -2800,7 +2881,16 @@ function refreshArchMesh(mesh){
       ? (lightMode?0.72:0.82)
       : (lightMode?Math.min(Math.max(ei,0.2),0.48):Math.max(ei,0.34));
   }
-  if(lightMode&&mesh.material.emissive&&(!(selectionActive&&!selectedDirect&&!selectedNeighbor)||isSharedExpert)&&!frontFoldedMoeDimmed){
+  const frontSoftSuppressed=activeView==='front'&&(rec.id==='expert_pool'||rec.id==='shared_expert')&&!selectedDirect&&!selectedNeighbor&&!mesh.userData.hoverHighlight&&!focusActive();
+  if(frontSoftSuppressed&&rec.id==='expert_pool'){
+    op=1;
+    ei=Math.max(Math.min(ei,lightMode?0.72:0.80),lightMode?0.48:0.56);
+  }
+  if(frontSoftSuppressed&&rec.id==='shared_expert'){
+    op=1;
+    ei=Math.max(Math.min(ei,lightMode?0.74:0.82),lightMode?0.50:0.58);
+  }
+  if(lightMode&&mesh.material.emissive&&(!(selectionActive&&!selectedDirect&&!selectedNeighbor)||isSharedExpert)&&!frontFoldedMoeDimmed&&!frontSoftSuppressed){
     ei=Math.max(ei,1);
     mesh.material.toneMapped=false;
   }
@@ -2908,6 +2998,9 @@ function applyViewPresentation(){
       let opacity=focusActive()?(tagMatchesFocus(tags)||ppFocusActive()?1:0.14):1;
       if(frontNodeVisible){
         opacity=Math.max(opacity,archId==='shared_expert'?1:0.78);
+        if(['expert_pool','shared_expert','w_expert'].includes(archId)&&!archLabelSelectionRelated(label)&&!focusActive()){
+          opacity=Math.min(opacity,0.72);
+        }
       }
       if(archSelectionActive()&&!only){
         opacity=archLabelSelectionRelated(label)||archId==='shared_expert'?1:Math.min(opacity,frontNodeVisible?0.48:0.12);
@@ -3124,26 +3217,35 @@ function addNode(n,layer,{ghost=false,opaque=false,showLabel=true,labelText=null
 function addArchLine(a,b,color,opacity,layerA=0,layerB=layerA,tags=null){
   const pa=nodePos(a,layerA), pb=nodePos(b,layerB); if(!pa||!pb)return;
   const rec=addArchLinePoints(pa,pb,color,opacity,tags||lineTagsFor(a,b,layerA,layerB));
-  if(rec){rec.aMesh=archByKey.get(archKey(layerA,a))||null; rec.bMesh=archByKey.get(archKey(layerB,b))||null; rec.source=a; rec.target=b;}
+  if(rec){
+    rec.aMesh=archByKey.get(archKey(layerA,a))||null;
+    rec.bMesh=archByKey.get(archKey(layerB,b))||null;
+    rec.source=a; rec.target=b; rec.layerA=layerA; rec.layerB=layerB;
+  }
+  return rec;
 }
 function addArchLinePoints(pa,pb,color,opacity,tags=[]){
   if(!pa||!pb)return null;
-  const front=ARCH_FRONT;
+  const front=-ARCH_THICK*1.1;
   const line=fatLine([
     pa.clone().add(new THREE.Vector3(0,0,front)),
     pb.clone().add(new THREE.Vector3(0,0,front))
   ],color,opacity,LW.arch);
   line.material.uniforms.opacity.value=ARCH_LINE_DIM;  // 统一默认透明（flat），hover 时由 updateArchLineHover 提亮
-  const rec={mat:line.material,base:opacity,aMesh:null,bMesh:null,tags};
+  const rec={mat:line.material,base:opacity,aMesh:null,bMesh:null,tags,layerA:null,layerB:null,edgeType:null};
   archLineRecords.push(rec); scene.add(line);
   return rec;
 }
-function drawGraphEdges(layer,{moeOnly=false,opacity=0.18}={}){
+function drawGraphEdges(layer,{moeOnly=false,opacity=0.18,attentionDetail=false}={}){
   G.edges.forEach(e=>{
     if(moeOnly&&!(isMoeNode(e.source)&&isMoeNode(e.target)))return;
     if(e.source==='moe_residual'&&e.target==='final_norm')return;
     if(e.source==='dense_block'&&e.target==='mla')return;
-    addArchLine(e.source,e.target,EDGE_COL[e.edgeType]||0x4369ef,e.dashed?opacity*0.55:opacity,layer);
+    const detailEdge=ATTENTION_DETAIL_NODE_IDS.has(e.source)||ATTENTION_DETAIL_NODE_IDS.has(e.target);
+    if(detailEdge&&!attentionDetail)return;
+    if(attentionDetail&&e.source==='mla'&&e.target==='attn_reduce_scatter')return;
+    const rec=addArchLine(e.source,e.target,EDGE_COL[e.edgeType]||0x4369ef,e.dashed?opacity*0.55:opacity,layer);
+    if(rec){rec.edgeType=e.edgeType; rec.dashed=!!e.dashed; rec.detailEdge=detailEdge;}
   });
 }
 function expertGridLineGeometry(w,h,{cols=16,rows=16,bucketCols=8,bucketRows=4,bucketOnly=false}={}){
@@ -3181,7 +3283,7 @@ function addExpertPoolGrid(panel,c,layer){
   group.position.z+=ARCH_THICK*0.42;
   group.renderOrder=layerRenderOrder(layer)+0.36;
   group.visible=false;
-  const expertCols=10, expertRows=8;
+  const expertCols=16, expertRows=Math.ceil(MODEL_CONFIG.routedExperts/expertCols);
   const fineMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,toneMapped:false});
   const bucketMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,toneMapped:false});
   const bucketCols=DEMO.ep, bucketRows=1;
@@ -3231,7 +3333,7 @@ function syncExpertPoolGrid(mesh,rec){
   const contextualFocus=focusMatch&&(objectFocus==='layer:moe'||objectFocus==='op:experts'||objectFocus==='data:dispatch'||objectFocus==='comm:ep');
   const representative=typeof layer==='number'&&(isMajorLayer(layer)||isSolidLayer(layer));
   const frontFoldedMoe=activeView==='front'&&typeof layer==='number'&&layer>=FIRST_MOE_LAYER&&layer!==LAST_MOE_LAYER;
-  const defaultFrontSolid=activeView==='front'&&isSolidLayer(layer);
+  const defaultFrontSolid=false;
   const visible=!frontFoldedMoe&&(directHighlight||(contextualFocus&&representative)||defaultFrontSolid);
   const high=mesh.userData.selectedHighlight?1:(mesh.userData.hoverHighlight?1:(mesh.userData.activeHighlight?0.82:(mesh.userData.selectedNeighborHighlight?0.62:(mesh.userData.neighborHighlight?0.58:(mesh.userData.trailHighlight?0.42:(contextualFocus?0.5:(defaultFrontSolid?0.36:0)))))));
   grid.group.visible=visible;
@@ -3260,12 +3362,14 @@ function addExpertFan(layer,opacity=0.18){
     dispatch.aMesh=archByKey.get(archKey(layer,'a2a_dispatch'))||null;
     dispatch.bMesh=archByKey.get(archKey(layer,'expert_pool'))||null;
     dispatch.source='a2a_dispatch'; dispatch.target='expert_pool';
+    dispatch.layerA=layer; dispatch.layerB=layer; dispatch.edgeType='communication';
   }
   const combine=addArchLinePoints(pool,nodePos('a2a_combine',layer),EDGE_COL.communication,opacity,['comm:ep','data:dispatch','layer:moe','op:experts']);
   if(combine){
     combine.aMesh=archByKey.get(archKey(layer,'expert_pool'))||null;
     combine.bMesh=archByKey.get(archKey(layer,'a2a_combine'))||null;
     combine.source='expert_pool'; combine.target='a2a_combine';
+    combine.layerA=layer; combine.layerB=layer; combine.edgeType='communication';
   }
 }
 function addLayerMarker(layer,text,colorHex,major=false){
@@ -3276,7 +3380,7 @@ function addLayerMarker(layer,text,colorHex,major=false){
 }
 function addDenseLayer(layer){
   const n=byId.get('dense_block');
-  const desc=`Dense decoder layer L${layer}：openPangu-R-72B config 的 mlp_only_layers=[0,1,2,3] 之一，没有 Router、All-to-All、Expert Pool 或 Shared Expert；hidden state 直接传给下一层。`;
+  const desc=`Dense decoder layer L${layer}：openPangu-2.0-Flash config 的 first_k_dense_replace=2 范围之一，没有 Router、All-to-All、Expert Pool 或 Shared Expert；hidden state 直接传给下一层。`;
   // 单个实心块：宽度和 MoE 保持同一层级，但在 local-Z 上低于 MoE 专家区，正视图不会互相遮挡。
   addNode(n,layer,{opaque:true,labelText:`Dense L${layer}`,descOverride:desc,showLabel:true,
     box:DENSE_LAYER_BOX});
@@ -3285,15 +3389,17 @@ function addDenseLayer(layer){
 function addMoeLayer(layer){
   const major=isMajorLayer(layer);
   const solid=isSolidLayer(layer);  // 最后一层 MoE 架构全 solid、可读
+  const attentionDetail=major||solid;
   const moeCluster=clusterById.get('moe_layer');
   const expertCluster=clusterById.get('expert_pool');
   if(moeCluster)addCluster(moeCluster,layer,solid?0.85:(major?0.16:0.014),{showLabel:major||solid,labelText:`MoE L${layer}`});
   if(expertCluster)addCluster(expertCluster,layer,solid?0.8:(major?0.15:0.012),{showLabel:major||solid,labelText:`Expert Pool · L${layer}`,solid});
   G.nodes.filter(n=>isMoeNode(n.id)).forEach(n=>{
+    if(ATTENTION_DETAIL_NODE_IDS.has(n.id)&&!attentionDetail)return;
     const showLabel=(major||solid)&&n.id!=='w_gate';
     addNode(n,layer,{ghost:!major&&!solid,opaque:solid,showLabel});
   });
-  drawGraphEdges(layer,{moeOnly:true,opacity:solid?0.5:(major?0.22:0.018)});
+  drawGraphEdges(layer,{moeOnly:true,opacity:solid?0.5:(major?0.22:0.018),attentionDetail});
   addExpertFan(layer,solid?0.42:(major?0.18:0.012));
   addLayerMarker(layer,`L${layer} MoE`,0xa78bfa,major||solid);
 }
@@ -3318,20 +3424,21 @@ function drawStaticInputOutput(){
 }
 function drawHiddenStateChain(){
   const hiddenMainTags=['data:hidden','hidden-main'];
-  addArchLine('dense_block','dense_block',0x93c5fd,0.58,0,1,hiddenMainTags);
-  addArchLine('dense_block','dense_block',0x93c5fd,0.58,1,2,hiddenMainTags);
-  addArchLine('dense_block','attn_norm',0x93c5fd,0.62,2,FIRST_MOE_LAYER,hiddenMainTags);
+  for(let i=0;i<DENSE_LAYER_IDS.length-1;i++){
+    addArchLine('dense_block','dense_block',0x93c5fd,0.58,DENSE_LAYER_IDS[i],DENSE_LAYER_IDS[i+1],hiddenMainTags);
+  }
+  addArchLine('dense_block','attn_norm',0x93c5fd,0.62,DENSE_LAYER_END,FIRST_MOE_LAYER,hiddenMainTags);
   for(let layer=FIRST_MOE_LAYER;layer<LAST_MOE_LAYER;layer++){
     addArchLine('moe_residual','attn_norm',0x93c5fd,layer%10===0?0.34:0.15,layer,layer+1,hiddenMainTags);
   }
   addArchLine('moe_residual','final_norm',0x93c5fd,0.7,LAST_MOE_LAYER,'output',hiddenMainTags);
   addArchLabel(`hidden state flows L0 → L${LAST_MOE_LAYER} along world Y toward the back`,
-    graphPos(G.width-210,420,28),0x93c5fd,0.78,layerRenderOrder(28)+0.3,{tags:['data:hidden']});
+    graphPos(G.width-210,420,REPRESENTATIVE_MOE_LAYER),0x93c5fd,0.78,layerRenderOrder(REPRESENTATIVE_MOE_LAYER)+0.3,{tags:['data:hidden']});
 }
 function addSideViewAnnotations(){
   transferLayerAxisPoints.clear();
   transferModelYBounds=null;
-  const zDense=(archDepth(0)+archDepth(2))*0.5;
+  const zDense=(archDepth(DENSE_LAYER_START)+archDepth(DENSE_LAYER_END))*0.5;
   const denseY=graphPos(DENSE_LAYER_BOX.x+DENSE_LAYER_BOX.width/2,DENSE_LAYER_BOX.y+DENSE_LAYER_BOX.height/2,1).y;
   const zMoeStart=archDepth(FIRST_MOE_LAYER);
   const zMoeEnd=archDepth(LAST_MOE_LAYER);
@@ -3353,7 +3460,7 @@ function addSideViewAnnotations(){
   hiddenRailTip={
     points:railPts,
     title:'Hidden state main path',
-    body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L3 -> MoE L${FIRST_MOE_LAYER}-L${LAST_MOE_LAYER} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`
+    body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense ${DENSE_LAYER_RANGE_LABEL} -> MoE ${MOE_LAYER_RANGE_LABEL} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`
   };
   const railMinY=Math.min(...railPts.map(p=>p.y)), railMaxY=Math.max(...railPts.map(p=>p.y));
   addStaticFocusHitBox(
@@ -3363,7 +3470,7 @@ function addSideViewAnnotations(){
     {
       viewOnly:'right',
       title:'Hidden state main path',
-      body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense L0-L3 -> MoE L${FIRST_MOE_LAYER}-L${LAST_MOE_LAYER} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`,
+      body:`这条蓝色轨道表示 hidden state 在整网主链路中的流动：Embedding -> Dense ${DENSE_LAYER_RANGE_LABEL} -> MoE ${MOE_LAYER_RANGE_LABEL} -> Final RMSNorm / LM Head。侧视图把层深度展开，因此它是理解 layer 顺序和 PP stage range 的主参照线。`,
       pickOnlyWhenFocus:true
     }
   );
@@ -3396,11 +3503,15 @@ function addSideViewAnnotations(){
       }
     );
   };
-  const yOf=(id,layer=34,fallbackY=ARCH_HEIGHT_CENTER)=>nodePos(id,layer)?.y??fallbackY;
+  const yOf=(id,layer=REPRESENTATIVE_MOE_LAYER,fallbackY=ARCH_HEIGHT_CENTER)=>nodePos(id,layer)?.y??fallbackY;
   const moeRows=[
     {id:'attn_norm',label:'Attention RMSNorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14},
     {id:'attn_all_gather',label:'TP AllGather · Attention',tags:['comm:tp','layer:moe','data:hidden'],color:0x22c55e},
-    {id:'mla',label:'Attention(GQA)',tags:['op:mla','layer:moe','data:hidden','comm:tp'],color:0x0891b2},
+    {id:'mla',label:'Sparse MLA module',tags:['op:mla','layer:moe','data:hidden','comm:tp'],color:0x0891b2},
+    {id:'q_a_proj',label:'Q latent path',tags:['op:mla','layer:moe','data:hidden','comm:tp'],color:0x7c3aed},
+    {id:'kv_a_proj',label:'KV latent path',tags:['op:mla','layer:moe','data:hidden','comm:tp'],color:0x7c3aed},
+    {id:'attention_core',label:'Sparse FlashAttention',tags:['op:mla','layer:moe','data:attention','comm:tp'],color:0x2563eb},
+    {id:'o_proj',label:'Output projection',tags:['op:mla','layer:moe','data:hidden','comm:tp'],color:0x7c3aed},
     {id:'attn_reduce_scatter',label:'TP Reduce-Scatter · Attention',tags:['comm:tp','layer:moe','data:hidden'],color:0x22c55e},
     {id:'moe_prenorm',label:'Pre-RMSNorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14},
     {id:'moe_all_gather',label:'TP AllGather · MoE FFN',tags:['comm:tp','layer:moe','data:hidden'],color:0x22c55e},
@@ -3411,13 +3522,13 @@ function addSideViewAnnotations(){
     {id:'moe_reduce_scatter',label:'TP Reduce-Scatter · MoE FFN',tags:['comm:tp','layer:moe','data:hidden'],color:0x22c55e},
     {id:'moe_residual',label:'Post-MLP RMSNorm',tags:['op:norm','layer:moe','data:hidden'],color:0x9a8a14}
   ];
-  rowGuide(denseY,archDepth(0),archDepth(2),['layer:dense','data:hidden'],0x60a5fa);
-  sideRowLabel('Dense MLP · L0-L3',denseY,(archDepth(0)+archDepth(2))*0.5,['layer:dense','data:hidden'],0x60a5fa);
+  rowGuide(denseY,archDepth(DENSE_LAYER_START),archDepth(DENSE_LAYER_END),['layer:dense','data:hidden'],0x60a5fa);
+  sideRowLabel(`Dense MLP · ${DENSE_LAYER_RANGE_LABEL}`,denseY,(archDepth(DENSE_LAYER_START)+archDepth(DENSE_LAYER_END))*0.5,['layer:dense','data:hidden'],0x60a5fa);
   const moeRowYById=new Map();
   moeRows.forEach(row=>{
     const y=row.id==='expert_pool'
-      ? (clusterCenterPos('expert_pool',34)?.y??yOf('shared_expert',34,moeY))
-      : yOf(row.id,34,moeY);
+      ? (clusterCenterPos('expert_pool',REPRESENTATIVE_MOE_LAYER)?.y??yOf('shared_expert',REPRESENTATIVE_MOE_LAYER,moeY))
+      : yOf(row.id,REPRESENTATIVE_MOE_LAYER,moeY);
     moeRowYById.set(row.id,y);
     rowGuide(y,zMoeStart,zMoeEnd,row.tags,row.color);
     sideRowLabel(row.label,y,(zMoeStart+zMoeEnd)*0.5,row.tags,row.color);
@@ -3722,9 +3833,9 @@ function buildArchitecturePreview(){
   drawHiddenStateChain();
   addSideViewAnnotations();
   addFrontViewAnnotations();
-  addArchLabel('L0-L3: Dense decode layers, no experts',graphPos(1040,308,1),0x38bdf8,0.62,layerRenderOrder(1)+0.3);
-  addArchLabel(`L4-L49: Attention(GQA) + TP AG/RS + Router + EP A2A + ${MODEL_CONFIG.routedExperts} experts + Shared Expert + TP RS`,
-    graphPos(1050,470,28),0xa78bfa,0.72,layerRenderOrder(28)+0.3);
+  addArchLabel(`${DENSE_LAYER_RANGE_LABEL}: Dense decode layers, no experts`,graphPos(1040,308,DENSE_LAYER_END),0x38bdf8,0.62,layerRenderOrder(DENSE_LAYER_END)+0.3);
+  addArchLabel(`${MOE_LAYER_RANGE_LABEL}: Sparse MLA + TP AG/RS + Router + EP A2A + ${MODEL_CONFIG.routedExperts} experts + Shared Expert + TP RS`,
+    graphPos(1050,470,REPRESENTATIVE_MOE_LAYER),0xa78bfa,0.72,layerRenderOrder(REPRESENTATIVE_MOE_LAYER)+0.3);
   applyViewPresentation();
 }
 function resetArchitecture(){
@@ -4820,7 +4931,7 @@ function redraw(){
     }
   }
 
-  // 活跃架构层:按当前真实 layer 高亮 L0-L49 中对应切片
+  // 活跃架构层:按当前真实 layer 高亮 L0-L45 中对应切片
   for(let stage=0;stage<DEMO.pp;stage++)activePrim[stage]=null;
   for(let stage=0;stage<DEMO.pp;stage++){
     const evt={...stageCell(stage),stage};
@@ -6042,7 +6153,7 @@ function neighborMeshesOf(id,layer){
   if(id==='a2a_dispatch'||id==='a2a_combine')addLocal('expert_pool');
   return [...out];
 }
-// 架构层 → 负责计算它的 PP stage（stageRanges：L0-12 / L13-25 / L26-37 / L38-49；input 在头 stage、output 在尾 stage）
+// 架构层 → 负责计算它的 PP stage（Flash: L0-11 / L12-22 / L23-34 / L35-45；input 在头 stage、output 在尾 stage）
 function stageForArchLayer(layer){
   if(layer==='input')return 0;
   if(layer==='output')return DEMO.pp-1;
@@ -7074,7 +7185,7 @@ function buildInspectorFindings(){
     title:'PP=4 · 按层切分 / stage 空泡',
     label:'PP stage 空闲与切分',
     summary:`PP 是按层纵切；${ppLabel(ppWorst?.stage??0)} ${stageRangeLabel(ppWorst?.stage??0)} 平均空泡 ${pct(ppWorst?.avgBubble??0)}%。`,
-    diagnosis:`PP=${RT.config.pp} 把 50 层切成 ${DEMO_STAGE_RANGES.map(([lo,hi],i)=>`PP${i}:L${lo}-${hi}`).join(' / ')}。${ppLabel(ppWorst?.stage??0)} 平均空泡 <b>${pct(ppWorst?.avgBubble??0)}%</b>，stage 间差 <b>${pct(ppSkew)}%</b>；PP 的主要通信对象是相邻 stage 的 hidden state / gradient send-recv。`,
+    diagnosis:`PP=${RT.config.pp} 把 ${MODEL_CONFIG.hiddenLayers} 个 main decoder layers 切成 ${DEMO_STAGE_RANGES.map(([lo,hi],i)=>`PP${i}:L${lo}-${hi}`).join(' / ')}。${ppLabel(ppWorst?.stage??0)} 平均空泡 <b>${pct(ppWorst?.avgBubble??0)}%</b>，stage 间差 <b>${pct(ppSkew)}%</b>；PP 的主要通信对象是相邻 stage 的 hidden state / gradient send-recv。`,
     evidence:[['切法',`按层切模型 · ${RT.config.pp} stages`],['micro-batch',`${RT.config.microbatches}`],['最高空泡 stage',`${ppLabel(ppWorst?.stage??0)} ${stageRangeLabel(ppWorst?.stage??0)}`],['stage 差异',`${pct(ppSkew)}%`]],
     cause:'文章里的 PP 解决“整模型太长、装不下”，代价是 stage 间串行依赖、激活传输和 pipeline bubble；所以这里优先检查 stage range 与 micro-batch 是否让流水线饱满。',
     confidence:'推断',
@@ -7121,7 +7232,7 @@ function buildInspectorFindings(){
       severity:sevForRatio(Math.max(peakLayer.allToAllSkew,peakLayer.maxLoadRatio),1.25,1.65),
       title:'EP=2 · MoE expert 切分 / A2A',
       label:'EP token dispatch/combine',
-      summary:`EP=2 在每个 TP column 内把 80 个 routed experts 切成两份；当前峰值 A2A skew ${peakLayer.allToAllSkew.toFixed(2)}×。`,
+      summary:`EP=2 在每个 TP column 内把 ${MODEL_CONFIG.routedExperts} 个 routed experts 切成两份；当前峰值 A2A skew ${peakLayer.allToAllSkew.toFixed(2)}×。`,
       diagnosis:`EP=${RT.config.ep} 是 MoE 内部的 expert/token 切法：Router Top-${MODEL_CONFIG.expertsPerTok} 选中专家后，token 先 dispatch 到 EP0/EP1 的 expert shard，再 combine 回主链路。当前 L${peakLayer.layer} 峰值负载 <b>${peakLayer.maxLoadRatio.toFixed(2)}×</b> capacity，A2A skew <b>${peakLayer.allToAllSkew.toFixed(2)}×</b>；这里要看 EP All-to-All，不要把它理解成 PP stage 或 DP 副本。`,
       evidence:[['切法',`${MODEL_CONFIG.routedExperts} routed experts / EP${RT.config.ep} ≈ ${expertsPerEp} per EP`],['Top-K',`${MODEL_CONFIG.expertsPerTok}`],['峰值层',`L${peakLayer.layer} · ${stageRangeLabel(epStage)}`],['A2A skew',`${peakLayer.allToAllSkew.toFixed(2)}×`]],
       cause:'EP 的代价是 MoE layer 内 token dispatch/combine 的 All-to-All；当路由负载集中到少数 experts，A2A skew 会把等待扩散到同组 rank。',
