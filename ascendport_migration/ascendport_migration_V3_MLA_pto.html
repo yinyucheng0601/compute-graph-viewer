@@ -1489,8 +1489,9 @@
     .pstep.done { background: var(--success); }
     .pstep.cur { background: var(--primary); }
     .pstep.view { box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 38%, transparent); }
-    .pstep[disabled], .plabel[disabled] { cursor: default !important; opacity: .45; }
+    .pstep[disabled], .plabel[disabled] { cursor: default !important; }
     .pstep[disabled]:hover { background: var(--surface-disabled); }
+    .pstep.cur[disabled] { background: var(--primary); }
     .plabel[disabled]:hover { color: var(--foreground-muted); }
     .plabels { display: flex; justify-content: space-between; padding: 0 16px 8px; color: var(--foreground-muted); font-size: 12px; }
     .plabel {
@@ -2338,37 +2339,67 @@
       window.setProblems?.(2);
       if (document.getElementById('split')?.classList.contains('graph-open')) renderGraph(false);
 
-      // PTO split 的 ResizeObserver 会不断重设内联 flex,只能用 inline !important 强行隐藏
+      // Keep the analysis close affordances in sync with the split helper.
       (() => {
         const HIDE_STYLE = 'display: none !important; flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; max-width: 0 !important; overflow: hidden !important; padding: 0 !important; margin: 0 !important; border: 0 !important;';
         const GUTTER_HIDE = 'display: none !important;';
+        let paneStyleBeforeHide = null;
+        let gutterStyleBeforeHide = null;
+        function analysisGutterEl() {
+          const pane = document.getElementById('analysisPane');
+          if (!pane) return null;
+          const prev = pane.previousElementSibling;
+          const next = pane.nextElementSibling;
+          if (prev?.matches?.('.pto-workbench-shell__split-gutter')) return prev;
+          if (next?.matches?.('.pto-workbench-shell__split-gutter')) return next;
+          return null;
+        }
         function forceHidePane() {
           const pane = document.getElementById('analysisPane');
           if (!pane) return;
+          paneStyleBeforeHide = pane.getAttribute('style');
+          const gutter = analysisGutterEl();
+          gutterStyleBeforeHide = gutter?.getAttribute('style') ?? null;
+          pane.hidden = true;
           pane.setAttribute('style', HIDE_STYLE);
           const split = document.getElementById('split');
           if (split) split.classList.remove('analysis-open','graph-open','compare-open','tiling-open','pipe-open','link-active');
-          const gutter = document.querySelector('.analysispane + .pto-workbench-shell__split-gutter');
           if (gutter) gutter.setAttribute('style', GUTTER_HIDE);
           clearLinkHot?.();
           syncParseBtn?.();
         }
-        // 1) gclose 按钮
+        function restoreAnalysisSplitStyles() {
+          const pane = document.getElementById('analysisPane');
+          const gutter = analysisGutterEl();
+          if (paneStyleBeforeHide === null) pane?.removeAttribute('style');
+          else pane?.setAttribute('style', paneStyleBeforeHide);
+          if (gutterStyleBeforeHide === null) gutter?.removeAttribute('style');
+          else gutter?.setAttribute('style', gutterStyleBeforeHide);
+        }
+        function closeAnalysisPane() {
+          _closeAV?.();
+          forceHidePane();
+        }
+        // 1) graph header close button
         const _gclose = document.getElementById('gclose');
-        if (_gclose) { _gclose.onclick = null; _gclose.addEventListener('click', (e) => { e.stopPropagation(); forceHidePane(); }); }
-        // 2) closeAnalysisView — parseBtn 等走 legacy closeGraph → closeAnalysisView 路径
+        if (_gclose) { _gclose.onclick = null; _gclose.addEventListener('click', (e) => { e.stopPropagation(); closeAnalysisPane(); }); }
+        // 2) tab-strip close icons
+        document.querySelectorAll('.analysis-tab .x').forEach((closeIcon) => {
+          closeIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAnalysisPane();
+          });
+        });
+        // 3) closeAnalysisView: parseBtn and legacy closeGraph route through this path.
         const _closeAV = window.closeAnalysisView;
-        if (_closeAV) { window.closeAnalysisView = function() { _closeAV(); forceHidePane(); }; }
-        // 3) setAnalysisView 打开时清除 inline !important
+        if (_closeAV) { window.closeAnalysisView = closeAnalysisPane; }
+        // 4) setAnalysisView clears the forced inline hiding when reopening.
         const _setAV = window.setAnalysisView;
         if (_setAV) {
           window.setAnalysisView = function(view) {
-            const r = _setAV(view);
-            const pane = document.getElementById('analysisPane');
-            if (pane) pane.removeAttribute('style');
-            const gutter = document.querySelector('.analysispane + .pto-workbench-shell__split-gutter');
-            if (gutter) gutter.removeAttribute('style');
-            return r;
+            restoreAnalysisSplitStyles();
+            return _setAV(view);
           };
         }
       })();

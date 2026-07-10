@@ -620,7 +620,7 @@ static ge::graphStatus TilingFunc(gert::TilingContext* ctx) {
 }
 
 const VIEWS = {
-  cuda:{file:'example_mla_decode.py', lang:'py', text:CUDA, hl:riskHL},
+  cuda:{file:'example_mla_decode.py', lang:'py', text:CUDA, hl:()=>''},
   s3:{file:'flash_mla_decode.cpp', lang:'cpp', text:S3, hl:todoHL},
   s4:{file:'flash_mla_decode.cpp', lang:'cpp', text:S4, hl:s4HL},
   s6:{file:'flash_mla_decode.cpp', lang:'cpp', text:S6, hl:s6HL},
@@ -741,7 +741,7 @@ function closeAnalysisView(){
   if(!sp) return;
   sp.classList.remove('analysis-open','graph-open','compare-open','tiling-open','pipe-open','link-active');
   const pane=document.getElementById('analysisPane');
-  if(pane) pane.hidden=true;
+  if(pane){ pane.hidden=true; delete pane.dataset.analysisView; }
   const gutter=analysisGutter();
   if(gutter) gutter.hidden=true;
   clearLinkHot();
@@ -756,6 +756,8 @@ function openCompare(diffKey){
   renderCode('cuda');                             // 左侧固定为 CUDA
   document.getElementById('leftPaneH').style.display='flex';
   renderDiff(diffKey);                            // 右侧为生成的 AscendC
+  const genTab=document.querySelector('.analysis-tab[data-analysis="generated"]');
+  if(genTab) genTab.childNodes[0].textContent = (VIEWS[diffKey]?.file) || '生成代码';
   unlockAnalysisView('generated');
   setAnalysisView('generated');
   renderTabs(); renderTree();
@@ -2130,6 +2132,7 @@ function runStep(){
   const btn=document.getElementById('runBtn');
   const allBtn=document.getElementById('runAllBtn');
   btn.disabled=true; btn.textContent=`运行中 ${s.n}`;
+  document.querySelector(`.pstep[data-step-index="${state.step}"]`)?.classList.add('cur');
   if(allBtn){allBtn.disabled=true; allBtn.textContent=runAllMode?'连续执行中':'全部执行';}
   document.getElementById('sbStep').textContent=`${s.n} · 运行中…`;
   stopFlow();
@@ -2152,8 +2155,27 @@ function runStep(){
     state.step++; // 完成后步骤+1
     state.viewStep=Math.min(state.step-1, STEPS.length-1);
     renderProg(); renderWizard();
-    // S4：完成后打开硬件数据流动画并自动播放
-    if(s.n==='S4'){ openFlowPanel(true); }
+    // S3：完成后关闭计算图，展示源端↔昇腾同屏对比
+    if(s.n==='S3'){ closeGraph(); openCompare('s3'); }
+    // S4：左面板切换到 flash_mla_decode.cpp（绿色高亮新增内存行），右侧只显示数据流
+    if(s.n==='S4'){
+      activeTab='cpp'; renderCode('s4'); renderTabs(); renderTree();
+      document.getElementById('leftPaneH').style.display='none';
+      const f=document.getElementById('etbFile'); if(f) f.textContent='flash_mla_decode.cpp';
+      unlockedAnalysisViews.delete('graph'); unlockedAnalysisViews.delete('generated');
+      openFlowPanel(false); // 不自动播放动画
+      // 点击绿色高亮代码行 → 跳转到对应含义的数据流步骤（不循环播放）
+      document.querySelectorAll('#codelines .ln.hl-new').forEach(el=>{
+        el.style.cursor='pointer';
+        el.addEventListener('click',()=>{
+          const line=parseInt(el.dataset.line); if(isNaN(line)) return;
+          stopFlow();
+          let found=-1;
+          for(let i=0;i<FLOW_STEPS.length;i++){ const c=FLOW_STEPS[i].code; if(line>=c[0]&&line<=c[1]){found=i;break;} }
+          if(found>=0){ flowIdx=found; showFlowStep(found); }
+        });
+      });
+    }
     // S5：完成后默认打开 tiling.h 并展示 Tiling 可视化
     if(s.n==='S5'){ openTilingFile(); }
     // S6：完成后定位回 AscendC 源码,高亮新增流水代码并展示前后对比
