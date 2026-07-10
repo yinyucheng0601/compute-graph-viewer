@@ -9,17 +9,17 @@
       document.documentElement.dataset.preview = 'card';
     }
   </script>
-  <link rel="stylesheet" href="../../pto-design-system/tokens/foundation.css">
-  <link rel="stylesheet" href="../../pto-design-system/tokens/semantic.css">
-  <link rel="stylesheet" href="../../pto-design-system/tokens/components.css">
-  <link rel="stylesheet" href="../../pto-design-system/css/style.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/workbench-shell/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/ide-frame/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/model-graphviz/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/swimlane-task/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/aic-core-object/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/aiv-core-object/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/memory-architecture/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/model-graphviz/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/swimlane-task/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css">
   <style>
     :root {
       --mem: #6c8cff;
@@ -339,6 +339,10 @@
       opacity: 1;
       pointer-events: auto;
     }
+    .analysispane.gp-closed {
+      display: none !important;
+      flex: 0 0 0 !important;
+    }
     .edit-split.analysis-open .analysispane {
       display: grid;
       opacity: 1;
@@ -527,6 +531,7 @@
       flex-direction: column;
       border-radius: var(--radius-md) 0 0 var(--radius-md);
     }
+    .graphpane > .legend { display: none; }
     .gp-close, .tp-close {
       margin-left: auto;
       width: 24px;
@@ -549,7 +554,25 @@
     }
     .legend span { display: inline-flex; align-items: center; gap: 5px; }
     .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
-    .gcanvas { flex: 1; min-height: 0; overflow: auto; }
+    .gcanvas { flex: 1; min-height: 0; overflow: auto; position: relative; }
+    .graph-legend-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .graph-legend-overlay i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
     .gcanvas svg { display: block; width: 100%; min-height: 100%; }
     .gcanvas {
       --model-graphviz-stage-bg: transparent;
@@ -574,14 +597,45 @@
       --model-graphviz-report-priority-on-light: var(--background);
     }
     .gcanvas .pto-model-graphviz-node.is-gpu-only rect {
-      fill: color-mix(in srgb, var(--surface-3) 86%, var(--danger) 8%);
-      stroke: color-mix(in srgb, var(--danger) 64%, transparent);
-      stroke-width: 2.2px;
+      fill: color-mix(in srgb, var(--surface-3) 86%, var(--danger) 8%) !important;
+      stroke: color-mix(in srgb, var(--danger) 64%, transparent) !important;
+      stroke-width: 2.2px !important;
       filter: none;
     }
     .gcanvas .pto-model-graphviz-node.is-gpu-only.is-rewritten rect {
-      fill: color-mix(in srgb, var(--surface-3) 82%, var(--vec) 12%);
-      stroke: color-mix(in srgb, var(--vec) 66%, transparent);
+      fill: color-mix(in srgb, var(--surface-3) 82%, var(--vec) 12%) !important;
+      stroke: color-mix(in srgb, var(--vec) 66%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:comm"] rect {
+      fill: color-mix(in srgb, var(--mem) 22%, transparent) !important;
+      stroke: var(--mem) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:linear"] rect {
+      fill: color-mix(in srgb, var(--cube) 22%, transparent) !important;
+      stroke: var(--cube) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:act"] rect {
+      fill: color-mix(in srgb, var(--vec) 22%, transparent) !important;
+      stroke: var(--vec) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:norm"] rect {
+      fill: color-mix(in srgb, var(--scalar) 22%, transparent) !important;
+      stroke: var(--scalar) !important;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only[data-color-key="io:constant"] rect {
+      fill: color-mix(in srgb, var(--surface-3) 86%, var(--risk) 8%) !important;
+      stroke: color-mix(in srgb, var(--risk) 64%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only.is-rewritten[data-color-key="io:constant"] rect {
+      fill: color-mix(in srgb, var(--surface-3) 82%, var(--vec) 12%) !important;
+      stroke: color-mix(in srgb, var(--vec) 66%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node[data-color-key^="io:"] rect {
+      stroke-width: 2.2px !important;
+    }
+    .gcanvas {
+      --model-graphviz-tensor-fill: color-mix(in srgb, var(--mem) 18%, transparent);
+      --model-graphviz-tensor-stroke: var(--mem);
     }
     .gcanvas .pto-model-graphviz-node.is-gpu-only .pto-model-graphviz-node-label {
       fill: var(--foreground);
@@ -608,6 +662,11 @@
     .gedge.hot { stroke: var(--risk); stroke-width: 2; }
     .risk-pulse { animation: pulse 1.8s ease-in-out infinite; }
     .gnode.enter { animation: pop .38s cubic-bezier(.2,1.4,.4,1) both; }
+    .pto-model-graphviz-node.is-code-hover rect,
+    .gnode.is-code-hover rect {
+      filter: brightness(1.25) drop-shadow(0 0 8px rgba(255,255,255,.3));
+      stroke-width: 2.5px !important;
+    }
     .gp-detail {
       min-height: 74px;
       padding: 10px 12px;
@@ -1430,6 +1489,10 @@
     .pstep.done { background: var(--success); }
     .pstep.cur { background: var(--primary); }
     .pstep.view { box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 38%, transparent); }
+    .pstep[disabled], .plabel[disabled] { cursor: default !important; }
+    .pstep[disabled]:hover { background: var(--surface-disabled); }
+    .pstep.cur[disabled] { background: var(--primary); }
+    .plabel[disabled]:hover { color: var(--foreground-muted); }
     .plabels { display: flex; justify-content: space-between; padding: 0 16px 8px; color: var(--foreground-muted); font-size: 12px; }
     .plabel {
       border: 0;
@@ -1626,9 +1689,9 @@
             <path d="m7 9 3 3-3 3"></path>
             <path d="M12 15h5"></path>
           </svg>
-          <span class="mla-host-chip-text"><span class="mla-status-dot"></span>AscendPort 已连接 · Atlas 800T A2</span>
+          <span class="mla-host-chip-text"><span class="mla-status-dot"></span>AscendPort 已连接 · Atlas A3 (Ascend 910C)</span>
         </div>
-        <div class="pto-ide-frame__workspace">稀疏解码算子 · 源码迁移</div>
+        <div class="pto-ide-frame__workspace">MLA Decode 算子 · Ascend C &amp; PTO</div>
       </div>
       <div class="pto-ide-frame__topbar-center">
         <div class="pto-ide-frame__search" aria-label="工作台上下文">
@@ -1636,7 +1699,7 @@
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.3-4.3"></path>
           </svg>
-          <span class="mla-search-copy">源端到昇腾迁移 · CANN 8.0 · FP8 e4m3</span>
+          <span class="mla-search-copy">源端到昇腾迁移 · CANN 8.3.RC1 · torch-npu 2.6.0.RC1 · FP16</span>
         </div>
       </div>
       <div class="pto-ide-frame__topbar-right">
@@ -1701,7 +1764,7 @@
                       </div>
                       <header class="pto-ide-frame__pane-header">
                         <div class="edtoolbar">
-                          <span class="etb-path"><b>ops</b> / <span id="etbFile">flash_mla_decode.cu</span></span>
+                          <span class="etb-path"><b>ops</b> / <span id="etbFile">example_mla_decode.py</span></span>
                           <span class="etb-spacer"></span>
                           <button class="etb-btn" id="parseBtn" type="button" title="解析算子并打开计算图">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7.5 7.5 11 15m6-8.5L13 15"></path></svg>
@@ -1711,7 +1774,7 @@
                       </header>
                       <div class="codewrap" id="codewrap" data-ide-pane="source-code">
                         <div class="pane-h" id="leftPaneH" style="display:none">
-                          <span class="dot-c" style="background:var(--cube)"></span><b>flash_mla_decode.cu</b><span class="pane-tag cuda">源端代码</span>
+                          <span class="dot-c" style="background:var(--cube)"></span><b>example_mla_decode.py</b><span class="pane-tag cuda">源端代码</span>
                           <span class="link-hint">悬停/点击代码 ↔ 联动对侧</span>
                         </div>
                         <div class="code"><div class="gutter" id="gutter"></div><div class="codelines" id="codelines"></div></div>
@@ -1734,7 +1797,7 @@
                         <div class="graphpane" id="graphpane">
                           <div class="gp-head">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7.5 7.5 11 15m6-8.5L13 15"></path></svg>
-                            <div><b>算子计算图</b> <span class="sub">解析结果 · 稀疏解码</span></div>
+                            <div><b>算子计算图</b> <span class="sub">解析结果 · MLA Decode</span></div>
                             <div class="gp-close" id="gclose" title="收起">×</div>
                           </div>
                           <div class="legend">
@@ -1823,7 +1886,7 @@
             <div class="pto-ide-frame__bottom-view" data-ide-bottom-panel="terminal" id="terminal-view">
               <div class="panel-body">
                 <div class="panel-tabs">
-                  <div class="ptab" data-p="probs" aria-controls="probs">问题<span class="cnt err" id="probCnt">2</span></div>
+                  <div class="ptab" data-p="probs" aria-controls="probs">问题<span class="cnt err" id="probCnt">3</span></div>
                   <div class="ptab on" data-p="term">终端</div>
                   <div class="ptab" data-p="term2">输出</div>
                   <div style="margin-left:auto;color:var(--foreground-muted);font-size:12px;align-self:center">迁移日志</div>
@@ -1845,10 +1908,10 @@
         <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome">
           <span class="s">迁移任务</span>
           <span class="s" id="sbStep">S1 · 已完成</span>
-          <span class="s">昇腾代码 · CANN 8.0</span>
+          <span class="s">昇腾代码 · CANN 8.3.RC1</span>
           <span class="mla-status-right">
             <span class="s" id="sbAicore">算力核 —</span>
-            <span class="s">FP8 · e4m3</span>
+            <span class="s">FP16 · FP32累加</span>
             <span class="s">UTF-8</span>
           </span>
         </footer>
@@ -1867,13 +1930,13 @@
       }
     })();
   </script>
-  <script src="../../pto-design-system/patterns/workbench-shell/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/ide-frame/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/model-graphviz/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/swimlane-task/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/aiv-core-object/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/aic-core-object/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/memory-architecture/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/model-graphviz/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/swimlane-task/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aiv-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-architecture/pattern.js"></script>
   <script src="./ascendport_migration_V3_MLA_pto_legacy.js"></script>
   <script>
     (function wirePtoRefresh() {
@@ -1902,7 +1965,9 @@
         scalar: 'sem:norm',
         risk: 'io:constant'
       };
-      const gpuOnlyGraphNodeIds = new Set(['shf', 'sync']);
+      const gpuOnlyGraphNodeIds = new Set(
+        (typeof GNODES !== 'undefined' ? GNODES : []).filter(n => n.gpuOnly).map(n => n.id)
+      );
 
       function pct(value, total) {
         return total > 0 ? value / total * 100 : 0;
@@ -1914,14 +1979,14 @@
       }
 
       function buildPatternGraph() {
-        const sx = 1.58;
-        const sy = 1.52;
-        const ox = 56;
-        const oy = 48;
+        const sx = 1.0;
+        const sy = 1.0;
+        const ox = 40;
+        const oy = 32;
         const nodes = GNODES.map((node) => {
           const unit = effectiveGraphUnit(node);
           const rewritten = graphMapped && node.unit === 'risk';
-          const isTensor = node.unit === 'mem';
+          const isTensor = ['q', 'qpe', 'kv', 'kpe', 'out'].includes(node.id);
           const isGpuOnly = node.gpuOnly || gpuOnlyGraphNodeIds.has(node.id);
           return {
             id: node.id,
@@ -1941,11 +2006,11 @@
         const edges = GEDGES.map(([source, target]) => ({
           source,
           target,
-          edgeType: ['q', 'kv', 'idx', 'out'].includes(source) ? 'communication' : 'activation',
+          edgeType: ['q', 'qpe', 'kv', 'kpe', 'cfg', 'copyq', 'copykv', 'out'].includes(source) ? 'communication' : 'activation',
         }));
         return {
-          width: 660,
-          height: 650,
+          width: 800,
+          height: 980,
           nodes,
           edges,
         };
@@ -1970,7 +2035,7 @@
         const col = unitColor(unit);
         let note = node.d;
         if (graphMapped && node.unit === 'risk') {
-          note = '【已在 S2 改写】' + node.d.replace(/S2 决策.*$/, '现映射为向量单元片上归约，见 S6 的 SelectTopK / TopK 原语。');
+          note = '【已在 S2 改写】' + node.d.replace(/S2 决策.*$/, '现映射为分核 + 向量单元片上归约，见 S6 的在线 Softmax 规约实现。');
         }
         detail.innerHTML =
           `<span class="badge" style="background:${col}22;color:${col}">${graphUnitLabel[unit]}</span>` +
@@ -1996,7 +2061,7 @@
         if (!canvas || !modelGraph?.renderController) return;
         graphController?.destroy?.();
         graphController = modelGraph.renderController(canvas, buildPatternGraph(), {
-          ariaLabel: 'AscendPort 稀疏解码算子计算图',
+          ariaLabel: 'AscendPort TileLang MLA Decode 计算图',
           interaction: { selectableClusters: false },
           overlays: { edgeTags: false, evidence: false },
           fitMode: 'full',
@@ -2005,6 +2070,31 @@
           onSelect: ({ nodeId }) => applyGraphSelection(nodeId, 'pattern'),
         });
         decorateGpuOnlyGraphNodes();
+        // data-color-key 由 GNODES 的 unit 映射,覆盖库默认色
+        (() => {
+          const svg = canvas.querySelector('svg');
+          if (!svg) return;
+          GNODES.forEach((n) => {
+            const g = svg.querySelector(`.pto-model-graphviz-node[data-node-id="${n.id}"]`);
+            if (g) {
+              const k = graphColorKey[effectiveGraphUnit(n)] || 'io:constant';
+              g.setAttribute('data-color-key', k);
+            }
+          });
+        })();
+        // 图例浮层:嵌入 gcanvas 内部,跟随画布缩放
+        let legend = canvas.querySelector('.graph-legend-overlay');
+        if (!legend) {
+          legend = document.createElement('div');
+          legend.className = 'graph-legend-overlay';
+          canvas.appendChild(legend);
+        }
+        legend.innerHTML =
+          '<span><i style="background:var(--mem)"></i>片上搬运</span>' +
+          '<span><i style="background:var(--cube)"></i>矩阵单元</span>' +
+          '<span><i style="background:var(--vec)"></i>向量单元</span>' +
+          '<span><i style="background:var(--scalar)"></i>标量单元</span>' +
+          '<span><i style="background:var(--risk)"></i>仅源端支持</span>';
         const detail = document.getElementById('gdetail');
         if (detail) {
           detail.innerHTML = '<b>点击任意节点查看解析详情</b><br><span>计算图由共享图谱组件渲染，节点语义映射到昇腾执行单元。</span>';
@@ -2159,7 +2249,7 @@
             </span>
           </div>
           <div class="flow-arch" id="flowMemoryArch">
-            <div class="flow-arch__head"><span>内存架构 · 昇腾 910B</span><span>路径焦点随步骤同步</span></div>
+            <div class="flow-arch__head"><span>内存架构 · 昇腾 A3 (910C)</span><span>路径焦点随步骤同步</span></div>
             <div class="pto-memory-architecture-viewport" data-pto-mem-arch-viewport>
               <div class="pto-memory-architecture-sizer" data-pto-mem-arch-sizer>
                 <div class="pto-memory-architecture-canvas" data-pto-mem-arch-canvas>
@@ -2248,6 +2338,110 @@
       document.getElementById('topResetBtn')?.addEventListener('click', () => window.reset?.());
       window.setProblems?.(2);
       if (document.getElementById('split')?.classList.contains('graph-open')) renderGraph(false);
+
+      // Keep the analysis close affordances in sync with the split helper.
+      (() => {
+        const HIDE_STYLE = 'display: none !important; flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; max-width: 0 !important; overflow: hidden !important; padding: 0 !important; margin: 0 !important; border: 0 !important;';
+        const GUTTER_HIDE = 'display: none !important;';
+        let paneStyleBeforeHide = null;
+        let gutterStyleBeforeHide = null;
+        function analysisGutterEl() {
+          const pane = document.getElementById('analysisPane');
+          if (!pane) return null;
+          const prev = pane.previousElementSibling;
+          const next = pane.nextElementSibling;
+          if (prev?.matches?.('.pto-workbench-shell__split-gutter')) return prev;
+          if (next?.matches?.('.pto-workbench-shell__split-gutter')) return next;
+          return null;
+        }
+        function forceHidePane() {
+          const pane = document.getElementById('analysisPane');
+          if (!pane) return;
+          paneStyleBeforeHide = pane.getAttribute('style');
+          const gutter = analysisGutterEl();
+          gutterStyleBeforeHide = gutter?.getAttribute('style') ?? null;
+          pane.hidden = true;
+          pane.setAttribute('style', HIDE_STYLE);
+          const split = document.getElementById('split');
+          if (split) split.classList.remove('analysis-open','graph-open','compare-open','tiling-open','pipe-open','link-active');
+          if (gutter) gutter.setAttribute('style', GUTTER_HIDE);
+          clearLinkHot?.();
+          syncParseBtn?.();
+        }
+        function restoreAnalysisSplitStyles() {
+          const pane = document.getElementById('analysisPane');
+          const gutter = analysisGutterEl();
+          if (paneStyleBeforeHide === null) pane?.removeAttribute('style');
+          else pane?.setAttribute('style', paneStyleBeforeHide);
+          if (gutterStyleBeforeHide === null) gutter?.removeAttribute('style');
+          else gutter?.setAttribute('style', gutterStyleBeforeHide);
+        }
+        function closeAnalysisPane() {
+          _closeAV?.();
+          forceHidePane();
+        }
+        // 1) graph header close button
+        const _gclose = document.getElementById('gclose');
+        if (_gclose) { _gclose.onclick = null; _gclose.addEventListener('click', (e) => { e.stopPropagation(); closeAnalysisPane(); }); }
+        // 2) tab-strip close icons
+        document.querySelectorAll('.analysis-tab .x').forEach((closeIcon) => {
+          closeIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAnalysisPane();
+          });
+        });
+        // 3) closeAnalysisView: parseBtn and legacy closeGraph route through this path.
+        const _closeAV = window.closeAnalysisView;
+        if (_closeAV) { window.closeAnalysisView = closeAnalysisPane; }
+        // 4) setAnalysisView clears the forced inline hiding when reopening.
+        const _setAV = window.setAnalysisView;
+        if (_setAV) {
+          window.setAnalysisView = function(view) {
+            restoreAnalysisSplitStyles();
+            return _setAV(view);
+          };
+        }
+      })();
+
+      // 源码行 hover → 高亮对应计算图节点
+      function toggleGraphNodeHover(id, on) {
+        const svg = document.querySelector('#gcanvas svg');
+        if (svg) {
+          const g = svg.querySelector(`.pto-model-graphviz-node[data-node-id="${id}"]`);
+          if (g) g.classList.toggle('is-code-hover', on);
+        }
+        const lg = document.querySelector(`.gnode[data-id="${id}"]`);
+        if (lg) lg.classList.toggle('is-code-hover', on);
+      }
+      const LINE_NODE_MAP = {};
+      if (typeof GNODES !== 'undefined') {
+        GNODES.forEach(n => {
+          if (!n.lines) return;
+          for (let i = n.lines[0]; i <= n.lines[1]; i++) {
+            if (!LINE_NODE_MAP[i]) LINE_NODE_MAP[i] = [];
+            LINE_NODE_MAP[i].push(n.id);
+          }
+        });
+      }
+      let _hoverNodeIds = [];
+      const codewrap = document.getElementById('codewrap');
+      if (codewrap) {
+        codewrap.addEventListener('mouseover', (e) => {
+          const ln = e.target.closest('.ln');
+          if (!ln) return;
+          const lineNum = parseInt(ln.dataset.line);
+          if (!lineNum) return;
+          const ids = LINE_NODE_MAP[lineNum] || [];
+          _hoverNodeIds.forEach(id => toggleGraphNodeHover(id, false));
+          ids.forEach(id => toggleGraphNodeHover(id, true));
+          _hoverNodeIds = ids;
+        });
+        codewrap.addEventListener('mouseleave', () => {
+          _hoverNodeIds.forEach(id => toggleGraphNodeHover(id, false));
+          _hoverNodeIds = [];
+        });
+      }
     })();
   </script>
 </body>
