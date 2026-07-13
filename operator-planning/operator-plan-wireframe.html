@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operator Plan Workbench</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+
+    .plan-page {
+      min-height: 100vh;
+    }
+
+    .plan-shell {
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr) minmax(220px, 0.35fr);
+      gap: var(--space-3);
+      height: calc(100vh - 44px);
+      padding: var(--space-3);
+      overflow: hidden;
+    }
+
+    .plan-tabs {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      min-height: 38px;
+      padding: var(--space-2);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--surface-2) 62%, transparent);
+    }
+
+    .tab-row,
+    .seg-row,
+    .template-row,
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .tab-chip,
+    .seg-chip,
+    .template-chip,
+    .status-chip {
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .tab-chip {
+      padding: 8px 12px;
+    }
+
+    .tab-chip.is-active,
+    .seg-chip.is-active,
+    .template-chip.is-active {
+      background: var(--foreground);
+      color: var(--background);
+      font-weight: 700;
+    }
+
+    .plan-path {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: var(--space-2);
+    }
+
+    .path-step {
+      min-width: 0;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+    }
+
+    .path-step span {
+      display: block;
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-label-xs);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .path-step b {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: var(--font-size-body-sm);
+    }
+
+    .path-step.is-current {
+      background: color-mix(in srgb, var(--primary) 20%, var(--surface-2));
+    }
+
+    .top-summary {
+      display: grid;
+      grid-template-columns: minmax(720px, 1.8fr) minmax(360px, 0.9fr);
+      gap: var(--space-3);
+      min-height: 150px;
+    }
+
+    .panel {
+      display: flex;
+      min-width: 0;
+      min-height: 0;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: color-mix(in srgb, var(--surface-3) 56%, transparent);
+    }
+
+    .panel-head h2,
+    .panel-head h3 {
+      margin: 0;
+      font-size: var(--font-size-body-md);
+      font-weight: 600;
+    }
+
+    .panel-head span,
+    .muted,
+    .metric span,
+    .field-label {
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .panel-body {
+      min-height: 0;
+      padding: var(--space-3);
+      overflow: auto;
+    }
+
+    .constraints-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: var(--space-2);
+    }
+
+    .constraints-collection {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      gap: var(--space-5);
+      align-content: center;
+      min-height: 112px;
+    }
+
+    .constraint-group {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .constraint-line {
+      display: grid;
+      grid-template-columns: minmax(86px, 0.72fr) minmax(0, 1fr);
+      gap: var(--space-2);
+      align-items: baseline;
+      min-width: 0;
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+      line-height: 1.25;
+    }
+
+    .constraint-line strong {
+      overflow: hidden;
+      color: var(--foreground);
+      font-size: var(--font-size-body-md);
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .constraint-line span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 68%, transparent);
+    }
+
+    .metric b {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: var(--font-size-body-sm);
+      font-weight: 700;
+    }
+
+    .verdict-card {
+      background: color-mix(in srgb, var(--success) 10%, var(--surface-2));
+    }
+
+    .verdict-card .panel-body {
+      display: grid;
+      gap: var(--space-3);
+      align-content: stretch;
+    }
+
+    .verdict-title {
+      margin: 0;
+      color: var(--success);
+      font-size: var(--font-size-title-sm);
+      line-height: 1.25;
+    }
+
+    .verdict-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(230px, 0.88fr);
+      gap: var(--space-5);
+      align-items: start;
+    }
+
+    .verdict-details {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      padding-top: 2px;
+    }
+
+    .pressure-title {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .pressure-meter {
+      height: 12px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--surface-4) 44%, transparent);
+    }
+
+    .pressure-meter span {
+      display: block;
+      width: 18%;
+      height: 100%;
+      background: var(--warning);
+    }
+
+    .verdict-checks {
+      display: grid;
+      gap: 4px;
+    }
+
+    .verdict-check {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--space-2);
+      align-items: center;
+      min-height: 28px;
+      padding: 5px 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .verdict-check:last-child {
+      border-bottom: 0;
+    }
+
+    .verdict-check b {
+      font-size: var(--font-size-body-sm);
+      color: var(--success);
+    }
+
+    .verdict-check.is-warning b {
+      color: var(--warning);
+    }
+
+    .status-chip {
+      padding: 5px 8px;
+      color: var(--foreground);
+    }
+
+    .status-chip.is-pass {
+      color: var(--success);
+    }
+
+    .status-chip.is-warning {
+      color: var(--warning);
+    }
+
+    .status-chip.is-danger {
+      color: var(--danger);
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 340px minmax(660px, 1fr) 320px;
+      gap: var(--space-3);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .control-stack,
+    .inspector-stack {
+      display: grid;
+      align-content: start;
+      gap: var(--space-3);
+    }
+
+    .section {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .section-title {
+      margin: 0;
+      padding: 9px 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 78%, transparent);
+      font-size: var(--font-size-body-md);
+      font-weight: 600;
+    }
+
+    .field {
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .field-label {
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .seg-chip,
+    .template-chip {
+      padding: 7px 10px;
+    }
+
+    .scheme-list {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .scheme-card {
+      display: grid;
+      gap: var(--space-1);
+      padding: var(--space-2);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 64%, transparent);
+    }
+
+    .scheme-card.is-active {
+      background: color-mix(in srgb, var(--primary) 18%, var(--surface-3));
+    }
+
+    .scheme-card b {
+      font-size: var(--font-size-body-sm);
+    }
+
+    .scheme-card span {
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .core-map,
+    .tile-map {
+      display: grid;
+      gap: 6px;
+    }
+
+    .core-map {
+      grid-template-columns: repeat(8, 1fr);
+    }
+
+    .tile-map {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .core-cell,
+    .tile-cell {
+      min-height: 28px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-3) 70%, transparent);
+      color: var(--foreground-secondary);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 28px;
+      text-align: center;
+    }
+
+    .core-cell.is-active,
+    .tile-cell.is-active {
+      background: var(--primary-hover);
+      color: var(--background);
+      font-weight: 700;
+    }
+
+    .core-cell.is-tail {
+      background: var(--warning);
+      color: var(--background);
+      font-weight: 700;
+    }
+
+    .pipeline-panel {
+      display: grid;
+      grid-template-rows: auto minmax(170px, 0.7fr) minmax(240px, 1fr);
+      gap: var(--space-3);
+      min-height: 0;
+      padding: var(--space-3);
+      overflow: hidden;
+    }
+
+    .pseudo-code,
+    .swimlane {
+      min-height: 0;
+      overflow: hidden;
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+    }
+
+    .code-lines {
+      margin: 0;
+      padding: var(--space-3);
+      overflow: auto;
+      color: var(--foreground-secondary);
+      font-family: var(--font-mono);
+      font-size: var(--font-size-body-sm);
+      line-height: 1.55;
+    }
+
+    .code-row {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) auto;
+      gap: var(--space-2);
+      align-items: center;
+      min-width: 520px;
+      padding: 3px 0;
+    }
+
+    .code-num {
+      color: var(--foreground-muted);
+    }
+
+    .code-tag {
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-3) 72%, transparent);
+      color: var(--accent);
+      font-size: 10px;
+      font-family: var(--font-sans);
+    }
+
+    .swimlane {
+      display: grid;
+      grid-template-columns: 108px 1fr;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      overflow: auto;
+    }
+
+    .swimlane-legend {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      min-width: 640px;
+      color: var(--foreground-muted);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .legend-items {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .lane-label {
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+      line-height: 34px;
+    }
+
+    .lane {
+      position: relative;
+      height: 34px;
+      min-width: 520px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 58%, transparent);
+    }
+
+    .lane::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(to right, color-mix(in srgb, var(--foreground) 7%, transparent) 1px, transparent 1px);
+      background-size: 20% 100%;
+      pointer-events: none;
+    }
+
+    .stage {
+      position: absolute;
+      left: var(--x);
+      top: 6px;
+      width: var(--w);
+      height: 22px;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: var(--background);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 22px;
+      text-align: center;
+    }
+
+    .stage.t0 {
+      background: var(--primary-hover);
+    }
+
+    .stage.t1 {
+      background: var(--accent);
+    }
+
+    .stage.t2 {
+      background: var(--warning);
+    }
+
+    .stage.wait {
+      background: var(--danger);
+      color: var(--foreground);
+    }
+
+    .inspector-row {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: var(--space-2);
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+
+    .inspector-row span {
+      color: var(--foreground-muted);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .inspector-row b {
+      color: var(--foreground);
+      font-size: var(--font-size-body-sm);
+    }
+
+    .soft-note {
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-3) 54%, transparent);
+      color: var(--foreground-secondary);
+      font-size: var(--font-size-body-sm);
+      line-height: 1.5;
+    }
+
+    .code-output {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+      gap: var(--space-3);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .code-output pre {
+      margin: 0;
+      padding: var(--space-3);
+      overflow: auto;
+      color: var(--foreground-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1240px) {
+      .plan-shell {
+        height: auto;
+        overflow: visible;
+      }
+
+      .top-summary,
+      .main-layout,
+      .code-output,
+      .verdict-layout,
+      .constraints-collection,
+      .plan-path {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="pto-ide-frame plan-page" data-ide-frame data-host="standalone">
+    <header class="pto-ide-frame__topbar">
+      <div class="pto-ide-frame__topbar-left">
+        <span class="pto-ide-frame__title">Operator Plan Workbench</span>
+        <span class="pto-ide-frame__crumbs">Tiling GUI / Pipeline Skeleton / Code Handoff</span>
+      </div>
+      <div class="pto-ide-frame__topbar-right">
+        <button class="btn btn-sm btn-ghost" type="button">Snapshot</button>
+        <button class="btn btn-sm btn-solid" type="button">Generate Handoff</button>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <aside class="pto-ide-frame__activity-rail" aria-label="PTO rail">
+        <button class="pto-ide-frame__activity-btn is-active" type="button" title="Explorer">E</button>
+        <button class="pto-ide-frame__activity-btn" type="button" title="Search">S</button>
+        <button class="pto-ide-frame__activity-btn" type="button" title="Source control">G</button>
+        <button class="pto-ide-frame__activity-btn" type="button" title="Terminal">T</button>
+      </aside>
+
+      <main class="pto-ide-frame__workarea">
+        <div class="plan-shell">
+          <nav class="plan-tabs" aria-label="Workbench sections">
+            <div class="tab-row">
+              <span class="tab-chip">Overview</span>
+              <span class="tab-chip is-active">Operator Plan</span>
+              <span class="tab-chip">API Visualizer</span>
+              <span class="tab-chip">Format Lab</span>
+            </div>
+            <span class="muted">Overview 是入口，API/Format 是证据下钻，Operator Plan 是主工作面。</span>
+          </nav>
+
+          <section class="plan-path" aria-label="Plan path">
+            <div class="path-step"><span>1 / Source</span><b>OP-001 Elementwise Add</b></div>
+            <div class="path-step"><span>2 / Tiling</span><b>DB-friendly B8 / T8 / DB2</b></div>
+            <div class="path-step is-current"><span>3 / Pipeline</span><b>Double-buffer skeleton</b></div>
+            <div class="path-step"><span>4 / Validate</span><b>UB pass · tail review</b></div>
+            <div class="path-step"><span>5 / Handoff</span><b>Kernel + host tiling</b></div>
+          </section>
+
+          <section class="top-summary" aria-label="Constraints and verdict">
+            <article class="panel">
+              <header class="panel-head">
+                <h2>Constraints</h2>
+                <span>shape / hardware / memory / checks</span>
+              </header>
+              <div class="panel-body constraints-collection">
+                <div class="constraint-group">
+                  <div class="constraint-line"><strong>SOC</strong><span>910B</span></div>
+                  <div class="constraint-line"><strong>core</strong><span>24 AIV active budget</span></div>
+                  <div class="constraint-line"><strong>UB</strong><span>192 KB / core</span></div>
+                  <div class="constraint-line"><strong>align</strong><span>32B copy boundary</span></div>
+                  <div class="constraint-line"><strong>vector</strong><span>256B width</span></div>
+                </div>
+                <div class="constraint-group">
+                  <div class="constraint-line"><strong>dtype</strong><span>half</span></div>
+                  <div class="constraint-line"><strong>format</strong><span>ND</span></div>
+                  <div class="constraint-line"><strong>input shape</strong><span>A,B: 1024 x 1024</span></div>
+                  <div class="constraint-line"><strong>total length</strong><span>1,048,576 elems</span></div>
+                </div>
+                <div class="constraint-group">
+                  <div class="constraint-line"><strong>UB usage</strong><span>18% / core</span></div>
+                  <div class="constraint-line"><strong>blockLength</strong><span>131,072 elems</span></div>
+                  <div class="constraint-line"><strong>tileLength</strong><span>8,192 elems</span></div>
+                  <div class="constraint-line"><strong>loop times</strong><span>16</span></div>
+                  <div class="constraint-line"><strong>former/tail</strong><span>branch + mask review</span></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel verdict-card">
+              <header class="panel-head">
+                <h2>Verdict</h2>
+                <span>pass / warning / error</span>
+              </header>
+              <div class="panel-body">
+                <div class="verdict-layout">
+                  <div>
+                    <h2 class="verdict-title">Ready for profiling</h2>
+                    <div class="status-row" style="margin-top:10px">
+                      <span class="status-chip is-pass">3 pass</span>
+                      <span class="status-chip is-warning">2 warning</span>
+                      <span class="status-chip is-danger">0 error</span>
+                    </div>
+                    <p class="muted">当前方案可以作为 profiling 候选；重点观察 CopyIn(next) 是否被 Compute(i) 覆盖，以及 CopyOut 是否造成 output queue back pressure。</p>
+                  </div>
+                  <div class="verdict-details">
+                    <div class="pressure-title">
+                      <span>UB pressure</span>
+                      <b>18%</b>
+                    </div>
+                    <div class="pressure-meter" aria-label="UB pressure"><span></span></div>
+                    <div class="verdict-checks">
+                      <div class="verdict-check"><span>UB 容量</span><b>OK</b></div>
+                      <div class="verdict-check"><span>32B 对齐</span><b>OK</b></div>
+                      <div class="verdict-check is-warning"><span>TAIL 覆盖</span><b>Review</b></div>
+                      <div class="verdict-check"><span>VECTOR 宽度</span><b>OK</b></div>
+                      <div class="verdict-check is-warning"><span>GM queue</span><b>Watch</b></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="main-layout" aria-label="Operator plan">
+            <aside class="panel">
+              <header class="panel-head">
+                <h2>Tiling 参数</h2>
+              </header>
+              <div class="panel-body control-stack">
+                <section class="section">
+                  <h3 class="section-title">hardware</h3>
+                  <div class="field">
+                    <span class="field-label">SOC</span>
+                    <div class="seg-row">
+                      <span class="seg-chip is-active">910B</span>
+                      <span class="seg-chip">310P</span>
+                      <span class="seg-chip">910A</span>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">dtype</span>
+                    <div class="seg-row">
+                      <span class="seg-chip is-active">half</span>
+                      <span class="seg-chip">bf16</span>
+                      <span class="seg-chip">float</span>
+                      <span class="seg-chip">int8</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="section">
+                  <h3 class="section-title">tiling</h3>
+                  <div class="field">
+                    <span class="field-label">preset tiling scheme</span>
+                    <div class="scheme-list">
+                      <div class="scheme-card"><b>1 · Baseline</b><span>B8 / T8 / DB1 · first runnable</span></div>
+                      <div class="scheme-card is-active"><b>2 · Double Buffer Friendly</b><span>B8 / T8 / DB2 · selected</span></div>
+                      <div class="scheme-card"><b>3 · Tail Alignment</b><span>B7 / T8 / DB2 · boundary review</span></div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">controls</span>
+                    <div class="constraints-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+                      <div class="metric"><span>block-dim</span><b>8</b></div>
+                      <div class="metric"><span>tile-num</span><b>8</b></div>
+                      <div class="metric"><span>double buffer</span><b>on</b></div>
+                      <div class="metric"><span>tail policy</span><b>branch</b></div>
+                      <div class="metric"><span>padding policy</span><b>mask</b></div>
+                      <div class="metric"><span>queue slots</span><b>6 / 8</b></div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="section">
+                  <h3 class="section-title">核间核内 visualization</h3>
+                  <span class="muted">核间：BLOCK_DIM 映射到 core；核内：TILE_NUM × BUFFER_NUM 映射到 loop / slot。</span>
+                  <div class="core-map">
+                    <span class="core-cell is-active">c0</span>
+                    <span class="core-cell is-active">c1</span>
+                    <span class="core-cell is-active">c2</span>
+                    <span class="core-cell is-active">c3</span>
+                    <span class="core-cell is-active">c4</span>
+                    <span class="core-cell is-active">c5</span>
+                    <span class="core-cell is-active">c6</span>
+                    <span class="core-cell is-tail">c7</span>
+                  </div>
+                  <div class="tile-map">
+                    <span class="tile-cell is-active">loop0<br>slot0</span>
+                    <span class="tile-cell is-active">loop1<br>slot1</span>
+                    <span class="tile-cell">loop2<br>slot0</span>
+                    <span class="tile-cell">loop3<br>slot1</span>
+                  </div>
+                </section>
+              </div>
+            </aside>
+
+            <section class="panel">
+              <header class="panel-head">
+                <h2>Pipeline</h2>
+                <span>pseudo code drives swimlane</span>
+              </header>
+              <div class="pipeline-panel">
+                <section class="section">
+                  <div class="field">
+                    <span class="field-label">preset pipeline scheme</span>
+                    <div class="template-row">
+                      <span class="template-chip">1 Serial baseline</span>
+                      <span class="template-chip is-active">2 Double-buffer loop</span>
+                      <span class="template-chip">3 Cube + Vector handoff</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="pseudo-code" aria-label="Pseudo code">
+                  <pre class="code-lines"><span class="code-row"><span class="code-num">01</span><span>// prologue: fill two input slots</span><span class="code-tag">phase</span></span><span class="code-row"><span class="code-num">02</span><span>CopyIn(0);</span><span class="code-tag">slot0</span></span><span class="code-row"><span class="code-num">03</span><span>CopyIn(1);</span><span class="code-tag">slot1</span></span><span class="code-row"><span class="code-num">04</span><span>for (int i = 0; i &lt; loopCount; i++) {</span><span class="code-tag">steady</span></span><span class="code-row"><span class="code-num">05</span><span>  Compute(i);</span><span class="code-tag">VEC</span></span><span class="code-row"><span class="code-num">06</span><span>  CopyOut(i);</span><span class="code-tag">MTE3</span></span><span class="code-row"><span class="code-num">07</span><span>  int next = i + BUFFER_NUM;</span><span class="code-tag">index</span></span><span class="code-row"><span class="code-num">08</span><span>  if (next &lt; loopCount) CopyIn(next);</span><span class="code-tag">prefetch</span></span><span class="code-row"><span class="code-num">09</span><span>}</span><span class="code-tag">drain</span></span></pre>
+                </section>
+
+                <section class="swimlane" aria-label="Pipeline swimlane">
+                  <div class="swimlane-legend">
+                    <span>Timeline derived from pseudo code and tiling contract</span>
+                    <div class="legend-items">
+                      <span><i class="legend-dot" style="background:var(--primary-hover)"></i> tile0</span>
+                      <span><i class="legend-dot" style="background:var(--accent)"></i> tile1</span>
+                      <span><i class="legend-dot" style="background:var(--warning)"></i> tile2</span>
+                    </div>
+                  </div>
+                  <div class="lane-label">MTE2 / CopyIn</div>
+                  <div class="lane">
+                    <span class="stage t0" style="--x:2%;--w:14%">t0</span>
+                    <span class="stage t1" style="--x:16%;--w:14%">t1</span>
+                    <span class="stage t2" style="--x:54%;--w:14%">t2</span>
+                  </div>
+                  <div class="lane-label">Vector / Compute</div>
+                  <div class="lane">
+                    <span class="stage t0" style="--x:28%;--w:20%">t0</span>
+                    <span class="stage t1" style="--x:50%;--w:20%">t1</span>
+                    <span class="stage t2" style="--x:74%;--w:16%">t2</span>
+                  </div>
+                  <div class="lane-label">MTE3 / CopyOut</div>
+                  <div class="lane">
+                    <span class="stage t0" style="--x:44%;--w:14%">t0</span>
+                    <span class="stage t1" style="--x:68%;--w:14%">t1</span>
+                    <span class="stage t2" style="--x:88%;--w:10%">t2</span>
+                  </div>
+                  <div class="lane-label">FLOWCTRL</div>
+                  <div class="lane">
+                    <span class="stage wait" style="--x:47%;--w:8%">wait</span>
+                    <span class="stage wait" style="--x:71%;--w:8%">wait</span>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <aside class="panel">
+              <header class="panel-head">
+                <h2>Inspector</h2>
+                <span>解释层</span>
+              </header>
+              <div class="panel-body inspector-stack">
+                <div class="soft-note">当前选中 `CopyIn(next)`。它是 double buffer 是否真正形成 overlap 的关键行：如果 slot1 未释放或 UB pressure 接近上限，prefetch 会从隐藏延迟变成阻塞源。</div>
+                <div>
+                  <div class="inspector-row"><span>selected</span><b>CopyIn(next)</b></div>
+                  <div class="inspector-row"><span>source line</span><b>pseudo code line 08</b></div>
+                  <div class="inspector-row"><span>depends on</span><b>BUFFER_NUM=2</b></div>
+                  <div class="inspector-row"><span>queue / slot</span><b>inQueue slot1</b></div>
+                  <div class="inspector-row"><span>memory impact</span><b>UB input slot</b></div>
+                  <div class="inspector-row"><span>risk</span><b>CopyIn not hidden</b></div>
+                </div>
+                <div class="soft-note">Profiling checklist：确认 MTE2 与 Compute 同时出现；观察 CopyOut 是否反向阻塞 output queue；tail core 路径需要单独检查 mask / branch。</div>
+              </div>
+            </aside>
+          </section>
+
+          <section class="code-output" aria-label="Generated code output">
+            <article class="panel">
+              <header class="panel-head">
+                <h2>生成的 kernel 骨架</h2>
+                <span>op_kernel/add_custom.cpp</span>
+              </header>
+              <pre>constexpr int32_t BUFFER_NUM = 2;
+constexpr int32_t TILE_NUM = 8;
+constexpr int32_t TILE_LENGTH = 8192;
+
+class KernelAdd {
+public:
+    __aicore__ inline void Init(GM_ADDR x, GM_ADDR y, GM_ADDR z) {
+        pipe.InitBuffer(inQueueX, BUFFER_NUM, TILE_LENGTH * sizeof(half));
+        pipe.InitBuffer(inQueueY, BUFFER_NUM, TILE_LENGTH * sizeof(half));
+        pipe.InitBuffer(outQueueZ, BUFFER_NUM, TILE_LENGTH * sizeof(half));
+    }
+
+    __aicore__ inline void Process() {
+        CopyIn(0);
+        CopyIn(1);
+        for (int32_t i = 0; i &lt; TILE_NUM * BUFFER_NUM; i++) {
+            Compute(i);
+            CopyOut(i);
+            int32_t next = i + BUFFER_NUM;
+            if (next &lt; TILE_NUM * BUFFER_NUM) {
+                CopyIn(next);
+            }
+        }
+    }
+
+private:
+    AscendC::TPipe pipe;
+    AscendC::TQue&lt;AscendC::TPosition::VECIN, BUFFER_NUM&gt; inQueueX;
+    AscendC::TQue&lt;AscendC::TPosition::VECOUT, BUFFER_NUM&gt; outQueueZ;
+};</pre>
+            </article>
+
+            <article class="panel">
+              <header class="panel-head">
+                <h2>Host 侧 Tiling 结构体</h2>
+                <span>op_host/tiling.h</span>
+              </header>
+              <pre>BEGIN_TILING_DATA_DEF(TilingData)
+  TILING_DATA_FIELD_DEF(uint32_t, blockDim);
+  TILING_DATA_FIELD_DEF(uint32_t, tileNum);
+  TILING_DATA_FIELD_DEF(uint32_t, bufferNum);
+  TILING_DATA_FIELD_DEF(uint32_t, tileLength);
+  TILING_DATA_FIELD_DEF(uint32_t, blockLength);
+  TILING_DATA_FIELD_DEF(uint32_t, tailPolicy);
+END_TILING_DATA_DEF;
+
+// op_host/tiling.cpp
+context-&gt;SetBlockDim(blockDim);
+tiling.set_tileNum(tileNum);
+tiling.set_bufferNum(bufferNum);
+tiling.set_tileLength(tileLength);</pre>
+            </article>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
