@@ -304,7 +304,7 @@
     }
     .plan-constraint-line {
       display: grid;
-      grid-template-columns: minmax(84px, 0.68fr) minmax(0, 1fr);
+      grid-template-columns: minmax(84px, 0.68fr) minmax(0, 1fr) auto;
       gap: 8px;
       align-items: baseline;
       min-width: 0;
@@ -323,14 +323,14 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .plan-constraint-status {
+      color: var(--success);
+      font: 700 var(--font-size-body-sm) / 1 var(--font-sans);
+      white-space: nowrap;
+    }
+    .plan-constraint-status.is-warning { color: var(--warning); }
     .plan-verdict {
       background: color-mix(in srgb, var(--success) 10%, var(--ide-frame-pane-bg));
-    }
-    .plan-verdict-layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(210px, 0.9fr);
-      gap: 18px;
-      align-items: start;
     }
     .plan-verdict-title {
       margin: 0;
@@ -356,42 +356,155 @@
     .plan-status-pill.is-pass { color: var(--success); }
     .plan-status-pill.is-warning { color: var(--warning); }
     .plan-status-pill.is-danger { color: var(--danger); }
-    .plan-pressure-title {
+    .plan-verdict-actions {
       display: flex;
-      justify-content: space-between;
-      gap: 8px;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+    }
+    .padding-policy-detail {
+      display: grid;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
       color: var(--foreground-secondary);
       font: var(--text-body-sm);
     }
-    .plan-pressure-meter {
-      height: 10px;
-      margin: 8px 0 6px;
+    .padding-policy-detail__group {
+      display: grid;
+      gap: var(--space-1);
+    }
+    .padding-policy-detail__title {
+      color: var(--foreground);
+      font-weight: 700;
+    }
+    .padding-policy-detail__row {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: var(--space-2);
+    }
+    .padding-policy-detail__row span:first-child { color: var(--foreground-muted); }
+    .padding-value-options {
+      display: grid;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+    }
+    .padding-value-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 26px;
+      cursor: pointer;
+    }
+    .padding-value-option input[type="number"] {
+      width: 132px;
+      min-width: 0;
+      height: 28px;
+      padding: 0 var(--space-2);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      background: var(--surface-1);
+      color: var(--foreground);
+      font: var(--text-body-sm);
+    }
+    .padding-value-option input[type="number"]:disabled { opacity: 0.45; }
+    .operator-code-preview[hidden] { display: none; }
+    .operator-code-preview {
+      position: fixed;
+      z-index: 30;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: var(--space-6);
+      background: rgb(0 0 0 / 58%);
+    }
+    .operator-code-preview__dialog {
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      width: min(1060px, 100%);
+      height: min(760px, calc(100vh - 48px));
       overflow: hidden;
-      border-radius: var(--radius-pill);
-      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
+      background: var(--surface-1);
+      box-shadow: var(--ide-frame-pane-shadow);
     }
-    .plan-pressure-meter span {
-      display: block;
-      width: var(--pressure, 18%);
-      height: 100%;
-      background: var(--warning);
+    .operator-code-preview__header,
+    .operator-code-preview__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
     }
-    .plan-checks {
-      display: grid;
-      gap: 3px;
-    }
-    .plan-check {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      padding: 5px 0;
-      border-bottom: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+    .operator-code-preview__title { margin: 0; font: 600 var(--font-size-title-sm) / 1.3 var(--font-sans); }
+    .operator-code-preview__meta { color: var(--foreground-muted); font: var(--text-body-sm); }
+    .operator-code-preview__summary {
+      padding: var(--space-3) var(--space-4);
       color: var(--foreground-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      font: var(--font-size-body-md) / 1.5 var(--font-sans);
+    }
+    .operator-code-preview__workbench {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 0;
+    }
+    .operator-code-preview__files {
+      padding: var(--space-3);
+      overflow: auto;
+      border-right: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-2) 65%, transparent);
+    }
+    .operator-code-preview__files h4 { margin: 0 0 var(--space-2); color: var(--foreground-muted); font: 500 var(--font-size-label-xs) / 1.2 var(--font-sans); letter-spacing: var(--letter-spacing-label); }
+    .operator-code-preview__folder { margin: var(--space-2) 0 var(--space-1); color: var(--foreground-secondary); font: var(--text-body-sm); }
+    .operator-code-preview__file {
+      display: block;
+      width: 100%;
+      padding: 6px var(--space-2);
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-secondary);
+      text-align: left;
+      font: var(--text-body-sm);
+      cursor: pointer;
+    }
+    .operator-code-preview__file:hover,
+    .operator-code-preview__file.is-active { background: var(--surface-4); color: var(--foreground); }
+    .operator-code-preview__editor { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; }
+    .operator-code-preview__tab {
+      padding: var(--space-2) var(--space-3);
+      color: var(--foreground-secondary);
+      border-bottom: 1px solid var(--border-subtle);
       font: var(--text-body-sm);
     }
-    .plan-check:last-child { border-bottom: 0; }
-    .plan-check b { color: var(--success); }
-    .plan-check.is-warning b { color: var(--warning); }
+    .operator-code-preview__code {
+      margin: 0;
+      padding: var(--space-3) var(--space-4);
+      overflow: auto;
+      background: var(--background);
+      color: var(--foreground);
+      font: var(--text-body-sm) / 1.6 var(--font-mono);
+      white-space: pre;
+    }
+    .operator-code-preview__code .syntax-generated { color: var(--success); }
+    .operator-code-preview__code .syntax-user { color: var(--warning); }
+    .operator-code-preview__code .syntax-keyword { color: var(--operator-purple); }
+    .operator-code-preview__code .syntax-type { color: var(--operator-cyan); }
+    .operator-code-preview__code .syntax-number { color: var(--operator-amber); }
+    .operator-code-preview__code .syntax-call { color: var(--operator-blue); }
+    .operator-code-preview__footer { border-top: 1px solid var(--border-subtle); border-bottom: 0; }
+    .operator-code-preview__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    @media (max-width: 720px) {
+      .operator-code-preview { padding: var(--space-3); }
+      .operator-code-preview__workbench { grid-template-columns: 1fr; }
+      .operator-code-preview__files { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+      .operator-code-preview__file { display: inline-block; width: auto; }
+      .operator-code-preview__footer { align-items: flex-start; flex-direction: column; }
+    }
     .operator-plan-grid {
       display: grid;
       grid-template-columns: 320px minmax(0, 1fr) 300px;
@@ -585,19 +698,6 @@
     }
     .plan-inspector-row span { color: var(--foreground-muted); }
     .plan-inspector-row b { color: var(--foreground); }
-    .plan-code-output {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
-      gap: 12px;
-    }
-    .plan-code-output pre {
-      margin: 0;
-      padding: 12px;
-      overflow: auto;
-      color: var(--foreground-secondary);
-      font: var(--text-mono);
-      line-height: 1.5;
-    }
     .section-head {
       min-height: 38px;
       display: flex;
@@ -3099,6 +3199,41 @@
     </div>
   </section>
 
+  <div class="operator-code-preview" id="operatorCodePreview" hidden>
+    <section class="operator-code-preview__dialog" role="dialog" aria-modal="true" aria-labelledby="operatorCodePreviewTitle">
+      <header class="operator-code-preview__header">
+        <div>
+          <h2 class="operator-code-preview__title" id="operatorCodePreviewTitle">算子工程预览</h2>
+          <span class="operator-code-preview__meta" id="operatorCodePreviewMeta"></span>
+        </div>
+        <button class="btn btn-sm btn-ghost" type="button" data-close-code-preview>关闭</button>
+      </header>
+      <div class="operator-code-preview__summary" id="operatorCodePreviewSummary"></div>
+      <div class="operator-code-preview__workbench">
+        <nav class="operator-code-preview__files" aria-label="工程文件">
+          <h4>文件</h4>
+          <div class="operator-code-preview__folder">⌄ op_host</div>
+          <button class="operator-code-preview__file is-active" type="button" data-code-preview-file="tiling">op_tiling.h</button>
+          <button class="operator-code-preview__file" type="button" data-code-preview-file="host">op_tiling.cpp</button>
+          <div class="operator-code-preview__folder">⌄ op_kernel</div>
+          <button class="operator-code-preview__file" type="button" data-code-preview-file="kernel">op_kernel.cpp</button>
+        </nav>
+        <section class="operator-code-preview__editor" aria-label="代码预览">
+          <div class="operator-code-preview__tab" id="operatorCodePreviewFile"></div>
+          <div class="operator-code-preview__code" id="operatorCodePreviewCode"></div>
+        </section>
+      </div>
+      <footer class="operator-code-preview__footer">
+        <span class="operator-code-preview__meta">工程内容根据当前 Tiling 参数生成，尚未写入本地目录。</span>
+        <div class="operator-code-preview__actions">
+          <button class="btn btn-sm" type="button" data-close-code-preview>返回配置</button>
+          <button class="btn btn-sm" type="button" data-regenerate-code-preview>重新生成</button>
+          <button class="btn btn-sm btn-solid" type="button" data-generate-operator-project>生成完整算子工程</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
   <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
   <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
   <script src="../vendor/pto-design-system/patterns/floating-playback-control/pattern.js"></script>
@@ -3110,6 +3245,7 @@
           title: 'Elementwise Add',
           status: '未开始',
           type: '入门算子',
+          tailComputation: 'elementwise',
           requirement: '为 C = A + B 创建一个最小算子设计，并说明 shape、dtype 和第一版 tiling 如何确定。',
           performanceGoal: '第一版设计优先保证覆盖完整、tile 简单且适合 vector 处理。',
           formula: 'C[i] = A[i] + B[i]',
@@ -3123,6 +3259,7 @@
           title: 'Copy 与对齐',
           status: '设计中',
           type: '数据搬运',
+          tailComputation: 'elementwise',
           requirement: '搬运带 stride 的 tensor 切片，同时保持对齐，并解释 tail 处理方式。',
           performanceGoal: '减少非对齐 DataCopy 片段，并显式暴露 tail 策略决策。',
           formula: 'Y[n] = X[n * stride]',
@@ -3136,6 +3273,7 @@
           title: 'Load3D 滑窗展开',
           status: '已对比',
           type: 'API 数据变换',
+          tailComputation: 'elementwise',
           requirement: '使用 Load3D 为 Cube 计算准备 feature map tile，并解释每个滑窗如何变成矩阵数据。',
           performanceGoal: '在规划 pipeline 之前，先暴露数据搬运、repeatMode 和 layout 决策。',
           formula: 'Y = Conv2D(X, W)',
@@ -3149,6 +3287,7 @@
           title: 'Cube + Vector Fusion',
           status: '待评审',
           type: 'Pipeline',
+          tailComputation: 'reduction',
           requirement: '在同一 tiling 策略下，对比偏 Cube 的调度和 Vector 后处理调度。',
           performanceGoal: '减少 Cube Compute 与 Vector Compute 之间的空闲间隙，同时保持 buffer 压力可见。',
           formula: 'Z = activation(Mmad(A, B) + bias)',
@@ -3169,8 +3308,8 @@
 
       const tilingSchemes = [
           { name: '基线方案', soc: '910b', dtype: 'half', inputs: 2, total: 16384, blockDim: 8, tileNum: 8, bufferNum: 2, tailPolicy: 'branch', paddingPolicy: 'mask', tilingMode: 'auto', note: '第一版均分方案，便于阅读和解释。' },
-        { name: '尾块对齐', soc: '910b', dtype: 'half', inputs: 2, total: 16448, blockDim: 7, tileNum: 8, bufferNum: 2, tailPolicy: 'former/tail', paddingPolicy: 'padding', tilingMode: 'auto', note: '刻意制造 former/tail 核切分，让 tail 对齐更可见。' },
-        { name: 'Double Buffer友好', soc: '910b', dtype: 'half', inputs: 3, total: 32768, blockDim: 12, tileNum: 4, bufferNum: 2, tailPolicy: 'pad', paddingPolicy: 'padding', tilingMode: 'auto', note: 'tile 数更少，启用 Double Buffer，UB 压力更高。' }
+        { name: '尾块对齐', soc: '910b', dtype: 'half', inputs: 2, total: 16448, blockDim: 7, tileNum: 8, bufferNum: 2, tailPolicy: 'pad', paddingPolicy: 'redundant', tilingMode: 'auto', note: '刻意制造尾块切分，让 Pad 的对齐处理更可见。' },
+        { name: 'Double Buffer友好', soc: '910b', dtype: 'half', inputs: 3, total: 32768, blockDim: 12, tileNum: 4, bufferNum: 2, tailPolicy: 'pad', paddingPolicy: 'redundant', tilingMode: 'auto', note: 'tile 数更少，启用 Double Buffer，UB 压力更高。' }
       ];
 
       const pipelineLanes = [
@@ -3463,8 +3602,13 @@
         blockDim: 7,
         tileNum: 8,
         bufferNum: 2,
-        tailPolicy: 'former/tail',
-        paddingPolicy: 'padding',
+        tailPolicy: 'pad',
+        paddingPolicy: 'redundant',
+        paddingValueMode: 'recommended',
+        paddingCustomValue: 0,
+        paddingImplementation: 'dataCopyPad',
+        maskMode: 'continuous',
+        maskScope: 'tailOnly',
         tilingMode: 'auto',
         apiStep: 3,
         apiPlaying: false,
@@ -3523,6 +3667,7 @@
         $$('[data-operator]').forEach((btn) => {
           btn.addEventListener('click', () => {
             state.operatorId = btn.dataset.operator;
+            syncTailPolicyToOperator();
             state.selectedApi = currentOperator().apis[0] || 'Load3D';
             if (state.operatorId === 'OP-003') state.view = 'api';
             else state.view = 'overview';
@@ -3581,7 +3726,10 @@
         $$('[data-open-view]').forEach((btn) => {
           btn.addEventListener('click', () => {
             state.view = btn.dataset.openView;
-            if (state.view === 'pipeline') state.operatorId = 'OP-004';
+            if (state.view === 'pipeline') {
+              state.operatorId = 'OP-004';
+              syncTailPolicyToOperator();
+            }
             if (state.view === 'api') state.selectedApi = p.apis.includes('Load3D') ? 'Load3D' : p.apis[0];
             renderAll();
           });
@@ -3629,6 +3777,94 @@
         };
       }
 
+      function tailPolicyRecommendation(operator = currentOperator()) {
+        if (operator.tailComputation === 'reduction') {
+          return {
+            policy: 'branch',
+            label: 'Branch',
+            reason: '归约计算，无效数据可能改变结果'
+          };
+        }
+        return {
+          policy: 'pad',
+          label: 'Pad',
+          reason: '逐元素计算，无效数据不影响有效输出'
+        };
+      }
+
+      function tailPolicyHint(operator = currentOperator()) {
+        const recommendation = tailPolicyRecommendation(operator);
+        return `当前推荐：${recommendation.label}<br>原因：${recommendation.reason}`;
+      }
+
+      function paddingPolicyRecommendation(operator = currentOperator()) {
+        if (operator.tailComputation === 'reduction') {
+          return { policy: 'mask', label: '使用 Mask', reason: '归约计算需要隔离无效元素，避免参与结果。' };
+        }
+        return { policy: 'redundant', label: '冗余计算', reason: '逐元素计算，无效数据不影响有效输出。' };
+      }
+
+      function renderPaddingPolicyControl(operator, selected, outcome) {
+        if (selected.tailPolicy !== 'pad') return '';
+        const recommendation = paddingPolicyRecommendation(operator);
+        const validLength = Math.max(1, outcome.tileLen);
+        const alignedLength = Math.ceil(validLength / outcome.alignElems) * outcome.alignElems;
+        const paddedElements = alignedLength - validLength;
+        const labels = {
+          redundant: '冗余计算',
+          value: '填充值',
+          mask: '使用 Mask'
+        };
+        return `
+          <div class="control-field">
+            <label>填充策略</label>
+            <div class="seg-control" data-seg="paddingPolicy">
+              ${Object.entries(labels).map(([policy, label]) => `<button type="button" class="${selected.paddingPolicy === policy ? 'is-active' : ''}" data-set-padding-policy="${policy}">${label}</button>`).join('')}
+            </div>
+            <div class="control-hint">当前推荐：${recommendation.label}<br>原因：${recommendation.reason}</div>
+            ${selected.paddingPolicy === 'value' ? `
+              <div class="padding-value-options" aria-label="填充值设置">
+                <label class="padding-value-option"><input type="radio" name="paddingValueMode" value="recommended" data-padding-value-mode ${state.paddingValueMode === 'recommended' ? 'checked' : ''}> 推荐值：0</label>
+                <label class="padding-value-option"><input type="radio" name="paddingValueMode" value="custom" data-padding-value-mode ${state.paddingValueMode === 'custom' ? 'checked' : ''}> 自定义值：<input type="number" value="${state.paddingCustomValue}" data-padding-custom-value ${state.paddingValueMode === 'custom' ? '' : 'disabled'}></label>
+              </div>
+              <div class="padding-value-options" aria-label="填充实现方式">
+                <span class="padding-policy-detail__title">实现方式</span>
+                ${[['dataCopyPad', 'DataCopyPad'], ['duplicate', 'Duplicate'], ['padApi', 'Pad API']].map(([value, label]) => `<label class="padding-value-option"><input type="radio" name="paddingImplementation" value="${value}" data-padding-implementation ${state.paddingImplementation === value ? 'checked' : ''}> ${label}</label>`).join('')}
+              </div>
+            ` : ''}
+            ${selected.paddingPolicy === 'mask' ? `
+              <div class="padding-value-options" aria-label="Mask 模式">
+                <span class="padding-policy-detail__title">Mask 模式</span>
+                ${[['continuous', '连续 Mask'], ['bitwise', '逐 bit Mask']].map(([value, label]) => `<label class="padding-value-option"><input type="radio" name="maskMode" value="${value}" data-mask-mode ${state.maskMode === value ? 'checked' : ''}> ${label}</label>`).join('')}
+              </div>
+              <div class="padding-value-options" aria-label="Mask 作用范围">
+                <span class="padding-policy-detail__title">作用范围</span>
+                ${[['tailOnly', '仅尾块'], ['allTiles', '所有 Tile']].map(([value, label]) => `<label class="padding-value-option"><input type="radio" name="maskScope" value="${value}" data-mask-scope ${state.maskScope === value ? 'checked' : ''}> ${label}</label>`).join('')}
+              </div>
+            ` : ''}
+            <div class="padding-policy-detail">
+              <div class="padding-policy-detail__group">
+                <span class="padding-policy-detail__title">尾块信息</span>
+                <div class="padding-policy-detail__row"><span>有效长度</span><span>${validLength}</span></div>
+                <div class="padding-policy-detail__row"><span>对齐长度</span><span>${alignedLength}</span></div>
+                <div class="padding-policy-detail__row"><span>补齐元素</span><span>${paddedElements}</span></div>
+              </div>
+              <div class="padding-policy-detail__group">
+                <span class="padding-policy-detail__title">生成方式</span>
+                <div class="padding-policy-detail__row"><span>搬入</span><span>DataCopyPad</span></div>
+                <div class="padding-policy-detail__row"><span>计算</span><span>${alignedLength} elements</span></div>
+                <div class="padding-policy-detail__row"><span>搬出</span><span>${validLength} elements</span></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function syncTailPolicyToOperator() {
+        state.tailPolicy = tailPolicyRecommendation().policy;
+        if (state.tailPolicy === 'pad') state.paddingPolicy = paddingPolicyRecommendation().policy;
+      }
+
       function applyTilingScheme(scheme) {
         state.tilingScheme = scheme.name;
         state.soc = scheme.soc;
@@ -3638,8 +3874,8 @@
         state.blockDim = scheme.blockDim;
         state.tileNum = scheme.tileNum;
         state.bufferNum = scheme.bufferNum;
-        state.tailPolicy = scheme.tailPolicy || 'former/tail';
-        state.paddingPolicy = scheme.paddingPolicy || 'padding';
+        syncTailPolicyToOperator();
+        state.paddingPolicy = scheme.paddingPolicy || 'redundant';
         state.tilingMode = scheme.tilingMode || 'manual';
       }
 
@@ -3715,8 +3951,8 @@
             label: 'Tail 核处理',
             value: formerNum === 0 ? '没有 tail 分支' : `${formerNum} former + ${tailNum} tail`,
             cls: formerNum === 0 ? 'is-ok' : 'is-warning',
-            impact: formerNum === 0 ? '多核工作量均分，kernel 边界分支较少。' : '不同 core 工作量不一致，需要 kernel 明确区分 former/tail 或 padding。',
-            action: formerNum === 0 ? '可使用普通均分 kernel 路径。' : '确认 tail policy 选择 former/tail 或 padding，并验证 tail core 的搬运长度。'
+            impact: formerNum === 0 ? '多核工作量均分，kernel 边界分支较少。' : '不同 core 工作量不一致，需要 kernel 明确采用 Branch 或 Pad 承接尾块。',
+            action: formerNum === 0 ? '可使用普通均分 kernel 路径。' : '确认当前推荐的尾块策略，并验证 tail core 的搬运长度。'
           },
           {
             label: 'Vector 宽度',
@@ -3824,7 +4060,7 @@
 
       function schemeTailText(scheme, outcome) {
         if (outcome.formerNum === 0) return `${scheme.tailPolicy || 'branch'}, no tail`;
-        return `${outcome.formerNum} + ${outcome.tailNum}, ${scheme.paddingPolicy || 'padding'}`;
+        return `${outcome.formerNum} + ${outcome.tailNum}, ${scheme.paddingPolicy || 'redundant'}`;
       }
 
       function checkClass(row) {
@@ -3964,6 +4200,77 @@
         host += '}\n';
         host += `\n// op_host/tiling.cpp — SetTilingKey(${tilingKey});\n`;
         return { kernel, host };
+      }
+
+      let generatedOperatorFiles = {};
+
+      function buildGeneratedOperatorFiles() {
+        const operator = currentOperator();
+        const scheme = currentTilingScheme();
+        const outcome = computeTilingOutcome(scheme);
+        const tail = tailPolicyRecommendation(operator);
+        const tailGuard = tail.policy === 'branch'
+          ? `if (offset + tileLength > totalLength) {\n  tileLength = totalLength - offset;\n}`
+          : `const int32_t paddedLength = AlignUp(totalLength, ${outcome.alignElems});\nSetLoadDataPaddingValue(0);`;
+        return {
+          tiling: {
+            name: 'op_tiling.h',
+            code: `#pragma once\n#include "register/tilingdata_base.h"\n\n// [Generated] Tiling 数据定义\nBEGIN_TILING_DATA_DEF(TilingData)\n  TILING_DATA_FIELD_DEF(uint32_t, totalLength);\n  TILING_DATA_FIELD_DEF(uint32_t, blockLength);\n  TILING_DATA_FIELD_DEF(uint32_t, tileLength);\n  TILING_DATA_FIELD_DEF(uint32_t, tileNum);\nEND_TILING_DATA_DEF;\n\n// [Generated] Tiling 数据注册\nREGISTER_TILING_DATA_CLASS(${operator.id.replace('-', '_')}, TilingData)`
+          },
+          host: {
+            name: 'op_tiling.cpp',
+            code: `// [Generated] Tiling 参数计算\ntiling.set_totalLength(${outcome.totalAligned});\ntiling.set_blockLength(${outcome.perCoreDisplay});\ntiling.set_tileLength(${outcome.tileLen});\ntiling.set_tileNum(${scheme.tileNum});\n\n// [Generated] Kernel launch 绑定\ncontext->SetBlockDim(${scheme.blockDim});\ncontext->SetTilingKey(${outcome.formerNum === 0 ? 0 : 2});\ncontext->SetTilingData(tiling);\n\n// [User Code] 补充算子特定约束\nreturn ValidateOperatorContract(context);`
+          },
+          kernel: {
+            name: 'op_kernel.cpp',
+            code: `// [Generated] 编译期 Tiling 常量\nconstexpr int32_t USE_CORE_NUM = ${scheme.blockDim};\nconstexpr int32_t TILE_NUM = ${scheme.tileNum};\nconstexpr int32_t BUFFER_NUM = ${scheme.bufferNum};\nconstexpr int32_t TILE_LENGTH = ${outcome.tileLen};\n\n// [Generated] 核间 Former/Tail 分配\nif (GetBlockIdx() < formerNum) {\n  coreLength = formerLength;\n  tileLength = formerTileLength;\n} else {\n  coreLength = tailLength;\n  tileLength = tailTileLength;\n}\n\n// [Generated] 尾块 ${tail.label} 处理\nif (isLastTile) {\n  ${tailGuard.replace(/\n/g, '\n  ')}\n}\n\n// [User Code] 在这里填写计算逻辑\nCompute(localInput, localOutput);`
+          },
+          summary: `${scheme.blockDim} 核 ｜ Tile ${fmt(outcome.tileLen)} ｜ 尾块 ${tailPolicyRecommendation(operator).label} ｜ ${scheme.dtype} / ${outcome.soc.name}`,
+          meta: `${operator.id} · ${operator.title} · ${scheme.name}`
+        };
+      }
+
+      function showGeneratedOperatorFile(key) {
+        const file = generatedOperatorFiles[key];
+        if (!file) return;
+        $('#operatorCodePreviewFile').textContent = file.name;
+        $('#operatorCodePreviewCode').innerHTML = fakeSyntaxHighlight(file.code);
+        $$('[data-code-preview-file]').forEach((button) => button.classList.toggle('is-active', button.dataset.codePreviewFile === key));
+      }
+
+      function fakeSyntaxHighlight(code) {
+        return String(code).split('\n').map((line) => {
+          const escaped = escapeHtml(line);
+          if (escaped.startsWith('// [Generated]')) return `<span class="syntax-generated">${escaped}</span>`;
+          if (escaped.startsWith('// [User Code]')) return `<span class="syntax-user">${escaped}</span>`;
+          return escaped
+            .replace(/\b(constexpr|const|if|else|return)\b/g, '<span class="syntax-keyword">$1</span>')
+            .replace(/\b(int32_t|uint32_t|TilingData)\b/g, '<span class="syntax-type">$1</span>')
+            .replace(/\b(\d+)\b/g, '<span class="syntax-number">$1</span>')
+            .replace(/\b(Compute|SetBlockDim|SetTilingKey|SetTilingData|AlignUp|SetLoadDataPaddingValue|ValidateOperatorContract)\b/g, '<span class="syntax-call">$1</span>');
+        }).join('\n');
+      }
+
+      function openCodePreview() {
+        generatedOperatorFiles = buildGeneratedOperatorFiles();
+        $('#operatorCodePreviewMeta').textContent = generatedOperatorFiles.meta;
+        $('#operatorCodePreviewSummary').textContent = `生成结果摘要：${generatedOperatorFiles.summary}`;
+        $('#operatorCodePreview').hidden = false;
+        showGeneratedOperatorFile('tiling');
+        $('[data-close-code-preview]')?.focus();
+      }
+
+      function closeCodePreview() {
+        $('#operatorCodePreview').hidden = true;
+      }
+
+      function prepareOperatorProject() {
+        const operator = currentOperator();
+        const scheme = currentTilingScheme();
+        const log = $('#mockLog');
+        if (log) {
+          log.textContent = `已准备 ${operator.id} 的算子工程模板：op_host/op_tiling.h · op_host/op_tiling.cpp · op_kernel/op_kernel.cpp\n当前配置：${scheme.blockDim} 核 / TILE_NUM=${scheme.tileNum} / BUFFER_NUM=${scheme.bufferNum}。这是 UX 原型，尚未写入本地目录。`;
+        }
       }
 
       function renderTilingCode(selected, outcome) {
@@ -4111,10 +4418,31 @@
         }));
         findAll('[data-set-tail-policy]').forEach((btn) => btn.addEventListener('click', () => {
           state.tailPolicy = btn.dataset.setTailPolicy;
+          if (state.tailPolicy === 'pad') state.paddingPolicy = paddingPolicyRecommendation().policy;
           renderAll();
         }));
         findAll('[data-set-padding-policy]').forEach((btn) => btn.addEventListener('click', () => {
           state.paddingPolicy = btn.dataset.setPaddingPolicy;
+          renderAll();
+        }));
+        findAll('[data-padding-value-mode]').forEach((input) => input.addEventListener('change', () => {
+          state.paddingValueMode = input.value;
+          renderAll();
+        }));
+        findAll('[data-padding-custom-value]').forEach((input) => input.addEventListener('change', () => {
+          state.paddingCustomValue = Number(input.value) || 0;
+          renderAll();
+        }));
+        findAll('[data-padding-implementation]').forEach((input) => input.addEventListener('change', () => {
+          state.paddingImplementation = input.value;
+          renderAll();
+        }));
+        findAll('[data-mask-mode]').forEach((input) => input.addEventListener('change', () => {
+          state.maskMode = input.value;
+          renderAll();
+        }));
+        findAll('[data-mask-scope]').forEach((input) => input.addEventListener('change', () => {
+          state.maskScope = input.value;
           renderAll();
         }));
       }
@@ -4190,19 +4518,13 @@
                           <div class="control-hint">BUFFER_NUM → UB 压力 / overlap 就绪度；Double Buffer 会成倍增加队列占用。</div>
                         </div>
                         <div class="control-field">
-                          <label>尾块策略</label>
+                          <label>核内尾块策略</label>
                           <div class="seg-control" data-seg="tailPolicy">
-                            ${['former/tail', 'branch', 'pad'].map((policy) => `<button type="button" class="${selected.tailPolicy === policy ? 'is-active' : ''}" data-set-tail-policy="${policy}">${policy}</button>`).join('')}
+                            ${['branch', 'pad'].map((policy) => `<button type="button" class="${selected.tailPolicy === policy ? 'is-active' : ''}" data-set-tail-policy="${policy}">${policy === 'branch' ? 'Branch' : 'Pad'}</button>`).join('')}
                           </div>
-                          <div class="control-hint">决定 totalAligned 之后不均分时，kernel 用分支、former/tail 还是 padding 承接尾块。</div>
+                          <div class="control-hint">${tailPolicyHint(p)}</div>
                         </div>
-                        <div class="control-field">
-                          <label>填充策略</label>
-                          <div class="seg-control" data-seg="paddingPolicy">
-                            ${['mask', 'padding', 'drop'].map((policy) => `<button type="button" class="${selected.paddingPolicy === policy ? 'is-active' : ''}" data-set-padding-policy="${policy}">${policy}</button>`).join('')}
-                          </div>
-                          <div class="control-hint">决定未覆盖元素是用 mask 保护、补齐计算，还是显式标记为不可接受。</div>
-                        </div>
+                        ${renderPaddingPolicyControl(p, selected, outcome)}
                       </section>
                     </div>
               </section>
@@ -4314,7 +4636,7 @@
             blockDim: state.blockDim,
             tileNum: state.tileNum,
             bufferNum: state.bufferNum,
-            tailPolicy: computeTilingOutcome(currentTilingScheme()).formerNum > 0 ? 'former/tail' : 'branch',
+            tailPolicy: tailPolicyRecommendation().policy,
             paddingPolicy: state.paddingPolicy,
             tilingMode: 'manual',
             custom: true,
@@ -5488,7 +5810,7 @@
           tileNum: tilingOutcome.tileNum,
           bufferNum: tilingOutcome.bufferNum,
           tailPolicy: tilingScheme.tailPolicy || 'branch',
-          paddingPolicy: tilingScheme.paddingPolicy || 'padding',
+          paddingPolicy: tilingScheme.paddingPolicy || 'redundant',
           tilingScheme: tilingScheme.name,
           tileLength: tilingOutcome.tileLen,
           ubBudget: `${tilingOutcome.ubPct.toFixed(0)}% (${bytesFmt(tilingOutcome.ubUsed)} / ${tilingOutcome.soc.ubKB} KB)`,
@@ -5498,7 +5820,7 @@
           constraints: [
             `SOC ${tilingOutcome.soc.name} · ${tilingOutcome.soc.coreLabel}`,
             `BLOCK_DIM=${tilingOutcome.blockDim}, TILE_NUM=${tilingOutcome.tileNum}, BUFFER_NUM=${tilingOutcome.bufferNum}`,
-            `tail=${tilingScheme.tailPolicy || 'branch'}, padding=${tilingScheme.paddingPolicy || 'padding'}`,
+            `tail=${tilingScheme.tailPolicy || 'branch'}, padding=${tilingScheme.paddingPolicy || 'redundant'}`,
             `UB ${tilingOutcome.ubPct.toFixed(0)}%, queue ${queueCount}/${queueLimit}`
           ]
         };
@@ -5812,15 +6134,12 @@
           const operator = currentOperator();
           const selected = currentTilingScheme();
           const outcome = computeTilingOutcome(selected);
-          const scenario = currentPipelineScenario();
-          const activeBlock = currentPipelineBlock(scenario);
           const verdict = schemeVerdict(outcome);
           const ubOk = outcome.ubUsed <= outcome.soc.ubKB * 1024;
           const tailOk = outcome.formerNum === 0;
           const queueCount = selected.inputs * selected.bufferNum;
           const queueLimit = outcome.soc.maxQueuePerPos * 2;
           const queueOk = queueCount <= queueLimit;
-          const code = tilingCodeForScheme(selected, outcome);
           const activeCores = Math.min(selected.blockDim, outcome.soc.cores);
           const output = operator.outputs[0] || ['output', '-', '-'];
           const outputMeta = splitDtypeFormat(output[2]);
@@ -5828,14 +6147,14 @@
             <div class="operator-plan">
               <section class="plan-summary-grid">
                 <article class="viz-panel">
-                  <header class="section-head"><h3>Constraints</h3></header>
+                  <header class="section-head"><h3>总览</h3></header>
                   <div class="section-body plan-constraints">
                     <div class="plan-constraint-group">
                       <div class="plan-constraint-line"><strong>目标硬件</strong><span>${outcome.soc.name}</span></div>
                       <div class="plan-constraint-line"><strong>核数</strong><span>${outcome.soc.cores} ${outcome.soc.coreLabel}</span></div>
                       <div class="plan-constraint-line"><strong>UB容量</strong><span>${outcome.soc.ubKB} KB / core</span></div>
-                      <div class="plan-constraint-line"><strong>对齐要求</strong><span>${outcome.soc.alignBytes}B copy boundary</span></div>
-                      <div class="plan-constraint-line"><strong>vector</strong><span>${outcome.soc.vectorWidthBytes}B width</span></div>
+                      <div class="plan-constraint-line"><strong>对齐要求</strong><span>${outcome.soc.alignBytes}B copy boundary</span><b class="plan-constraint-status ${outcome.tileAligned ? '' : 'is-warning'}">${outcome.tileAligned ? '通过' : '复核'}</b></div>
+                      <div class="plan-constraint-line"><strong>vector</strong><span>${outcome.soc.vectorWidthBytes}B width</span><b class="plan-constraint-status ${outcome.tileLen >= outcome.soc.vectorWidthBytes / outcome.dtypeBytes ? '' : 'is-warning'}">${outcome.tileLen >= outcome.soc.vectorWidthBytes / outcome.dtypeBytes ? '通过' : '复核'}</b></div>
                     </div>
                     <div class="plan-constraint-group">
                       <div class="plan-constraint-line"><strong>dtype</strong><span>${selected.dtype}</span></div>
@@ -5847,18 +6166,19 @@
                       <div class="plan-constraint-line"><strong>Total length</strong><span>${fmt(outcome.total)}</span></div>
                     </div>
                     <div class="plan-constraint-group">
-                      <div class="plan-constraint-line"><strong>UB使用量</strong><span>${outcome.ubPct.toFixed(0)}% / core</span></div>
+                      <div class="plan-constraint-line"><strong>UB使用量</strong><span>${outcome.ubPct.toFixed(0)}% / core</span><b class="plan-constraint-status ${ubOk ? '' : 'is-warning'}">${ubOk ? '通过' : '复核'}</b></div>
                       <div class="plan-constraint-line"><strong>blockLength</strong><span>${fmt(outcome.perCoreDisplay)}</span></div>
                       <div class="plan-constraint-line"><strong>tileLength</strong><span>${fmt(outcome.tileLen)}</span></div>
                       <div class="plan-constraint-line"><strong>loop times</strong><span>${fmt(outcome.loopCount)}</span></div>
-                      <div class="plan-constraint-line"><strong>former/tail</strong><span>${tailOk ? 'no tail branch' : `${outcome.formerNum} former / ${outcome.tailNum} tail`}</span></div>
+                      <div class="plan-constraint-line"><strong>核间尾块</strong><span>${tailOk ? '无尾块' : `${outcome.formerNum} former / ${outcome.tailNum} tail`}</span><b class="plan-constraint-status ${tailOk ? '' : 'is-warning'}">${tailOk ? '通过' : '复核'}</b></div>
+                      <div class="plan-constraint-line"><strong>GM queue</strong><span>${queueCount} / ${queueLimit}</span><b class="plan-constraint-status ${queueOk ? '' : 'is-warning'}">${queueOk ? '通过' : '复核'}</b></div>
                     </div>
                   </div>
                 </article>
 
                 <article class="viz-panel plan-verdict">
-                  <header class="section-head"><h3>Verdict</h3></header>
-                  <div class="section-body plan-verdict-layout">
+                  <header class="section-head"><h3>工程评估</h3></header>
+                  <div class="section-body">
                     <div>
                       <h2 class="plan-verdict-title">${verdict.label === 'Invalid' ? 'Capacity risk' : 'Ready for profiling'}</h2>
                       <div class="plan-status-row">
@@ -5867,16 +6187,9 @@
                         <span class="plan-status-pill is-danger">${verdict.label === 'Invalid' ? 1 : 0} error</span>
                       </div>
                       <p class="soft-note" style="margin-top:12px">当前方案可以作为 profiling 候选；重点观察 CopyIn(next) 是否被 Compute(i) 覆盖，以及 CopyOut 是否造成 output queue back pressure。</p>
-                    </div>
-                    <div>
-                      <div class="plan-pressure-title"><span>UB pressure</span><b>${outcome.ubPct.toFixed(0)}%</b></div>
-                      <div class="plan-pressure-meter" style="--pressure:${Math.min(100, outcome.ubPct).toFixed(0)}%"><span></span></div>
-                      <div class="plan-checks">
-                        <div class="plan-check ${ubOk ? '' : 'is-warning'}"><span>UB 容量</span><b>${ubOk ? 'OK' : 'Overflow'}</b></div>
-                        <div class="plan-check ${outcome.tileAligned ? '' : 'is-warning'}"><span>${outcome.soc.alignBytes}B 对齐</span><b>${outcome.tileAligned ? 'OK' : 'Review'}</b></div>
-                        <div class="plan-check ${tailOk ? '' : 'is-warning'}"><span>TAIL 覆盖</span><b>${tailOk ? 'OK' : 'Review'}</b></div>
-                        <div class="plan-check ${outcome.tileLen >= outcome.soc.vectorWidthBytes / outcome.dtypeBytes ? '' : 'is-warning'}"><span>VECTOR 宽度</span><b>${outcome.tileLen >= outcome.soc.vectorWidthBytes / outcome.dtypeBytes ? 'OK' : 'Review'}</b></div>
-                        <div class="plan-check ${queueOk ? '' : 'is-warning'}"><span>GM queue</span><b>${queueOk ? 'OK' : 'Watch'}</b></div>
+                      <div class="plan-verdict-actions">
+                        <button class="btn btn-sm" type="button" data-open-code-preview>代码预览</button>
+                        <button class="btn btn-sm btn-solid" type="button" data-generate-operator-project>生成算子工程</button>
                       </div>
                     </div>
                   </div>
@@ -5926,19 +6239,13 @@
                         </div>
                       </div>
                       <div class="control-field">
-                        <label>尾块策略</label>
+                        <label>核内尾块策略</label>
                         <div class="seg-control" data-seg="tailPolicy">
-                          ${['former/tail', 'branch', 'pad'].map((policy) => `<button type="button" class="${selected.tailPolicy === policy ? 'is-active' : ''}" data-set-tail-policy="${policy}">${policy}</button>`).join('')}
+                          ${['branch', 'pad'].map((policy) => `<button type="button" class="${selected.tailPolicy === policy ? 'is-active' : ''}" data-set-tail-policy="${policy}">${policy === 'branch' ? 'Branch' : 'Pad'}</button>`).join('')}
                         </div>
-                        <div class="control-hint">决定不均分时，kernel 用分支、former/tail 还是 padding 承接尾块。</div>
+                        <div class="control-hint">${tailPolicyHint(operator)}</div>
                       </div>
-                      <div class="control-field">
-                        <label>填充策略</label>
-                        <div class="seg-control" data-seg="paddingPolicy">
-                          ${['mask', 'padding', 'drop'].map((policy) => `<button type="button" class="${selected.paddingPolicy === policy ? 'is-active' : ''}" data-set-padding-policy="${policy}">${policy}</button>`).join('')}
-                        </div>
-                        <div class="control-hint">决定未覆盖元素是用 mask 保护、补齐计算，还是显式标记为不可接受。</div>
-                      </div>
+                      ${renderPaddingPolicyControl(operator, selected, outcome)}
                     </section>
                     <section class="tiling-group">
                       <div class="tiling-group__head"><h4>核间核内 visualization</h4><span>${selected.blockDim} cores · ${outcome.loopCount} loops</span></div>
@@ -5962,10 +6269,12 @@
                     </section>
                     <section class="plan-swimlane">
                       <div class="plan-swimlane-legend"><span>Timeline derived from pseudo code and tiling contract</span><span>tile0 · tile1 · tile2</span></div>
-                      <div class="plan-lane-label">MTE2 / CopyIn</div><div class="plan-lane"><span class="plan-stage t0" style="--x:2%;--w:14%">t0</span><span class="plan-stage t1" style="--x:16%;--w:14%">t1</span><span class="plan-stage t2" style="--x:54%;--w:14%">t2</span></div>
-                      <div class="plan-lane-label">Vector / Compute</div><div class="plan-lane"><span class="plan-stage t0" style="--x:28%;--w:20%">t0</span><span class="plan-stage t1" style="--x:50%;--w:20%">t1</span><span class="plan-stage t2" style="--x:74%;--w:16%">t2</span></div>
-                      <div class="plan-lane-label">MTE3 / CopyOut</div><div class="plan-lane"><span class="plan-stage t0" style="--x:44%;--w:14%">t0</span><span class="plan-stage t1" style="--x:68%;--w:14%">t1</span><span class="plan-stage t2" style="--x:88%;--w:10%">t2</span></div>
-                      <div class="plan-lane-label">FLOWCTRL</div><div class="plan-lane"><span class="plan-stage wait" style="--x:47%;--w:8%">wait</span><span class="plan-stage wait" style="--x:71%;--w:8%">wait</span></div>
+                      <div class="plan-lane-label">MTE2 / CopyIn</div><div class="plan-lane"><span class="plan-stage t0" style="--x:2%;--w:14%">t0</span><span class="plan-stage t1" style="--x:20%;--w:14%">t1</span><span class="plan-stage t2" style="--x:52%;--w:12%">t2</span></div>
+                      <div class="plan-lane-label">MTE1 / LoadData</div><div class="plan-lane"><span class="plan-stage t0" style="--x:15%;--w:10%">t0</span><span class="plan-stage t1" style="--x:32%;--w:10%">t1</span><span class="plan-stage t2" style="--x:54%;--w:10%">t2</span></div>
+                      <div class="plan-lane-label">Cube / MMAD</div><div class="plan-lane"><span class="plan-stage t0" style="--x:25%;--w:17%">t0</span><span class="plan-stage t1" style="--x:49%;--w:17%">t1</span><span class="plan-stage t2" style="--x:74%;--w:13%">t2</span></div>
+                      <div class="plan-lane-label">FLOWCTRL / Sync</div><div class="plan-lane"><span class="plan-stage wait" style="--x:42%;--w:6%">wait</span><span class="plan-stage wait" style="--x:66%;--w:6%">wait</span></div>
+                      <div class="plan-lane-label">Vector / Epilogue</div><div class="plan-lane"><span class="plan-stage t0" style="--x:47%;--w:12%">t0</span><span class="plan-stage t1" style="--x:71%;--w:12%">t1</span><span class="plan-stage t2" style="--x:88%;--w:8%">t2</span></div>
+                      <div class="plan-lane-label">FIXP / CopyOut</div><div class="plan-lane"><span class="plan-stage t0" style="--x:62%;--w:11%">t0</span><span class="plan-stage t1" style="--x:84%;--w:10%">t1</span><span class="plan-stage t2" style="--x:95%;--w:4%">t2</span></div>
                     </section>
                   </div>
                 </section>
@@ -5987,16 +6296,6 @@
                 </aside>
               </section>
 
-              <section class="plan-code-output">
-                <article class="viz-panel">
-                  <header class="section-head"><h3>生成的 kernel 骨架</h3></header>
-                  <pre>${escapeHtml(code.kernel)}</pre>
-                </article>
-                <article class="viz-panel">
-                  <header class="section-head"><h3>Host 侧 Tiling 结构体</h3></header>
-                  <pre>${escapeHtml(code.host)}</pre>
-                </article>
-              </section>
             </div>
           `;
           bindTilingControls('all', $('#planView'));
@@ -6528,6 +6827,37 @@
         });
       }
 
+      function initGeneratedCodePreview() {
+        document.addEventListener('click', (event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          if (!target) return;
+          if (target.closest('[data-open-code-preview]')) {
+            openCodePreview();
+            return;
+          }
+          if (target.closest('[data-close-code-preview]')) {
+            closeCodePreview();
+            return;
+          }
+          const fileButton = target.closest('[data-code-preview-file]');
+          if (fileButton) {
+            showGeneratedOperatorFile(fileButton.dataset.codePreviewFile);
+            return;
+          }
+          if (target.closest('[data-regenerate-code-preview]')) {
+            openCodePreview();
+            return;
+          }
+          if (target.closest('[data-generate-operator-project]')) prepareOperatorProject();
+        });
+        $('#operatorCodePreview').addEventListener('click', (event) => {
+          if (event.target === event.currentTarget) closeCodePreview();
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && !$('#operatorCodePreview').hidden) closeCodePreview();
+        });
+      }
+
       function initFrame() {
         window.PtoIdeFrame?.initAll?.();
         $('#themeToggle').addEventListener('click', () => {
@@ -6542,6 +6872,7 @@
 
       initTabs();
       renderAll();
+      initGeneratedCodePreview();
       initFrame();
     })();
   </script>
