@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AscendPort MLA · Existing UI Audit</title>
+  <link rel="stylesheet" href="../../pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../../pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../../pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../../pto-design-system/css/style.css">
+  <style>
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+    main {
+      width: min(1180px, calc(100vw - 40px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+    h1 { margin: 0 0 8px; font: var(--text-display); }
+    p { margin: 0 0 20px; color: var(--foreground-secondary); font: var(--text-body); }
+    section { margin-top: 20px; }
+    h2 { margin: 0 0 10px; font: var(--text-title-2); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface-1);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+      border-top: 1px solid var(--border-subtle);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    th {
+      border-top: 0;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      text-transform: uppercase;
+    }
+    code {
+      padding: 1px 5px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-disabled);
+      color: var(--foreground);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 8px;
+      border-radius: var(--radius-pill);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+    }
+    .ok { color: var(--success); }
+    .warn { color: var(--warning); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AscendPort MLA Existing UI Audit</h1>
+    <p>原页面 <code>ascendport_migration_V3_MLA.html</code> 的视觉/功能库存与 PTO refresh 映射。运行页见 <code>ascendport_migration_V3_MLA_pto.html</code>。</p>
+
+    <section>
+      <h2>Shell Classification</h2>
+      <table>
+        <thead><tr><th>项目</th><th>结论</th><th>处理</th></tr></thead>
+        <tbody>
+          <tr><td>Shell</td><td><span class="badge">ide-frame</span></td><td class="ok">已迁移到 <code>patterns/ide-frame</code>，split 行为由 <code>workbench-shell</code> 接管。</td></tr>
+          <tr><td>Theme</td><td>dark-first workstation</td><td class="ok">保留旧页暗色工作台语义，改用 PTO tokens 和 shared pane skin。</td></tr>
+          <tr><td>Playback</td><td>pane-local step/play controls</td><td class="warn">未使用 floating playback；旧页只有 S4/S5/S6/S8 局部演示按钮。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Migration Table</h2>
+      <table>
+        <thead><tr><th>旧页面元素</th><th>PTO 等价物</th><th>状态</th><th>删除/保留的旧装饰</th></tr></thead>
+        <tbody>
+          <tr><td><code>.titlebar</code></td><td><code>.pto-ide-frame__topbar</code></td><td class="ok">pattern-migrate</td><td>删除私有实色 titlebar、macOS 三点装饰。</td></tr>
+          <tr><td><code>.activity</code></td><td><code>.pto-ide-frame__activity-rail</code></td><td class="ok">pattern-migrate</td><td>改为 Explorer/Search/Source control/Terminal 四个固定语义按钮。</td></tr>
+          <tr><td><code>.sidebar .tree</code></td><td>Explorer pane content</td><td class="ok">migrate</td><td>保留文件树行为；颜色、radius、hover 改 token。</td></tr>
+          <tr><td><code>.edit-split</code></td><td>Editor pane 内业务互斥视图</td><td class="ok">migrate</td><td>保留 graph/compare/tiling/pipeline 互斥状态；外层 pane resize 交给 pattern。</td></tr>
+          <tr><td>计算图 SVG</td><td>业务 operator DAG</td><td class="warn">data-viz-exempt</td><td>不是 model Graphviz；节点/边色作为数据编码保留。</td></tr>
+          <tr><td>S4 数据流</td><td><code>memory-architecture-layout</code> + 原步骤图</td><td class="ok">pattern-migrate</td><td>新增共享 Ascend 910B memory architecture pattern，路径焦点随步骤同步。</td></tr>
+          <tr><td>S6/S8 泳道</td><td><code>swimlane-task-bar</code></td><td class="ok">pattern-migrate</td><td>任务条改用 shared canvas renderer；idle/bubble 斜纹为 data-viz。</td></tr>
+          <tr><td>Wizard cards</td><td>Inspector pane + PTO quiet cards</td><td class="ok">migrate</td><td>移除旧 <code>border-left</code> 提示条，改 <code>inspector-soft-card</code>。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Residue Classification</h2>
+      <table>
+        <thead><tr><th>信号</th><th>当前解释</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td><code>linear-gradient(90deg)</code> + inset marker</td><td>代码行风险/新增/联动高亮，编码源码状态。</td><td class="ok">data-viz-exempt</td></tr>
+          <tr><td><code>box-shadow: inset 0 1px 0</code></td><td>表格/列表行分隔，不是 left rail。</td><td class="ok">PTO-owned separator</td></tr>
+          <tr><td><code>box-shadow: inset 0 0 0</code></td><td>单选控件状态。</td><td class="ok">PTO-owned control state</td></tr>
+          <tr><td><code>border-left</code></td><td>旧提示条已移除。</td><td class="ok">removed</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

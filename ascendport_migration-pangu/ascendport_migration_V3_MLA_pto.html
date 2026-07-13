@@ -1,0 +1,2757 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AscendPort · 昇腾迁移工作台</title>
+  <script>
+    if (new URLSearchParams(location.search).has('preview')) {
+      document.documentElement.dataset.preview = 'card';
+    }
+  </script>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/model-graphviz/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/swimlane-task/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css">
+  <style>
+    :root {
+      --mem: #6c8cff;
+      --cube: #f2b44a;
+      --vec: #37c7c9;
+      --scalar: #a98bff;
+      --risk: #ff5470;
+      --ok: var(--success);
+      --warn: var(--warning);
+      --acc: var(--primary);
+      --acc-soft: color-mix(in srgb, var(--primary) 18%, transparent);
+      --txt: var(--foreground);
+      --dim: var(--foreground-secondary);
+      --dim2: var(--foreground-muted);
+      --line: var(--border-subtle);
+      --line2: var(--border-default);
+      --edit: color-mix(in srgb, var(--surface-1) 78%, transparent);
+      --chrome: color-mix(in srgb, var(--surface-2) 78%, transparent);
+      --chrome2: color-mix(in srgb, var(--surface-2) 88%, transparent);
+      --side: color-mix(in srgb, var(--surface-1) 72%, transparent);
+      --k: #ff7ba6;
+      --ty: #f2b44a;
+      --fn: #68b6ff;
+      --num: #c99bff;
+      --str: #8fd98f;
+      --com: #7a8199;
+      --pp: #e08adf;
+      --mono: var(--font-mono);
+      --sans: var(--font-sans);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    html {
+      color-scheme: dark;
+      scrollbar-color: color-mix(in srgb, var(--foreground-muted) 62%, transparent) transparent;
+      scrollbar-width: thin;
+    }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--ide-frame-page-bg);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+      font-size: 14px;
+    }
+    button { font-family: inherit; }
+    * {
+      scrollbar-color: color-mix(in srgb, var(--foreground-muted) 58%, transparent) transparent;
+      scrollbar-width: thin;
+    }
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+      min-height: 32px;
+      border: 2px solid transparent;
+      border-radius: var(--radius-pill);
+      background: color-mix(in srgb, var(--foreground-muted) 62%, transparent);
+      background-clip: content-box;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--foreground-secondary) 72%, transparent);
+      background-clip: content-box;
+    }
+    *::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    .mobile-note { display: none; }
+    .mla-frame {
+      width: 100vw;
+      height: 100vh;
+      aspect-ratio: auto;
+      border-radius: 0;
+      --ide-frame-title-font: 600 13px / 1.2 var(--font-sans);
+      --ide-frame-meta-font: 500 12px / 1.35 var(--font-mono);
+    }
+    .mla-frame .pto-ide-frame__topbar { min-height: 46px; }
+    .mla-frame .pto-ide-frame__split { padding: 0 8px 0 0; }
+    .mla-frame .pto-ide-frame__pane-body { background: transparent; }
+    .mla-frame .pto-ide-frame__status-strip { min-height: 25px; }
+    .mla-frame [data-ide-pane="main-row"] {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .mla-host-chip-text {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .mla-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--success);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--success) 70%, transparent);
+    }
+    .mla-search-copy {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mla-status-right {
+      margin-left: auto;
+      display: inline-flex;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .explorer-head {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--foreground-secondary);
+      font: var(--ide-frame-meta-font);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .tree {
+      height: 100%;
+      overflow: auto;
+      padding: 8px 6px 18px;
+    }
+    .node {
+      min-height: 26px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .node:hover { background: var(--state-hover); color: var(--foreground); }
+    .node.sel { background: var(--state-selected); color: var(--foreground); }
+    .node.ind { padding-left: 22px; }
+    .node.ind2 { padding-left: 36px; }
+    .node .chev, .node .ic { flex: none; color: var(--foreground-muted); }
+    .fic { width: 14px; height: 14px; }
+    .tag {
+      margin-left: auto;
+      min-height: 18px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 6px;
+      border-radius: var(--radius-sm);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+    .tag.new { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+    .tag.mod { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, transparent); }
+    .dot-c {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      display: inline-block;
+      flex: none;
+    }
+
+    .editor-pane-body {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+      min-height: 0;
+    }
+    .editor-pane-body.pto-ide-frame__split {
+      padding: 0;
+    }
+    .editor-pane-body > .edit-split {
+      min-height: 0;
+      min-width: 0;
+    }
+    .editor-pane-body > [data-ide-bottom-dock] {
+      min-height: 154px;
+      overflow: hidden;
+    }
+    .editor-pane-body > [data-ide-bottom-dock][hidden] {
+      display: none !important;
+    }
+    .pto-ide-frame__pane[data-ide-pane="editor-preview"] {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .tabs {
+      min-width: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      border-radius: var(--radius-md);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font: var(--ide-frame-title-font);
+      white-space: nowrap;
+    }
+    .tab:hover { background: var(--state-hover); color: var(--foreground); }
+    .tab.on {
+      background: var(--ide-frame-selected-bg);
+      color: var(--foreground);
+      box-shadow: var(--ide-frame-selected-shadow);
+    }
+    .tab .cd { width: 12px; height: 12px; }
+    .tab .x { opacity: .58; font-size: 14px; }
+
+    .edtoolbar {
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .etb-path {
+      min-width: 0;
+      color: var(--foreground-muted);
+      font: var(--ide-frame-meta-font);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .etb-path b { color: var(--foreground-secondary); }
+    .etb-spacer { flex: 1; }
+    .etb-btn, .fb-btn, .tp-anim, .pp-play, .perf-play, .acc-apply {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border: 1px solid var(--button-secondary-border);
+      border-radius: var(--button-radius);
+      background: var(--button-secondary-bg);
+      color: var(--button-secondary-fg);
+      box-shadow: var(--button-secondary-shadow);
+      padding: 0 11px;
+      font: var(--button-font);
+      cursor: pointer;
+    }
+    .etb-btn:hover, .fb-btn:hover, .tp-anim:hover, .pp-play:hover, .perf-play:hover, .acc-apply:hover {
+      background: var(--button-secondary-bg-hover);
+      color: var(--foreground);
+    }
+    .etb-btn.on, .fb-btn.on {
+      background: var(--state-selected);
+      color: var(--foreground);
+    }
+    .etb-btn svg { width: 14px; height: 14px; }
+
+    .edit-split.pto-ide-frame__split {
+      min-height: 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: row;
+      padding: 0 !important;
+      overflow: hidden;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .editor-group-panel {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--ide-frame-pane-border);
+      border-radius: var(--radius-lg);
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 82%, transparent);
+    }
+    .sourcepane {
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+    .editor-group-panel > .pto-ide-frame__tabstrip {
+      min-height: 40px;
+      padding: 5px 8px;
+      border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 68%, transparent);
+      background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+    }
+    .sourcepane .pto-ide-frame__pane-header {
+      border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 58%, transparent);
+    }
+    .codewrap, .graphpane, .tilingpane, .pipepane {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 74%, transparent);
+    }
+    .codewrap { position: relative; overflow: auto; }
+    .analysispane {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .analysispane.gp-closed {
+      display: none !important;
+      flex: 0 0 0 !important;
+    }
+    .edit-split.analysis-open .analysispane {
+      display: grid;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .analysis-tabs {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .analysis-tabs::-webkit-scrollbar { display: none; }
+    .analysis-tab {
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      flex: 0 0 auto;
+    }
+    .analysis-tab.on {
+      background: var(--ide-frame-selected-bg);
+      color: var(--foreground);
+      box-shadow: var(--ide-frame-selected-shadow);
+    }
+    .analysis-tab[hidden] {
+      display: none !important;
+    }
+    .analysis-close {
+      width: 26px;
+      min-height: 26px;
+      padding: 0;
+      border-radius: var(--radius-sm);
+    }
+    .analysis-body {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .analysis-body > .diffpane,
+    .analysis-body > .graphpane,
+    .analysis-body > .tilingpane,
+    .analysis-body > .pipepane,
+    .analysis-body > .flowpane,
+    .analysis-body > .accpane,
+    .analysis-body > .perfpane,
+    .analysis-body > .apipane {
+      display: none;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .analysis-body > .diffpane {
+      flex-direction: column;
+      overflow: auto;
+    }
+    .analysispane[data-analysis-view="generated"] .diffpane,
+    .analysispane[data-analysis-view="graph"] .graphpane,
+    .analysispane[data-analysis-view="tiling"] .tilingpane,
+    .analysispane[data-analysis-view="pipeline"] .pipepane {
+      display: flex;
+    }
+    .analysispane[data-analysis-view="flow"] .flowpane {
+      display: flex;
+    }
+    .analysispane[data-analysis-view="accuracy"] .accpane,
+    .analysispane[data-analysis-view="performance"] .perfpane,
+    .analysispane[data-analysis-view="api"] .apipane {
+      display: block;
+    }
+    .analysispane .gp-head,
+    .analysispane .tp-head {
+      display: none;
+    }
+    .diffpane, .graphpane, .tilingpane, .pipepane {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--duration-base) var(--easing-default);
+    }
+    .analysispane[data-analysis-view="generated"] .diffpane,
+    .analysispane[data-analysis-view="graph"] .graphpane,
+    .analysispane[data-analysis-view="tiling"] .tilingpane,
+    .analysispane[data-analysis-view="pipeline"] .pipepane {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .pane-h, .gp-head, .tp-head {
+      min-height: 33px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      background: var(--ide-frame-pane-header-fill);
+      color: var(--foreground-secondary);
+      font: var(--ide-frame-meta-font);
+      backdrop-filter: var(--ide-frame-pane-backdrop-filter);
+    }
+    .pane-h b, .gp-head b, .tp-head b {
+      color: var(--foreground);
+      font: var(--ide-frame-title-font);
+    }
+    .pane-h .link-hint {
+      color: var(--vec);
+      background: color-mix(in srgb, var(--vec) 12%, transparent);
+      border-radius: var(--radius-sm);
+      padding: 2px 7px;
+      font-size: 12px;
+    }
+    .pane-tag {
+      margin-left: auto;
+      min-height: 18px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 7px;
+      border-radius: var(--radius-sm);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      font-size: 12px;
+    }
+    .pane-tag.cuda { color: var(--cube); }
+    .pane-tag.asc { color: var(--primary); }
+
+    .code {
+      min-width: max-content;
+      min-height: 100%;
+      display: grid;
+      grid-template-columns: auto minmax(680px, 1fr);
+      font: 500 12px / 19px var(--font-mono);
+    }
+    .gutter {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      padding: 10px 12px 40px 16px;
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 90%, transparent);
+      color: var(--foreground-muted);
+      text-align: right;
+      white-space: pre;
+      user-select: none;
+    }
+    .codelines {
+      min-width: 0;
+      padding: 10px 20px 40px 16px;
+      white-space: pre;
+    }
+    .ln {
+      display: block;
+      min-height: 19px;
+      border-radius: 2px;
+      transition: background var(--duration-fast) var(--easing-default);
+    }
+    .ln.hl-risk { background: color-mix(in srgb, var(--risk) 16%, transparent); }
+    .ln.hl-add { background: color-mix(in srgb, var(--success) 12%, transparent); }
+    .ln.hl-buf { background: color-mix(in srgb, var(--mem) 14%, transparent); }
+    .ln.hl-new { position: relative; background: color-mix(in srgb, var(--success) 18%, transparent); }
+    .ln.hl-new::after {
+      content: "+S4";
+      position: absolute;
+      right: 14px;
+      color: var(--success);
+      background: color-mix(in srgb, var(--success) 14%, transparent);
+      border-radius: 2px;
+      padding: 0 4px;
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+    }
+    .ln.hl-node { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+    .ln.link-hot { background: color-mix(in srgb, var(--vec) 22%, transparent) !important; }
+    .ln.link-grp { cursor: pointer; }
+    .ln.link-grp:hover { background: color-mix(in srgb, var(--vec) 12%, transparent); }
+    .edit-split.compare-open.link-active .ln.link-grp:not(.link-hot),
+    .edit-split.compare-open.link-active .ln:not(.link-hot) { opacity: .5; }
+    /* 改写行（两平台算子 API 差异）：左侧强调条 + 悬停徽标 */
+    .ln.link-diff { box-shadow: inset 2px 0 0 var(--cube); }
+    .ln.link-diff::after {
+      content: "Δ API";
+      position: absolute;
+      right: 12px;
+      top: 1px;
+      color: var(--cube);
+      background: color-mix(in srgb, var(--cube) 15%, transparent);
+      border-radius: 2px;
+      padding: 0 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: var(--font-weight-bold);
+      letter-spacing: .3px;
+      opacity: 0;
+      transition: opacity var(--duration-fast) var(--easing-default);
+      pointer-events: none;
+    }
+    .ln.link-diff:hover::after { opacity: 1; }
+    /* 架构差异解释浮窗 */
+    .link-pop {
+      position: fixed;
+      z-index: 999;
+      width: 340px;
+      max-width: calc(100vw - 24px);
+      border: 1px solid var(--border-strong, var(--border-subtle));
+      border-radius: var(--radius-md);
+      background: var(--surface-1);
+      box-shadow: var(--shadow-lg, 0 12px 32px rgba(0,0,0,.4));
+      padding: 0;
+      overflow: hidden;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity var(--duration-fast) var(--easing-default), transform var(--duration-fast) var(--easing-default);
+    }
+    .link-pop.show { opacity: 1; transform: translateY(0); }
+    .lp-h {
+      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+      padding: 9px 12px;
+      background: color-mix(in srgb, var(--cube) 10%, var(--surface-2));
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .lp-h b { color: var(--foreground); font-size: 13px; font-weight: var(--font-weight-semibold); }
+    .lp-tag {
+      flex: none;
+      border-radius: var(--radius-sm);
+      padding: 1px 7px;
+      font-size: 10px; font-weight: var(--font-weight-bold);
+      color: var(--cube);
+      background: color-mix(in srgb, var(--cube) 16%, transparent);
+    }
+    .lp-row { padding: 8px 12px 6px; }
+    .lp-k {
+      display: inline-block; margin-bottom: 3px;
+      border-radius: var(--radius-sm);
+      padding: 1px 7px;
+      font-family: var(--font-mono); font-size: 10px; font-weight: var(--font-weight-bold);
+    }
+    .lp-gpu .lp-k { color: var(--risk); background: color-mix(in srgb, var(--risk) 14%, transparent); }
+    .lp-npu .lp-k { color: var(--ok);   background: color-mix(in srgb, var(--ok) 14%, transparent); }
+    .lp-row p { margin: 0; color: var(--foreground-secondary); font-size: 12px; line-height: 1.5; }
+    .lp-row code, .lp-why code {
+      font-family: var(--font-mono); font-size: 11px;
+      padding: 0 3px; border-radius: var(--radius-sm);
+      color: var(--foreground);
+      background: color-mix(in srgb, var(--foreground) 9%, transparent);
+    }
+    .lp-arrow { padding: 0 12px; color: var(--cube); font-size: 11px; font-weight: var(--font-weight-semibold); }
+    .lp-why {
+      margin: 4px 0 0; padding: 8px 12px 10px;
+      border-top: 1px solid var(--border-subtle);
+      background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+      color: var(--foreground-secondary); font-size: 12px; line-height: 1.5;
+    }
+    .lp-why b { display: block; margin-bottom: 2px; color: var(--foreground); font-size: 11px; }
+    .c-k { color: var(--k); }
+    .c-ty { color: var(--ty); }
+    .c-fn { color: var(--fn); }
+    .c-num { color: var(--num); }
+    .c-str { color: var(--str); }
+    .c-com { color: var(--com); font-style: italic; }
+    .c-pp { color: var(--pp); }
+
+    .graphpane, .tilingpane, .pipepane {
+      display: flex;
+      flex-direction: column;
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+    }
+    .graphpane > .legend { display: none; }
+    .gp-close, .tp-close {
+      margin-left: auto;
+      width: 24px;
+      height: 24px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      color: var(--foreground-muted);
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .gp-close:hover, .tp-close:hover { background: var(--state-hover); color: var(--foreground); }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      padding: 8px 12px;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    .gcanvas { flex: 1; min-height: 0; overflow: auto; position: relative; }
+    .graph-legend-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .graph-legend-overlay i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+    .gcanvas svg { display: block; width: 100%; min-height: 100%; }
+    .gcanvas {
+      --model-graphviz-stage-bg: transparent;
+      --model-graphviz-line: color-mix(in srgb, var(--foreground) 62%, transparent);
+      --model-graphviz-line-soft: var(--border-strong);
+      --model-graphviz-node-label: var(--foreground);
+      --model-graphviz-node-type: var(--foreground-secondary);
+      --model-graphviz-tensor-fill: color-mix(in srgb, var(--surface-4) 72%, var(--foreground));
+      --model-graphviz-tensor-stroke: var(--border-strong);
+      --model-graphviz-toggle-bg: var(--state-focus);
+      --model-graphviz-toggle-border: var(--border-strong);
+      --model-graphviz-toggle-icon: var(--foreground);
+      --model-graphviz-active-stroke: color-mix(in srgb, var(--foreground) 90%, transparent);
+      --model-graphviz-related-stroke: color-mix(in srgb, var(--foreground) 42%, transparent);
+      --model-graphviz-edge-tag-bg: color-mix(in srgb, var(--surface-1) 94%, var(--background));
+      --model-graphviz-edge-tag-fg: var(--foreground-secondary);
+      --model-graphviz-edge-tag-border: var(--border-default);
+      --model-graphviz-report-p0: #ff2d7a;
+      --model-graphviz-report-p1: #ff9d00;
+      --model-graphviz-report-p2: #ffe600;
+      --model-graphviz-report-priority-on-dark: var(--foreground);
+      --model-graphviz-report-priority-on-light: var(--background);
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only rect {
+      fill: color-mix(in srgb, var(--surface-3) 86%, var(--danger) 8%) !important;
+      stroke: color-mix(in srgb, var(--danger) 64%, transparent) !important;
+      stroke-width: 2.2px !important;
+      filter: none;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only.is-rewritten rect {
+      fill: color-mix(in srgb, var(--surface-3) 82%, var(--vec) 12%) !important;
+      stroke: color-mix(in srgb, var(--vec) 66%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:comm"] rect {
+      fill: color-mix(in srgb, var(--mem) 22%, transparent) !important;
+      stroke: var(--mem) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:linear"] rect {
+      fill: color-mix(in srgb, var(--cube) 22%, transparent) !important;
+      stroke: var(--cube) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:act"] rect {
+      fill: color-mix(in srgb, var(--vec) 22%, transparent) !important;
+      stroke: var(--vec) !important;
+    }
+    .gcanvas .pto-model-graphviz-node:not(.is-gpu-only)[data-color-key="sem:norm"] rect {
+      fill: color-mix(in srgb, var(--scalar) 22%, transparent) !important;
+      stroke: var(--scalar) !important;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only[data-color-key="io:constant"] rect {
+      fill: color-mix(in srgb, var(--surface-3) 86%, var(--risk) 8%) !important;
+      stroke: color-mix(in srgb, var(--risk) 64%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only.is-rewritten[data-color-key="io:constant"] rect {
+      fill: color-mix(in srgb, var(--surface-3) 82%, var(--vec) 12%) !important;
+      stroke: color-mix(in srgb, var(--vec) 66%, transparent) !important;
+    }
+    .gcanvas .pto-model-graphviz-node[data-color-key^="io:"] rect {
+      stroke-width: 2.2px !important;
+    }
+    .gcanvas {
+      --model-graphviz-tensor-fill: color-mix(in srgb, var(--mem) 18%, transparent);
+      --model-graphviz-tensor-stroke: var(--mem);
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only .pto-model-graphviz-node-label {
+      fill: var(--foreground);
+      font-size: var(--font-size-title-sm);
+      font-weight: var(--font-weight-semibold);
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only .pto-model-graphviz-node-type {
+      fill: var(--danger);
+      font-size: var(--font-size-body-sm);
+      font-weight: var(--font-weight-medium);
+      opacity: 1;
+    }
+    .gcanvas .pto-model-graphviz-node.is-gpu-only.is-rewritten .pto-model-graphviz-node-type {
+      fill: var(--vec);
+    }
+    .gnode { cursor: pointer; }
+    .gnode rect { transition: filter var(--duration-fast), stroke-width var(--duration-fast); }
+    .gnode:hover rect { filter: brightness(1.18); }
+    .gnode.sel rect { stroke-width: 2.4px; }
+    .gnode text { font-family: var(--font-sans); pointer-events: none; }
+    .gnode .nt { font-weight: var(--font-weight-semibold); }
+    .gnode .ns { fill: rgba(0,0,0,.62); }
+    .gedge { stroke: color-mix(in srgb, var(--foreground-muted) 52%, transparent); stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+    .gedge.hot { stroke: var(--risk); stroke-width: 2; }
+    .risk-pulse { animation: pulse 1.8s ease-in-out infinite; }
+    .gnode.enter { animation: pop .38s cubic-bezier(.2,1.4,.4,1) both; }
+    .pto-model-graphviz-node.is-code-hover rect,
+    .gnode.is-code-hover rect {
+      filter: brightness(1.25) drop-shadow(0 0 8px rgba(255,255,255,.3));
+      stroke-width: 2.5px !important;
+    }
+    .gp-detail {
+      min-height: 74px;
+      padding: 10px 12px;
+      background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .gp-detail b { color: var(--foreground); }
+    .gp-detail .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: var(--radius-sm);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      font-size: 12px;
+      margin-right: 6px;
+    }
+    @keyframes pulse { 0%, 100% { opacity: .38; } 50% { opacity: .92; } }
+    @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.94); } to { opacity: 1; transform: none; } }
+
+    .tp-body, .accpane, .perfpane, .apipane {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+    }
+    .tp-sec, .pp-block { margin-bottom: 14px; }
+    .tp-sec > .h, .perf-sec-h, .acc-sec-h {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 8px;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      text-transform: uppercase;
+    }
+    .tp-opts, .tp-metrics, .pp-metrics, .acc-top, .perf-top {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tp-opt, .tp-metric, .pp-metric, .acc-kpi, .perf-kpi, .acc-card, .perf-tune, .perf-reg, .swim, .tl-rows, .opmap, .stepcard, .riskcard {
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+    }
+    .tp-opt {
+      flex: 1;
+      min-width: 86px;
+      padding: 8px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .tp-opt:hover { background: var(--state-hover); }
+    .tp-opt.on { background: var(--state-selected); }
+    .tp-opt b { display: block; color: var(--foreground); font-size: 12px; }
+    .tp-opt span { display: block; color: var(--foreground-secondary); font-size: 12px; }
+    .tp-opt .rec { color: var(--success); }
+    .tp-opt .wrn { color: var(--danger); }
+    .sbar {
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+      gap: 5px;
+      padding: 5px;
+      overflow: visible;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 80%, transparent);
+    }
+    .sblk {
+      min-width: 0;
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      font-size: 12px;
+      transition:
+        background var(--duration-base) var(--easing-default),
+        border-color var(--duration-base) var(--easing-default),
+        color var(--duration-base) var(--easing-default);
+    }
+    .sblk.tail {
+      border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+      background: color-mix(in srgb, var(--danger) 12%, transparent);
+      color: var(--danger);
+    }
+    .sblk.act {
+      border-color: color-mix(in srgb, var(--primary) 58%, transparent);
+      background: color-mix(in srgb, var(--primary) 24%, transparent);
+      color: var(--foreground);
+    }
+    .sbar-cap, .tl-axis, .swim-axis {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      font-size: 12px;
+    }
+    .util { margin-bottom: 9px; }
+    .util .ul, .cmp .cl {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      color: var(--foreground-secondary);
+      font-size: 14px;
+    }
+    .util .ul b, .cmp .cl b { color: var(--foreground); font-family: var(--font-mono); }
+    .util .track, .cmp .brt {
+      position: relative;
+      height: 10px;
+      overflow: hidden;
+      border-radius: var(--radius-pill);
+      background: var(--surface-disabled);
+    }
+    .util .fill, .cmp .brf {
+      height: 100%;
+      border-radius: var(--radius-pill);
+      transition: width var(--duration-slow) var(--easing-default);
+    }
+    .util .cap-line { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--foreground); opacity: .5; }
+    .tp-metric, .pp-metric, .acc-kpi, .perf-kpi {
+      flex: 1;
+      min-width: 110px;
+      padding: 10px 12px;
+    }
+    .tp-metric .mv, .pp-metric .mv, .acc-kpi .kv, .perf-kpi .kv {
+      color: var(--foreground);
+      font-size: 17px;
+      font-weight: var(--font-weight-bold);
+    }
+    .tp-metric .mk, .pp-metric .mk, .acc-kpi .kk, .perf-kpi .kk, .acc-kpi .kd {
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    .tp-scheme-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+    }
+    .tp-scheme {
+      min-width: 0;
+      min-height: 148px;
+      padding: 10px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 8px;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      text-align: left;
+    }
+    .tp-scheme:hover {
+      border-color: var(--card-hover-border);
+      background: color-mix(in srgb, var(--card-bg) 86%, var(--state-hover));
+    }
+    .tp-scheme:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+    .tp-scheme.is-active {
+      border-color: color-mix(in srgb, var(--primary) 68%, transparent);
+      background: color-mix(in srgb, var(--primary) 15%, var(--card-bg));
+      color: var(--foreground);
+    }
+    .tp-scheme__top {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .tp-scheme__top h4 {
+      margin: 0;
+      overflow: hidden;
+      color: var(--foreground);
+      font: 700 14px / 1.25 var(--font-sans);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-scheme__badge {
+      min-height: var(--tag-height);
+      padding: 0 var(--tag-padding-x);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--tag-radius);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .tp-verdict {
+      min-height: 28px;
+      padding: 5px 7px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      color: var(--foreground-muted);
+      font-size: 12px;
+    }
+    .tp-verdict b {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+      white-space: nowrap;
+    }
+    .tp-verdict b::before {
+      width: 6px;
+      height: 6px;
+      content: "";
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+    }
+    .tp-verdict--ready {
+      border-color: color-mix(in srgb, var(--success) 20%, transparent);
+      background: color-mix(in srgb, var(--success) 6%, transparent);
+    }
+    .tp-verdict--ready b { color: var(--success); }
+    .tp-verdict--review {
+      border-color: color-mix(in srgb, var(--warning) 22%, transparent);
+      background: color-mix(in srgb, var(--warning) 7%, transparent);
+    }
+    .tp-verdict--review b { color: var(--warning); }
+    .tp-scheme__facts {
+      display: grid;
+      gap: 5px;
+    }
+    .tp-scheme__row {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 7px;
+      align-items: baseline;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .tp-scheme__row span {
+      overflow: hidden;
+      color: var(--foreground-muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-scheme__row b {
+      overflow: hidden;
+      color: var(--foreground);
+      font-weight: var(--font-weight-bold);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-scheme__row b.is-ok { color: var(--success); }
+    .tp-scheme__row b.is-warn { color: var(--warning); }
+    .tp-scheme__row b.is-risk { color: var(--danger); }
+    .tp-scheme__note {
+      margin: 0;
+      color: var(--foreground-muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .tp-detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 10px;
+      align-items: stretch;
+    }
+    .tp-detail-card {
+      min-width: 0;
+      padding: 11px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+    }
+    .tp-detail-card--wide {
+      display: grid;
+      gap: 10px;
+    }
+    .tp-detail-head {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .tp-detail-head h4,
+    .tp-subhead {
+      margin: 0;
+      color: var(--foreground);
+      font: var(--text-title-2);
+      font-size: 14px;
+    }
+    .tp-subhead { margin-bottom: 6px; }
+    .tp-detail-head span {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tp-control-row .tp-anim {
+      margin: 0;
+    }
+    .tp-explain {
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .sblk.next {
+      outline: 1px solid color-mix(in srgb, var(--success) 55%, transparent);
+      outline-offset: -2px;
+      color: color-mix(in srgb, var(--success) 82%, var(--foreground));
+    }
+    .tp-memory-area {
+      display: grid;
+      gap: 10px;
+    }
+    .tp-memory-arch {
+      height: 300px;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 52%, transparent);
+      overflow: hidden;
+    }
+    .tp-memory-arch__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px 4px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+    }
+    .tp-memory-arch .pto-memory-architecture-viewport {
+      height: 268px;
+      min-height: 0;
+      background: radial-gradient(circle, color-mix(in srgb, var(--foreground) 8%, transparent) 1px, transparent 1.5px);
+      background-size: 20px 20px;
+      overflow: hidden;
+    }
+    .tp-memory-arch .pto-memory-architecture-sizer {
+      min-height: 0;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded {
+      padding: 10px;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__layout {
+      gap: 42px;
+      align-items: flex-start;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__rails {
+      height: var(--tp-aic-height, 430px);
+      align-self: flex-start;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__rail {
+      height: 100%;
+      min-height: 0;
+      border-radius: 24px;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__rail-grid {
+      top: 22px;
+      bottom: 68px;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__rail-label {
+      bottom: 32px;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__stack {
+      gap: 0;
+    }
+    .tp-memory-arch .pto-mem950.is-aiv-folded .pto-mem950__notes {
+      display: none;
+    }
+    .tp-transfer-map {
+      display: grid;
+      grid-template-columns: minmax(82px, 1fr) 18px minmax(82px, 1fr) 18px minmax(82px, 1fr) 18px minmax(96px, 1fr);
+      gap: 6px;
+      align-items: stretch;
+    }
+    .tp-transfer-node {
+      min-width: 0;
+      min-height: 54px;
+      padding: 8px;
+      display: grid;
+      align-content: center;
+      gap: 4px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+      color: var(--foreground-secondary);
+      transition: background var(--duration-base) var(--easing-default), color var(--duration-base) var(--easing-default), border-color var(--duration-base) var(--easing-default);
+    }
+    .tp-transfer-node b {
+      overflow: hidden;
+      color: var(--foreground);
+      font-size: 14px;
+      font-weight: var(--font-weight-bold);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-transfer-node span {
+      overflow: hidden;
+      color: var(--foreground-muted);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-transfer-node.act {
+      border-color: color-mix(in srgb, var(--primary) 58%, transparent);
+      background: color-mix(in srgb, var(--primary) 20%, transparent);
+      color: var(--foreground);
+    }
+    .tp-transfer-node.next {
+      border-color: color-mix(in srgb, var(--success) 40%, transparent);
+      background: color-mix(in srgb, var(--success) 10%, transparent);
+    }
+    .tp-transfer-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--foreground-muted);
+      font-size: 14px;
+    }
+    .tp-transfer-status {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .tp-transfer-card {
+      min-width: 0;
+      padding: 9px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 74%, transparent);
+    }
+    .tp-transfer-card span {
+      display: block;
+      color: var(--foreground-muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .tp-transfer-card b {
+      display: block;
+      overflow: hidden;
+      color: var(--foreground);
+      font-size: 14px;
+      font-weight: var(--font-weight-bold);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tp-current-summary {
+      display: grid;
+      gap: 8px;
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .tp-current-summary b {
+      color: var(--foreground);
+      font-weight: var(--font-weight-bold);
+    }
+    .tp-current-note {
+      padding: 9px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .tp-current-note.is-ready { color: color-mix(in srgb, var(--success) 82%, var(--foreground)); }
+    .tp-current-note.is-review { color: color-mix(in srgb, var(--warning) 86%, var(--foreground)); }
+    @media (max-width: 1180px) {
+      .tp-scheme-grid,
+      .tp-detail-grid,
+      .tp-transfer-map,
+      .tp-transfer-status {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .tp-transfer-arrow { display: none; }
+    }
+
+    .panel-body {
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      background: color-mix(in srgb, var(--ide-frame-pane-bg) 82%, transparent);
+    }
+    .panel-tabs {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 10px;
+      overflow-x: auto;
+    }
+    .ptab {
+      min-height: 26px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 9px;
+      border-radius: var(--radius-sm);
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font: var(--text-label);
+      font-size: 12px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .ptab:hover { background: var(--state-hover); color: var(--foreground); }
+    .ptab.on { background: var(--ide-frame-selected-bg); color: var(--foreground); }
+    .ptab .cnt {
+      min-width: 16px;
+      min-height: 16px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 5px;
+      border-radius: var(--radius-pill);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font-size: 12px;
+    }
+    .ptab .cnt.err { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+    .term, .outputpane, .probs, .flowpane, .accpane, .perfpane, .apipane {
+      min-height: 0;
+      overflow: auto;
+    }
+    .probs { display: none; }
+    .term {
+      padding: 8px 14px;
+      color: var(--foreground-secondary);
+      font: 500 14px / 1.45 var(--font-mono);
+    }
+    .outputpane {
+      padding: 8px 14px;
+      color: var(--foreground-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .tl { white-space: pre-wrap; word-break: break-word; }
+    .tl .g { color: var(--success); }
+    .tl .y { color: var(--warning); }
+    .tl .r { color: var(--danger); }
+    .tl .b { color: var(--fn); }
+    .tl .a { color: var(--primary); }
+    .tl .d, .tl .t { color: var(--foreground-muted); }
+    .tl .p { color: var(--primary); font-weight: var(--font-weight-bold); }
+    .cursor {
+      display: inline-block;
+      width: 7px;
+      height: 14px;
+      vertical-align: -2px;
+      background: var(--primary);
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    .prob {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      padding: 6px 14px;
+      color: var(--foreground-secondary);
+      font-size: 14px;
+    }
+    .prob:hover { background: var(--state-hover); }
+    .prob .pf { color: var(--foreground-muted); font-size: 12px; }
+
+    .flowpane {
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+    }
+    .flow-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      color: var(--foreground-secondary);
+    }
+    .flow-bar .fb-step { font: var(--text-mono); font-size: 12px; }
+    .flow-bar .fb-spacer { flex: 1; }
+    .flow-bar .fb-legend, .swim-legend {
+      display: flex;
+      gap: 10px;
+      color: var(--foreground-secondary);
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .flow-bar .fb-legend span, .swim-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .flow-bar .fb-legend i, .swim-legend i { width: 8px; height: 8px; border-radius: 2px; }
+    .flow-stage {
+      flex: 1;
+      min-height: 136px;
+      overflow: hidden;
+      position: relative;
+    }
+    .flow-stage svg { width: 100%; height: 100%; display: block; }
+    .fu-box { transition: filter var(--duration-fast); }
+    .fu-box.active rect { filter: brightness(1.35); }
+    .fu-lbl { font-family: var(--font-sans); font-size: 12px; font-weight: var(--font-weight-semibold); fill: var(--foreground); pointer-events: none; }
+    .fu-sub { font-family: var(--font-mono); font-size: 12px; fill: var(--foreground-secondary); pointer-events: none; }
+    .fedge { stroke: color-mix(in srgb, var(--foreground-muted) 52%, transparent); stroke-width: 2; fill: none; }
+    .fedge.lit { stroke: var(--success); stroke-width: 2.4; }
+    .fcap { font-family: var(--font-mono); font-size: 12px; fill: var(--foreground-muted); }
+    .flow-note {
+      padding: 6px 12px;
+      color: var(--foreground-secondary);
+      font-size: 14px;
+    }
+    .flow-arch {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      padding: 8px 12px 12px;
+      background: color-mix(in srgb, var(--surface-1) 52%, transparent);
+    }
+    .flow-arch__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      margin-bottom: 6px;
+    }
+    .flow-arch .pto-memory-architecture-viewport {
+      height: 100%;
+      min-height: 180px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle, color-mix(in srgb, var(--foreground) 8%, transparent) 1px, transparent 1.5px);
+      background-size: 20px 20px;
+      overflow: hidden;
+    }
+
+    .tl-rows, .swim {
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .tl-row, .swim-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .tl-lbl, .swim-lbl {
+      width: 66px;
+      flex: none;
+      color: var(--foreground-secondary);
+      text-align: right;
+      font: var(--text-mono);
+      font-size: 12px;
+    }
+    .tl-track, .swim-track {
+      flex: 1;
+      position: relative;
+      height: 24px;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: var(--surface-disabled);
+    }
+    .tl-cell, .swim-cell {
+      position: absolute;
+      top: 3px;
+      height: 14px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      color: rgba(0, 0, 0, .72);
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+      white-space: nowrap;
+    }
+    .tl-cell.mte, .swim-cell.mte { background: var(--mem); }
+    .tl-cell.cube, .swim-cell.cube { background: var(--cube); }
+    .tl-cell.vec, .swim-cell.vec { background: var(--vec); }
+    .tl-cell.bub, .swim-cell.idle {
+      background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--foreground) 18%, transparent), color-mix(in srgb, var(--foreground) 18%, transparent) 3px, transparent 3px, transparent 6px);
+    }
+    .swim-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .cmp { margin-bottom: 9px; }
+    .cmp .barrow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .cmp .brl { width: 44px; flex: none; color: var(--foreground-muted); text-align: right; font-size: 12px; }
+    .cmp .brf {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 6px;
+      color: rgba(0,0,0,.7);
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+    }
+
+    .acc-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+    }
+    .acc-table th, .acc-table td { padding: 8px 10px; text-align: left; }
+    .acc-table th { color: var(--foreground-muted); font: var(--text-label); text-transform: uppercase; }
+    .acc-table td { color: var(--foreground-secondary); box-shadow: inset 0 1px 0 var(--border-subtle); }
+    .acc-table tr.bad td { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+    .acc-op, .acc-err { font-family: var(--font-mono); color: var(--foreground); }
+    .acc-st, .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 0 7px;
+      border-radius: var(--radius-sm);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      font: var(--text-label);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .acc-st.pass, .pill.rec { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+    .acc-st.fail, .tag.risk { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+    .acc-st.fixed { color: var(--mem); background: color-mix(in srgb, var(--mem) 16%, transparent); }
+    .acc-card { margin-top: 10px; padding: 12px 14px; }
+    .acc-card .ac-h { display: flex; align-items: center; gap: 8px; color: var(--foreground); font-weight: var(--font-weight-semibold); margin-bottom: 8px; }
+    .acc-card .ac-row { display: flex; gap: 8px; margin-bottom: 6px; color: var(--foreground-secondary); font-size: 14px; line-height: 1.5; }
+    .acc-card .ac-k { width: 58px; flex: none; color: var(--foreground-muted); }
+    .acc-card code, .perf-reg code {
+      font-family: var(--font-mono);
+      background: var(--surface-disabled);
+      color: var(--foreground);
+      border-radius: var(--radius-sm);
+      padding: 1px 5px;
+    }
+    .acc-fix {
+      margin-top: 10px;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--success) 8%, transparent);
+    }
+    .acc-fix .fh { padding: 8px 11px; color: var(--success); font-weight: var(--font-weight-semibold); }
+    .acc-diff { padding: 8px 11px; font: var(--text-mono); white-space: pre-wrap; }
+    .acc-diff .del, .acc-diff .add, .acc-diff .ctx { display: block; border-radius: var(--radius-sm); padding: 0 4px; }
+    .acc-diff .del { color: color-mix(in srgb, var(--danger) 72%, white); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+    .acc-diff .add { color: color-mix(in srgb, var(--success) 72%, white); background: color-mix(in srgb, var(--success) 12%, transparent); }
+    .acc-diff .ctx { color: var(--foreground-muted); }
+
+    /* ---------- S2 API 可视化面板 ---------- */
+    .api-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .api-head .ah-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .api-head .ah-t b { color: var(--foreground); font-size: 16px; font-family: var(--font-mono); }
+    .api-head .ah-t span { color: var(--foreground-secondary); font-size: 13px; }
+    .api-head .ah-unit {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-left: auto;
+      flex: none;
+      border-radius: var(--radius-sm);
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+    }
+    .api-head .ah-unit i { width: 8px; height: 8px; border-radius: 2px; }
+    .api-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 24px;
+      text-align: center;
+      color: var(--foreground-muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .api-card {
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .api-card .apc-h {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 10px 13px;
+      box-shadow: inset 0 -1px 0 var(--border-subtle);
+    }
+    .api-card .apc-h .nm { color: var(--foreground); font-weight: var(--font-weight-semibold); font-family: var(--font-mono); font-size: 14px; }
+    .api-card .apc-h .ns { color: var(--foreground-muted); font-size: 12px; font-family: var(--font-mono); }
+    .api-card .apc-h .since {
+      margin-left: auto;
+      border-radius: var(--radius-sm);
+      padding: 1px 7px;
+      font-size: 11px;
+      color: var(--foreground-secondary);
+      background: var(--comp-tag-bg);
+    }
+    .api-card .apc-brief { padding: 9px 13px 3px; color: var(--foreground-secondary); font-size: 14px; line-height: 1.55; }
+    .api-sig {
+      margin: 9px 13px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+      color: var(--foreground);
+      font: var(--text-mono);
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .api-sig .kw { color: var(--vec); }
+    .api-sig .ty { color: var(--cube); }
+    .api-sig .fn { color: var(--primary); font-weight: var(--font-weight-bold); }
+    .api-ptable { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 6px; }
+    .api-ptable th, .api-ptable td { padding: 6px 13px; text-align: left; box-shadow: inset 0 1px 0 var(--border-subtle); vertical-align: top; }
+    .api-ptable th { color: var(--foreground-muted); font: var(--text-label); text-transform: uppercase; }
+    .api-ptable .pn { color: var(--foreground); font-family: var(--font-mono); white-space: nowrap; }
+    .api-ptable .pt { color: var(--cube); font-family: var(--font-mono); white-space: nowrap; }
+    .api-ptable .pd { color: var(--foreground-secondary); line-height: 1.45; }
+    .api-notes { list-style: none; margin: 6px 13px 10px; padding: 0; }
+    .api-notes li {
+      position: relative;
+      padding: 3px 0 3px 16px;
+      color: var(--foreground-secondary);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .api-notes li::before { content: "▸"; position: absolute; left: 0; color: var(--primary); }
+    .api-notes li code, .api-card .apc-brief code, .api-ptable code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 0 3px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+    .api-ex-h { padding: 4px 13px; color: var(--foreground-muted); font: var(--text-label); text-transform: uppercase; }
+    .api-ex {
+      margin: 0 13px 12px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+      color: var(--foreground-secondary);
+      font: var(--text-mono);
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+
+    .perf-tune { overflow: hidden; }
+    .perf-tune .pt-item {
+      display: flex;
+      gap: 9px;
+      padding: 8px 11px;
+      color: var(--foreground-secondary);
+      box-shadow: inset 0 1px 0 var(--border-subtle);
+      font-size: 14px;
+    }
+    .perf-tune .pt-item:first-child { box-shadow: none; }
+    .perf-tune b, .perf-reg b { color: var(--foreground); }
+    .perf-reg { margin-top: 10px; padding: 10px 13px; color: var(--foreground-secondary); }
+
+    .wizard-shell {
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+    .wz-h { padding: 14px 16px 12px; }
+    .wz-h .kick { color: var(--primary); font: var(--text-label); text-transform: uppercase; letter-spacing: .12em; }
+    .wz-h h1 { margin: 5px 0 2px; color: var(--foreground); font: var(--text-title-2); }
+    .wz-h p { margin: 0; color: var(--foreground-secondary); font-size: 14px; line-height: 1.5; }
+    .prog { display: flex; gap: 6px; padding: 0 16px 5px; }
+    .pstep {
+      flex: 1;
+      min-width: 0;
+      height: 6px;
+      border: 0;
+      border-radius: var(--radius-pill);
+      background: var(--surface-disabled);
+      cursor: pointer;
+      padding: 0;
+    }
+    .pstep:hover { background: var(--state-hover); }
+    .pstep.done { background: var(--success); }
+    .pstep.cur { background: var(--primary); }
+    .pstep.view { box-shadow: 0 0 0 1px color-mix(in srgb, var(--foreground) 38%, transparent); }
+    .pstep[disabled], .plabel[disabled] { cursor: default !important; }
+    .pstep[disabled]:hover { background: var(--surface-disabled); }
+    .pstep.cur[disabled] { background: var(--primary); }
+    .plabel[disabled]:hover { color: var(--foreground-muted); }
+    .plabels { display: flex; justify-content: space-between; padding: 0 16px 8px; color: var(--foreground-muted); font-size: 12px; }
+    .plabel {
+      border: 0;
+      background: transparent;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .plabel:hover, .plabel.view { color: var(--foreground); }
+    .wz-scroll { min-height: 0; overflow: auto; padding: 6px 16px 16px; }
+    .stepcard { padding: 14px; margin-bottom: 12px; }
+    .stepcard.cur-card { background: var(--state-selected); }
+    .sc-h { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+    .sc-n {
+      width: 26px;
+      height: 26px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-md);
+      background: var(--state-selected);
+      color: var(--primary);
+      font-weight: var(--font-weight-bold);
+      font-size: 12px;
+    }
+    .sc-t b { display: block; color: var(--foreground); font-size: 14px; }
+    .sc-t span, .sc-body { color: var(--foreground-secondary); font-size: 14px; line-height: 1.55; }
+    .sc-body code { font-family: var(--font-mono); background: var(--surface-disabled); border-radius: var(--radius-sm); padding: 1px 5px; color: var(--foreground); }
+    .riskcard { margin-top: 10px; padding: 10px 11px; background: color-mix(in srgb, var(--danger) 10%, transparent); }
+    .riskcard .rh { display: flex; align-items: center; gap: 7px; color: var(--danger); font-weight: var(--font-weight-bold); }
+    .riskcard p { margin: 6px 0 0; color: color-mix(in srgb, var(--danger) 34%, var(--foreground-secondary)); }
+    .choice { margin-top: 10px; }
+    .choice > .q { color: var(--foreground); font-weight: var(--font-weight-semibold); margin-bottom: 8px; }
+    .opt {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 9px 11px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+      margin-bottom: 7px;
+      cursor: pointer;
+    }
+    .opt:hover { background: var(--state-hover); }
+    .opt.on { background: var(--state-selected); }
+    .opt .rd {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 2px var(--foreground-muted);
+      margin-top: 1px;
+    }
+    .opt.on .rd { box-shadow: inset 0 0 0 4px var(--primary); }
+    .opt .ot b { display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 14px; }
+    .opt .ot span { display: block; margin-top: 2px; color: var(--foreground-secondary); font-size: 14px; line-height: 1.45; }
+    .chk { list-style: none; padding: 0; margin: 0; }
+    .chk li {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 2px;
+      color: var(--foreground-secondary);
+      box-shadow: inset 0 1px 0 var(--border-subtle);
+      font-size: 14px;
+    }
+    .chk li:first-child { box-shadow: none; }
+    .chk li .cb {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      background: var(--surface-disabled);
+      color: var(--background);
+      font-size: 12px;
+    }
+    .chk li.done { color: var(--foreground); }
+    .chk li.done .cb { background: var(--success); }
+    .opmap { margin: 12px 0 4px; overflow: hidden; }
+    .opmap-h {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 11px;
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+      font-size: 14px;
+    }
+    .opmap-h .cnt { margin-left: auto; color: var(--foreground-secondary); font-size: 12px; }
+    .opmap table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .opmap th, .opmap td { padding: 7px 10px; text-align: left; box-shadow: inset 0 1px 0 var(--border-subtle); }
+    .opmap th { color: var(--foreground-muted); font: var(--text-label); text-transform: uppercase; }
+    .opmap .cuda, .opmap .op { font-family: var(--font-mono); color: var(--foreground); font-size: 13px; }
+    .opmap .unit { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .opmap .unit i { width: 8px; height: 8px; border-radius: 2px; }
+    .opmap .st { display: inline-flex; border-radius: var(--radius-sm); padding: 1px 6px; font-size: 12px; font-weight: var(--font-weight-bold); }
+    .opmap .st.ok { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+    .opmap .st.rw { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+    .opmap tbody tr { cursor: pointer; transition: background var(--duration-fast) var(--easing-default); }
+    .opmap tbody tr:hover { background: var(--state-hover); }
+    .opmap tbody tr.on { background: var(--state-selected); }
+    .opmap .api-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: var(--radius-sm);
+      padding: 1px 7px;
+      font-size: 12px;
+      font-weight: var(--font-weight-bold);
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 12%, transparent);
+      white-space: nowrap;
+    }
+    .opmap .api-link svg { width: 12px; height: 12px; }
+    .opmap tbody tr:hover .api-link { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+
+    /* ---------- S4 内存层次注入代码清单 ---------- */
+    .s4list {
+      margin: 12px 0 4px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+      overflow: hidden;
+    }
+    .s4list-h {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 8px 11px;
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+      font-size: 14px;
+    }
+    .s4list-h .cnt { margin-left: auto; color: var(--foreground-secondary); font-size: 12px; font-weight: var(--font-weight-normal); }
+    .s4site {
+      padding: 8px 11px;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 var(--border-subtle);
+      transition: background var(--duration-fast) var(--easing-default);
+    }
+    .s4site:hover { background: var(--state-hover); }
+    .s4site.on { background: var(--state-selected); }
+    .s4-top { display: flex; align-items: center; gap: 7px; }
+    .s4-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+    .s4-top b { color: var(--foreground); font-size: 13px; font-weight: var(--font-weight-semibold); }
+    .s4-ln {
+      margin-left: auto;
+      flex: none;
+      border-radius: var(--radius-sm);
+      padding: 1px 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--foreground-secondary);
+      background: var(--comp-tag-bg);
+    }
+    .s4-what { margin: 3px 0 0 16px; color: var(--foreground-secondary); font-size: 12px; line-height: 1.45; }
+    .s4-code {
+      margin: 6px 0 0 16px;
+      padding: 6px 9px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+      color: var(--foreground);
+      font: var(--text-mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .s4list code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 0 3px;
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--foreground) 8%, transparent);
+    }
+    /* ---- 迁移可行性雷达 ---- */
+    .feas {
+      margin: 12px 0 4px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+      overflow: hidden;
+    }
+    .feas-h {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 8px 11px;
+      color: var(--foreground);
+      font-weight: var(--font-weight-semibold);
+      font-size: 14px;
+    }
+    .feas-h .verdict {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border-radius: var(--radius-sm);
+      padding: 1px 8px;
+      font-size: 12px;
+      font-weight: var(--font-weight-semibold);
+    }
+    .feas-h .verdict b { font-family: var(--font-mono); }
+    .feas-plot { display: block; width: 100%; height: auto; padding: 2px 6px 0; }
+    .feas-plot .grid { fill: none; stroke: var(--border-subtle); }
+    .feas-plot .spoke { stroke: var(--border-subtle); }
+    .feas-plot .axl { fill: var(--foreground-secondary); font-size: 9px; font-family: var(--font-sans, inherit); }
+    .feas-plot .poly-base { fill: color-mix(in srgb, var(--foreground) 8%, transparent); stroke: var(--foreground-secondary); stroke-width: 1; stroke-dasharray: 3 3; }
+    .feas-plot .poly-main { stroke-width: 1.6; }
+    .feas-plot .dot { stroke: var(--surface-1); stroke-width: 0.8; }
+    .feas-legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 2px 12px 6px; }
+    .feas-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--foreground-secondary); font-size: 11px; }
+    .feas-legend i { width: 14px; height: 0; border-top-width: 2px; border-top-style: solid; display: inline-block; }
+    .feas-rows { padding: 4px 11px 9px; display: grid; gap: 5px; }
+    .feas-row { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: 8px; }
+    .feas-row .fl { color: var(--foreground); font-size: 12px; }
+    .feas-row .fbar { position: relative; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; }
+    .feas-row .fbar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; transition: width var(--duration-normal, .3s) var(--easing-default); }
+    .feas-row .fbar u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--foreground-secondary); opacity: .55; }
+    .feas-row .fv { font-family: var(--font-mono); font-size: 11px; color: var(--foreground-secondary); min-width: 58px; text-align: right; }
+    .feas-row .fv .up { color: var(--ok); }
+    .feas-row .fv .dn { color: var(--risk); }
+    .wz-foot {
+      position: sticky;
+      bottom: -32px;
+      z-index: 3;
+      margin: 10px -16px -16px;
+      padding: 12px 16px 16px;
+      background:
+        linear-gradient(
+          180deg,
+          transparent 0,
+          color-mix(in srgb, var(--background) 94%, transparent) 18px,
+          color-mix(in srgb, var(--background) 98%, transparent) 100%
+        );
+    }
+    .run-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
+    }
+    .run {
+      width: 100%;
+      min-height: 38px;
+      border: 0;
+      border-radius: var(--button-radius);
+      background: var(--button-solid-bg);
+      color: var(--button-solid-fg);
+      font-weight: var(--font-weight-bold);
+      cursor: pointer;
+    }
+    .run:hover { background: var(--button-solid-bg-hover); }
+    .run:disabled { opacity: var(--button-disabled-opacity); cursor: default; }
+    .run.ghost { background: var(--button-secondary-bg); color: var(--button-secondary-fg); }
+    .run.ghost:hover { background: var(--button-secondary-bg-hover); }
+    .foot-hint { margin: 0 0 8px; text-align: center; color: var(--foreground-muted); font-size: 12px; }
+
+    .notif-wrap {
+      position: fixed;
+      right: 18px;
+      bottom: 34px;
+      z-index: var(--z-toast);
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      pointer-events: none;
+    }
+    .notif {
+      min-width: 250px;
+      max-width: 320px;
+      padding: 11px 14px;
+      border-radius: var(--radius-lg);
+      background: var(--background-elevated);
+      box-shadow: var(--shadow-lg);
+      animation: slidein .3s cubic-bezier(.2,1.2,.3,1) both;
+    }
+    .notif b { display: block; margin-bottom: 2px; color: var(--foreground); font-size: 14px; }
+    .notif span { color: var(--foreground-secondary); font-size: 14px; line-height: 1.4; }
+    @keyframes slidein { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+    @media (max-width: 860px) {
+      .mla-frame { display: none; }
+      .mobile-note {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 14px;
+        padding: 32px;
+        text-align: center;
+        color: var(--foreground-secondary);
+      }
+      .mobile-note b { color: var(--foreground); font-size: 16px; }
+    }
+    @media (max-width: 860px) {
+      html[data-preview="card"] .mla-frame { display: flex; }
+      html[data-preview="card"] .mobile-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-note">
+    <b>请在桌面端打开</b>
+    <span>AscendPort 迁移工作台是多分栏编辑布局，需要较宽屏幕才能完整呈现文件树、编辑器、计算图和迁移向导。</span>
+  </div>
+
+  <section class="pto-ide-frame mla-frame" data-ide-frame data-host="standalone" aria-label="AscendPort 迁移工作台">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+      <div class="pto-ide-frame__topbar-left">
+        <div class="pto-ide-frame__host-chip">
+          <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+            <path d="m7 9 3 3-3 3"></path>
+            <path d="M12 15h5"></path>
+          </svg>
+          <span class="mla-host-chip-text"><span class="mla-status-dot"></span>AscendPort 已连接 · Atlas A3 (Ascend 910C)</span>
+        </div>
+        <div class="pto-ide-frame__workspace">MLA Decode 算子 · Ascend C &amp; PTO</div>
+      </div>
+      <div class="pto-ide-frame__topbar-center">
+        <div class="pto-ide-frame__search" aria-label="工作台上下文">
+          <svg class="pto-ide-frame__search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <span class="mla-search-copy">源端到昇腾迁移 · CANN 8.3.RC1 · torch-npu 2.6.0.RC1 · FP16</span>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-right">
+        <div class="pto-ide-frame__window-actions" aria-label="窗口控制">
+          <button class="pto-ide-frame__window-action is-selected" type="button" data-ide-toggle="terminal" aria-label="切换终端面板" aria-controls="terminal-view" aria-expanded="true" aria-pressed="true" id="topTerminalBtn" title="终端">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+              <path d="m7 9 3 3-3 3"></path>
+              <path d="M12 15h5"></path>
+            </svg>
+          </button>
+          <button class="pto-ide-frame__window-action is-selected" type="button" data-ide-toggle="inspector" aria-label="切换检查器面板" aria-controls="inspector-pane" aria-expanded="true" aria-pressed="true" id="topInspectorBtn" title="检查器">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+              <path d="M15 4v16"></path>
+              <path d="M7 8h4"></path>
+              <path d="M7 12h4"></path>
+              <path d="M7 16h4"></path>
+            </svg>
+          </button>
+          <button class="pto-ide-frame__window-action" type="button" aria-label="重置迁移流程" id="topResetBtn" title="重置">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+              <path d="M3 3v6h6"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" aria-label="活动栏">
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="切换资源管理器" aria-controls="explorer-pane" aria-expanded="true" aria-pressed="true" title="资源管理器">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="搜索" title="搜索">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="源码控制" title="源码控制">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 6h3a2 2 0 0 1 2 2v7"></path><path d="M6 9v12"></path></svg>
+        </button>
+        <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="终端" title="终端" id="railTerminalBtn">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m7 9 3 3-3 3"></path><path d="M12 15h5"></path></svg>
+        </button>
+      </nav>
+
+      <div class="pto-ide-frame__workarea">
+        <div class="pto-ide-frame__split" data-ide-split="mla-vertical" data-split-direction="vertical" data-sizes="72,28" data-min-size="390,165" data-storage-key="ascendport-mla-pto-vertical-v1">
+          <section class="pto-ide-frame__pane pto-ide-frame__pane--stack" data-ide-pane="main-row">
+            <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="17,64,19" data-min-size="220,640,300" data-storage-key="ascendport-mla-pto-main-v1">
+              <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="explorer-pane">
+                <header class="pto-ide-frame__pane-header"><div class="explorer-head"><span>资源管理器</span><span>flash_attention_v2</span></div></header>
+                <div class="pto-ide-frame__pane-body"><div class="tree" id="tree"></div></div>
+              </aside>
+
+              <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
+                <div class="pto-ide-frame__pane-body pto-ide-frame__split editor-pane-body" data-ide-split="editor-bottom" data-split-direction="vertical" data-sizes="76,24" data-min-size="360,154" data-storage-key="ascendport-mla-pto-editor-bottom-v1">
+                  <div class="edit-split pto-ide-frame__split" id="split" data-ide-pane="editor-main" data-ide-split="source-analysis" data-split-direction="horizontal" data-sizes="50,50" data-min-size="420,420" data-storage-key="ascendport-mla-source-analysis-v1">
+                    <section class="editor-group-panel sourcepane" data-ide-pane="source-code-group">
+                      <div class="pto-ide-frame__tabstrip">
+                        <div class="tabs" id="tabs"></div>
+                      </div>
+                      <header class="pto-ide-frame__pane-header">
+                        <div class="edtoolbar">
+                          <span class="etb-path"><b>ops</b> / <span id="etbFile">flash_attention_v2.py</span></span>
+                          <span class="etb-spacer"></span>
+                          <button class="etb-btn" id="parseBtn" type="button" title="解析算子并打开计算图">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7.5 7.5 11 15m6-8.5L13 15"></path></svg>
+                            解析算子 · 计算图
+                          </button>
+                        </div>
+                      </header>
+                      <div class="codewrap" id="codewrap" data-ide-pane="source-code">
+                        <div class="pane-h" id="leftPaneH" style="display:none">
+                          <span class="dot-c" style="background:var(--cube)"></span><b>flash_attention_v2</b><span class="pane-tag cuda">源端代码</span>
+                          <span class="link-hint">悬停/点击代码 ↔ 联动对侧</span>
+                        </div>
+                        <div class="code"><div class="gutter" id="gutter"></div><div class="codelines" id="codelines"></div></div>
+                      </div>
+                    </section>
+
+                    <section class="editor-group-panel analysispane" id="analysisPane" data-ide-pane="analysis" data-analysis-view="graph">
+                      <div class="pto-ide-frame__tabstrip">
+                        <div class="tabs analysis-tabs" aria-label="分析视图">
+                          <button class="tab analysis-tab on" type="button" data-analysis="graph">计算图<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="api">API可视化<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="generated">生成代码<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="flow">数据流<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="tiling">分块<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="pipeline">流水<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="accuracy">精度<span class="x">×</span></button>
+                          <button class="tab analysis-tab" type="button" data-analysis="performance">性能<span class="x">×</span></button>
+                        </div>
+                      </div>
+                      <div class="analysis-body">
+                        <div class="graphpane" id="graphpane">
+                          <div class="gp-head">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.8" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><circle cx="12" cy="18" r="2.5"></circle><path d="M7.5 7.5 11 15m6-8.5L13 15"></path></svg>
+                            <div><b>算子计算图</b> <span class="sub">解析结果 · MLA Decode</span></div>
+                            <div class="gp-close" id="gclose" title="收起">×</div>
+                          </div>
+                          <div class="legend">
+                            <span><i style="background:var(--mem)"></i>片上搬运</span>
+                            <span><i style="background:var(--cube)"></i>矩阵单元</span>
+                            <span><i style="background:var(--vec)"></i>向量单元</span>
+                            <span><i style="background:var(--scalar)"></i>标量单元</span>
+                            <span><i style="background:var(--risk)"></i>仅源端支持</span>
+                          </div>
+                          <div class="gcanvas" id="gcanvas"></div>
+                          <div class="gp-detail" id="gdetail">
+                            <b>点击任意节点查看解析详情</b><br>
+                            <span>计算图由 S1 从源码抽取，节点颜色表示目标执行单元。</span>
+                          </div>
+                        </div>
+
+                        <div class="codewrap diffpane" id="diffwrap">
+                          <div class="pane-h">
+                            <span class="dot-c" style="background:var(--primary)"></span><b id="diffFile">flash_mla_decode.cpp</b><span class="pane-tag asc">昇腾代码</span>
+                          </div>
+                          <div class="code"><div class="gutter" id="diffGutter"></div><div class="codelines" id="diffLines"></div></div>
+                        </div>
+
+                        <div class="tilingpane" id="tilingpane">
+                          <div class="tp-head">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--vec)" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18"></path></svg>
+                            <div><b>分块可视化</b> <span class="sub">维度分块 · 缓冲占用</span></div>
+                            <div class="tp-close" id="tpClose" title="收起">×</div>
+                          </div>
+                          <div class="tp-body" id="tpBody"></div>
+                        </div>
+
+                        <div class="flowpane" id="flowpane"></div>
+
+                        <div class="pipepane" id="pipepane">
+                          <div class="tp-head">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--mem)" stroke-width="1.8" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+                            <div><b>流水线编排 · 前后对比</b> <span class="sub">串行 → 双缓冲重叠</span></div>
+                            <div class="tp-close" id="ppClose" title="收起">×</div>
+                          </div>
+                          <div class="tp-body" id="ppBody"></div>
+                        </div>
+
+                        <div class="accpane" id="accpane"></div>
+                        <div class="perfpane" id="perfpane"></div>
+                        <div class="apipane" id="apipane"></div>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="pto-ide-frame__pane" data-ide-pane="inspector" id="inspector-pane">
+                <header class="pto-ide-frame__pane-header">
+                  <span class="pto-ide-frame__pane-title">算子迁移向导</span>
+                  <span class="pto-ide-frame__pane-meta">S1-S8</span>
+                </header>
+                <div class="pto-ide-frame__pane-body">
+                  <div class="wizard-shell">
+                    <div class="wz-h">
+                      <div class="kick">AscendPort</div>
+                      <h1>源端到昇腾 · 八阶段流水</h1>
+                      <p>逐步把源端算子迁移为昇腾算子。每一步都可介入，下方按钮执行当前阶段。</p>
+                    </div>
+                    <div class="prog" id="prog"></div>
+                    <div class="plabels" id="plabels"></div>
+                    <div class="wz-scroll" id="wzScroll">
+                      <div id="wzContent"></div>
+                      <div class="wz-foot">
+                        <div class="foot-hint" id="footHint">共 8 个阶段 · 当前 1 / 8 完成</div>
+                        <div class="run-row">
+                          <button class="run" id="runBtn" type="button">单步运行 S2</button>
+                          <button class="run ghost" id="runAllBtn" type="button">全部执行</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="pto-ide-frame__pane pto-ide-frame__bottom-dock" data-ide-pane="bottom-panel" data-ide-bottom-dock>
+            <button type="button" id="bottomVisualizationToggle" data-ide-toggle="visualization" hidden aria-hidden="true">问题</button>
+            <div class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization" hidden aria-hidden="true">
+            </div>
+            <div class="pto-ide-frame__bottom-view" data-ide-bottom-panel="terminal" id="terminal-view">
+              <div class="panel-body">
+                <div class="panel-tabs">
+                  <div class="ptab" data-p="probs" aria-controls="probs">问题<span class="cnt err" id="probCnt">3</span></div>
+                  <div class="ptab on" data-p="term">终端</div>
+                  <div class="ptab" data-p="term2">输出</div>
+                  <div style="margin-left:auto;color:var(--foreground-muted);font-size:12px;align-self:center">迁移日志</div>
+                  <button class="pto-ide-frame__window-action" type="button" data-ide-close="terminal" aria-label="关闭终端" title="关闭终端">
+                    <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M18 6 6 18"></path>
+                      <path d="m6 6 12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="probs" id="probs"></div>
+                <div class="term" id="term"></div>
+                <div class="outputpane" id="outputpane" style="display:none">暂无输出。</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome">
+          <span class="s">迁移任务</span>
+          <span class="s" id="sbStep">S1 · 已完成</span>
+          <span class="s">昇腾代码 · CANN 8.3.RC1</span>
+          <span class="mla-status-right">
+            <span class="s" id="sbAicore">算力核 —</span>
+            <span class="s">FP16 · FP32累加</span>
+            <span class="s">UTF-8</span>
+          </span>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <div class="notif-wrap" id="notifs"></div>
+
+  <script>
+    (function placeEditorBottomDock() {
+      const editorBody = document.querySelector('[data-ide-pane="editor-preview"] .editor-pane-body');
+      const bottomDock = document.querySelector('[data-ide-bottom-dock]');
+      if (editorBody && bottomDock && bottomDock.parentElement !== editorBody) {
+        editorBody.appendChild(bottomDock);
+      }
+    })();
+  </script>
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/model-graphviz/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/swimlane-task/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aiv-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-architecture/pattern.js"></script>
+  <script src="./ascendport_migration_V3_MLA_pto_legacy.js"></script>
+  <script>
+    (function wirePtoRefresh() {
+      const helper = window.PtoSwimlaneTaskPattern;
+      const modelGraph = window.PtoModelGraphvizPattern;
+      let swimId = 0;
+      let graphController = null;
+      const tone = {
+        mte: '#6c8cff',
+        cube: '#f2b44a',
+        vec: '#37c7c9',
+        idle: 'rgba(255,255,255,.18)',
+        bub: 'rgba(255,255,255,.18)'
+      };
+      const graphUnitLabel = {
+        mem: '片上搬运',
+        cube: '矩阵单元',
+        vector: '向量单元',
+        scalar: '标量单元',
+        risk: '仅源端支持 · 无直接适配'
+      };
+      const graphColorKey = {
+        mem: 'sem:comm',
+        cube: 'sem:linear',
+        vector: 'sem:act',
+        scalar: 'sem:norm',
+        risk: 'io:constant'
+      };
+      const gpuOnlyGraphNodeIds = new Set(
+        (typeof GNODES !== 'undefined' ? GNODES : []).filter(n => n.gpuOnly).map(n => n.id)
+      );
+
+      function pct(value, total) {
+        return total > 0 ? value / total * 100 : 0;
+      }
+
+      function effectiveGraphUnit(node) {
+        if (!node) return 'mem';
+        return graphMapped && node.unit === 'risk' ? 'vector' : node.unit;
+      }
+
+      function buildPatternGraph() {
+        const sx = 1.0;
+        const sy = 1.0;
+        const ox = 40;
+        const oy = 32;
+        const nodes = GNODES.map((node) => {
+          const unit = effectiveGraphUnit(node);
+          const rewritten = graphMapped && node.unit === 'risk';
+          const isTensor = ['q', 'k', 'v', 'out', 'lmstat'].includes(node.id);
+          const isGpuOnly = node.gpuOnly || gpuOnlyGraphNodeIds.has(node.id);
+          return {
+            id: node.id,
+            label: node.t,
+            typeLabel: rewritten && isGpuOnly
+              ? '仅源端支持 → 向量归约替代'
+              : (isGpuOnly ? '仅源端支持 · 无直接适配' : (isTensor ? node.s : graphUnitLabel[unit])),
+            kind: isTensor ? 'tensor' : 'op',
+            hideTypeLabel: !isTensor && !isGpuOnly,
+            x: ox + (node.x + node.w / 2) * sx,
+            y: oy + (node.y + node.h / 2) * sy,
+            width: Math.max(isGpuOnly ? 210 : (isTensor ? 178 : 188), node.w * 1.42),
+            height: Math.max(isTensor ? 52 : 56, node.h * 1.18),
+            colorKey: graphColorKey[unit] || `unit:${unit}`,
+          };
+        });
+        const edges = GEDGES.map(([source, target]) => ({
+          source,
+          target,
+          edgeType: ['q', 'k', 'v', 'cfg', 'loadq', 'loadkv', 'lmstat'].includes(source) ? 'communication' : 'activation',
+        }));
+        return {
+          width: 800,
+          height: 980,
+          nodes,
+          edges,
+        };
+      }
+
+      function decorateGpuOnlyGraphNodes() {
+        const canvas = document.getElementById('gcanvas');
+        if (!canvas) return;
+        gpuOnlyGraphNodeIds.forEach((id) => {
+          const group = canvas.querySelector(`.pto-model-graphviz-node[data-node-id="${id}"]`);
+          if (!group) return;
+          group.classList.add('is-gpu-only');
+          group.classList.toggle('is-rewritten', graphMapped);
+        });
+      }
+
+      function updateGraphDetail(id) {
+        const node = GNODES.find((item) => item.id === id);
+        const detail = document.getElementById('gdetail');
+        if (!node || !detail) return;
+        const unit = effectiveGraphUnit(node);
+        const col = unitColor(unit);
+        let note = node.d;
+        if (graphMapped && node.unit === 'risk') {
+          note = '【已在 S2 改写】' + node.d.replace(/S2 决策.*$/, '现映射为分核 + 向量单元片上归约，见 S6 的在线 Softmax 规约实现。');
+        }
+        detail.innerHTML =
+          `<span class="badge" style="background:${col}22;color:${col}">${graphUnitLabel[unit]}</span>` +
+          `<b>${node.t}</b> · <code style="font-family:var(--mono);font-size:13px">${node.s}</code><br>` +
+          `<span style="display:block;margin-top:6px">${note}</span>`;
+      }
+
+      function applyGraphSelection(id, source) {
+        const node = GNODES.find((item) => item.id === id);
+        if (!node) return;
+        if (source !== 'pattern') {
+          graphController?.selectNode?.(id, { source: source || 'external' });
+        }
+        updateGraphDetail(id);
+        if (node.lines && node.lines.length >= 2) {
+          if (activeTab !== 'cuda') switchTab('cuda');
+          requestAnimationFrame(() => highlightCodeLines(node.lines[0], node.lines[1]));
+        }
+      }
+
+      window.renderGraph = renderGraph = function renderGraphPto() {
+        const canvas = document.getElementById('gcanvas');
+        if (!canvas || !modelGraph?.renderController) return;
+        graphController?.destroy?.();
+        graphController = modelGraph.renderController(canvas, buildPatternGraph(), {
+          ariaLabel: 'AscendPort Flash Attention v2 计算图',
+          interaction: { selectableClusters: false },
+          overlays: { edgeTags: false, evidence: false },
+          fitMode: 'full',
+          viewportPadding: 18,
+          minReadableZoom: 0.58,
+          onSelect: ({ nodeId }) => applyGraphSelection(nodeId, 'pattern'),
+        });
+        decorateGpuOnlyGraphNodes();
+        // data-color-key 由 GNODES 的 unit 映射,覆盖库默认色
+        (() => {
+          const svg = canvas.querySelector('svg');
+          if (!svg) return;
+          GNODES.forEach((n) => {
+            const g = svg.querySelector(`.pto-model-graphviz-node[data-node-id="${n.id}"]`);
+            if (g) {
+              const k = graphColorKey[effectiveGraphUnit(n)] || 'io:constant';
+              g.setAttribute('data-color-key', k);
+            }
+          });
+        })();
+        // 图例浮层:嵌入 gcanvas 内部,跟随画布缩放
+        let legend = canvas.querySelector('.graph-legend-overlay');
+        if (!legend) {
+          legend = document.createElement('div');
+          legend.className = 'graph-legend-overlay';
+          canvas.appendChild(legend);
+        }
+        legend.innerHTML =
+          '<span><i style="background:var(--mem)"></i>片上搬运</span>' +
+          '<span><i style="background:var(--cube)"></i>矩阵单元</span>' +
+          '<span><i style="background:var(--vec)"></i>向量单元</span>' +
+          '<span><i style="background:var(--scalar)"></i>标量单元</span>' +
+          '<span><i style="background:var(--risk)"></i>仅源端支持</span>';
+        const detail = document.getElementById('gdetail');
+        if (detail) {
+          detail.innerHTML = '<b>点击任意节点查看解析详情</b><br><span>计算图由共享图谱组件渲染，节点语义映射到昇腾执行单元。</span>';
+        }
+      };
+
+      window.selectNode = selectNode = function selectNodePto(id) {
+        applyGraphSelection(id, 'legacy');
+      };
+
+      function drawIdle(ctx, x, y, w, h) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, 4);
+        ctx.clip();
+        ctx.fillStyle = 'rgba(255,255,255,.05)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,.18)';
+        ctx.lineWidth = 1;
+        for (let i = -h; i < w + h; i += 8) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, y + h);
+          ctx.lineTo(x + i + h, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawPatternSwim(id, model, play) {
+        const root = document.querySelector(`[data-swim-id="${id}"]`);
+        if (!root) return;
+        const total = Math.max(1, model.total || 1);
+        const rows = [
+          ['mte', '搬运单元', model.rows.mte || []],
+          ['cube', '矩阵单元', model.rows.cube || []],
+          ['vec', '向量单元', model.rows.vec || []]
+        ];
+        const fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-sans').trim() || 'sans-serif';
+        rows.forEach(([key, label, cells]) => {
+          const canvas = root.querySelector(`canvas[data-row="${key}"]`);
+          if (!canvas) return;
+          const rect = canvas.getBoundingClientRect();
+          const dpr = window.devicePixelRatio || 1;
+          const width = Math.max(1, Math.round(rect.width));
+          const height = Math.max(1, Math.round(rect.height));
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          const ctx = canvas.getContext('2d');
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, width, height);
+          cells.forEach((cell, index) => {
+            const x = width * pct(cell.s, total) / 100;
+            const w = Math.max(3, width * pct(cell.w, total) / 100);
+            if (cell.cls === 'idle' || cell.cls === 'bub') {
+              drawIdle(ctx, x, 3, w, height - 6);
+              return;
+            }
+            helper?.drawTaskBar?.(ctx, {
+              x,
+              y: 3,
+              width: w,
+              height: height - 6,
+              baseColor: tone[cell.cls] || tone[key],
+              task: {
+                label: cell.l || label,
+                opName: cell.l || label,
+                laneKind: key.toUpperCase(),
+                laneId: key,
+                totalCycle: cell.w,
+                status: play ? 'playback' : 'ready'
+              },
+              isEmphasized: !!play,
+              fontFamily
+            });
+          });
+        });
+      }
+
+      window.swimHTML = swimHTML = function swimHTMLPto(model, play) {
+        const id = `swim-${++swimId}`;
+        const axis = `<div class="swim-axis"><span>t=0</span><span>时间(周期)→</span><span>t=${model.total}</span></div>`;
+        const legend = '<div class="swim-legend"><span><i style="background:var(--mem)"></i>搬运单元</span><span><i style="background:var(--cube)"></i>矩阵单元</span><span><i style="background:var(--vec)"></i>向量单元</span><span><i style="background:repeating-linear-gradient(45deg,rgba(255,255,255,.28),rgba(255,255,255,.28) 3px,transparent 3px,transparent 6px)"></i>空转</span></div>';
+        const row = (key, label) => `<div class="swim-row pto-pattern-swimlane-task__row"><div class="swim-lbl pto-pattern-swimlane-task__label">${label}</div><div class="swim-track"><canvas class="swim-canvas pto-pattern-swimlane-task__canvas" data-row="${key}"></canvas></div></div>`;
+        requestAnimationFrame(() => drawPatternSwim(id, model, play));
+        return `<div class="swim pto-pattern-swimlane-task" data-swim-id="${id}">${row('mte', '搬运单元')}${row('cube', '矩阵单元')}${row('vec', '向量单元')}${axis}${legend}</div>`;
+      };
+
+      window.timelineHTML = timelineHTML = function timelineHTMLPto(model, play) {
+        return window.swimHTML(model, play);
+      };
+
+      function mountMemoryArchitecture() {
+        const shell = document.getElementById('flowMemoryArch');
+        const mem = window.PtoMemoryArchitecturePattern;
+        if (!shell || !mem) return;
+        const stage = document.getElementById('flowMemoryStage');
+        mem.renderArchitecture(stage, 'ascend910b');
+        const overlay = mem.createRouteOverlay?.(stage, 'ascend910b');
+        overlay?.render?.();
+        mem.attachHoverInteractions?.(stage, 'ascend910b');
+        window.__mlaMemoryStage = stage;
+        window.__mlaMemoryOverlay = overlay;
+        const viewport = shell.querySelector('[data-pto-mem-arch-viewport]');
+        const sizer = shell.querySelector('[data-pto-mem-arch-sizer]');
+        const canvas = shell.querySelector('[data-pto-mem-arch-canvas]');
+        const zoom = mem.createZoomController?.({
+          viewport,
+          sizer,
+          canvas,
+          defaultZoom: 0.42,
+          min: 0.3,
+          max: 1,
+          pan: true,
+          wheelZoom: true,
+          centerOnReset: true,
+          centerTarget: '.pto-mem950__rails, .pto-mem950__engine-stack, .pto-mem950__stack',
+          onZoom: () => overlay?.render?.(),
+          onPan: () => overlay?.render?.()
+        });
+        requestAnimationFrame(() => zoom?.center?.());
+      }
+
+      function focusMemoryStep(index) {
+        const mem = window.PtoMemoryArchitecturePattern;
+        const stage = window.__mlaMemoryStage;
+        if (!mem || !stage) return;
+        const focus = [
+          { routes: ['l2-to-aiv1'], selectors: ['[data-mem950-node="rail:GM"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'] },
+          { routes: ['l2-to-aic'], selectors: ['[data-mem950-node="rail:GM"]', '#mem950-aic [data-aic-node="buffer:L1"]', '#mem950-aic [data-aic-node="buffer:L0B"]'] },
+          { routes: ['l2-to-aic'], selectors: ['[data-mem950-node="rail:GM"]', '#mem950-aic [data-aic-node="buffer:L1"]', '#mem950-aic [data-aic-node="buffer:L0A"]'] },
+          { selectors: ['#mem950-aic [data-aic-node="buffer:L0A"]', '#mem950-aic [data-aic-node="buffer:L0B"]', '#mem950-aic [data-aic-node="buffer:L0C"]'] },
+          { selectors: ['#mem950-aic [data-aic-node="buffer:L0C"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]'] },
+          { selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="exec:SIMD"]'] }
+        ][index] || {};
+        mem.setPathFocus(stage, 'ascend910b', focus);
+        window.__mlaMemoryOverlay?.render?.();
+      }
+
+      window.renderFlow = renderFlow = function renderFlowPto() {
+        const pane = document.getElementById('flowpane');
+        if (!pane) return;
+        pane.innerHTML = `
+          <div class="flow-bar">
+            <button class="fb-btn" id="flowPlay">▶ 播放</button>
+            <button class="fb-btn" id="flowStep">⏭ 单步</button>
+            <span class="fb-step">步骤 <b id="flowNo">1</b>/${FLOW_STEPS.length} · <span id="flowTitle">${FLOW_STEPS[0].t}</span></span>
+            <span class="fb-spacer"></span>
+            <span class="fb-legend">
+              <span><i style="background:var(--mem)"></i>搬运单元</span>
+              <span><i style="background:var(--cube)"></i>矩阵单元</span>
+              <span><i style="background:var(--vec)"></i>向量单元</span>
+            </span>
+          </div>
+          <div class="flow-arch" id="flowMemoryArch">
+            <div class="flow-arch__head"><span>内存架构 · 昇腾 A3 (910C)</span><span>路径焦点随步骤同步</span></div>
+            <div class="pto-memory-architecture-viewport" data-pto-mem-arch-viewport>
+              <div class="pto-memory-architecture-sizer" data-pto-mem-arch-sizer>
+                <div class="pto-memory-architecture-canvas" data-pto-mem-arch-canvas>
+                  <div id="flowMemoryStage"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flow-note"><span id="flowNote">${FLOW_STEPS[0].note}</span></div>`;
+        mountMemoryArchitecture();
+        document.getElementById('flowPlay').onclick = toggleFlowPlay;
+        document.getElementById('flowStep').onclick = () => {
+          stopFlow();
+          flowIdx = (flowIdx + 1) % FLOW_STEPS.length;
+          showFlowStep(flowIdx);
+        };
+        flowIdx = 0;
+        showFlowStep(0);
+      };
+
+      window.showFlowStep = showFlowStep = function showFlowStepPto(index) {
+        const step = FLOW_STEPS[index];
+        if (!step) return;
+        const no = document.getElementById('flowNo');
+        const title = document.getElementById('flowTitle');
+        const note = document.getElementById('flowNote');
+        if (no) no.textContent = String(index + 1);
+        if (title) title.textContent = step.t;
+        if (note) note.textContent = step.note;
+        focusMemoryStep(index);
+        if (step.code && document.getElementById('split')?.classList.contains('compare-open')) {
+          highlightDiffLines(step.code[0], step.code[1]);
+        }
+      };
+
+      const baseActivatePanelTab = window.activatePanelTab;
+      window.activatePanelTab = activatePanelTab = function activatePanelTabPto(panel) {
+        baseActivatePanelTab?.(panel);
+        requestAnimationFrame(() => {
+          const frame = document.querySelector('[data-ide-frame]');
+          if (!frame?.dataset.ideFrameReady) return;
+          const terminalMode = panel === 'term' || panel === 'term2' || panel === 'probs';
+          if (terminalMode && frame.dataset.bottomPanelMode !== 'terminal') {
+            document.getElementById('topTerminalBtn')?.click();
+          }
+          if (!terminalMode && frame.dataset.bottomPanelMode !== 'visualization') {
+            document.getElementById('bottomVisualizationToggle')?.click();
+          }
+        });
+      };
+
+      function wireInspectorToggle() {
+        const frame = document.querySelector('[data-ide-frame]');
+        const toggle = document.getElementById('topInspectorBtn');
+        const pane = document.getElementById('inspector-pane');
+        const mainSplit = document.querySelector('[data-ide-split="standalone-main"]');
+        if (!frame || !toggle || !pane || !mainSplit || toggle.dataset.wired === 'true') return;
+        toggle.dataset.wired = 'true';
+        let expanded = pane.getAttribute('aria-hidden') !== 'true' && !pane.hidden;
+        const render = () => {
+          const gutter = pane.previousElementSibling?.matches?.('.pto-workbench-shell__split-gutter')
+            ? pane.previousElementSibling
+            : null;
+          pane.hidden = !expanded;
+          pane.setAttribute('aria-hidden', String(!expanded));
+          if (gutter) gutter.hidden = !expanded;
+          toggle.classList.toggle('is-selected', expanded);
+          toggle.setAttribute('aria-expanded', String(expanded));
+          toggle.setAttribute('aria-pressed', String(expanded));
+          frame.dataset.inspectorCollapsed = String(!expanded);
+          mainSplit.dataset.inspectorCollapsed = String(!expanded);
+        };
+        toggle.addEventListener('click', () => {
+          expanded = !expanded;
+          render();
+        });
+        render();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(wireInspectorToggle), { once: true });
+      } else {
+        requestAnimationFrame(wireInspectorToggle);
+      }
+      document.getElementById('railTerminalBtn')?.addEventListener('click', () => document.getElementById('topTerminalBtn')?.click());
+      document.getElementById('topResetBtn')?.addEventListener('click', () => window.reset?.());
+      window.setProblems?.(2);
+      if (document.getElementById('split')?.classList.contains('graph-open')) renderGraph(false);
+
+      // Keep the analysis close affordances in sync with the split helper.
+      (() => {
+        const HIDE_STYLE = 'display: none !important; flex: 0 0 0 !important; width: 0 !important; min-width: 0 !important; max-width: 0 !important; overflow: hidden !important; padding: 0 !important; margin: 0 !important; border: 0 !important;';
+        const GUTTER_HIDE = 'display: none !important;';
+        let paneStyleBeforeHide = null;
+        let gutterStyleBeforeHide = null;
+        function analysisGutterEl() {
+          const pane = document.getElementById('analysisPane');
+          if (!pane) return null;
+          const prev = pane.previousElementSibling;
+          const next = pane.nextElementSibling;
+          if (prev?.matches?.('.pto-workbench-shell__split-gutter')) return prev;
+          if (next?.matches?.('.pto-workbench-shell__split-gutter')) return next;
+          return null;
+        }
+        function forceHidePane() {
+          const pane = document.getElementById('analysisPane');
+          if (!pane) return;
+          paneStyleBeforeHide = pane.getAttribute('style');
+          const gutter = analysisGutterEl();
+          gutterStyleBeforeHide = gutter?.getAttribute('style') ?? null;
+          pane.hidden = true;
+          pane.setAttribute('style', HIDE_STYLE);
+          const split = document.getElementById('split');
+          if (split) split.classList.remove('analysis-open','graph-open','compare-open','tiling-open','pipe-open','link-active');
+          if (gutter) gutter.setAttribute('style', GUTTER_HIDE);
+          clearLinkHot?.();
+          syncParseBtn?.();
+        }
+        function restoreAnalysisSplitStyles() {
+          const pane = document.getElementById('analysisPane');
+          const gutter = analysisGutterEl();
+          if (paneStyleBeforeHide === null) pane?.removeAttribute('style');
+          else pane?.setAttribute('style', paneStyleBeforeHide);
+          if (gutterStyleBeforeHide === null) gutter?.removeAttribute('style');
+          else gutter?.setAttribute('style', gutterStyleBeforeHide);
+        }
+        function closeAnalysisPane() {
+          _closeAV?.();
+          forceHidePane();
+        }
+        // 1) graph header close button
+        const _gclose = document.getElementById('gclose');
+        if (_gclose) { _gclose.onclick = null; _gclose.addEventListener('click', (e) => { e.stopPropagation(); closeAnalysisPane(); }); }
+        // 2) tab-strip close icons
+        document.querySelectorAll('.analysis-tab .x').forEach((closeIcon) => {
+          closeIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAnalysisPane();
+          });
+        });
+        // 3) closeAnalysisView: parseBtn and legacy closeGraph route through this path.
+        const _closeAV = window.closeAnalysisView;
+        if (_closeAV) { window.closeAnalysisView = closeAnalysisPane; }
+        // 4) setAnalysisView clears the forced inline hiding when reopening.
+        const _setAV = window.setAnalysisView;
+        if (_setAV) {
+          window.setAnalysisView = function(view) {
+            restoreAnalysisSplitStyles();
+            return _setAV(view);
+          };
+        }
+      })();
+
+      // 源码行 hover → 高亮对应计算图节点
+      function toggleGraphNodeHover(id, on) {
+        const svg = document.querySelector('#gcanvas svg');
+        if (svg) {
+          const g = svg.querySelector(`.pto-model-graphviz-node[data-node-id="${id}"]`);
+          if (g) g.classList.toggle('is-code-hover', on);
+        }
+        const lg = document.querySelector(`.gnode[data-id="${id}"]`);
+        if (lg) lg.classList.toggle('is-code-hover', on);
+      }
+      const LINE_NODE_MAP = {};
+      if (typeof GNODES !== 'undefined') {
+        GNODES.forEach(n => {
+          if (!n.lines) return;
+          for (let i = n.lines[0]; i <= n.lines[1]; i++) {
+            if (!LINE_NODE_MAP[i]) LINE_NODE_MAP[i] = [];
+            LINE_NODE_MAP[i].push(n.id);
+          }
+        });
+      }
+      let _hoverNodeIds = [];
+      const codewrap = document.getElementById('codewrap');
+      if (codewrap) {
+        codewrap.addEventListener('mouseover', (e) => {
+          const ln = e.target.closest('.ln');
+          if (!ln) return;
+          const lineNum = parseInt(ln.dataset.line);
+          if (!lineNum) return;
+          const ids = LINE_NODE_MAP[lineNum] || [];
+          _hoverNodeIds.forEach(id => toggleGraphNodeHover(id, false));
+          ids.forEach(id => toggleGraphNodeHover(id, true));
+          _hoverNodeIds = ids;
+        });
+        codewrap.addEventListener('mouseleave', () => {
+          _hoverNodeIds.forEach(id => toggleGraphNodeHover(id, false));
+          _hoverNodeIds = [];
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
