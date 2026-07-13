@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-07-13 — training-run-twin 训练监控侧栏改为弹性宽度(最小 420px / 分辨率足够时占整网图 40%)
+- **布局**(`wzh_index.html`):`.twin-center-scroll` 网格列由固定 `1fr 420px` 改为 `1fr minmax(420px, 0.4fr)`,侧栏保持 420px 最小宽度,分辨率足够时取整网图列(`1fr`)宽度的 40%。
+- **图表健壮化**(`js/training-run-twin.js`):精度图 SVG 用 `viewBox` + `height:auto`,渲染高度随宽度换算;侧栏变宽不触发 window resize,原来只在 window resize 时重画,导致图表按旧宽高比溢出固定高度网格单元、底部被裁("挤在容器上面")。新增 `ResizeObserver` 观察 `.twin-monitor-sidebar`,尺寸变化时 rAF 合并触发 `syncAccCards / syncInfraCards / syncLocateMetricCharts` 重新测量重画。
+
+## 2026-07-10 — training-run-twin 模型名统一为 Pangu 2.0 flash
+- 把 `Pangu-Pro-MoE-72BA16B架构参考.md` 标题+正文、`wzh_index.html` 可见文字里的模型专名 `Pangu Pro MoE 72BA16B` / `Pangu Pro MoE` 统一改为 `Pangu 2.0 flash`;整网图标题实际由 `js/training-run-twin.js` 的 `models.deepseek.name/title` 渲染,一并改成 `Pangu 2.0 flash` / `Pangu 2.0 flash 整网图`,否则静态 HTML 改动不生效。
+- 保留 DeepSeek 对比引用(对比对象非本模型)、代码标识符(`PanguProMoE` 模块类名、`data-model="deepseek"`、aria-label/注释)与 72B/16.50B 等架构数字。
+
+## 2026-07-10 — training-run-twin 底部 Timeline dock 自动滚动露出首个问题泳道(健壮化)
+- **问题**:底部 Timeline 泳道图默认高度只够显示前几个 rank,首个问题所在的异常泳道(EP rank 23 all-to-all timeout,最后一行)在可视区外,用户以为没有滚动条 / 看不到问题。原有一次性 double-rAF 定位在 workbench-shell split 布局定型前就跑,dock `clientHeight` 可能还是 0,用错误高度算出的 `scrollTop` 之后不再修正。
+- **修复**(`js/timeline-swimlane.js`):把定位抽成 `revealAnomaly()`,`viewportH<=0`(dock 尚无高度)时本帧放弃、逐帧重试至多 30 帧,直到容器有真实高度再定位;区分自动/手动滚动(`autoScrolling` 标志 + `userScrolled`),用户一旦手动滚动即不再干预;并在 ResizeObserver(split 拖拽定型 / 首次展开)后补一次定位。异常行按「行尾靠可视区 2/3 处」定位,末行天然完整贴底露出。
+- **验证**:Node 静态服务器 + Edge headless 截图,底部 dock 首屏即滚到 R20–R23,红色 R23 TIMEOUT 泳道完整露出。
+
 ## 2026-07-10 — training-run-twin 顶栏训练进度条重设计(默认极简 + 悬浮撑大)
 - **默认态极简**:去掉原来常驻的 step/epoch 双行文字 + 边框盒,只保留「当前 step 单号 · 进度条 · 总 step 单号」一行,进度条透明无框不再突兀。问题点标注从进度条下方的三角箭头改为**进度条内的带白边纵向线**(`.twin-progress-marker`,P0 红/P1 橙,`box-shadow` 白边),用百分比直接定位,不再测量几何。
 - **悬浮态动效撑大**:hover 时整条浮起(surface 底 + 阴影 + 圆角),进度条加粗(5→8px),右侧滑入**进度百分比 + Epoch 进度**(`.twin-progress-detail`,max-width/opacity/位移过渡)。

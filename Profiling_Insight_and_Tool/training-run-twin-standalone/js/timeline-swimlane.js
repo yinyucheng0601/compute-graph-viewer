@@ -506,18 +506,37 @@
     paint();
 
     // 首次渲染自动把纵向滚动定位到「首个问题」(异常 rank 所在行) 露出:该行默认在可视区域之外
-    // (面板高度只够显示前几个 rank),不然用户以为面板没有滚动条 / 看不到问题。只在首次渲染时
-    // 定位一次,不跟随后续 paint() (主题切换/resize) 反复重置,避免打断用户手动滚动的位置。
+    // (面板高度只够显示前几个 rank),不然用户以为面板没有滚动条 / 看不到问题。
+    // 只在首次渲染时定位,用户一旦手动滚动就不再干预,避免打断手动滚动的位置。
     const anomalyRowIndex = RT.ranks.findIndex((r) => r.rank === ANOMALY_RANK);
-    if (anomalyRowIndex >= 0) {
-      const rowH = COMM_SPLIT ? ROW_H * 2 : ROW_H;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        const rowTop = anomalyRowIndex * rowH;
-        const viewportH = scrollEl.clientHeight || 0;
-        // 异常行落在可视区域上方约 1/3 处,而不是贴边,便于看清上下文
-        scrollEl.scrollTop = Math.max(0, rowTop - viewportH / 3);
-      }));
+    const rowH = COMM_SPLIT ? ROW_H * 2 : ROW_H;
+    let userScrolled = false;
+    let autoScrolling = false; // 自身触发的 scrollTop 变更不算用户手动滚动
+    scrollEl.addEventListener("scroll", () => { if (!autoScrolling) userScrolled = true; });
+
+    function revealAnomaly() {
+      if (anomalyRowIndex < 0 || userScrolled) return true; // 无异常行 / 用户已接管:不再尝试
+      const viewportH = scrollEl.clientHeight || 0;
+      const maxScroll = scrollEl.scrollHeight - viewportH;
+      // dock 高度还没算好(0)或还不可滚动:本帧放弃,等下一帧重试
+      if (viewportH <= 0) return false;
+      const rowTop = anomalyRowIndex * rowH;
+      // 异常行(含计算/通信两条子轨)整体落在可视区偏下但完整露出:先按「行中心靠可视区 2/3 处」定位,
+      // 浏览器会把超出的 scrollTop 夹到底部,末行天然完整贴底;maxScroll<=0 时说明整列都放得下,无需滚动。
+      const target = maxScroll <= 0 ? 0 : Math.min(maxScroll, Math.max(0, rowTop + rowH - viewportH * 0.66));
+      autoScrolling = true;
+      scrollEl.scrollTop = target;
+      requestAnimationFrame(() => { autoScrolling = false; });
+      return true;
     }
+
+    // dock 常在 workbench-shell split 布局定型前就渲染,clientHeight 可能暂时为 0;
+    // 重试若干帧直到容器有真实高度再定位一次(而不是用 0 高度算错位置后再不修正)。
+    let revealTries = 0;
+    (function tryReveal() {
+      if (revealAnomaly()) return;
+      if (revealTries++ < 30) requestAnimationFrame(tryReveal);
+    })();
 
     // 主题切换 / 尺寸变化时重绘（画布颜色是烘焙进去的，必须重画）
     const themeObs = new MutationObserver(() => paint());
@@ -525,7 +544,12 @@
     let roTimer = null;
     const ro = new ResizeObserver(() => {
       clearTimeout(roTimer);
-      roTimer = setTimeout(paint, 60);
+      roTimer = setTimeout(() => {
+        paint();
+        // dock 高度变化(如 split 拖拽定型、首次展开)后,若用户还没手动滚动,补一次定位,
+        // 免得初次用错误高度算的位置卡住不动。
+        if (!userScrolled) revealAnomaly();
+      }, 60);
     });
     ro.observe(host);
 

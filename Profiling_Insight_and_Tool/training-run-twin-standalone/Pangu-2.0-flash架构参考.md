@@ -1,15 +1,15 @@
-# Pangu Pro MoE 72BA16B 架构参考（MoE + GQA）
+# Pangu 2.0 flash 架构参考（MoE + GQA）
 
 v 20260710 in PROLILINGTEST 项目
 
 > 基于 arXiv `2505.21411v2` 论文与开源代码仓库整理。数据来源均为**公开可查**。
 >
-> **关于命名**：Pangu Pro MoE 72BA16B 是华为盘古团队发布的 MoE 语言模型，总参数量 72B，激活 16.50B。采用 GQA 注意力（非 MLA）+ MoGE 分组均衡路由，与 DeepSeek-V3 系列架构思路有显著差异。
+> **关于命名**：Pangu 2.0 flash 是华为盘古团队发布的 MoE 语言模型，总参数量 72B，激活 16.50B。采用 GQA 注意力（非 MLA）+ MoGE 分组均衡路由，与 DeepSeek-V3 系列架构思路有显著差异。
 
 ## 1. 骨架
 
 ```
-Pangu Pro MoE 72BA16B (72B total, 16.50B activated per token)
+Pangu 2.0 flash (72B total, 16.50B activated per token)
 │
 ├─ embedding: token_embeddings (vocab 153600 × 4608)
 │   └─ 是个层: 将 token id 查表映射为 4608 维向量，仅首层
@@ -102,14 +102,14 @@ Pangu Pro MoE 72BA16B (72B total, 16.50B activated per token)
 ## 2. GQA 注意力详解（区别于 MLA / MHA）
 
 ```
-Pangu Pro MoE 72BA16B 采用 GQA (Grouped Query Attention)，而非 DeepSeek 的 MLA
+Pangu 2.0 flash 采用 GQA (Grouped Query Attention)，而非 DeepSeek 的 MLA
 
 传统 MHA:
   Q = X·W_Q  [4608 → 64×192]
   K = X·W_K  [4608 → 64×192]
   V = X·W_V  [4608 → 64×128]
 
-Pangu Pro MoE GQA (64 Q heads, 4 KV heads):
+Pangu 2.0 flash GQA (64 Q heads, 4 KV heads):
   Q: X → [4608 → 64×192]        ← Q 头数多，细粒度语义捕获
   K: X → [4608 → 4×192]         ← KV 头数减半，KV Cache 减少 37.5%
   V: X → [4608 → 4×128]
@@ -250,7 +250,7 @@ graph TD
 传统 Pre-Norm:
   x → Norm → Attn → + residual → Norm → FFN → + residual
 
-Sandwich-Norm (Pangu Pro MoE):
+Sandwich-Norm (Pangu 2.0 flash):
   x → Norm₁ → Attn → Norm₂ → + residual → Norm₃ → FFN → + residual
        ↑                ↑                    ↑
     前 sandwich      中 sandwich         后 sandwich
@@ -269,7 +269,7 @@ Sandwich-Norm (Pangu Pro MoE):
 
 ### 5.3 与 DeepSeek-V3 架构对比
 
-| 维度 | DeepSeek-V3 | Pangu Pro MoE 72BA16B |
+| 维度 | DeepSeek-V3 | Pangu 2.0 flash |
 |---|---|---|
 | 注意力机制 | **MLA** (低秩压缩) | **GQA** (分组查询) |
 | KV Cache 压缩 | 低秩瓶颈 (kv_lora=512) | GQA 4 KV-heads |

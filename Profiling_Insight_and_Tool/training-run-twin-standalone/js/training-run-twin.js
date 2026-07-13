@@ -163,8 +163,8 @@
       },
     },
     deepseek: {
-      name: "Pangu Pro MoE 72BA16B",
-      title: "Pangu Pro MoE 72BA16B 整网图",
+      name: "Pangu 2.0 flash",
+      title: "Pangu 2.0 flash 整网图",
       meta: "",
       graphKind: "moe",
       trainingGraph: makeDeepSeekTrainingGraph(),
@@ -4064,6 +4064,23 @@
       if (!document.getElementById("runTwinLocateView").hidden) renderCase6AllCharts();
       if (_locateTrackArgs) drawLocateTrackLines(_locateTrackArgs.top, _locateTrackArgs.nodeCount, _locateTrackArgs.branchBeforeIndex, _locateTrackArgs.bypassList);
     });
+    // 监控侧栏宽度改由 grid 的 minmax(420px, 0.4fr) 弹性伸缩(分辨率足够时占整网图列 40%),
+    // 侧栏变宽不会触发 window resize,需单独观察侧栏尺寸变化重画图表,否则 SVG(height:auto)
+    // 会按旧宽度的宽高比溢出固定高度的网格单元,底部被裁掉,看起来像"挤在容器上面"
+    const monitorSidebar = document.querySelector(".twin-monitor-sidebar");
+    if (monitorSidebar && "ResizeObserver" in window) {
+      let sidebarSyncRaf = 0;
+      const ro = new ResizeObserver(() => {
+        if (sidebarSyncRaf) return;
+        sidebarSyncRaf = requestAnimationFrame(() => {
+          sidebarSyncRaf = 0;
+          syncAccCards(false);
+          syncInfraCards(false);
+          syncLocateMetricCharts(false);
+        });
+      });
+      ro.observe(monitorSidebar);
+    }
     setInterval(tick, 120000); // 每 2 分钟推进一次 step,图表与进度条同步刷新,不再频繁闪动
   }
 
