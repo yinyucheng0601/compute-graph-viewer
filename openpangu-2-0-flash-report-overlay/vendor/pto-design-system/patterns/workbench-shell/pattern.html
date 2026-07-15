@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Workbench Split Kernel</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const applyTheme = (theme) => {
+        if (theme === 'light' || theme === 'dark' || theme === 'glass') {
+          document.documentElement.dataset.theme = theme;
+        }
+      };
+      if (params.has('embed')) {
+        document.documentElement.dataset.embedPreview = 'true';
+      }
+      applyTheme(params.get('theme'));
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'pto-preview-theme') {
+          applyTheme(event.data.theme);
+        }
+      });
+    })();
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+    .kernel-preview {
+      width: min(1320px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .kernel-preview h1 {
+      margin: 0;
+      font: var(--text-display);
+      letter-spacing: 0;
+    }
+    .kernel-preview p {
+      max-width: 860px;
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body);
+    }
+    .kernel-demo-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      gap: 16px;
+    }
+    .kernel-demo {
+      min-height: 360px;
+      border: 1px solid var(--border-subtle);
+      background: var(--background-elevated);
+      border-radius: var(--radius-lg);
+      padding: 10px;
+      overflow: hidden;
+    }
+    .kernel-demo-tall {
+      min-height: 460px;
+    }
+    .kernel-demo-panes {
+      height: 100%;
+      min-height: 0;
+    }
+    .kernel-demo-pane {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      padding: 12px;
+      gap: 10px;
+    }
+    .kernel-demo-pane strong {
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .kernel-demo-pane span {
+      color: var(--foreground-muted);
+      font: var(--text-mono);
+    }
+    .kernel-demo-stage {
+      min-height: 0;
+      flex: 1 1 auto;
+      border-radius: var(--radius-md);
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--primary) 18%, transparent) 1px, transparent 1px),
+        linear-gradient(color-mix(in srgb, var(--primary) 18%, transparent) 1px, transparent 1px),
+        var(--surface-1);
+      background-size: 32px 32px;
+    }
+    .kernel-demo-footer {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .kernel-demo-badge {
+      border: 1px solid var(--comp-tag-border);
+      border-radius: var(--tag-radius);
+      background: var(--comp-tag-bg);
+      color: var(--comp-tag-fg);
+      padding: 4px 8px;
+      font: var(--text-label);
+    }
+    html[data-embed-preview="true"] .kernel-preview {
+      width: 100%;
+      padding: 0;
+    }
+    html[data-embed-preview="true"] .kernel-preview > h1,
+    html[data-embed-preview="true"] .kernel-preview > p,
+    html[data-embed-preview="true"] .kernel-demo-footer {
+      display: none;
+    }
+    html[data-embed-preview="true"] .kernel-demo-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    @media (max-width: 880px) {
+      .kernel-demo-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="kernel-preview">
+    <h1>Workbench Split Kernel</h1>
+    <p>
+      Low-level split, gutter, resize, keyboard resize, min-size, callback, lifecycle,
+      and localStorage persistence helpers. Product chrome belongs in higher-level patterns.
+    </p>
+
+    <section class="kernel-demo-grid">
+      <div class="kernel-demo kernel-demo-tall">
+        <div class="pto-workbench-shell__panes kernel-demo-panes" data-kernel-demo="nested">
+          <section class="pto-workbench-shell__pane kernel-demo-pane" data-pane="source">
+            <strong>Horizontal split</strong>
+            <span>min 180px</span>
+          </section>
+          <section class="pto-workbench-shell__pane kernel-demo-pane" data-pane="canvas">
+            <strong>Primary pane</strong>
+            <span>persists width</span>
+            <div class="kernel-demo-stage"></div>
+          </section>
+          <section class="pto-workbench-shell__pane kernel-demo-pane" data-pane="inspector">
+            <strong>Nested vertical split</strong>
+            <div class="pto-workbench-shell__panes kernel-demo-panes" data-kernel-demo="vertical">
+              <div class="pto-workbench-shell__pane kernel-demo-pane" data-pane="upper">
+                <strong>Top</strong>
+                <span>row-resize</span>
+              </div>
+              <div class="pto-workbench-shell__pane kernel-demo-pane" data-pane="lower">
+                <strong>Bottom</strong>
+                <span>keyboard arrows</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="kernel-demo">
+        <div class="pto-workbench-shell__panes kernel-demo-panes" data-kernel-demo="vertical-only">
+          <section class="pto-workbench-shell__pane kernel-demo-pane" data-pane="timeline">
+            <strong>Vertical split</strong>
+            <span>min 120px</span>
+          </section>
+          <section class="pto-workbench-shell__pane kernel-demo-pane" data-pane="trace">
+            <strong>Trace details</strong>
+            <span>destroy lifecycle available</span>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <div class="kernel-demo-footer">
+      <span class="kernel-demo-badge">PtoWorkbenchShell.initResizablePanes</span>
+      <span class="kernel-demo-badge">createSplitGutter</span>
+      <span class="kernel-demo-badge">direction: horizontal | vertical</span>
+      <span class="kernel-demo-badge">initNestedResizablePanes</span>
+    </div>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderWorkbenchKernelPattern() {
+      const helper = window.PtoWorkbenchShell;
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!helper) return;
+
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(document.body.getBoundingClientRect().height);
+        if (nextHeight > 0) {
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: nextHeight + 4,
+          }, '*');
+        }
+      };
+
+      helper.initNestedResizablePanes({
+        splits: [
+          {
+            root: '[data-kernel-demo="nested"]',
+            panes: [
+              ':scope > [data-pane="source"]',
+              ':scope > [data-pane="canvas"]',
+              ':scope > [data-pane="inspector"]',
+            ],
+            direction: 'horizontal',
+            sizes: [22, 50, 28],
+            minSize: [180, 280, 220],
+            storageKey: 'pto-workbench-kernel-horizontal-v1',
+            onResize: syncFrameHeight,
+          },
+          {
+            root: '[data-kernel-demo="vertical"]',
+            panes: [
+              ':scope > [data-pane="upper"]',
+              ':scope > [data-pane="lower"]',
+            ],
+            direction: 'vertical',
+            sizes: [52, 48],
+            minSize: [120, 120],
+            storageKey: 'pto-workbench-kernel-nested-vertical-v1',
+            onResize: syncFrameHeight,
+          },
+          {
+            root: '[data-kernel-demo="vertical-only"]',
+            panes: [
+              ':scope > [data-pane="timeline"]',
+              ':scope > [data-pane="trace"]',
+            ],
+            direction: 'vertical',
+            sizes: [45, 55],
+            minSize: [120, 120],
+            storageKey: 'pto-workbench-kernel-vertical-v1',
+            onResize: syncFrameHeight,
+          },
+        ],
+      });
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.setTimeout(syncFrameHeight, 160);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "id": "swimlane-task-bar",
+  "name": "Swimlane Task Bar",
+  "type": "canvas",
+  "description": "Canvas-rendered task bar and hover tooltip for timed events in swimlane and timeline surfaces. Draws an IN/compute/OUT three-segment bar when the task carries raw input/output arrays; otherwise falls back to a single solid compute bar (no IN/OUT chips or side tints).",
+  "source": {
+    "visualContract": "pypto-swimlane-perf-tool/js/swimlane.js task-bar render block and PMU swimlane .sl-tooltip hover behavior",
+    "renderScript": "patterns/swimlane-task/pattern.js",
+    "patternHtml": "patterns/swimlane-task/pattern.html",
+    "patternCss": "patterns/swimlane-task/pattern.css"
+  },
+  "useWhen": [
+    "Displaying a timed task in a swimlane, timeline, or execution trace surface.",
+    "Showing input, compute, and output subsegments inside one task duration when raw input/output arrays are present.",
+    "Drawing a single solid bar (no IN/OUT subsegments) for events that have no raw input/output arrays, such as pipeline forward/backward/communication/bubble timeline events.",
+    "Showing a task hover tooltip with op, lane, timing, status, dominant counter, and wrap metadata."
+  ],
+  "rules": [
+    "Three-segment mode is opt-in via the data: IN and OUT segments are drawn only when task.inputRawMagic / task.outputRawMagic are non-empty arrays. When both are absent or empty, drawTaskBar renders one solid compute bar and omits the IN/OUT chips and side tints. Do not synthesize empty input/output arrays just to force the segmented style on events that have no in/out semantics."
+  ],
+  "requiredApis": [
+    "window.PtoSwimlaneTaskPattern.drawTaskBar",
+    "window.PtoSwimlaneTaskPattern.buildTaskSegmentSpec",
+    "window.PtoSwimlaneTaskPattern.createTaskColormap(options)",
+    "window.PtoSwimlaneTaskPattern.colorFromColormap(input, palette, domain)",
+    "window.PtoSwimlaneTaskPattern.formatTaskTooltip",
+    "window.PtoSwimlaneTaskPattern.initHoverTooltip"
+  ],
+  "previewStructure": [
+    "pto-pattern-swimlane-task",
+    "pto-pattern-swimlane-task__row",
+    "pto-pattern-swimlane-task__label",
+    "pto-pattern-swimlane-task__canvas"
+  ],
+  "states": [
+    "hover",
+    "is-selected",
+    "is-related",
+    "is-emphasized"
+  ],
+  "allowedOverrides": [
+    "x",
+    "y",
+    "width",
+    "height",
+    "baseColor",
+    "task.label",
+    "task.displayName",
+    "task.rawName",
+    "task.opName",
+    "task.laneKind",
+    "task.laneId",
+    "task.totalCycle",
+    "task.clcCycle",
+    "task.gap",
+    "task.gapRatio",
+    "task.status",
+    "task.dominantCounter",
+    "task.wrapId",
+    "task.inputRawMagic",
+    "task.outputRawMagic",
+    "isSelected",
+    "isRelated",
+    "isEmphasized",
+    "fontFamily"
+  ],
+  "forbiddenOverrides": [
+    "segment width math",
+    "base fill alpha",
+    "top highlight alpha",
+    "border alpha",
+    "font threshold rules",
+    "text truncation rules",
+    "DOM/CSS reimplementation of the task bar"
+  ],
+  "agentReuseRule": "Import patterns/swimlane-task/pattern.js and call window.PtoSwimlaneTaskPattern.drawTaskBar for the canvas bar, createTaskColormap for semantic/stitch/engine/subgraph colors, and initHoverTooltip for hover tips. Do not rebuild the task bar or tooltip behavior with page-local DOM/CSS or rewrite the segment math, color hashing, colormap selection, or hover tip behavior locally."
+}

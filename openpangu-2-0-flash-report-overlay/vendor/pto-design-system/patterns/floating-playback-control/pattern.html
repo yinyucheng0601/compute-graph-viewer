@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Floating Playback Control</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const applyTheme = (theme) => {
+        if (theme === 'light' || theme === 'dark' || theme === 'glass') {
+          document.documentElement.dataset.theme = theme;
+        }
+      };
+      if (params.has('embed')) {
+        document.documentElement.dataset.embedPreview = 'true';
+      }
+      applyTheme(params.get('theme'));
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'pto-preview-theme') {
+          applyTheme(event.data.theme);
+        }
+      });
+    })();
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-floating-playback-pattern-page">
+  <main class="pto-floating-playback-pattern-main">
+    <h1 class="pto-floating-playback-pattern-title">Floating Playback Control</h1>
+    <p class="pto-floating-playback-pattern-subtitle">
+      Bottom-centered playback toolbar with collapsed state, timeline metadata, scrubber, and hover preview.
+      Pages own playback data; this pattern owns chrome, state classes, and scrubber hover behavior.
+    </p>
+    <div class="pto-floating-playback-pattern-meta">
+      <span class="pto-floating-playback-pattern-badge">pattern id: floating-playback-control</span>
+      <span class="pto-floating-playback-pattern-badge">type: DOM component + state helper</span>
+      <span class="pto-floating-playback-pattern-badge">source: mem_viewer bottom toolbar</span>
+    </div>
+
+    <section class="pto-floating-playback-pattern-stage" aria-label="Floating playback preview">
+      <div id="preview-control-mount"></div>
+    </section>
+
+    <section class="pto-floating-playback-pattern-stage" aria-label="Playback controls without built-in scrubber">
+      <div id="preview-compact-control-mount"></div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    (function renderFloatingPlaybackPattern() {
+      const helper = window.PtoFloatingPlaybackControl;
+      const mount = document.getElementById('preview-control-mount');
+      const compactMount = document.getElementById('preview-compact-control-mount');
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!helper || !mount) return;
+
+      const sampleOps = [
+        'TILE_COPY_IN #10179',
+        'CAST #10180',
+        'BROADCAST #10228',
+        'MUL #10229',
+        'TILE_COPY_OUT #10230',
+      ];
+      const totalSteps = 128;
+      let step = 42;
+      let playing = false;
+
+      const control = helper.createControl({
+        className: 'pto-floating-playback--preview',
+      });
+      mount.appendChild(control);
+      if (compactMount) {
+        const compactControl = helper.createControl({
+          className: 'pto-floating-playback--preview',
+          showTimeline: false,
+        });
+        compactMount.appendChild(compactControl);
+        helper.init({
+          root: compactControl,
+          isPlaying: () => playing,
+        });
+      }
+
+      const playBtn = control.querySelector('#play-btn');
+      const backBtn = control.querySelector('#step-back-btn');
+      const forwardBtn = control.querySelector('#step-fwd-btn');
+      const replayBtn = control.querySelector('#replay-btn');
+      const scrubber = control.querySelector('#scrubber');
+      const label = control.querySelector('#scrubber-label');
+      const opname = control.querySelector('#scrubber-opname');
+
+      const playback = helper.init({
+        root: control,
+        isPlaying: () => playing,
+      });
+
+      helper.initScrubberHover({
+        root: control,
+        totalSteps,
+        getLabelForStep: (nextStep) => `Step ${nextStep} · ${sampleOps[nextStep % sampleOps.length]}`,
+      });
+
+      const syncFrameHeight = () => {
+        if (!isEmbedPreview || window.parent === window) return;
+        const nextHeight = Math.ceil(document.body.getBoundingClientRect().height);
+        if (nextHeight > 0) {
+          const resolvedHeight = nextHeight + 4;
+          if (window.frameElement) {
+            window.frameElement.style.height = `${resolvedHeight}px`;
+          }
+          window.parent.postMessage({
+            type: 'pto-pattern-preview-height',
+            pathname: window.location.pathname,
+            height: resolvedHeight,
+          }, '*');
+        }
+      };
+
+      const render = () => {
+        scrubber.max = String(totalSteps - 1);
+        scrubber.value = String(step);
+        label.textContent = `${step} / ${totalSteps - 1}`;
+        opname.textContent = sampleOps[step % sampleOps.length];
+        playBtn.innerHTML = playing ? helper.iconLabel('pause', 'Pause') : helper.iconLabel('play', 'Play');
+        playback.sync({ playing });
+        syncFrameHeight();
+      };
+
+      playBtn.addEventListener('click', () => {
+        playing = !playing;
+        render();
+      });
+      backBtn.addEventListener('click', () => {
+        playing = false;
+        step = Math.max(0, step - 1);
+        render();
+      });
+      forwardBtn.addEventListener('click', () => {
+        playing = false;
+        step = Math.min(totalSteps - 1, step + 1);
+        render();
+      });
+      replayBtn.addEventListener('click', () => {
+        playing = false;
+        step = 0;
+        render();
+      });
+      scrubber.addEventListener('input', () => {
+        playing = false;
+        step = Number(scrubber.value) || 0;
+        render();
+      });
+
+      render();
+      window.addEventListener('resize', syncFrameHeight);
+      setTimeout(syncFrameHeight, 50);
+    })();
+  </script>
+</body>
+</html>
