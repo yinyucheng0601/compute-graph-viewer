@@ -260,3 +260,87 @@ Keep the established four side-view context tracks available in Structure and Ex
 - **Notes**: Structure Lens now retains the same four side-view context tracks as Execution, keeping the shared label and stage-positioning pass active.
 
 ---
+
+## [LRN-20260715-001] correction
+
+**Logged**: 2026-07-15T09:39:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Persistent viewport controls must live outside the transformed 3D stage instead of relying on GPU promotion inside it.
+
+### Details
+The Structure / Numerics / Communication / Execution switch intermittently disappeared after CSS3D view or zoom changes. Raising `z-index` and adding nested `translateZ(0)` layers did not make the control reliable because it remained a child of the same stage whose 3D compositing tree was being rebuilt.
+
+### Suggested Action
+Mount persistent viewport chrome as a sibling of the 3D stage under the editor pane, give the editor pane an isolated stacking context, and keep the control layer in ordinary 2D composition. Avoid nested `translateZ(0)` on toolbar controls once they are outside the scene.
+
+### Metadata
+- Source: user_feedback
+- Related Files: /Users/yin/pto/pangu-moe-trainviz/op-rank-time-openpangu-flash-events.html
+- Tags: css3d, compositor, viewport-toolbar, stacking-context, persistent-controls
+- See Also: LRN-20260714-003
+
+### Resolution
+- **Resolved**: 2026-07-15T09:39:00+08:00
+- **Notes**: Moved the complete stage toolbar out of `.opv-stage`, isolated the editor pane, raised the 2D toolbar layer, and removed GPU-promotion transforms from its controls.
+
+---
+
+## [LRN-20260715-002] correction
+
+**Logged**: 2026-07-15T09:47:18+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+A PP boundary communication bridge must remain visible in the side view instead of being gated behind the Communication Lens.
+
+### Details
+The compact `===` bridge was implemented correctly but `syncPpCommBridge()` required `activeLens === 'communication'`. A user entering the side view through another Lens therefore saw the PP stage lines but no bridge. Its placement also followed the diagnostics-to-model gap, which could put it outside the immediately visible PP header region at a small default side-view scale.
+
+### Suggested Action
+Keep compact topology-critical boundary markers present across all side-view Lenses, place them at a stable offset below the PP stage labels, and reserve expanded metric detail for hover/selection. Give the side projection its own explicit default scale instead of reusing the front/iso scale.
+
+### Metadata
+- Source: user_feedback
+- Related Files: /Users/yin/pto/pangu-moe-trainviz/op-rank-time-openpangu-flash-events.html
+- Tags: side-view, pp-boundary, send-recv, communication-bridge, default-zoom, visibility
+- See Also: LRN-20260714-006
+
+### Resolution
+- **Resolved**: 2026-07-15T09:47:18+08:00
+- **Notes**: Made the compact bridge persistent across side-view Lenses, positioned it below PP labels, and set the CSS side projection default to 80% of fitted scale.
+
+---
+
+## [LRN-20260715-003] correction
+
+**Logged**: 2026-07-15T10:04:17+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: frontend
+
+### Summary
+Dimmed or absent parallel guides must not retain hitboxes that overwrite the tooltip of a visible PP communication bridge.
+
+### Details
+Hovering the yellow PP `===` bridge first produced the correct Layer-boundary tooltip, but the window-level 3D raycast then hit a legacy EP token-flow hitbox. The EP guide was visually dimmed to near-zero opacity under PP focus, yet remained pickable, so the final tooltip described a nonexistent “purple vertical line.” The expanded bridge also showed only tensor direction labels and omitted its diagnostic values.
+
+### Suggested Action
+Give overlay bridge hits priority over 3D raycasts, exclude nonmatching dimmed guides from static picking, and remove legacy EP side-view hit targets when EP is represented only in the front view. Put one summary metric on the compact bridge and show phase-specific payload plus Active / Wait / Exposed values on hover or selection.
+
+### Metadata
+- Source: user_feedback
+- Related Files: /Users/yin/pto/pangu-moe-trainviz/op-rank-time-openpangu-flash-events.html
+- Tags: tooltip-priority, stale-hitbox, pp-bridge, ep-guide, active-wait-exposed, side-view
+- See Also: LRN-20260715-002
+
+### Resolution
+- **Resolved**: 2026-07-15T10:10:00+08:00
+- **Notes**: Removed the legacy EP token-flow side guide/hitbox, made bridge hits short-circuit the 3D raycast, filtered dimmed nonmatching static picks, added forward/backward PP timing records, and surfaced Exposed/Payload on the bridge with full timing in its tooltip.
+
+---

@@ -1,7 +1,7 @@
 ## [ERR-20260713-001] apply_patch context mismatch
 
 **Logged**: 2026-07-13T15:40:00+08:00
-**Priority**: low
+**Priority**: medium
 **Status**: resolved
 **Area**: frontend
 
@@ -18,6 +18,7 @@ apply_patch verification failed: Failed to find expected lines
 - The source used raw double quotes inside template literals while the failed patch context contained escaped quotes.
 - A follow-up `rg` command also had an unmatched shell quote while locating the exact line.
 - A later CSS hunk assumed a neighboring rule body that differed from the file; splitting style and coordinate edits resolved it.
+- Recurred at 2026-07-15T00:00:00+08:00 when a broad `**Priority**: low` patch hunk updated the first error entry instead of the intended later entry. Metadata edits also require entry-specific heading context.
 
 ### Suggested Fix
 Read the exact source hunk first, use single-quoted search patterns, and split unrelated hunks into separate patches.
@@ -31,7 +32,7 @@ Read the exact source hunk first, use single-quoted search patterns, and split u
 ## [ERR-20260714-004] node module extraction regex escaping
 
 **Logged**: 2026-07-14T16:09:00+08:00
-**Priority**: low
+**Priority**: medium
 **Status**: resolved
 **Area**: tests
 
@@ -50,6 +51,7 @@ SyntaxError: Invalid regular expression flags
 - The command tried to extract `<script type="module">` with a regex embedded inside a shell-quoted `node -e` expression.
 - Recurred at 2026-07-14T16:42:00+08:00 when a second inline assertion mixed shell double quotes, JavaScript template-literal backticks, and `${...}` text, producing `zsh: unmatched "` before Node ran.
 - Recurred at 2026-07-14T19:20:00+08:00 when a generic inline-script checker passed the ES module body to `vm.Script`, then a follow-up single-quoted `node -e` expression was truncated by embedded single quotes.
+- Recurred at 2026-07-15T00:00:00+08:00 when the checker skipped `type="module"` but still passed `type="importmap"` JSON to `vm.Script`. Inline HTML validators must skip every non-classic script type, not just modules.
 
 ### Suggested Fix
 Extract the module using `indexOf`/`slice` delimiters inside Node instead of stacking shell, JavaScript string, and regular-expression escaping. For assertions containing backticks or `${...}`, single-quote the entire `node -e` program or avoid embedding the source fragment.
@@ -85,6 +87,9 @@ agent.browsers.list() => []
 - The local HTTP server returned 200 OK.
 - Browser bootstrap troubleshooting was read and the existing runtime was reused as required.
 - Recurred on 2026-07-14 while validating `op-rank-time-openpangu-flash-events.html`: the exact page returned HTTP 200 and module syntax passed, but `agent.browsers.list()` again returned `[]`.
+- Recurred on 2026-07-15 while validating the 80% side-view default and persistent PP `===` bridge. The user-provided screenshot was inspected, module/source assertions and HTTP 200 passed, but browser discovery still returned `[]`, so automated visual QA remained unavailable.
+- Recurred again on 2026-07-15 while validating phase-specific PP bridge metrics and tooltip priority. Module syntax, source assertions, removal of stale EP copy, and HTTP 200 passed; browser discovery still returned `[]`.
+- Recurred on 2026-07-15 while validating the persistent Lens toolbar fix on the same events page; browser discovery still returned `[]` after the required troubleshooting flow.
 
 ### Suggested Fix
 Start or attach an in-app browser instance, then rerun screenshot and interaction verification.
@@ -92,6 +97,38 @@ Start or attach an in-app browser instance, then rerun screenshot and interactio
 ### Metadata
 - Reproducible: yes
 - Related Files: op-rank-time-openpangu-flash-css3d.html
+
+---
+
+## [ERR-20260715-001] apply_patch empty update hunk
+
+**Logged**: 2026-07-15T09:40:00+08:00
+**Priority**: low
+**Status**: resolved
+**Area**: docs
+
+### Summary
+An `apply_patch` call failed because it included an empty second file update.
+
+### Error
+```
+apply_patch verification failed: invalid hunk at line 39, Update hunk does not contain any lines
+```
+
+### Context
+- The intended learning entry was valid, but the patch also declared an `ERRORS.md` update without any hunk body.
+- No target file was changed by the failed call.
+
+### Suggested Fix
+Do not include a file in a multi-file patch until its actual hunk is ready; apply independent documentation updates separately when necessary.
+
+### Metadata
+- Reproducible: yes
+- Related Files: pangu-moe-trainviz/.learnings/LEARNINGS.md, pangu-moe-trainviz/.learnings/ERRORS.md
+
+### Resolution
+- **Resolved**: 2026-07-15T09:40:00+08:00
+- **Notes**: Reapplied the learning patch without the empty update and added this error in a separate patch.
 
 ---
 

@@ -5,8 +5,15 @@
 
 ---
 
+## 2026-07-15 — openPangu PP 边界增加双向通信桥
+- **侧视 PP Send/Recv 语义**(`pangu-moe-trainviz/op-rank-time-openpangu-flash-events.html`):三个 PP stage 分割点常驻紧凑黄色 `===` 桥，并稳定排在 PP 标签下方；hover、键盘聚焦或选中后展开为 `F ACT ===▶` 与 `◀=== dH B`，明确区分前向 activation handoff 和反向 dHidden return。通信桥复用原 Layer-gap 数据键、Tooltip、去色聚焦与 Swimlane 下钻，PP 竖线仍只表示模型切分位置；侧视投影使用独立的 80% 默认 Fit 比例，不再继承正视/轴测的 50%。
+- **补充通信数值与命中优先级**:桥默认直接显示最大 `Exposed µs`，展开后分别显示 Forward activation / Backward dHidden 的 Payload 与 Exposed，Tooltip 展示两相独立的 Active、Wait、Exposed，并注明 Send/Recv 两端观测不可相加；删除侧视旧 EP token-flow 紫线及 hitbox，桥 hover 会优先截断底层 3D raycast，避免不可见 EP 对象覆盖 PP Tooltip。
+
 ## 2026-07-15 — AscendPort 恢复源端不兼容算子标识
 - **由算子映射恢复风险节点**(`ascendport_migration_V3_MLA_pto.html` + `mla-model-architecture/assets/modelviz.html`):删除常驻 Operator Association 面板后，图节点继续从 18 条算子关联映射中聚合 `removed_with_replacement` / `planned_not_emitted` 风险；默认二级折叠态在 Kernel Dispatch、QK + PE Score Compute、Probability · Value 上显示 danger 加粗边框与“不兼容” badge，展开后精确落到 `T.use_swizzle(10)` 以及 3 个 `T.GemmWarpPolicy.FullCol` 算子。点击风险节点时优先展示不兼容映射、源端原语和替换状态，同时保留原有源码行高亮联动；S6 精度边框可独立覆盖算子结果颜色，不会抹掉兼容性 badge。运行时回归覆盖默认 3 个、展开 4 个风险节点以及 root 折叠聚合。
+
+## 2026-07-14 — Pangu 训练时空透视卡片补充版本入口
+- **首页版本按钮**(`launch.html`):把原 `Light / Dark` 两个主题入口合并为 `V1`，保留页面内主题切换；新增 `V4`，指向带并行事件标识与通信泳道缩放的 `op-rank-time-openpangu-flash-events.html`，原 `WZH-Temp` 入口保持不变。
 
 ## 2026-07-14 — AscendPort example_mla_decode.py 架构与算子关联映射独立预览
 - **纠正事实源并可复现提取**(`ascendport_migration-pangu/mla-model-architecture/`):提取脚本直接读取项目自带 `ascendport_migration_MLA_A3_updated.zip` 中 `_legacy.js` 的 `const CUDA` payload，恢复并校验 TileLang `example_mla_decode.py`，不再误用外部 DeepSeek `model.py`，也不受工作区顶层旧 FlashAttention V2 payload 污染；输出源码 SHA-256 与可查看的 source mirror。
