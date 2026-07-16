@@ -318,7 +318,7 @@
         `intermediate size=${config.intermediate} 解释了 MLP 为什么比 hidden size 宽很多。`,
         "MLP 对矩阵乘吞吐敏感，和 tensor parallel 的切分策略强相关。",
       ], "如果 attention 正常但 MFU 偏低，检查 MLP fusion、TP 切分和重算粒度。", ["mlp_norm_gamma", "gate_weight", "up_weight", "mlp_gate_linear", "mlp_up_linear", "down_weight", "mlp_output_linear"]),
-      gate_weight: evidenceItem(null, "parameter tensor", "mlp.w1 / gate_proj", "Gate Weight 是 SwiGLU 门控分支的参数输入。", [
+      gate_weight: evidenceItem(null, "parameter tensor", "mlp.w1 / gate_up", "Gate Weight 是 SwiGLU 门控分支（gate+up 合并）的参数输入。", [
         `intermediate size=${config.intermediate} 主要体现在 Gate/Up/Down 三组 MLP 权重上。`,
       ], "把 MLP 算力问题映射到 Gate/Up/Down 三条参数输入。", ["mlp_gate_linear"], ["modeling_qwen.py", "safetensors.index"]),
       up_weight: evidenceItem(null, "parameter tensor", "mlp.w2 / up_proj", "Up Weight 是 SwiGLU 上投影分支的参数输入。", [
@@ -602,9 +602,9 @@
       },
       // 问题标注：对应进度条上 5 个诊断标记，标在整网图的首个问题节点上
       problemMarkers: [
-        { id: "1", nodeId: "router",              diagnosisKey: "moe-a2a",                  label: "问题1：MoE all-to-all 超时", sub: "layer 30 router → rank 23 死锁 → loss NaN" },
+        { id: "1", nodeId: "router",              diagnosisKey: "moe-a2a",                  label: "问题1：MoE all-to-all 超时", sub: "layer 38 router → rank 23 死锁 → loss NaN" },
         { id: "2", nodeId: "query_tensor",        diagnosisKey: "qproj-overflow",           label: "问题2：q_proj FP8 溢出", sub: "layer 33 q_proj 输入 3.2% 超 FP8 E4M3 max(448)" },
-        { id: "3", nodeId: "query_projection",    diagnosisKey: "low-precision-training",    label: "问题3：低精训练 loss 不收敛", sub: "FP8 深层数值退化 → layer 47 偏差起点 → 梯度消失" },
+        { id: "3", nodeId: "query_projection",    diagnosisKey: "low-precision-training",    label: "问题3：低精训练 loss 不收敛", sub: "FP8 深层数值退化 → layer 35 偏差起点 → 梯度消失" },
         { id: "4", nodeId: "routed_experts",      diagnosisKey: "nvlink",                   label: "问题4：NVLINK 链路掉线", sub: "node2 GPU3 lane5 inactive → MFU 骤降至 20%" },
         { id: "5", nodeId: "lm_head",             diagnosisKey: "perf-compute-bottleneck",  label: "问题5：lm_head 带宽瓶颈", sub: "vocab 129280 非对齐256 → cube_util 仅 49%" },
         { id: "6", nodeId: "topk_expert_select",  diagnosisKey: "perf-comm-straggler",      label: "问题6：all-to-all 快慢卡", sub: "rank 17/23/41 负载 5× → 步耗时周期性尖峰" },
@@ -976,6 +976,11 @@
     const atIncident = step === INCIDENT_STEP;
     const inRecovery = step > INCIDENT_STEP && step < RECOVERY_END;
 
+    // 收敛型时间重整:训练早期变化快、后期趋于平稳(真实训练里 loss 先快降后收敛,
+    // acc/precision/recall/corr 先快升后趋稳),避免曲线呈直线。convUp 0→1 先快后慢,convDown 反之。
+    const convUp = t >= 1 ? 1 : 1 - Math.pow(2, -5.5 * t);
+    const convDown = 1 - convUp;
+
     // 事故步本身：loss NaN / grad_norm inf / 其余指标也 NaN（训练中断）
     // 恢复期：从异常值平滑过渡回正常趋势
     // 恢复后：继续正常训练，趋势朝好的方向发展
@@ -987,9 +992,9 @@
     const shockGn = atIncident ? Infinity : inRecovery ? (50.0 * (1 - ease) + baseGn * ease) : baseGn;
     const grad_norm = atIncident ? Infinity : +(shockGn).toFixed(2);
 
-    const tlBase = Math.max(0.15, targetLoss * (1.7 - 0.7 * t) + stepNoise(1, step, 0.05));
+    const tlBase = Math.max(0.15, targetLoss * (1.0 + 0.7 * convDown) + stepNoise(1, step, 0.11));
     const tl = atIncident ? NaN : inRecovery ? (tlBase + 0.8 * (1 - ease)) : tlBase;
-    const vlBase = tlBase + 0.05 + stepNoise(2, step, 0.03);
+    const vlBase = tlBase + 0.05 + stepNoise(2, step, 0.06);
     const vl = atIncident ? NaN : inRecovery ? (vlBase + 0.5 * (1 - ease)) : vlBase;
 
     const taBase = clamp(1 - tlBase / 6, 0.05, 0.99);
@@ -997,19 +1002,19 @@
     const vaBase = clamp(1 - vlBase / 6, 0.05, 0.99);
     const va = atIncident ? NaN : inRecovery ? (vaBase - 0.08 * (1 - ease)) : vaBase;
 
-    const mfBase = clamp(targetMfu * (0.72 + 0.28 * t) + stepNoise(3, step, 0.015), 0.05, 0.9);
+    const mfBase = clamp(targetMfu * (0.72 + 0.28 * convUp) + stepNoise(3, step, 0.03), 0.05, 0.9);
     const mf = atIncident ? 0 : inRecovery ? (mfBase * ease) : mfBase;
 
-    const pcBase = clamp(0.62 + 0.3 * t + stepNoise(4, step, 0.02), 0.05, 0.99);
+    const pcBase = clamp(0.62 + 0.3 * convUp + stepNoise(4, step, 0.045), 0.05, 0.99);
     const pc = atIncident ? NaN : inRecovery ? (pcBase - 0.1 * (1 - ease)) : pcBase;
-    const rcBase = clamp(0.58 + 0.32 * t + stepNoise(5, step, 0.024), 0.05, 0.99);
+    const rcBase = clamp(0.58 + 0.32 * convUp + stepNoise(5, step, 0.05), 0.05, 0.99);
     const rc = atIncident ? NaN : inRecovery ? (rcBase - 0.1 * (1 - ease)) : rcBase;
 
-    const crBase = clamp(0.7 + 0.28 * t + stepNoise(6, step, 0.02), -0.3, 0.999);
+    const crBase = clamp(0.7 + 0.28 * convUp + stepNoise(6, step, 0.045), -0.3, 0.999);
     const cr = atIncident ? NaN : inRecovery ? (crBase - 0.15 * (1 - ease)) : crBase;
 
     // HBM 显存利用率：事故步跌至 0（训练中断），恢复期从低位回升，恢复后继续正常波动
-    const memBase = clamp(0.72 + 0.12 * t + stepNoise(11, step, 0.025), 0.45, 0.95);
+    const memBase = clamp(0.72 + 0.12 * convUp + stepNoise(11, step, 0.03), 0.45, 0.95);
     const avg_mem = atIncident ? 0 : inRecovery ? (memBase * ease) : memBase;
 
     // 单卡重跑同一 step(定位链.md 案例一 · 分叉判定):不经历多卡 all-to-all,不受事故影响,全程健康——
@@ -1492,7 +1497,7 @@
 
   const diagnosisCases = {
     "moe-a2a": {
-      layer: "Layer 30 · MoE Router",
+      layer: "Layer 38 · MoE Router",
       nodeIds: ["router_gate", "router_weight", "routed_expert_bank", "shared_expert_mlp", "moe_all_to_all_dispatch", "moe_all_to_all_combine"],
       edges: [
         ["router_gate", "moe_all_to_all_dispatch"],
@@ -1544,7 +1549,7 @@
       note: "Router gate bias 漂移 → 热点 rank 承接 5× token → all-to-all 尾延迟恶化。",
     },
     "low-precision-training": {
-      layer: "Layer 47 深层",
+      layer: "Layer 35 深层",
       nodeIds: ["query_tensor", "attention_core", "shared_expert_mlp", "routed_expert_bank"],
       edges: [
         ["query_tensor", "attention_core"],
@@ -1557,7 +1562,7 @@
 
   // 进度条诊断标记:step 在 0~totalSteps 范围内,百分比自动换算
   const diagnosisMarkers = [
-    { key: "moe-a2a", step: INCIDENT_STEP, severity: "p0", category: "精度", num: "一", label: "MoE all-to-all 超时 → loss NaN", sub: "layer 30 router 98% token → expert 47, EP23 死锁" },
+    { key: "moe-a2a", step: INCIDENT_STEP, severity: "p0", category: "精度", num: "一", label: "MoE all-to-all 超时 → loss NaN", sub: "layer 38 router 98% token → expert 193, EP23 死锁" },
     { key: "qproj-overflow", step: 8500, severity: "p1", category: "精度", num: "二", label: "q_proj FP8 精度溢出 → grad_norm 发散", sub: "layer 33 q_proj 3.2% 超 FP8 max(448)" },
     { key: "low-precision-training", stepFrom: 28000, stepTo: 35000, severity: "p1", category: "精度", num: "三", label: "低精训练 loss 不收敛 → 梯度消失", sub: "FP8 E4M3 深层激活值长尾, 峰度 +15.3, SNR 降至 6.8dB" },
     { key: "nvlink", step: 20000, severity: "p1", category: "Infra", num: "四", label: "HCCS 链路掉线 → MFU 骤降", sub: "node2 NPU3 lane5 inactive, HCCL 回退 RoCE 慢路径" },
@@ -2113,23 +2118,23 @@
           ` },
         { label: "分叉判定", sub: "仅多卡异常 · 切入通信分支", branch: true },
         { label: "通信调度层", short: "EP rank 23", sub: "WHY(通信) · EP rank 23 all-to-all 死锁",
-          content: `<div class="opv-swim-embed" data-problem-one-timeline title="NCCL trace: node2 ranks 16-23, rank 23 all-to-all timeout"></div><p style="margin:10px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">识别 EP rank 23（node2 GPU 7）在 <code>all-to-all</code> 调用处超时（30s timeout）。该调用时间上定位到 layer 30 MoE 的 expert dispatch 阶段。</p><p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【模型层】提取 step ${INCIDENT_STEP} 各层 router 的 token-to-expert 分配统计。</p>` },
-        { label: "模型层", short: "layer 30", sub: "WHERE · layer 30 router 98% token 倾斜到 expert 47",
+          content: `<div class="opv-swim-embed" data-problem-one-timeline title="NCCL trace: node2 ranks 16-23, rank 23 all-to-all timeout"></div><p style="margin:10px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">识别 EP rank 23（node2 GPU 7）在 <code>all-to-all</code> 调用处超时（30s timeout）。该调用时间上定位到 layer 38 MoE 的 expert dispatch 阶段。</p><p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【模型层】提取 step ${INCIDENT_STEP} 各层 router 的 token-to-expert 分配统计。</p>` },
+        { label: "模型层", short: "layer 38", sub: "WHERE · layer 38 router 98% token 倾斜到 expert 193",
           content: `
-            <div class="twin-layerview-cta" data-open-layer-view data-lv-expanded="30" data-lv-hot-expert="47" role="button" tabindex="0">
+            <div class="twin-layerview-cta" data-open-layer-view data-lv-expanded="38" data-lv-hot-expert="193" role="button" tabindex="0">
               <div class="twin-layerview-cta-text">
-                <strong>layer 30 · MoE 层展开图</strong>
+                <strong>layer 38 · MoE 层展开图</strong>
                 <span>router→expert 分发与 rank 23 all-to-all 死锁动画 · 点击在整网图区域查看</span>
               </div>
               <span class="btn btn-solid btn-sm twin-layerview-cta-btn">查看</span>
             </div>
-            <p class="twin-locate-metric-note">layer 30 的 router 将当前 micro-batch 中 98% 的 token 路由到了 expert 47(恰好位于 EP rank 23),其余 63 个 expert 几乎无 token。</p>
-            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">对比分析收发数据， layer 30 每个 rank 的 all-to-all send/recv buffer size 对比如下图：</p>
+            <p class="twin-locate-metric-note">layer 38 的 router 将当前 micro-batch 中 98% 的 token 路由到了 expert 193(恰好位于 EP rank 23),其余 255 个 expert 几乎无 token。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">对比分析收发数据， layer 38 每个 rank 的 all-to-all send/recv buffer size 对比如下图：</p>
             <canvas id="bufChart" style="width:100%;height:168px;margin:6px 0 0;display:block;background:var(--surface-2);border-radius:6px"></canvas>
-            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">进一步证实 rank 23 的 send buffer 为 0（没有 token 被 router 分发到其他 rank 的 expert），而 recv buffer 期望接收 2048 token × 4608 dim × 8 experts 的数据，size 不匹配导致死锁。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">进一步证实 rank 23 的 send buffer 为 0（没有 token 被 router 分发到其他 rank 的 expert），而 recv buffer 期望接收 2048 token × 2560 dim × 8 experts 的数据，size 不匹配导致死锁。</p>
             <p class="twin-locate-metric-note">↳ 需在【infra层】识别对训练集群的影响。</p>
           ` },
-        { label: "infra层", short: "EP rank 23", sub: "CONTEXT · EP rank 23 / PP stage 3 / DP0",
+        { label: "infra层", short: "EP rank 23", sub: "CONTEXT · EP rank 23 / PP stage 6 / DP0",
           // infra 示意图完全复用外层「训练监控 · infra」的集群热力图(#heat 的 DP4×PP8×EP64 网格),
           // 由 syncLocateInfraHeat() 把当前 util 着色镜像到 #locateInfraHeat,再叠加本问题的 hot/warm 标记。
           content: `
@@ -2146,18 +2151,18 @@
               <p style="margin:8px 0 0;font-size:11px;color:var(--foreground-secondary);line-height:1.5"><span style="color:#dc2626;font-weight:700">EP rank 23</span> 在 all-to-all 死锁,<span style="color:#ea580c;font-weight:600">EP rank 16–22</span> 空等超时;异常聚集在单个 EP rank → 局部路由倾斜。</p>
             </div>
           ` },
-        { label: "超参/代码层", short: "3 处代码改动", sub: "FIX · MoGE group 8→16 + z-loss + 超时延长",
+        { label: "超参/代码层", short: "3 处代码改动", sub: "FIX · n_group 8→16 + z-loss + 超时延长",
           content: `
             <p class="twin-locate-metric-note" style="margin:0 0 12px">综合以上各层定位诊断，代码修改建议如下：</p>
             <div style="display:flex;flex-direction:column;gap:12px;">
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:8px 12px;background:var(--surface-2);font-size:12px;font-weight:600;color:var(--foreground)">① model_config.json</div>
                 <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
-                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"num_experts": 64,</div>
-                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"moge_group_topk": 1,</div>
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"num_experts": 256,</div>
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"top_k": 8,</div>
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;"n_group": <strong>8</strong>,</div>
-                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"n_group": <strong>16</strong>,&nbsp;&nbsp;<span style="color:var(--foreground-muted);font-family:system-ui"># MoGE 分组 8→16，每组 expert 8→4，分散热点</span></div>
-                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"experts_per_group": 4,</div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"n_group": <strong>16</strong>,&nbsp;&nbsp;<span style="color:var(--foreground-muted);font-family:system-ui"># router 分组 8→16，增加 expert 选择多样性，分散热点</span></div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"topk_group": <strong>6</strong>,&nbsp;&nbsp;<span style="color:var(--foreground-muted);font-family:system-ui"># topk_group 4→6，减少单一 expert 垄断概率</span></div>
                 </div>
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
@@ -2243,11 +2248,11 @@
         { label: "分叉判定", sub: "单/多卡均异常 · 沿计算主干", branch: true },
         { label: "张量数值分析", short: "分布曲线 + 宏观指标", sub: "WHICH · 直方图 + 峰度/离群率/p99/量化SNR/KL散度 + 风险矩阵",
           content: `
-            <p class="twin-locate-metric-note">锁定 layer 47 为异常层后，dump step 32000 时该层各关键张量，绘制数值分布直方图与 BF16 baseline 叠图对比：</p>
+            <p class="twin-locate-metric-note">锁定 layer 35 为异常层后，dump step 32000 时该层各关键张量，绘制数值分布直方图与 BF16 baseline 叠图对比：</p>
             <div class="locate-dist-grid">
-              <div class="locate-dist-cell"><h4>q_nope 输入（激活值）</h4><canvas id="case6DistQnope"></canvas><div class="note">BF16：N(0.12, 1.45)。FP8：严重右偏 skewness=+1.8，<span style="color:#dc2626">6.8% clip@448</span></div></div>
+              <div class="locate-dist-cell"><h4>q_b_proj 输入（MLA 低秩 latent）</h4><canvas id="case6DistQnope"></canvas><div class="note">BF16：N(0.12, 1.45)。FP8：严重右偏 skewness=+1.8，<span style="color:#dc2626">6.8% clip@448</span></div></div>
               <div class="locate-dist-cell"><h4>core_attention 输出</h4><canvas id="case6DistAttn"></canvas><div class="note">BF16：多模态 方差 0.85。FP8：<span style="color:#dc2626">主峰塌缩至[-0.3,0.3]</span>，方差→0.21</div></div>
-              <div class="locate-dist-cell"><h4>gate_proj 输出（FFN 中间激活）</h4><canvas id="case6DistGate"></canvas><div class="note">BF16：[-12,15] 自然长尾。FP8：<span style="color:#dc2626">双侧 ±448 截断，12.4% clip</span></div></div>
+              <div class="locate-dist-cell"><h4>gate_up 输出（FFN 中间激活）</h4><canvas id="case6DistGate"></canvas><div class="note">BF16：[-12,15] 自然长尾。FP8：<span style="color:#dc2626">双侧 ±448 截断，12.4% clip</span></div></div>
             </div>
             <p class="twin-locate-metric-note" style="margin:6px 0"><strong>三张分布图一致揭示</strong>：FP8 E4M3 动态范围（max=448）无法容纳深层激活值自然长尾。三阶段退化：激活值右偏 → attention 信息坍缩 → FFN 截断饱和。</p>
 
@@ -2255,7 +2260,7 @@
             <div style="overflow-x:auto;margin:6px 0">
               <table style="width:100%;border-collapse:collapse;font-size:11px;line-height:1.5">
                 <tr style="background:var(--surface-2)"><th style="padding:4px 8px;border:1px solid var(--border-subtle);text-align:left">张量</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">指标</th><th style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">FP8</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">BF16</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">诊断含义</th></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)" rowspan="7">q_nope 输入</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Mean</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">+2.41</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">+0.12</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">均值右偏 → 向 FP8 正上限漂移</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)" rowspan="7">q_b_proj 输入</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Mean</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">+2.41</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">+0.12</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">均值右偏 → 向 FP8 正上限漂移</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Std</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">3.82</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">1.45</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">标准差扩大 2.6×</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Skewness</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">+1.83</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">+0.08</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">严重右偏</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)"><strong>Kurtosis</strong></td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">+7.42</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">-0.12</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">高峰度 = 重尾+尖峰</td></tr>
@@ -2264,7 +2269,7 @@
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">p99.9</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">447.8 (clip)</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">4.89</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">最强 0.1% 激活完全丢失</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)" rowspan="2">core_attn 输出</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Std</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">0.21</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.85</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">方差 1/4 — 区分度丧失</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">KL Divergence</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">2.31 bits</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">分布根本性变化</td></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)" rowspan="2">gate_proj 输出</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Quantization SNR</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">6.8 dB</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">42.1 dB</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">信号被噪声严重污染</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)" rowspan="2">gate_up 输出</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Quantization SNR</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">6.8 dB</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">42.1 dB</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">信号被噪声严重污染</td></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">Kurtosis</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">+15.3</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">+0.45</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">极端 — "尖峰+截断双尾"</td></tr>
               </table>
             </div>
@@ -2272,7 +2277,7 @@
 
             <p class="twin-locate-metric-note" style="margin:14px 0 6px;font-weight:600;color:var(--foreground)">量化风险评估矩阵</p>
             <div style="display:grid;grid-template-columns:130px repeat(3,1fr) 100px;margin:6px 0;font-size:11px;border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
-              <div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">风险维度</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">q_nope</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">core_attn</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">gate_proj</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">综合</div>
+              <div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">风险维度</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">q_b_proj</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">core_attn</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">gate_up</div><div style="padding:5px 8px;background:var(--surface-2);font-weight:600;border-bottom:1px solid var(--border-subtle)">综合</div>
               <div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)">动态范围适配</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fff7ed;color:#ea580c">⚠️ 临界</span></div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626">🔴 危险</span></div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626">🔴 危险</span></div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626">🔴 高风险</span></div>
               <div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)">QSNR</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)">18.3 dB</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:#dc2626;font-weight:600">11.5 dB</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:#dc2626;font-weight:700">6.8 dB</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626">🔴 <10dB 不可用</span></div>
               <div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)">KL 散度</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)">0.87 bits</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:#dc2626;font-weight:600">2.31 bits</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle);color:#dc2626;font-weight:700">3.45 bits</div><div style="padding:5px 8px;border-bottom:1px solid var(--border-subtle)"><span style="display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626">🔴 >1 bit 显著偏移</span></div>
@@ -2281,48 +2286,48 @@
 
             <p class="twin-locate-metric-note" style="margin:14px 0 6px;font-weight:600;color:var(--foreground)">算子误差定位</p>
             <div class="locate-canvas-card">
-              <div class="locate-canvas-card__head"><span>Layer 47 算子误差瀑布（log₁₀ MSE vs BF16 baseline）</span></div>
+              <div class="locate-canvas-card__head"><span>Layer 35 算子误差瀑布（log₁₀ MSE vs BF16 baseline）</span></div>
               <div class="locate-canvas-card__body"><canvas id="case6OpWaterfallCanvas"></canvas></div>
             </div>
             <div style="overflow-x:auto;margin:6px 0">
               <table style="width:100%;border-collapse:collapse;font-size:11px;line-height:1.5">
                 <tr style="background:var(--surface-2)"><th style="padding:4px 8px;border:1px solid var(--border-subtle);text-align:left">算子</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">MSE vs BF16</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">变化</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">角色</th></tr>
                 <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">input_layernorm</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">3e-8</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">—</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 正常</td></tr>
-                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">q_nope</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">2e-7 → 4.1e-3</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">⬆ 20000×</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">🔴 首害</td></tr>
+                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">q_b_proj</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">6e-7 → 4.1e-3</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">⬆ 6800×</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">🔴 首害(MLA 上投影)</td></tr>
                 <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">core_attention</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">4.1e-3 → 1.6e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">⬆ 40×</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">🔴 放大器(softmax)</td></tr>
-                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">gate_proj</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">1.8e-1 → 7.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">⬆ 4×</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">放大器(FP8 cast)</td></tr>
+                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">gate_up</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">1.8e-1 → 7.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">⬆ 4×</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">放大器(FP8 cast)</td></tr>
               </table>
             </div>
-            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 首害算子 <code>q_nope</code>，误差放大链：q_nope → softmax（信息抹平）→ gate_proj（截断饱和）。需在【误差传递路径】逐层追查偏差起点。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 首害算子 <code>q_b_proj</code>（MLA Q 路低秩上投影），误差放大链：q_b_proj → softmax（信息抹平）→ gate_up（截断饱和）。需在【误差传递路径】逐层追查偏差起点。</p>
           ` },
-        { label: "误差传递路径", short: "L47 拐点 460×", sub: "逐层对比 BF16 基线，发现偏差起点 layer 47",
+        { label: "误差传递路径", short: "L35 拐点 460×", sub: "逐层对比 BF16 基线，发现偏差起点 layer 35",
           content: `
-            <p class="twin-locate-metric-note">以 BF16 全精度训练为 baseline，沿 forward 计算图逐层对比 FP8 训练的激活输出，绘制<strong>误差累积曲线</strong>（横轴 layer 1→61，纵轴 log₁₀ MSE）：</p>
+            <p class="twin-locate-metric-note">以 BF16 全精度训练为 baseline，沿 forward 计算图逐层对比 FP8 训练的激活输出，绘制<strong>误差累积曲线</strong>（横轴 layer 1→46，纵轴 log₁₀ MSE）：</p>
             <div class="locate-canvas-card">
-              <div class="locate-canvas-card__head"><span>61 层误差累积曲线（log₁₀ MSE vs BF16 baseline，step 32000）</span></div>
+              <div class="locate-canvas-card__head"><span>46 层误差累积曲线（log₁₀ MSE vs BF16 baseline，step 32000）</span></div>
               <div class="locate-canvas-card__body"><canvas id="case6MseCurveCanvas"></canvas></div>
             </div>
-            <p class="twin-locate-metric-note" style="margin:4px 0">layer 1~35：MSE 1e-7~1e-6 平稳 → layer 36~46：缓慢爬升至 5e-4 → <strong style="color:#dc2626">layer 47：跳跃至 2.3e-1（460×）</strong> → layer 48~55：0.2~0.8 高位震荡 → layer 56~61：飙升至 3.5</p>
+            <p class="twin-locate-metric-note" style="margin:4px 0">layer 1~25：MSE 1e-7~1e-6 平稳 → layer 26~34：缓慢爬升至 5e-4 → <strong style="color:#dc2626">layer 35：跳跃至 2.3e-1（460×）</strong> → layer 36~41：0.2~0.8 高位震荡 → layer 42~45：飙升至 3.5</p>
 
             <p class="twin-locate-metric-note" style="margin:12px 0 6px;font-weight:600;color:var(--foreground)">逐层对比详表（偏差起点附近）</p>
             <div style="overflow-x:auto;margin:6px 0">
               <table style="width:100%;border-collapse:collapse;font-size:11px;line-height:1.5">
                 <tr style="background:var(--surface-2)"><th style="padding:4px 8px;border:1px solid var(--border-subtle)">Layer</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">Attn MSE</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">FFN MSE</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">Grad MSE</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">状态</th></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">45</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">8.2e-7</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">1.1e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">2.3e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢</td></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">46</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">3.5e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">6.8e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">1.2e-5</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 略有抬升</td></tr>
-                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">47</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">2.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">7.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">1.8e+1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">🔴 偏差起点</td></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">48</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.41</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.55</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">8.7e+0</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🔴 向下游传播</td></tr>
-                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">50</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.45</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.78</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">9.1e+0</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🔴 误差放大</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">33</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">8.2e-7</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">1.1e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">2.3e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">34</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">3.5e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">6.8e-6</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">1.2e-5</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 略有抬升</td></tr>
+                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">35</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">2.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">7.3e-1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:700">1.8e+1</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">🔴 偏差起点</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">36</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.41</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.55</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">8.7e+0</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🔴 向下游传播</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">38</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.45</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.78</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">9.1e+0</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🔴 误差放大</td></tr>
               </table>
             </div>
-            <p class="twin-locate-metric-note" style="margin-top:8px"><strong style="color:var(--foreground)">误差传递因果链</strong>：layer 1~46 FP8 截断累积 → L47 RMSNorm 方差放大 → q_nope 6.8% clip@448 → core_attn softmax 信息抹平 → o_proj 噪声>50% → gate_proj 双侧 12% clip → L48~61 残差传播 → 全局梯度消失 → loss 反弹</p>
-            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ L47 的 Attn 和 FFN 在同一 step 同时爆炸 → 非特定算子 bug，而是该层激活值整体数值分布已超出 FP8 可表示范围。需在【infra层】检查并行策略和 scale 状态。</p>
+            <p class="twin-locate-metric-note" style="margin-top:8px"><strong style="color:var(--foreground)">误差传递因果链</strong>：layer 1~34 FP8 截断累积 → L35 RMSNorm 方差放大 → q_b_proj 6.8% clip@448 → core_attn softmax 信息抹平 → o_proj 噪声>50% → gate_up 双侧 12% clip → L36~45 残差传播 → 全局梯度消失 → loss 反弹</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ L35 的 Attn 和 FFN 在同一 step 同时爆炸 → 非特定算子 bug，而是该层激活值整体数值分布已超出 FP8 可表示范围。需在【infra层】检查并行策略和 scale 状态。</p>
           ` },
         { label: "infra层", short: "全 64 rank", sub: "CONTEXT · 跨所有 rank 复现，FP8 scale 0.62→0.18，有效 bit 4.5→2.8",
           content: `
-            <p class="twin-locate-metric-note">layer 47 属于 PP stage 6（layers 47~53），在所有 64 个 EP rank 上均观测到相同分布偏移。进一步检查 FP8 量化参数：layer 47 的 per-tensor scale 从 step 28000 的 <strong>0.62</strong> 持续下降至 step 32000 的 <strong style="color:#dc2626">0.18</strong>。</p>
+            <p class="twin-locate-metric-note">layer 35 属于 PP stage 5（layers 30~35），在所有 64 个 EP rank 上均观测到相同分布偏移。进一步检查 FP8 量化参数：layer 35 的 per-tensor scale 从 step 25000 的 <strong>0.62</strong> 持续下降至 step 32000 的 <strong style="color:#dc2626">0.18</strong>。</p>
             <div class="locate-canvas-card">
-              <div class="locate-canvas-card__head"><span>Layer 47 · FP8 per-tensor scale 衰减曲线（step 27000→32000）</span></div>
+              <div class="locate-canvas-card__head"><span>Layer 35 · FP8 per-tensor scale 衰减曲线（step 25000→32000）</span></div>
               <div class="locate-canvas-card__body"><canvas id="case6ScaleDecayCanvas"></canvas></div>
             </div>
             <p class="twin-locate-metric-note" style="margin:8px 0">scale 衰减使有效量化精度从 <strong>~4.5 bit 退化至 ~2.8 bit</strong>——scale 越小，量化 bin 越粗，舍入误差越大，形成"截断→scale 衰减→更粗量化→更多截断"正反馈。</p>
@@ -2340,7 +2345,7 @@
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_quant_mode": <strong>"hybrid"</strong>,</div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_attn_quant": "per_token",&nbsp;&nbsp;<span style="color:var(--foreground-muted)"># q/k/v 每个 token 独立 scale</span></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_ffn_quant": "per_channel",&nbsp;<span style="color:var(--foreground-muted)"># FFN 每个 channel 独立 scale</span></div>
-                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_hybrid_threshold_layer": <strong>45</strong>,&nbsp;<span style="color:var(--foreground-muted)"># L45+ 深层启用</span></div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_hybrid_threshold_layer": <strong>30</strong>,&nbsp;<span style="color:var(--foreground-muted)"># L30+ 深层启用</span></div>
                 </div>
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
@@ -2354,7 +2359,7 @@
                 <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">③ attention.py — 深层启用 BF16 softmax</div>
                 <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;attn_output = softmax(scores, dtype=<strong>torch.float8_e4m3fn</strong>)</div>
-                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;dtype = torch.float8_e4m3fn <strong>if layer_idx < 45 else torch.bfloat16</strong></div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;dtype = torch.float8_e4m3fn <strong>if layer_idx < 30 else torch.bfloat16</strong></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;attn_output = <strong>softmax(scores, dtype=dtype)</strong></div>
                 </div>
               </div>
@@ -2673,7 +2678,7 @@
   }
 
   // 体现 Pangu 72B 定位链案例一:对比各 EP rank 的 all-to-all send/recv buffer size。
-  // 31 个正常 rank send≈recv≈19MB(收发对称);rank 23 send=0(本地 token 全留在本卡 expert 47,
+  // 31 个正常 rank send≈recv≈19MB(收发对称);rank 23 send=0(本地 token 全留在本卡 expert 193,
   // 没有 token 发往其它 rank)、recv=151MB(2048 token × 4608 dim × 8 expert,BF16 2B/元素)——
   // 收发严重不对称 → all-to-all 期望的对称尺寸对不上 → 死锁。
   function drawBufferChart() {
@@ -2709,7 +2714,7 @@
 
     // 标题
     ctx.fillStyle = cSec; ctx.font = "600 11px system-ui"; ctx.textAlign = "left";
-    ctx.fillText("layer 30 · 各 EP rank 的 all-to-all send/recv buffer (MB)", padL, 14);
+    ctx.fillText("layer 38 · 各 EP rank 的 all-to-all send/recv buffer (MB)", padL, 14);
 
     // 图例
     const lgX = padL, lgY = 28;
@@ -3039,7 +3044,7 @@
     return [
       { id: "in_norm",   y: 688, h: 30, color: LV_BASE.cExpert, label: "input_layernorm", note: "RmsNorm" },
       { id: "mla",       y: 584, h: 92, color: LV_BASE.cAttn,   label: "MLA 注意力",
-        note: ["q_lora[7168→1536] · kv_lora[7168→512]", "128 heads · d=192 · attn_output→7168"] },
+        note: ["q_a_proj[2560→1024] + q_b_proj[1024→9216]", "48 heads · d=192 · attn_output→2560"] },
       { id: "post_norm", y: 534, h: 38, color: LV_BASE.cExpert, label: "post_attention_layernorm", note: "RmsNorm · +残差" },
       { id: "router",    y: 488, h: 34, color: LV_BASE.cRoute,  label: "router",
         note: `top-${LV_BASE.topK}/${LV_BASE.routedExperts} · n_group=${LV_BASE.nGroup} · topk_group=${LV_BASE.topkGroup}` },
@@ -3178,7 +3183,7 @@
         let fill, op, extra = "";
         if (hotExpert != null) {
           // 事故层:格子亮度 ∝ 该 expert 的 token 量。98% 全压在 E47(亮红),其余 63 个用可见底色——
-          // 直接体现模型层 §4「98% token → expert 47,其余 63 expert 几乎无 token」的路由倾斜。
+          // 直接体现模型层 §4「98% token → expert 193,其余 255 expert 几乎无 token」的路由倾斜。
           fill = hot ? LV.cHot : LV.cExpert;
           op = hot ? 1 : 0.35;
         } else {
@@ -3257,7 +3262,7 @@
     ` : "";
 
     // ── 体现 定位链.md L128:rank 23 的 all-to-all send/recv buffer 失配 ──
-    // 本地 token 全落在本卡 expert 47 → 没有 token 需要发往别的 rank(send=0);
+    // 本地 token 全落在本卡 expert 193 → 没有 token 需要发往别的 rank(send=0);
     // 但全局 98% token 都选中 E47,要从其它 rank 收进来(recv=2048×4608×8≈151MB) → 收发尺寸对不上 → 死锁。
     let mismatchGauge = "";
     if (isMoe && hotExpert != null) {
@@ -3733,9 +3738,9 @@
       ctx.fillStyle = 'rgba(59,130,246,0.55)'; ctx.fillRect(x, yOf(d28[i]), barW, P.t + ph - yOf(d28[i]));
       ctx.fillStyle = i === 46 ? '#dc2626' : 'rgba(220,38,38,0.5)'; ctx.fillRect(x + barW * 0.3, yOf(d32[i]), barW * 0.7, P.t + ph - yOf(d32[i]));
     }
-    const l47x = P.l + 46 * gap + gap / 2;
-    ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L47 · 震中', l47x, yOf(d32[46]) - 7);
-    ctx.setLineDash([2, 2]); ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(l47x, yOf(d32[46]) - 2); ctx.lineTo(l47x, P.t - 2); ctx.stroke(); ctx.setLineDash([]);
+    const l35x = P.l + 34 * gap + gap / 2;
+    ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L35 · 震中', l35x, yOf(d32[34]) - 7);
+    ctx.setLineDash([2, 2]); ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(l35x, yOf(d32[34]) - 2); ctx.lineTo(l35x, P.t - 2); ctx.stroke(); ctx.setLineDash([]);
   }
 
   function renderCase6OpWaterfall() {
@@ -3744,7 +3749,7 @@
     const r = dprCase6(canvas, canvas.parentElement.clientWidth, 140);
     const { ctx, W, H } = r;
     const P = { t: 16, r: 14, b: 42, l: 44 }, pw = W - P.l - P.r, ph = H - P.t - P.b;
-    const labels = ['LN', 'q_lora', 'kv_lora', 'q_nope', 'q_rope', 'attn', 'o_proj', 'gate', 'up', 'SiLU', 'down'];
+    const labels = ['LN', 'q_a_proj', 'kv_a_proj', 'q_b_proj', 'rope', 'attn', 'o_proj', 'gate_up', 'SiLU', 'down'];
     const vals = [-7.5, -6.2, -6.1, -2.4, -2.3, -0.8, -0.75, -0.14, -0.2, -0.25, -0.3];
     const colors = vals.map(v => v > -3 ? '#dc2626' : v > -6 ? '#ea580c' : '#3b82f6');
     const minV = -8, maxV = 0;
@@ -3757,7 +3762,7 @@
     vals.forEach((v, i) => {
       const x = P.l + i * barGap + (barGap - barW) / 2, h = P.t + ph - yOf(v);
       ctx.fillStyle = colors[i]; ctx.fillRect(x, yOf(v), barW, h);
-      if (i === 3 || i === 5 || i === 7) { ctx.fillStyle = '#dc2626'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.fillText('⬆' + (i === 3 ? '20000×' : i === 5 ? '40×' : '4×'), x + barW / 2, yOf(v) - 3); }
+      if (i === 3 || i === 5 || i === 7) { ctx.fillStyle = '#dc2626'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.fillText('⬆' + (i === 3 ? '6800×' : i === 5 ? '40×' : '4×'), x + barW / 2, yOf(v) - 3); }
       ctx.save(); ctx.fillStyle = '#666'; ctx.font = '8px system-ui'; ctx.textAlign = 'right'; ctx.translate(x + barW / 2, H - 8); ctx.rotate(-0.45); ctx.fillText(labels[i], 0, 0); ctx.restore();
     });
   }
@@ -3791,25 +3796,25 @@
     const r = dprCase6(canvas, canvas.parentElement.clientWidth, 170);
     const { ctx, W, H } = r;
     const P = { t: 15, r: 14, b: 24, l: 42 }, pw = W - P.l - P.r, ph = H - P.t - P.b;
-    const n = 61;
-    const mse = Array.from({ length: n }, (_, i) => { if (i < 35) return -6.5 + (i / 35) * 1.2 + (Math.random() - 0.5) * 0.3; if (i < 46) return -5.3 + (i - 35) / 11 * 2.8 + (Math.random() - 0.5) * 0.3; if (i === 46) return -0.64; if (i < 55) return -0.64 + (i - 46) * 0.03 + (Math.random() - 0.5) * 0.08; return -0.4 + (i - 55) / 6 * 0.9 + (Math.random() - 0.5) * 0.1; });
+    const n = 46;
+    const mse = Array.from({ length: n }, (_, i) => { if (i < 25) return -6.5 + (i / 25) * 1.2 + (Math.random() - 0.5) * 0.3; if (i < 34) return -5.3 + (i - 25) / 9 * 2.8 + (Math.random() - 0.5) * 0.3; if (i === 34) return -0.64; if (i < 41) return -0.64 + (i - 34) * 0.03 + (Math.random() - 0.5) * 0.08; return -0.4 + (i - 41) / 4 * 0.9 + (Math.random() - 0.5) * 0.1; });
     const minV = -7, maxV = 1;
     const xOf = (i) => P.l + (i / (n - 1)) * pw, yOf = (v) => P.t + ph - ((v - minV) / (maxV - minV)) * ph;
 
     ctx.clearRect(0, 0, W, H);
     ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 0.5;
     for (let i = 0; i <= 4; i++) { const y = P.t + (ph / 4) * i; ctx.beginPath(); ctx.moveTo(P.l, y); ctx.lineTo(W - P.r, y); ctx.stroke(); ctx.fillStyle = '#888'; ctx.font = '9px system-ui'; ctx.textAlign = 'right'; ctx.fillText('1e' + Math.round(minV + (maxV - minV) * (1 - i / 4)), P.l - 5, y + 4); }
-    ctx.fillStyle = '#888'; ctx.font = '9px system-ui'; ctx.textAlign = 'center'; [0, 15, 30, 46, 60].forEach(i => ctx.fillText('L' + (i + 1), xOf(i), H - 6));
+    ctx.fillStyle = '#888'; ctx.font = '9px system-ui'; ctx.textAlign = 'center'; [0, 11, 23, 34, 45].forEach(i => ctx.fillText('L' + (i + 1), xOf(i), H - 6));
 
     ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.beginPath();
     mse.forEach((v, i) => { const x = xOf(i), y = yOf(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
     ctx.stroke(); ctx.lineTo(xOf(n - 1), P.t + ph); ctx.lineTo(P.l, P.t + ph); ctx.closePath(); ctx.fillStyle = 'rgba(59,130,246,0.07)'; ctx.fill();
 
-    const l47x = xOf(46), l47y = yOf(mse[46]);
-    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(l47x, l47y, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L47 · 拐点', l47x, l47y - 9); ctx.fillText('460×', l47x, l47y + 14);
-    ctx.setLineDash([2, 2]); ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(l47x, l47y + 5); ctx.lineTo(l47x, P.t + ph); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(234,88,12,0.07)'; ctx.fillRect(xOf(35), P.t, xOf(46) - xOf(35), ph);
+    const l35x = xOf(34), l35y = yOf(mse[34]);
+    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(l35x, l35y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText('L35 · 拐点', l35x, l35y - 9); ctx.fillText('460×', l35x, l35y + 14);
+    ctx.setLineDash([2, 2]); ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(l35x, l35y + 5); ctx.lineTo(l35x, P.t + ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(234,88,12,0.07)'; ctx.fillRect(xOf(35), P.t, xOf(45) - xOf(35), ph);
   }
 
   function renderCase6ScaleDecay() {

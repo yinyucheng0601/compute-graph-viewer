@@ -1061,7 +1061,7 @@
                           <span class="diagnosis-category">精度</span>
                         </div>
                         <small><strong>MoE all-to-all 超时导致 loss NaN</strong></small>
-                        <small class="diagnosis-desc" data-tooltip="layer 30 router 将 98% token 集中路由到 expert 47,EP rank 23 all-to-all send/recv 死锁,其余 rank 空等超时">layer 30 router 将 98% token 集中路由到 expert 47,EP rank 23 all-to-all send/recv 死锁</small>
+                        <small class="diagnosis-desc" data-tooltip="layer 38 router 将 98% token 集中路由到 expert 193,EP rank 23 all-to-all send/recv 死锁,其余 rank 空等超时">layer 38 router 将 98% token 集中路由到 expert 193,EP rank 23 all-to-all send/recv 死锁</small>
                       </div>
                       <div class="twin-option diagnosis-card" data-diagnosis="qproj-overflow" role="button" tabindex="0">
                         <div class="diagnosis-card-head">
@@ -1069,8 +1069,8 @@
                           <span class="diagnosis-severity is-p1">P1</span>
                           <span class="diagnosis-category">精度</span>
                         </div>
-                        <small><strong>q_proj FP8 精度溢出 → grad_norm 缓慢发散</strong></small>
-                        <small class="diagnosis-desc" data-tooltip="layer 33 q_proj 输入 3.2% 元素超 FP8 E4M3 max(448),经 Linear[4608→12288] 扩张投影放大,Partial RoPE 高频分量尾部累积溢出">layer 33 q_proj 输入 3.2% 元素超 FP8 E4M3 max(448),扩张投影放大误差</small>
+                        <small><strong>q_b_proj FP8 精度溢出 → grad_norm 缓慢发散</strong></small>
+                        <small class="diagnosis-desc" data-tooltip="layer 33 q_b_proj 输入 3.2% 元素超 FP8 E4M3 max(448),经 MLA 上投影 Linear[1024→9216] 放大,Partial RoPE(64/192)高频分量尾部累积溢出">layer 33 q_b_proj 输入 3.2% 元素超 FP8 E4M3 max(448),MLA 上投影放大误差</small>
                       </div>
                       <div class="twin-option diagnosis-card" data-diagnosis="low-precision-training" role="button" tabindex="0">
                         <div class="diagnosis-card-head">
@@ -1079,7 +1079,7 @@
                           <span class="diagnosis-category">精度</span>
                         </div>
                         <small><strong>低精训练 loss 尾部不收敛，量化误差累积导致梯度信号淹没</strong></small>
-                        <small class="diagnosis-desc" data-tooltip="FP8 E4M3 深层激活值自然长尾超限,峰度从-0.12飙至+15.3,量化SNR从42dB降至6.8dB,layer 47 为偏差起点,梯度消失">FP8 E4M3 深层激活值长尾超限,峰度+15.3,SNR降至6.8dB,layer 47 偏差起点</small>
+                        <small class="diagnosis-desc" data-tooltip="FP8 E4M3 深层激活值自然长尾超限,峰度从-0.12飙至+15.3,量化SNR从42dB降至6.8dB,layer 35 为偏差起点,梯度消失">FP8 E4M3 深层激活值长尾超限,峰度+15.3,SNR降至6.8dB,layer 35 偏差起点</small>
                       </div>
                       <div class="twin-option diagnosis-card" data-diagnosis="nvlink" role="button" tabindex="0">
                         <div class="diagnosis-card-head">
@@ -1120,7 +1120,7 @@
                         <button class="btn btn-ghost btn-icon btn-sm" id="locateChainBack" type="button" hidden aria-label="返回 训练监控" title="返回 训练监控">←</button>
                         <div>
                           <div class="pto-ide-frame__pane-meta" id="architectureKicker" hidden></div>
-                          <div class="pto-ide-frame__pane-title" id="architectureTitle">Pangu 2.0 flash 整网图</div>
+                          <div class="pto-ide-frame__pane-title" id="architectureTitle">openPangu-2.0-Flash 整网图</div>
                           <div class="pto-ide-frame__pane-meta" id="architectureMeta"></div>
                         </div>
                       </div>
@@ -1275,20 +1275,21 @@
           <div class="twin-card-heading">
             <div>
               <h2>训练信息</h2>
-              <p>Pangu 2.0 flash 关键参数与预训练配置。</p>
+              <p>openPangu-2.0-Flash 关键参数与预训练配置。</p>
             </div>
           </div>
 
           <p class="twin-subhead" style="margin-top:2px">关键参数 · 模型结构</p>
           <div class="twin-info-box">
-            <div class="twin-info-line"><span>层数</span><span>48<small>4 Dense + 44 MoE</small></span></div>
-            <div class="twin-info-line"><span>hidden</span><span>4608<small>FFN 10240 / expert 1280</small></span></div>
-            <div class="twin-info-line"><span>MoE</span><span>64+4<small>top-8 路由, MoGE 8 groups</small></span></div>
-            <div class="twin-info-line"><span>注意力</span><span>GQA<small>64 Q-heads / 4 KV-heads</small></span></div>
-            <div class="twin-info-line"><span>参数量</span><span>72B<small>激活 16.50B / token</small></span></div>
-            <div class="twin-info-line"><span>精度</span><span>BF16<small>训练 · 推理</small></span></div>
-            <div class="twin-info-line"><span>vocab</span><span>153600<small>MTP 1 层</small></span></div>
-            <div class="twin-info-line"><span>max seq</span><span>131072<small>128K 上下文</small></span></div>
+            <div class="twin-info-line"><span>层数</span><span>46<small>2 Dense (L0-1) + 44 MoE (L2-45)</small></span></div>
+            <div class="twin-info-line"><span>hidden</span><span>2560<small>Dense FFN 9216 / expert 1024</small></span></div>
+            <div class="twin-info-line"><span>注意力</span><span>Sparse MLA<small>48 heads · 低秩 Q1024/KV512 · Causal Conv1D</small></span></div>
+            <div class="twin-info-line"><span>注意力混合</span><span>DSA 16 / SWA 30<small>DSA indexer 2048→24</small></span></div>
+            <div class="twin-info-line"><span>MoE</span><span>256+1<small>top-8 路由 · EP 切分（无 MoGE 分组）</small></span></div>
+            <div class="twin-info-line"><span>MTP</span><span>3 层<small>多 token 预测（层 46-48）</small></span></div>
+            <div class="twin-info-line"><span>vocab</span><span>151552</span></div>
+            <div class="twin-info-line"><span>max seq</span><span>524288<small>512K 上下文</small></span></div>
+            <div class="twin-info-line"><span>参数量</span><span>待补<small>本地未下载全权重</small></span></div>
           </div>
 
           <p class="twin-subhead">集群规模 · 2048×Ascend 910B</p>
@@ -1330,7 +1331,7 @@
             <div class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization" id="twinTimeline">
               <header class="pto-ide-frame__pane-header">
                 <span class="pto-ide-frame__pane-title">Timeline</span>
-                <p class="twin-timeline-subtitle">NCCL trace: node2 ranks 16–23 · EP rank 23（GPU 7）all-to-all 超时 30s → layer 30 MoE expert dispatch 死锁</p>
+                <p class="twin-timeline-subtitle">NCCL trace: node2 ranks 16–23 · EP rank 23（GPU 7）all-to-all 超时 30s → layer 38 MoE expert dispatch 死锁</p>
               </header>
               <div class="pto-ide-frame__pane-body twin-timeline-body" id="twinTimelineBody"></div>
             </div>
