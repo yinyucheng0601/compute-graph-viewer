@@ -2245,7 +2245,7 @@ let side3d = false;                     /* 整网侧视图 2D / 3D */
 let orbit = { rx: -16, ry: -32, z: 1 }; /* 3D 默认：等距斜视，深度轴投影为「左下→右上」 */
 let colorMode = 'cat';                   /* 整网染色图层：'cat' 类别 · 'dual' 双轴(是否matmul/有无权重) · 'off' 关 */
 let graphSem = true;                      /* 层内计算图：算子按类别染色(true) / 中性(false)——关掉让精度红/黄更聚焦 */
-const NODE_NEUTRAL = 'color-mix(in srgb, var(--foreground) 13%, var(--ide-pane-bg))';   /* 关闭算子染色时的中性卡面 */
+const NODE_NEUTRAL = 'color-mix(in srgb, var(--foreground) 36%, var(--ide-pane-bg))';   /* 关闭算子染色时的中性卡面（抬亮拉开图底、与 tensor 等亮，文字才看得清） */
 /* 算子类别配色 —— 对齐参考 openpangu modelviz 的领域色板（sem:* → opv:* → hex）
    norm=sky · linear=indigo · attention=blue · rope=violet · act=violet · gate=amber · moe=orange · mlp=violet · comm=cyan · embedding=teal · head=deep-violet */
 const CAT_COLOR = {
@@ -3639,7 +3639,19 @@ function injectArchCss(doc) {
     + ":root[data-theme='light'] .prec-cosbadge.c-crit text{fill:#e5325c}"
     + ":root[data-theme='light'] .prec-cosbadge.c-high text{fill:#c9781a}"
     + '.prec-tag rect{fill:#ff4b7b;filter:drop-shadow(0 2px 7px rgba(255,75,123,.55))}.prec-tag text{fill:#fff;font-family:var(--font-sans);font-weight:800;font-size:18px}'
-    + ':root.arch-nocolor .pto-model-graphviz-node.is-op rect,:root.arch-nocolor .pto-model-graphviz-node.is-module rect{fill:color-mix(in srgb,var(--foreground) 14%,var(--background))!important}';
+    /* 算子染色关：算子卡面抬到 ~0.40 灰，与 0.10 画布拉开图底、且与 tensor 卡（~0.40）等亮——
+       原 14% 几乎与背景同色→文字看不清，且比 tensor 暗一档看着像被「置灰」。仍保持中性去饱和，
+       不与首错/传播的红黄争焦点；文字强制满亮白，加一道细描边稳定图底。 */
+    + ':root.arch-nocolor .pto-model-graphviz-node.is-op rect,:root.arch-nocolor .pto-model-graphviz-node.is-module rect{fill:color-mix(in srgb,var(--foreground) 38%,var(--background))!important;stroke:color-mix(in srgb,var(--foreground) 22%,transparent)!important;stroke-width:1px!important}'
+    + ':root.arch-nocolor .pto-model-graphviz-node.is-op .pto-model-graphviz-node-label,:root.arch-nocolor .pto-model-graphviz-node.is-module .pto-model-graphviz-node-label{fill:#fff!important}'
+    + ':root.arch-nocolor .pto-model-graphviz-node.is-op .pto-model-graphviz-node-type,:root.arch-nocolor .pto-model-graphviz-node.is-module .pto-model-graphviz-node-type{fill:rgba(255,255,255,.72)!important}'
+    + ":root[data-theme='light'].arch-nocolor .pto-model-graphviz-node.is-op rect,:root[data-theme='light'].arch-nocolor .pto-model-graphviz-node.is-module rect{fill:color-mix(in srgb,var(--foreground) 14%,var(--background))!important;stroke:color-mix(in srgb,var(--foreground) 20%,transparent)!important}"
+    + ":root[data-theme='light'].arch-nocolor .pto-model-graphviz-node.is-op .pto-model-graphviz-node-label,:root[data-theme='light'].arch-nocolor .pto-model-graphviz-node.is-module .pto-model-graphviz-node-label{fill:#111!important}"
+    /* 浅色 + 算子染色开：引擎实测把类别色渲成满饱和 periwinkle/紫（fill-opacity=1），黑字压在上面只有 ~6:1、发闷看不清。
+       参考 modelviz 的本意是「淡彩底 + 深字」，这里把彩色底往白画布掺淡（降 fill-opacity）成 pastel，深字才清晰；
+       仅浅色 + 非中性态生效，深色模式与算子染色关都不受影响。 */
+    + ":root[data-theme='light']:not(.arch-nocolor) .pto-model-graphviz-node.is-op rect,:root[data-theme='light']:not(.arch-nocolor) .pto-model-graphviz-node.is-module rect{fill-opacity:.55!important}"
+    + ":root[data-theme='light']:not(.arch-nocolor) .pto-model-graphviz-node.is-op .pto-model-graphviz-node-label,:root[data-theme='light']:not(.arch-nocolor) .pto-model-graphviz-node.is-module .pto-model-graphviz-node-label{fill:#0d0f14!important}";
   (doc.head || doc.documentElement).appendChild(st);
 }
 /* 架构图 iframe：只有点「图外区域」(图内容并集包围盒之外的边距空白) 才返回整网；
