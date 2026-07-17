@@ -242,7 +242,7 @@
     .trace-surface[hidden] { display: none !important; }
 
     .convergence-map-shell {
-      min-height: 330px;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       margin: 0;
@@ -252,37 +252,18 @@
       animation: trace-view-in var(--duration-base) var(--easing-out);
     }
 
-    .convergence-map-head {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-4) 0;
-    }
-
-    .convergence-map-head strong {
-      color: var(--foreground);
-      font: var(--text-body-sm);
-      font-weight: var(--font-weight-semibold);
-    }
-
-    .convergence-map-head span {
-      color: var(--foreground-muted);
-      font: var(--text-label);
-    }
-
     .convergence-map-scroll {
       min-height: 0;
-      flex: 1 1 auto;
+      flex: 0 0 auto;
       overflow: auto hidden;
     }
 
     .convergence-svg {
       width: 100%;
       min-width: 720px;
-      height: 100%;
-      min-height: 300px;
+      height: auto;
+      min-height: 0;
+      aspect-ratio: 1120 / 420;
       display: block;
     }
 
@@ -358,7 +339,8 @@
       stroke-width: 1;
       transition:
         fill var(--duration-fast) var(--easing-default),
-        stroke var(--duration-fast) var(--easing-default);
+        stroke var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default);
     }
 
     .convergence-svg .stage-group {
@@ -373,9 +355,9 @@
     }
 
     .convergence-svg .stage-group.is-selected .stage-plane {
-      fill: color-mix(in srgb, var(--primary) 18%, var(--surface-4));
-      stroke: var(--primary-hover);
-      stroke-width: 1.5;
+      fill: color-mix(in srgb, var(--primary) 16%, var(--surface-4));
+      stroke: color-mix(in srgb, var(--primary-hover) 52%, var(--border-default));
+      filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--primary) 24%, transparent));
     }
 
     .convergence-svg .stage-group:focus-visible .stage-plane {
@@ -383,13 +365,49 @@
       stroke-width: 2;
     }
 
-    .convergence-svg .stage-kicker,
-    .convergence-svg .filter-kicker,
-    .convergence-svg .filter-meta {
-      fill: var(--foreground-muted);
-      font: 500 9px / 1 var(--font-mono);
-      letter-spacing: .4px;
-      text-transform: uppercase;
+
+    .convergence-svg .stage-label-plate,
+    .convergence-svg .filter-label-plate {
+      fill: transparent;
+      transition:
+        fill var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default);
+    }
+
+    .convergence-svg .stage-state-dot,
+    .convergence-svg .filter-state-dot {
+      fill: var(--primary-hover);
+      opacity: 0;
+      transition: opacity var(--duration-fast) var(--easing-default);
+    }
+
+    .convergence-svg .stage-label,
+    .convergence-svg .filter-kicker {
+      fill: var(--foreground-secondary);
+      font: var(--text-label);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: var(--letter-spacing-label);
+      transition: fill var(--duration-fast) var(--easing-default);
+    }
+
+    .convergence-svg .stage-group:hover .stage-label-plate,
+    .convergence-svg .filter-group:hover .filter-label-plate {
+      fill: color-mix(in srgb, var(--surface-4) 72%, transparent);
+    }
+
+    .convergence-svg .stage-group.is-selected .stage-label-plate,
+    .convergence-svg .filter-group.is-selected .filter-label-plate {
+      fill: color-mix(in srgb, var(--primary) 18%, var(--surface-4));
+      filter: drop-shadow(0 5px 9px color-mix(in srgb, var(--primary) 24%, transparent));
+    }
+
+    .convergence-svg .stage-group.is-selected .stage-state-dot,
+    .convergence-svg .filter-group.is-selected .filter-state-dot {
+      opacity: 1;
+    }
+
+    .convergence-svg .stage-group.is-selected .stage-kicker {
+      fill: var(--primary-hover);
     }
 
     .convergence-svg .stage-count {
@@ -397,10 +415,10 @@
       font: 700 18px / 1 var(--font-mono);
     }
 
-    .convergence-svg .stage-label {
-      fill: var(--foreground-secondary);
-      font: 600 10px / 1.2 var(--font-sans);
-    }
+    .convergence-svg .stage-group:hover .stage-label,
+    .convergence-svg .filter-group:hover .filter-kicker,
+    .convergence-svg .stage-group.is-selected .stage-label,
+    .convergence-svg .filter-group.is-selected .filter-kicker { fill: var(--foreground); }
 
     .convergence-svg .candidate-dot {
       fill: color-mix(in srgb, var(--foreground) 78%, var(--primary));
@@ -446,6 +464,16 @@
         stroke var(--duration-fast) var(--easing-default);
     }
 
+    .convergence-svg .filter-orb-halo {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 5;
+      vector-effect: non-scaling-stroke;
+      transition:
+        stroke var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default);
+    }
+
     .convergence-svg .filter-value {
       fill: var(--danger);
       font: 700 10px / 1 var(--font-mono);
@@ -462,8 +490,17 @@
       stroke: var(--primary-hover);
     }
 
-    .convergence-svg .filter-group.is-selected .filter-kicker,
-    .convergence-svg .filter-group.is-selected .filter-meta { fill: var(--foreground); }
+    .convergence-svg .filter-group.is-selected .filter-axis {
+      stroke-width: 1.5;
+      stroke-dasharray: 2 4;
+    }
+
+    .convergence-svg .filter-group.is-selected .filter-orb-halo {
+      stroke: color-mix(in srgb, var(--primary) 20%, transparent);
+      filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary-hover) 34%, transparent));
+    }
+
+    .convergence-svg .filter-group.is-selected .filter-value { fill: var(--foreground); }
 
     .convergence-svg .filter-group:focus-visible .filter-orb {
       stroke: var(--primary-hover);
@@ -473,6 +510,135 @@
     .convergence-svg .survival-caption {
       fill: var(--foreground-muted);
       font: 500 9px / 1 var(--font-mono);
+    }
+
+    .lineage-svg {
+      min-width: 920px;
+      aspect-ratio: 1120 / 460;
+    }
+
+    .lineage-svg .lineage-stage-kind,
+    .lineage-svg .lineage-edge-label,
+    .lineage-svg .lineage-branch-label,
+    .lineage-svg .lineage-reject-label {
+      font-family: var(--font-mono);
+      pointer-events: none;
+    }
+
+    .lineage-svg .lineage-stage-kind {
+      fill: var(--foreground-muted);
+      font-size: 8px;
+      font-weight: var(--font-weight-medium);
+      letter-spacing: var(--letter-spacing-label);
+      text-transform: uppercase;
+    }
+
+    .lineage-svg .lineage-ribbon {
+      stroke: color-mix(in srgb, var(--foreground) 18%, transparent);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      transition:
+        opacity var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default),
+        stroke var(--duration-fast) var(--easing-default);
+    }
+
+    .lineage-svg .lineage-ribbon.is-pass {
+      fill: url(#lineage-pass-river);
+    }
+
+    .lineage-svg .lineage-ribbon.is-reject {
+      fill: color-mix(in srgb, var(--danger) 68%, transparent);
+      stroke: color-mix(in srgb, var(--danger) 76%, var(--foreground));
+    }
+
+    .lineage-svg .lineage-ribbon.tone-1,
+    .lineage-svg .candidate-dot.tone-1 { fill: color-mix(in srgb, var(--primary-hover) 64%, var(--foreground)); }
+    .lineage-svg .lineage-ribbon.tone-2,
+    .lineage-svg .candidate-dot.tone-2 { fill: color-mix(in srgb, var(--accent) 72%, var(--foreground)); }
+    .lineage-svg .lineage-ribbon.tone-3,
+    .lineage-svg .candidate-dot.tone-3 { fill: color-mix(in srgb, var(--success) 62%, var(--foreground)); }
+
+    .lineage-svg .lineage-edge-group,
+    .lineage-svg .lineage-stage-group {
+      cursor: pointer;
+    }
+
+    .lineage-svg .lineage-edge-group:hover .lineage-ribbon,
+    .lineage-svg .lineage-edge-group.is-selected .lineage-ribbon {
+      opacity: 1;
+      stroke: color-mix(in srgb, var(--primary-hover) 64%, var(--foreground));
+      filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary-hover) 46%, transparent));
+    }
+
+    .lineage-svg .lineage-edge-group:focus-visible .lineage-ribbon,
+    .lineage-svg .lineage-stage-group:focus-visible .stage-plane {
+      stroke: var(--primary-hover);
+      stroke-width: 2;
+    }
+
+    .lineage-svg .lineage-edge-label {
+      fill: var(--foreground);
+      font-size: 8px;
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: var(--letter-spacing-label);
+    }
+
+    .lineage-svg .lineage-edge-label.is-expand { fill: var(--primary-hover); }
+    .lineage-svg .lineage-edge-label.is-reject { fill: var(--danger); }
+
+    .lineage-svg .lineage-branch-label {
+      fill: var(--foreground-secondary);
+      font-size: 7.5px;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .lineage-svg .lineage-reject-path {
+      fill: none;
+      stroke: var(--danger);
+      stroke-width: 1;
+      stroke-dasharray: 2 4;
+      vector-effect: non-scaling-stroke;
+      opacity: .62;
+      transition:
+        opacity var(--duration-fast) var(--easing-default),
+        filter var(--duration-fast) var(--easing-default);
+    }
+
+    .lineage-svg .lineage-reject-dot { fill: var(--danger); }
+
+    .lineage-svg .lineage-reject-label {
+      fill: var(--foreground-secondary);
+      font-size: 7px;
+      font-weight: var(--font-weight-medium);
+    }
+
+    .lineage-svg .lineage-edge-group:hover .lineage-reject-path,
+    .lineage-svg .lineage-edge-group.is-selected .lineage-reject-path {
+      opacity: 1;
+      filter: drop-shadow(0 0 4px color-mix(in srgb, var(--danger) 48%, transparent));
+    }
+
+    .lineage-svg .lineage-edge-group.is-selected .lineage-edge-label,
+    .lineage-svg .lineage-stage-group.is-selected .stage-label,
+    .lineage-svg .lineage-stage-group.is-selected .lineage-stage-kind {
+      fill: var(--foreground);
+    }
+
+    .lineage-svg .lineage-stage-group:hover .stage-plane,
+    .lineage-svg .lineage-stage-group.is-selected .stage-plane {
+      fill: color-mix(in srgb, var(--primary) 12%, var(--surface-3));
+      stroke: var(--primary-hover);
+    }
+
+    .lineage-map-summary {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      padding: var(--space-2) var(--space-3);
+      border-top: 1px solid var(--border-subtle);
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
     }
 
     .trace-section {
@@ -490,22 +656,10 @@
       gap: var(--space-4);
     }
 
-    .trace-summary-copy {
-      min-width: 0;
-      display: grid;
-      gap: var(--space-1);
-    }
-
-    .trace-summary-copy h1 {
+    .trace-population-title {
       margin: 0;
       color: var(--foreground);
       font: var(--text-title-2);
-    }
-
-    .trace-summary-copy p {
-      margin: 0;
-      color: var(--foreground-secondary);
-      font: var(--text-body-sm);
     }
 
     .trace-summary-actions {
@@ -526,28 +680,6 @@
       min-height: 24px;
       padding-inline: var(--space-2);
       font: var(--text-label);
-    }
-
-    .trace-total {
-      flex: 0 0 auto;
-      display: grid;
-      grid-template-columns: auto auto;
-      gap: var(--space-2);
-      align-items: baseline;
-      padding: var(--space-2) var(--space-3);
-      border-radius: var(--radius-md);
-      background: color-mix(in srgb, var(--surface-3) 68%, transparent);
-    }
-
-    .trace-total span {
-      color: var(--foreground-muted);
-      font: var(--text-label);
-      text-transform: uppercase;
-    }
-
-    .trace-total b {
-      color: var(--foreground);
-      font: 700 15px / 1 var(--font-mono);
     }
 
     .trace-path {
@@ -714,6 +846,10 @@
       flex-direction: column;
       padding: var(--space-4);
       animation: trace-view-in var(--duration-base) var(--easing-out);
+    }
+
+    .trace-detail-summary {
+      margin-bottom: var(--space-4);
     }
 
     .trace-detail-metrics {
@@ -1219,31 +1355,23 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    .candidate-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--space-4);
-      margin-bottom: var(--space-3);
+    .candidate-header-plain {
+      margin-bottom: var(--space-4);
+      display: block;
     }
 
-    .candidate-head-copy {
-      min-width: 0;
-      display: grid;
-      gap: var(--space-1);
-    }
-
-    .candidate-head h2 {
-      margin: 0;
+    .candidate-header-plain h2 {
+      margin: 0 0 6px 0;
       color: var(--foreground);
-      font: var(--text-title-2);
+      font: 700 16px / 1.1 var(--font-sans);
     }
 
-    .candidate-head p {
+    .candidate-subtitle {
       margin: 0;
       color: var(--foreground-secondary);
       font: var(--text-body-sm);
     }
+
 
     .recommendation-status {
       background: color-mix(in srgb, var(--primary) 16%, var(--stat-chip-bg));
@@ -1472,7 +1600,6 @@
     }
 
     @media (max-width: 1180px) {
-      .trace-summary-copy p { display: none; }
       .candidate-table th,
       .candidate-table td { padding-inline: var(--space-2); }
       .rejection-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1488,6 +1615,8 @@
       .trace-link::after { transition: none; }
       .trace-detail-section,
       .convergence-map-shell { animation: none; }
+      .lineage-ribbon,
+      .lineage-reject-path { transition: none; }
     }
   </style>
 </head>
@@ -1601,18 +1730,15 @@
             </header>
             <div class="pto-ide-frame__pane-body pane-scroll">
               <div class="center-workbench" id="decisionTracePanel">
-                <section class="trace-section" aria-labelledby="traceTitle">
+                <section class="trace-section" aria-labelledby="populationFlowTitle">
                   <div class="trace-summary">
-                    <div class="trace-summary-copy">
-                      <h1 id="traceTitle">设计空间如何从 288 收敛到 3</h1>
-                      <p data-trace-summary-copy>每一步记录应用的约束、被排除的候选，以及结论属于事实、估计还是建议。</p>
-                    </div>
+                    <h1 class="trace-population-title" id="populationFlowTitle">Candidate population flow</h1>
                     <div class="trace-summary-actions">
                       <div class="segmented-control segmented-control-muted trace-surface-tabs" role="tablist" aria-label="Trace visualization">
-                        <button class="btn btn-sm is-selected" type="button" role="tab" id="tracePathTab" aria-controls="tracePathSurface" aria-selected="true" data-trace-surface="path">Trace</button>
-                        <button class="btn btn-sm" type="button" role="tab" id="traceMapTab" aria-controls="traceMapSurface" aria-selected="false" tabindex="-1" data-trace-surface="map">Map</button>
+                        <button class="btn btn-sm" type="button" role="tab" id="tracePathTab" aria-controls="tracePathSurface" aria-selected="false" tabindex="-1" data-trace-surface="path">Trace</button>
+                        <button class="btn btn-sm is-selected" type="button" role="tab" id="traceMapTab" aria-controls="traceMapSurface" aria-selected="true" data-trace-surface="map">Map</button>
+                        <button class="btn btn-sm" type="button" role="tab" id="lineageMapTab" aria-controls="lineageMapSurface" aria-selected="false" tabindex="-1" data-trace-surface="map2">Map 2</button>
                       </div>
-                      <div class="trace-total"><span data-trace-total-label>Remaining</span><b data-trace-total-value>3</b></div>
                     </div>
                   </div>
 
@@ -1646,22 +1772,24 @@
 
                   <figure class="convergence-map-shell trace-surface" id="traceMapSurface" role="tabpanel" aria-labelledby="traceMapTab" data-trace-surface-panel="map" hidden>
                     <figcaption class="convergence-map-head">
-                      <strong id="convergenceMapTitle">Candidate population flow</strong>
-                      <span>Every split conserves counts · band width = local candidate share</span>
                     </figcaption>
                     <div class="convergence-map-scroll">
                       <svg class="convergence-svg" data-convergence-svg viewBox="0 0 1120 420" role="img" aria-labelledby="convergenceMapTitle" aria-label="Design space converges from 288 to 3 candidates through four explainable rejection stages"></svg>
                     </div>
                   </figure>
+
+                  <figure class="convergence-map-shell trace-surface" id="lineageMapSurface" role="tabpanel" aria-labelledby="lineageMapTab" data-trace-surface-panel="map2" hidden>
+                    <div class="convergence-map-scroll">
+                      <svg class="convergence-svg lineage-svg" data-lineage-svg viewBox="0 0 1120 460" role="img" aria-labelledby="lineageMapTitle" aria-describedby="lineageMapSummary"></svg>
+                    </div>
+                    <figcaption class="lineage-map-summary" id="lineageMapSummary" data-lineage-summary aria-live="polite">Partial plans branch into implementation paths and pipeline realizations before executable candidates converge.</figcaption>
+                  </figure>
                 </section>
 
-                <section class="candidate-section" data-view-panel="candidates" aria-labelledby="candidateTitle">
-                  <header class="candidate-head">
-                    <div class="candidate-head-copy">
-                      <h2 id="candidateTitle">三个可行候选，而不是一个黑盒答案</h2>
-                      <p>方案 B 以 18% 的 L1 余量获得接近方案 C 的预计性能。</p>
-                    </div>
-                    <span class="stat-chip recommendation-status">B · Recommended</span>
+                <section class="candidate-section" data-view-panel="candidates">
+                  <header class="candidate-header-plain">
+                    <h2 id="candidateTitle">三个可行候选，而不是一个黑盒答案</h2>
+                    <p class="candidate-subtitle">方案 B 以 18% 的 L1 余量获得接近方案 C 的预计性能。</p>
                   </header>
 
                   <div class="candidate-table-wrap">
@@ -1693,14 +1821,11 @@
                   </footer>
                 </section>
 
-                <section class="trace-detail-section" data-view-panel="trace-detail" aria-labelledby="detailTitle" aria-live="polite" hidden>
-                  <header class="candidate-head">
-                    <div class="candidate-head-copy">
-                      <h2 id="detailTitle" data-detail-title>阶段审查</h2>
-                      <p data-detail-subtitle></p>
-                    </div>
-                    <span class="stat-chip" data-detail-badge></span>
-                  </header>
+                <section class="trace-detail-section" data-view-panel="trace-detail" aria-live="polite" hidden>
+                  <div class="trace-detail-summary">
+                    <h1 id="traceTitle">设计空间如何从 288 收敛到 3</h1>
+                    <p data-detail-subtitle></p>
+                  </div>
 
                   <div class="trace-detail-metrics" aria-label="Stage counts">
                     <div class="trace-detail-metric"><span data-metric-label="0"></span><strong data-metric-value="0"></strong></div>
@@ -2011,7 +2136,7 @@
 
       const traceViews = {
         define: {
-          summaryTitle: 'Define · 先固定设计问题',
+          summaryTitle: 'Define',
           summaryCopy: '输入事实和优化目标会成为后续枚举、过滤与排序的共同前提。',
           totalLabel: 'State', totalValue: 'Ready',
           paneMeta: 'Stage 01 · Define', status: 'Interactive framework concept · Define stage',
@@ -2043,7 +2168,7 @@
           }
         },
         'expand-space': {
-          summaryTitle: 'Expand · 从 1 份设计问题展开为 288 个组合',
+          summaryTitle: 'Expand',
           summaryCopy: '连线表示一次设计空间变换：这里只枚举可能性，还不判断是否合法。',
           totalLabel: 'Generated', totalValue: '288',
           paneMeta: 'Transition · Expand ×288', status: 'Interactive framework concept · Expand transition',
@@ -2069,7 +2194,7 @@
           }
         },
         'design-space': {
-          summaryTitle: 'Design Space · 288 个待验证组合',
+          summaryTitle: 'Design Space',
           summaryCopy: '阶段节点展示当前状态；它回答“现在手里有什么”，而不是“刚才排除了什么”。',
           totalLabel: 'Remaining', totalValue: '288',
           paneMeta: 'Stage 02 · Design Space', status: 'Interactive framework concept · Design Space stage',
@@ -2101,7 +2226,7 @@
           }
         },
         'filter-api': {
-          summaryTitle: 'Filter · API 约束排除 96 个组合',
+          summaryTitle: 'Filter',
           summaryCopy: '这条连线按主要失败原因解释 288 如何变成 192；每个候选只计入一个主分类。',
           totalLabel: 'Excluded', totalValue: '96',
           paneMeta: 'Transition · API −96', status: 'Interactive framework concept · API filter transition',
@@ -2128,7 +2253,7 @@
           }
         },
         'api-constraints': {
-          summaryTitle: 'API Constraints · 192 个调用合法组合',
+          summaryTitle: 'API Constraints',
           summaryCopy: '节点展示过滤后的集合，以及这批方案获得了什么新的确定性。',
           totalLabel: 'Remaining', totalValue: '192',
           paneMeta: 'Stage 03 · API Constraints', status: 'Interactive framework concept · API Constraints stage',
@@ -2154,7 +2279,7 @@
           }
         },
         'filter-resources': {
-          summaryTitle: 'Filter · 资源约束排除 156 个组合',
+          summaryTitle: 'Filter',
           summaryCopy: '这条连线解释为什么大量 API 合法方案仍然无法放进片上存储。',
           totalLabel: 'Excluded', totalValue: '156',
           paneMeta: 'Transition · Resources −156', status: 'Interactive framework concept · Resource filter transition',
@@ -2180,7 +2305,7 @@
           }
         },
         resources: {
-          summaryTitle: 'Resources · 36 个容量可行组合',
+          summaryTitle: 'Resources',
           summaryCopy: '节点展示当前方案都能放得下，但资源余量并不相同。',
           totalLabel: 'Remaining', totalValue: '36',
           paneMeta: 'Stage 04 · Resources', status: 'Interactive framework concept · Resources stage',
@@ -2206,7 +2331,7 @@
           }
         },
         'filter-pipeline': {
-          summaryTitle: 'Filter · 流水可行性排除 24 个组合',
+          summaryTitle: 'Filter',
           summaryCopy: '这条连线解释为什么“放得下”仍不等于“能够形成有效流水”。',
           totalLabel: 'Excluded', totalValue: '24',
           paneMeta: 'Transition · Pipeline −24', status: 'Interactive framework concept · Pipeline filter transition',
@@ -2232,7 +2357,7 @@
           }
         },
         pipeline: {
-          summaryTitle: 'Pipeline · 12 个可形成流水的方案',
+          summaryTitle: 'Pipeline',
           summaryCopy: '节点展示通过 Queue、Buffer、Event 与 overlap 审查后的可行集合。',
           totalLabel: 'Remaining', totalValue: '12',
           paneMeta: 'Stage 05 · Pipeline', status: 'Interactive framework concept · Pipeline stage',
@@ -2258,7 +2383,7 @@
           }
         },
         shortlist: {
-          summaryTitle: 'Compare · 从 12 个可行方案收敛到 3 个代表候选',
+          summaryTitle: 'Compare',
           summaryCopy: '最后一条连线不是硬约束过滤，而是基于 Pareto 与证据质量的可解释 shortlist。',
           totalLabel: 'Excluded', totalValue: '9',
           paneMeta: 'Transition · Shortlist −9', status: 'Interactive framework concept · Shortlist transition',
@@ -2286,11 +2411,11 @@
       };
 
       const convergenceStages = [
-        { id: 'space', traceView: 'design-space', label: 'Design Space', kicker: 'enumerated', count: 288, x: 92, columns: 18, rows: 16, width: 76, height: 176 },
-        { id: 'api-pass', traceView: 'api-constraints', label: 'API Legal', kicker: 'contract pass', count: 192, x: 326, columns: 16, rows: 12, width: 68, height: 117.333 },
-        { id: 'resource-pass', traceView: 'resources', label: 'Resource Fit', kicker: 'capacity pass', count: 36, x: 570, columns: 6, rows: 6, width: 42, height: 62 },
-        { id: 'pipeline-pass', traceView: 'pipeline', label: 'Pipeline Fit', kicker: 'feasible', count: 12, x: 808, columns: 4, rows: 3, width: 28, height: 30 },
-        { id: 'final', traceView: 'candidates', label: 'Candidates', kicker: 'shortlisted', count: 3, x: 1018, columns: 1, rows: 3, width: 0, height: 34 }
+        { id: 'space', traceView: 'design-space', label: 'Design Space', kicker: '候选方案', count: 288, x: 92, columns: 18, rows: 16, width: 76, height: 176 },
+        { id: 'api-pass', traceView: 'api-constraints', label: 'API Legal', kicker: '候选方案', count: 192, x: 326, columns: 16, rows: 12, width: 68, height: 117.333 },
+        { id: 'resource-pass', traceView: 'resources', label: 'Resource Fit', kicker: '候选方案', count: 36, x: 570, columns: 6, rows: 6, width: 42, height: 62 },
+        { id: 'pipeline-pass', traceView: 'pipeline', label: 'Pipeline Fit', kicker: '候选方案', count: 12, x: 808, columns: 4, rows: 3, width: 28, height: 30 },
+        { id: 'final', traceView: 'candidates', label: 'Candidates', kicker: '候选方案', count: 3, x: 1018, columns: 1, rows: 3, width: 0, height: 34 }
       ];
 
       const convergenceFilters = [
@@ -2338,6 +2463,442 @@
           sources: ['Mock Pareto comparison', 'Schedule equivalence rule', 'Evidence confidence threshold']
         }
       ];
+
+      const lineageStages = [
+        {
+          id: 'tiling-skeletons', label: 'TILING', kind: 'partial plan', count: 92,
+          x: 64, columns: 8, rows: 12, width: 46, height: 100,
+          summary: '92 个 Tiling skeleton：blockDim、core grid、核内 baseM/N/K 与 tail policy 已确定，尚未绑定实现路径。'
+        },
+        {
+          id: 'path-realizations', label: 'PATH BINDING', kind: 'realization', count: 184,
+          x: 220, columns: 10, rows: 19, width: 58, height: 150,
+          segments: [48, 56, 80],
+          summary: '92 个部分方案派生为 184 个实现路径：Cube/Fixpipe、C→V 片上交接与 GM staged。'
+        },
+        {
+          id: 'api-legal-realizations', label: 'API LEGAL', kind: 'realization', count: 110,
+          x: 380, columns: 8, rows: 14, width: 48, height: 108,
+          summary: '110 个 Tiling × Data path realization 满足当前 SoC、dtype、format 与 API contract。'
+        },
+        {
+          id: 'base-resource-fit', label: 'BASE FIT', kind: 'realization', count: 48,
+          x: 535, columns: 6, rows: 8, width: 36, height: 68,
+          summary: '48 个 realization 的单 Tile 最低资源需求能够放入 L1、L0 与 UB。'
+        },
+        {
+          id: 'pipeline-realizations', label: 'PIPELINE SYNTH', kind: 'executable plan', count: 96,
+          x: 700, columns: 8, rows: 12, width: 48, height: 94,
+          segments: [48, 32, 16],
+          summary: '48 个基础可行方案派生为 96 个流水 realization：串行、Double Buffer overlap 与 C/V producer-consumer overlap。'
+        },
+        {
+          id: 'executable-plans', label: 'EXECUTABLE', kind: 'verified plan', count: 18,
+          x: 870, columns: 4, rows: 5, width: 28, height: 38,
+          summary: '18 个流水方案通过峰值片上资源、Queue/Event 生命周期与同步可实现性检查。'
+        },
+        {
+          id: 'lineage-shortlist', label: 'SHORTLIST', kind: 'decision', count: 3,
+          x: 1040, columns: 1, rows: 3, width: 0, height: 30,
+          summary: '3 个候选保留不同的性能、资源与同步风险位置，进入最终决策。'
+        }
+      ];
+
+      const lineageTransitions = [
+        {
+          id: 'bind-paths', type: 'expand', label: 'EXPAND ×2.0', from: 92, to: 184,
+          branches: [
+            { label: 'Cube / Fixpipe · 48', count: 48, tone: 1 },
+            { label: 'C→V on-chip · 56', count: 56, tone: 2 },
+            { label: 'GM staged · 80', count: 80, tone: 3 }
+          ],
+          summary: 'Path binding：一个 Tiling skeleton 可以派生多个满足算子语义的实现路径，因此候选从 92 扩张到 184。'
+        },
+        {
+          id: 'filter-path-apis', type: 'filter', label: 'REJECT −74', from: 184, to: 110,
+          categories: [
+            ['Epilogue API · 26', 26],
+            ['Handoff contract · 28', 28],
+            ['Format / path · 20', 20]
+          ],
+          summary: 'API legality：74 个路径 realization 因 Epilogue、C/V handoff 或 format/path contract 不成立而被拒绝。'
+        },
+        {
+          id: 'filter-base-resources', type: 'filter', label: 'REJECT −62', from: 110, to: 48,
+          categories: [
+            ['L0 / L1 footprint · 24', 24],
+            ['UB / queue · 26', 26],
+            ['Align / tail · 12', 12]
+          ],
+          summary: 'Base resource：62 个 realization 连单 Tile 的最低资源需求都无法满足，不进入流水综合。'
+        },
+        {
+          id: 'synthesize-pipelines', type: 'expand', label: 'EXPAND ×2.0', from: 48, to: 96,
+          branches: [
+            { label: 'Serial · 48', count: 48, tone: 1 },
+            { label: 'DB overlap · 32', count: 32, tone: 2 },
+            { label: 'C/V overlap · 16', count: 16, tone: 3 }
+          ],
+          summary: 'Pipeline synthesis：系统为 48 个基础可行方案生成 96 个 Buffer plan、Schedule 与同步 realization。'
+        },
+        {
+          id: 'filter-executable', type: 'filter', label: 'REJECT −78', from: 96, to: 18,
+          categories: [
+            ['Peak residency · 30', 30],
+            ['Sync / event · 26', 26],
+            ['Dependency gap · 22', 22]
+          ],
+          summary: 'Executable check：78 个流水 realization 因峰值驻留、Event 生命周期或无有效 overlap window 被拒绝。'
+        },
+        {
+          id: 'rank-lineage', type: 'filter', label: 'RANK −15', from: 18, to: 3,
+          categories: [
+            ['Dominated · 7', 7],
+            ['Equivalent · 5', 5],
+            ['Low confidence · 3', 3]
+          ],
+          summary: 'Ranking：15 个可执行方案被 Pareto 支配、与其他流水等价或缺少足够证据，最终保留 3 个。'
+        }
+      ];
+
+      const lineageStageNarratives = {
+        'tiling-skeletons': {
+          title: '92 个 Tiling skeleton 已显式枚举',
+          subtitle: '每个节点是一组核间切分、核内 Tile 与尾块策略；它仍是部分方案，尚未绑定实现路径和流水。',
+          metrics: [['Input', '1 brief'], ['Generated', '92'], ['State', 'Partial']],
+          listTitle: '已确定的 Tiling 字段',
+          list: [
+            ['Core grid', 'M split · N split · 2D split · Grouped'],
+            ['blockDim', '由 core grid、shape 与 tail 推导'],
+            ['In-core tile', 'baseM × baseN × baseK'],
+            ['Tail policy', 'Full tile · M/N/K tail'],
+            ['Lineage ID', 'tiling:<grid>:<base>:<tail>']
+          ],
+          outputTitle: '尚未决定的实现层',
+          outputStrong: 'Tiling is not an executable plan',
+          outputCopy: '相同 Tiling 可以绑定不同的数据通路，也可以在后续派生多个 Buffer plan 与 Schedule。',
+          outputList: [['Data path', 'Unbound'], ['Buffer / Queue', 'Unbound'], ['Schedule', 'Unbound']],
+          footerStrong: '部分候选', footerCopy: '92 为演示数据；真实数量应来自目标算子的 tiling enumerator。',
+          confidence: 'enumeration rule',
+          conclusion: '92 个核内与核间切分进入路径绑定',
+          inspectorCopy: '当前集合只承诺 Tiling 字段完整，不提前假设 Cube、Vector 或 GM staging 的实现方式。',
+          types: ['fact', 'recommendation'],
+          reasons: ['Core split 与核内 Tile 被放进同一个 Tiling skeleton。', 'Tail policy 是候选身份的一部分，不能在后续静默补齐。', 'Data path、Buffer 数量与 Schedule 仍保持未决。'],
+          ledger: [['Input brief', '1', 'fact'], ['Generated', '92', 'recommendation'], ['Current set', '92', 'recommendation']],
+          sources: ['Mock tiling option catalog', 'Shape / dtype contract', 'Core split enumerator']
+        },
+        'path-realizations': {
+          title: '184 个实现路径绑定到 92 个 Tiling skeleton',
+          subtitle: '候选从“怎么切”扩展为“怎么切 + 通过哪条数据通路完成计算与后处理”。',
+          metrics: [['Parents', '92'], ['Expanded', '+92'], ['Output', '184']],
+          listTitle: '路径 realization 分布',
+          list: [['Cube / Fixpipe', '48'], ['C→V on-chip', '56'], ['GM staged', '80'], ['Lineage ID', '<tiling-id>/<path-id>']],
+          outputTitle: '当前获得的新确定性',
+          outputStrong: 'Tiling now has an implementation path',
+          outputCopy: '每个 realization 已声明 producer、consumer 与中间存储位置，但尚未证明当前 API contract 可表达。',
+          outputList: [['Tiling', 'Bound'], ['Data path', 'Bound'], ['API legality', 'Unknown']],
+          footerStrong: '路径实现集', footerCopy: '184 是 realization 数量，不是 184 个互不相关的 Tiling。',
+          confidence: 'lineage expansion',
+          conclusion: '部分 Tiling 派生出多个合法语义路径',
+          inspectorCopy: '同一 Tiling 可以同时拥有 Direct/Fixpipe、C→V 片上交接或 GM staged 子候选。',
+          types: ['fact', 'recommendation'],
+          reasons: ['路径选择改变中间数据落点和所需 API。', '子候选保留父 Tiling ID，便于比较同源 realization。', '当前尚未应用 SoC、dtype、format 与 handoff contract。'],
+          ledger: [['Parent set', '92', 'fact'], ['Expanded', '+92', 'recommendation'], ['Realizations', '184', 'recommendation']],
+          sources: ['Mock path catalog', 'Producer / consumer topology', 'Candidate lineage IDs']
+        },
+        'api-legal-realizations': {
+          title: '110 个 Tiling × Path realization 满足 API contract',
+          subtitle: '它们能由目标 SoC 上的 API、dtype、format、TPosition 和 handoff 组合表达，但资源结论尚未产生。',
+          metrics: [['Input', '184'], ['Rejected', '74'], ['Remaining', '110']],
+          listTitle: '已通过的契约层',
+          list: [['API availability', 'Target SoC supported'], ['dtype / format', 'Signature matched'], ['TPosition', 'Producer / consumer legal'], ['Handoff / stride', 'Expressible'], ['Epilogue', 'Supported path']],
+          outputTitle: '下一步检查什么',
+          outputStrong: 'Legal does not mean it fits',
+          outputCopy: '下一轮只看单 Tile 的最低 L1、L0 与 UB footprint，先淘汰连基础驻留都无法满足的 realization。',
+          outputList: [['API contract', 'Pass'], ['Base footprint', 'Unknown'], ['Peak residency', 'Unknown']],
+          footerStrong: 'API 合法集', footerCopy: '回看上一条 −74 连线可以看到主拒绝分类。',
+          confidence: 'hard contract',
+          conclusion: '110 个路径 realization 具备可调用形态',
+          inspectorCopy: '这些方案通过静态 API legality gate，但没有获得资源或性能背书。',
+          types: ['fact'],
+          reasons: ['目标 SoC 提供所需 overload。', 'dtype、format 与地址位置组合在支持范围内。', 'producer → consumer handoff 可以由当前路径表达。'],
+          ledger: [['Input', '184', 'fact'], ['Rejected', '74', 'fact'], ['Current set', '110', 'fact']],
+          sources: ['Mock CANN API contract', 'Static path legality checker', 'Target SoC capability set']
+        },
+        'base-resource-fit': {
+          title: '48 个 realization 通过单 Tile 最低资源检查',
+          subtitle: '这里验证的是 base plan 能否存在，而不是多个 Buffer 与 overlap 同时驻留时的峰值资源。',
+          metrics: [['Input', '110'], ['Rejected', '62'], ['Remaining', '48']],
+          listTitle: '已满足的 base footprint',
+          list: [['L1 tile set', 'Within base budget'], ['L0A / L0B', 'Operands fit'], ['L0C', 'Accumulation tile fits'], ['UB workspace', 'Minimum workspace fits'], ['Alignment / tail', 'Static layout fits']],
+          outputTitle: '仍不能下的结论',
+          outputStrong: 'Base fit is not peak fit',
+          outputCopy: 'Double Buffer、C/V overlap 和 Queue 深度会增加同时驻留对象，必须等流水 realization 生成后重新计算峰值。',
+          outputList: [['Single-tile fit', 'Pass'], ['Buffer multiplicity', 'Unknown'], ['Peak residency', 'Unknown']],
+          footerStrong: '基础资源可行集', footerCopy: '资源数值为静态演示预算，不是芯片 profiling 结果。',
+          confidence: 'static capacity model',
+          conclusion: '48 个 base plan 至少能容纳一个计算工作集',
+          inspectorCopy: '它们具备生成流水方案的资源前提，但多 Buffer 派生仍可能再次触发容量拒绝。',
+          types: ['fact', 'estimate'],
+          reasons: ['单 Tile 的 L1、L0A、L0B、L0C 与 UB footprint 未超限。', '地址对齐与尾块 workspace 已计入最低预算。', '尚未计入流水并发导致的峰值驻留。'],
+          ledger: [['Input', '110', 'fact'], ['Rejected', '62', 'estimate'], ['Current set', '48', 'estimate']],
+          sources: ['Mock resource profile', 'Static tile footprint calculator', 'Base workspace estimator']
+        },
+        'pipeline-realizations': {
+          title: '96 个 Buffer plan × Schedule realization 已生成',
+          subtitle: '系统为 48 个 base plan 派生串行、Double Buffer overlap 与 C/V producer-consumer overlap。',
+          metrics: [['Parents', '48'], ['Expanded', '+48'], ['Output', '96']],
+          listTitle: '流水 realization 分布',
+          list: [['Serial', '48'], ['Double Buffer overlap', '32'], ['C/V overlap', '16'], ['Lineage ID', '<base-id>/<pipeline-id>']],
+          outputTitle: '每个 realization 新增什么',
+          outputStrong: 'Buffer, order and synchronization become explicit',
+          outputCopy: '候选现在包含 Buffer 数量、Queue 生命周期、阶段顺序和 Event 边，已经可以做可执行性审查。',
+          outputList: [['Buffer plan', 'Bound'], ['Schedule', 'Bound'], ['Event graph', 'Bound']],
+          footerStrong: '流水候选集', footerCopy: '扩张表示一个 base plan 可以有多个调度子候选，并非过滤反向发生。',
+          confidence: 'schedule synthesis',
+          conclusion: '48 个 base plan 派生为 96 个流水实现',
+          inspectorCopy: '这一阶段把之前未决的 Buffer 与 Schedule 具体化，因此候选数量再次增长。',
+          types: ['fact', 'estimate'],
+          reasons: ['所有 base plan 都保留 Serial 基线。', '只有部分 plan 能生成 Double Buffer 或 C/V overlap 子候选。', '派生候选必须重新接受峰值资源与同步检查。'],
+          ledger: [['Parent set', '48', 'fact'], ['Expanded', '+48', 'estimate'], ['Realizations', '96', 'estimate']],
+          sources: ['Mock schedule synthesizer', 'Queue / Buffer template set', 'Producer-consumer dependency graph']
+        },
+        'executable-plans': {
+          title: '18 个流水方案通过可执行性检查',
+          subtitle: '它们同时满足峰值片上资源、Queue / Buffer 生命周期、Event 无环与有效 overlap window。',
+          metrics: [['Input', '96'], ['Rejected', '78'], ['Remaining', '18']],
+          listTitle: '已通过的执行条件',
+          list: [['Peak residency', 'Within budget'], ['Queue ownership', 'Complete lifecycle'], ['Event dependency', 'Acyclic'], ['Copy / Compute window', 'Useful'], ['Tail execution', 'Covered']],
+          outputTitle: '进入排序的方案状态',
+          outputStrong: 'Executable, not yet recommended',
+          outputCopy: '18 个方案都可以成为实现；下一步只做等价归并、Pareto 支配判断与证据质量排序。',
+          outputList: [['Correctness gates', 'Pass'], ['Execution feasibility', 'Pass'], ['Recommendation', 'Pending']],
+          footerStrong: '可执行方案集', footerCopy: '失败方案通过上一条 −78 连线回溯到具体拒绝桶。',
+          confidence: 'mixed evidence',
+          conclusion: '18 个方案具备完整、可实现的流水',
+          inspectorCopy: '这一节点是 feasibility 与 recommendation 的边界；后续淘汰不再等同于实现非法。',
+          types: ['fact', 'estimate'],
+          reasons: ['峰值驻留包含多 Buffer 和 workspace。', 'Queue、Buffer 与 Event 生命周期闭合且无环。', '静态时长模型显示存在最低可接受的 overlap window。'],
+          ledger: [['Input', '96', 'estimate'], ['Rejected', '78', 'estimate'], ['Current set', '18', 'estimate']],
+          sources: ['Peak residency calculator', 'Queue / Event verifier', 'Design-time overlap estimator']
+        },
+        'lineage-shortlist': {
+          title: '3 个候选代表不同的决策位置',
+          subtitle: 'A、B、C 都是可执行方案；差异在资源余量、预计性能、实现复杂度与证据置信度。',
+          metrics: [['Input', '18'], ['Ranked out', '15'], ['Output', '3']],
+          listTitle: '最终代表候选',
+          list: [['A · Stable', 'Resource safe'], ['B · Balanced', 'Recommended trade-off'], ['C · Aggressive', 'Latency first']],
+          outputTitle: '为什么只保留三个',
+          outputStrong: 'Distinct trade-offs, not one black-box answer',
+          outputCopy: '每个候选占据不同的 Pareto 与风险位置，用户仍然拥有最终决策权。',
+          outputList: [['A', 'Largest headroom'], ['B', 'Balanced evidence'], ['C', 'Lowest estimated latency']],
+          footerStrong: '决策候选', footerCopy: '预计 latency 仍是 Mock 设计期数据，不能包装成 benchmark。',
+          confidence: 'engineering recommendation',
+          conclusion: '3 个方案进入最终人工比较',
+          inspectorCopy: '系统收敛掉重复和被支配方案，但保留有意义的资源—性能—复杂度差异。',
+          types: ['estimate', 'recommendation'],
+          reasons: ['A 保留最大资源安全余量。', 'B 在预计性能、余量与复杂度之间最平衡。', 'C 保留最低预计 latency 的激进位置。'],
+          ledger: [['Executable', '18', 'estimate'], ['Ranked out', '15', 'recommendation'], ['Decision set', '3', 'recommendation']],
+          sources: ['Mock Pareto comparison', 'Schedule equivalence rule', 'Evidence confidence threshold']
+        }
+      };
+
+      const lineageTransitionNarratives = {
+        'bind-paths': {
+          summaryTitle: 'Path binding · Expand',
+          summaryCopy: '这条连线把 Tiling skeleton 绑定到不同实现路径；它是 lineage expansion，不是过滤。',
+          title: '92 个 Tiling skeleton 派生为 184 个路径 realization',
+          subtitle: '河流分支表示不同的 producer → consumer 数据通路，分支宽度对应实际演示数量。',
+          listTitle: '派生路径',
+          outputTitle: '为什么候选会增加',
+          outputStrong: 'One parent may have multiple path children',
+          outputCopy: '一个 Tiling 可以同时拥有 Cube/Fixpipe、C→V 片上交接或 GM staged 子候选；系统保留父子关系而不是覆盖父方案。',
+          outputList: [['Parent identity', 'Preserved'], ['Child identity', 'Path suffix'], ['Legality', 'Checked next']],
+          footerStrong: 'Lineage expansion', footerCopy: '48 + 56 + 80 = 184；河流分支之和与输出节点一致。',
+          confidence: 'enumeration rule',
+          conclusion: '路径绑定使候选从 92 扩张到 184',
+          inspectorCopy: '增加的 92 个候选来自同源 Tiling 的多实现派生，不代表搜索器重复计数。',
+          types: ['fact', 'recommendation'],
+          reasons: ['不同路径需要不同 API、存储位置和中间布局。', '父 Tiling ID 被保留，可对同源路径做横向比较。', '路径绑定后才有足够信息执行 API legality check。'],
+          sources: ['Mock path catalog', 'Candidate lineage graph', 'Producer-consumer topology']
+        },
+        'filter-path-apis': {
+          summaryTitle: 'API legality · Filter',
+          summaryCopy: '这条连线判断每个 Tiling × Path realization 能否由目标 SoC 的 API contract 表达。',
+          title: '74 个路径 realization 因 API contract 被拒绝',
+          subtitle: 'Epilogue、C/V handoff 与 format/path 约束都是实现路径相关的硬门槛。',
+          listTitle: 'Primary rejection buckets',
+          outputTitle: '代表性拒绝',
+          outputStrong: 'Valid Tiling, unsupported path handoff',
+          outputCopy: 'Tiling 本身可以成立，但该子候选要求的 C→V 片上交接或 Epilogue overload 在当前组合下不可表达。',
+          outputList: [['Tiling skeleton', 'Keep parent'], ['Path child', 'Reject'], ['Next stage', 'Not admitted']],
+          footerStrong: '路径契约过滤', footerCopy: '26 + 28 + 20 = 74；每个失败 realization 只进入一个主分类。',
+          confidence: 'hard contract',
+          conclusion: '74 个路径子候选无法由当前 API 组合表达',
+          inspectorCopy: '拒绝的是具体 path child，不应因此删除仍有其他合法路径的父 Tiling。',
+          types: ['fact'],
+          reasons: ['26 个 realization 缺少所需 Epilogue API 组合。', '28 个 realization 的 producer-consumer handoff contract 不成立。', '20 个 realization 的 format 与路径组合不受支持。'],
+          sources: ['Mock CANN API contract', 'Static handoff checker', 'Target SoC capability set']
+        },
+        'filter-base-resources': {
+          summaryTitle: 'Base resource · Filter',
+          summaryCopy: '这条连线先检查单 Tile 的最低工作集，避免为基础资源都放不下的方案继续生成流水。',
+          title: '62 个 API 合法 realization 无法满足 base footprint',
+          subtitle: 'API 合法只说明调用形式存在；L1、L0、UB 或尾块 workspace 超限仍然是阻断条件。',
+          listTitle: 'Primary rejection buckets',
+          outputTitle: '代表性拒绝',
+          outputStrong: 'Large baseK + on-chip bridge',
+          outputCopy: '路径 contract 成立，但 operands、accumulation tile 与 bridge workspace 的最低同时驻留已经超过预算。',
+          outputList: [['API contract', 'Pass'], ['Base footprint', 'Fail'], ['Pipeline synthesis', 'Skipped']],
+          footerStrong: '基础容量过滤', footerCopy: '24 + 26 + 12 = 62；此时尚未计入 Double Buffer 的峰值。',
+          confidence: 'static capacity model',
+          conclusion: '62 个 realization 连最低资源前提都不满足',
+          inspectorCopy: '这一步提前阻断不可能的 base plan，减少无意义的流水派生。',
+          types: ['fact', 'estimate'],
+          reasons: ['24 个 realization 的 L0 / L1 footprint 超限。', '26 个 realization 的 UB 或 Queue 最低预算超限。', '12 个 realization 无法满足 alignment / tail workspace。'],
+          sources: ['Mock resource profile', 'Static tile footprint calculator', 'Tail workspace estimator']
+        },
+        'synthesize-pipelines': {
+          summaryTitle: 'Pipeline synthesis · Expand',
+          summaryCopy: '这条连线为 base plan 生成 Buffer plan、Schedule 和 Event graph，因此候选再次展开。',
+          title: '48 个 base plan 派生为 96 个流水 realization',
+          subtitle: '所有 plan 都有 Serial 基线，部分 plan 还能生成 Double Buffer 或 C/V overlap 子候选。',
+          listTitle: '派生 Schedule',
+          outputTitle: '为什么不能提前决定流水',
+          outputStrong: 'Schedule depends on a legal path and base fit',
+          outputCopy: '只有路径 API 合法且单 Tile 放得下后，才能生成可信的 Buffer、Queue 与同步组合。',
+          outputList: [['Parent identity', 'Preserved'], ['Buffer plan', 'New child field'], ['Event graph', 'New child field']],
+          footerStrong: 'Schedule expansion', footerCopy: '48 + 32 + 16 = 96；不同 base plan 拥有不同的可派生 Schedule 数量。',
+          confidence: 'schedule synthesis',
+          conclusion: '流水综合使候选从 48 扩张到 96',
+          inspectorCopy: 'Serial 是共同基线；Double Buffer 与 C/V overlap 只为具备依赖和资源前提的 plan 生成。',
+          types: ['fact', 'estimate'],
+          reasons: ['48 个 base plan 都保留 Serial realization。', '32 个 plan 能形成 Double Buffer overlap。', '16 个 plan 能形成 C/V producer-consumer overlap。'],
+          sources: ['Mock schedule synthesizer', 'Queue / Buffer templates', 'Producer-consumer dependency graph']
+        },
+        'filter-executable': {
+          summaryTitle: 'Executable · Filter',
+          summaryCopy: '这条连线对完整流水重新计算峰值资源，并验证 Queue、Event 与 overlap 是否真的可实现。',
+          title: '78 个流水 realization 未通过可执行性审查',
+          subtitle: '基础资源通过不代表多 Buffer 同驻留仍然放得下，也不代表 Event 关系能形成有效 overlap。',
+          listTitle: 'Primary rejection buckets',
+          outputTitle: '代表性拒绝',
+          outputStrong: 'C/V overlap with invalid peak or event graph',
+          outputCopy: '候选在 base fit 阶段可行，但派生后的 Buffer 复制或同步边导致峰值超限、生命周期冲突或依赖空窗。',
+          outputList: [['Base footprint', 'Pass'], ['Pipeline realization', 'Fail'], ['Executable set', 'Not admitted']],
+          footerStrong: '完整流水过滤', footerCopy: '30 + 26 + 22 = 78；资源与同步结论同时进入这一 gate。',
+          confidence: 'mixed evidence',
+          conclusion: '78 个流水 realization 不能形成可信执行计划',
+          inspectorCopy: '这里拒绝的是具体 Buffer/Schedule 子候选；同一个 base parent 的其他 realization 仍可存活。',
+          types: ['fact', 'estimate'],
+          reasons: ['30 个 realization 的 peak residency 超限。', '26 个 realization 的 Queue / Event 生命周期不成立。', '22 个 realization 没有有效 dependency gap 支撑 overlap。'],
+          sources: ['Peak residency calculator', 'Queue / Event verifier', 'Design-time overlap estimator']
+        },
+        'rank-lineage': {
+          summaryTitle: 'Shortlist · Rank',
+          summaryCopy: '最后一条连线处理的是推荐质量，不再把“未入选”描述成实现非法。',
+          title: '18 个可执行方案收敛为 3 个代表候选',
+          subtitle: 'Pareto 支配、等价 Schedule 与证据置信度共同决定 shortlist。',
+          listTitle: 'Ranking buckets',
+          outputTitle: '保留的决策位置',
+          outputStrong: 'Stable · Balanced · Aggressive',
+          outputCopy: 'A、B、C 保留不同的资源、性能与复杂度权衡，而不是只展示一个黑盒最优答案。',
+          outputList: [['A', 'Resource safe'], ['B', 'Balanced recommendation'], ['C', 'Latency first']],
+          footerStrong: '工程排序', footerCopy: '7 + 5 + 3 = 15；被 rank out 的方案可能完全可执行。',
+          confidence: 'engineering recommendation',
+          conclusion: '15 个可执行方案未进入最终对比',
+          inspectorCopy: '它们不是错误方案，而是被支配、与已保留方案等价，或证据不足以支撑展示。',
+          types: ['estimate', 'recommendation'],
+          reasons: ['7 个方案被其他方案在关键决策维度上支配。', '5 个方案与已保留方案具有等价 Schedule。', '3 个方案的预计收益证据低于置信阈值。'],
+          sources: ['Mock Pareto comparison', 'Schedule equivalence rule', 'Evidence confidence threshold']
+        }
+      };
+
+      const stripLineageCount = (label) => label.replace(/ · \d+$/, '');
+      const lineageTraceViews = {};
+
+      lineageStages.forEach((stage, index) => {
+        const narrative = lineageStageNarratives[stage.id];
+        const viewKey = `lineage-stage-${stage.id}`;
+        stage.traceView = viewKey;
+        lineageTraceViews[viewKey] = {
+          summaryTitle: stage.label,
+          summaryCopy: stage.summary,
+          totalLabel: 'Current set', totalValue: String(stage.count),
+          paneMeta: `Map 2 · Stage ${String(index + 1).padStart(2, '0')} · ${stage.label}`,
+          status: `Interactive framework concept · Map 2 ${stage.kind}`,
+          title: narrative.title,
+          subtitle: narrative.subtitle,
+          metrics: narrative.metrics,
+          listTitle: narrative.listTitle,
+          list: narrative.list,
+          outputTitle: narrative.outputTitle,
+          outputStrong: narrative.outputStrong,
+          outputCopy: narrative.outputCopy,
+          outputList: narrative.outputList,
+          footerStrong: narrative.footerStrong,
+          footerCopy: narrative.footerCopy,
+          inspector: {
+            meta: `Map 2 · ${stage.label} · ${stage.count}`,
+            confidence: narrative.confidence,
+            conclusion: narrative.conclusion,
+            copy: narrative.inspectorCopy,
+            types: narrative.types,
+            reasons: narrative.reasons,
+            ledgerKicker: 'stage state',
+            ledger: narrative.ledger,
+            sources: narrative.sources
+          }
+        };
+      });
+
+      lineageTransitions.forEach((transition, index) => {
+        const narrative = lineageTransitionNarratives[transition.id];
+        const viewKey = `lineage-transition-${transition.id}`;
+        const rejected = transition.type === 'filter' ? transition.from - transition.to : 0;
+        const operationLabel = transition.id === 'rank-lineage' ? 'Ranked out' : transition.type === 'expand' ? 'Expanded' : 'Rejected';
+        const operationValue = transition.type === 'expand' ? `+${transition.to - transition.from}` : String(rejected);
+        const resultNature = transition.id === 'filter-path-apis'
+          ? 'fact'
+          : transition.id === 'rank-lineage' || transition.type === 'expand'
+            ? 'recommendation'
+            : 'estimate';
+        const flowRows = transition.type === 'expand'
+          ? transition.branches.map((branch) => [stripLineageCount(branch.label), `${branch.count} realizations`])
+          : transition.categories.map(([label, count]) => [stripLineageCount(label), `${count} ${transition.id === 'rank-lineage' ? 'ranked out' : 'rejected'}`]);
+        transition.traceView = viewKey;
+        lineageTraceViews[viewKey] = {
+          summaryTitle: narrative.summaryTitle,
+          summaryCopy: narrative.summaryCopy,
+          totalLabel: operationLabel, totalValue: operationValue,
+          paneMeta: `Map 2 · Transition ${String(index + 1).padStart(2, '0')} · ${transition.label}`,
+          status: `Interactive framework concept · Map 2 ${transition.type} transition`,
+          title: narrative.title,
+          subtitle: narrative.subtitle,
+          metrics: [['Input', String(transition.from)], [operationLabel, operationValue], ['Output', String(transition.to)]],
+          listTitle: narrative.listTitle,
+          list: flowRows,
+          outputTitle: narrative.outputTitle,
+          outputStrong: narrative.outputStrong,
+          outputCopy: narrative.outputCopy,
+          outputList: narrative.outputList,
+          footerStrong: narrative.footerStrong,
+          footerCopy: narrative.footerCopy,
+          inspector: {
+            meta: `Map 2 · ${transition.label}`,
+            confidence: narrative.confidence,
+            conclusion: narrative.conclusion,
+            copy: narrative.inspectorCopy,
+            types: narrative.types,
+            reasons: narrative.reasons,
+            ledgerKicker: transition.type === 'expand' ? 'lineage expansion' : transition.id === 'rank-lineage' ? 'ranking result' : 'filter result',
+            ledger: [['Input', String(transition.from), 'fact'], [operationLabel, operationValue, resultNature], ['Output', String(transition.to), resultNature]],
+            sources: narrative.sources
+          }
+        };
+      });
+
+      Object.assign(traceViews, lineageTraceViews);
 
       const apiRejectionCategories = [
         { id: 'support', label: '产品与接口支持 · fake', baseLabel: '产品与接口支持', count: 12, enabled: false, hint: 'SoC / overload' },
@@ -2756,11 +3317,11 @@
         defs.append(apiPassGradient);
         svg.append(defs);
 
-        [72, 174, 276].forEach((y) => {
+        [84, 174, 276].forEach((y) => {
           svg.append(createSvgNode('line', { class: 'chart-guide', x1: 26, y1: y, x2: 1094, y2: y }));
         });
-        svg.append(createSvgNode('text', { class: 'survival-caption', x: 26, y: 28 }, '100% enumerated population'));
-        svg.append(createSvgNode('text', { class: 'survival-caption', x: 1094, y: 28, 'text-anchor': 'end' }, '1.04% shortlisted'));
+        svg.append(createSvgNode('text', { class: 'survival-caption', x: 26, y: 18 }, '100% enumerated population'));
+        svg.append(createSvgNode('text', { class: 'survival-caption', x: 1094, y: 18, 'text-anchor': 'end' }, '1.04% shortlisted'));
 
         renderConvergenceRivers(svg);
 
@@ -2783,7 +3344,21 @@
             height: stage.height + 28,
             rx: 14
           }));
-          group.append(createSvgNode('text', { class: 'stage-kicker', x: stage.x, y: 54, 'text-anchor': 'middle' }, stage.kicker));
+          const stageLabelWidth = Math.max(76, stage.label.length * 7 + 30);
+          group.append(createSvgNode('rect', {
+            class: 'stage-label-plate',
+            x: stage.x - stageLabelWidth / 2,
+            y: 35,
+            width: stageLabelWidth,
+            height: 26,
+            rx: 13
+          }));
+          group.append(createSvgNode('circle', {
+            class: 'stage-state-dot',
+            cx: stage.x - stageLabelWidth / 2 + 12,
+            cy: 48,
+            r: 3
+          }));
           group.append(createSvgNode('text', { class: 'stage-count', x: stage.x, y: 78, 'text-anchor': 'middle' }, stage.count));
 
           for (let index = 0; index < stage.count; index += 1) {
@@ -2802,7 +3377,7 @@
               group.append(createSvgNode('text', { class: 'candidate-name', x: x + 10, y: y + 3 }, ['A', 'B', 'C'][index]));
             }
           }
-          group.append(createSvgNode('text', { class: 'stage-label', x: stage.x, y: 386, 'text-anchor': 'middle' }, stage.label));
+          group.append(createSvgNode('text', { class: 'stage-label', x: stage.x, y: 52, 'text-anchor': 'middle' }, stage.label));
           svg.append(group);
         });
 
@@ -2810,20 +3385,314 @@
           const source = convergenceStages[filterIndex];
           const target = convergenceStages[filterIndex + 1];
           const x = (source.x + target.x) / 2;
+          const filterLabelWidth = Math.max(76, filter.label.length * 7 + 30);
           const group = createSvgNode('g', {
             class: 'filter-group',
-            'aria-hidden': 'true',
+            role: 'button',
+            tabindex: '0',
+            'aria-label': `查看 ${filter.label} 过滤：${filter.from} → ${filter.to}，排除 ${filter.rejected}`,
+            'aria-pressed': 'false',
             'data-trace-view': filter.traceView,
             'data-convergence-filter-group': filter.id
           });
           group.append(createSvgNode('rect', { class: 'filter-hit', x: x - 48, y: 34, width: 96, height: 330, rx: 12 }));
-          group.append(createSvgNode('text', { class: 'filter-kicker', x, y: 48, 'text-anchor': 'middle' }, filter.label));
-          group.append(createSvgNode('text', { class: 'filter-meta', x, y: 63, 'text-anchor': 'middle' }, `${filter.from} → ${filter.to}`));
+          group.append(createSvgNode('rect', {
+            class: 'filter-label-plate',
+            x: x - filterLabelWidth / 2,
+            y: 35,
+            width: filterLabelWidth,
+            height: 26,
+            rx: 13
+          }));
+          group.append(createSvgNode('circle', {
+            class: 'filter-state-dot',
+            cx: x - filterLabelWidth / 2 + 12,
+            cy: 48,
+            r: 3
+          }));
+          group.append(createSvgNode('text', { class: 'filter-kicker', x, y: 52, 'text-anchor': 'middle' }, filter.label));
           group.append(createSvgNode('line', { class: 'filter-axis', x1: x, y1: 76, x2: x, y2: 286 }));
+          group.append(createSvgNode('circle', { class: 'filter-orb-halo', cx: x, cy: 174, r: 23 }));
           group.append(createSvgNode('circle', { class: 'filter-orb', cx: x, cy: 174, r: 18 }));
           group.append(createSvgNode('text', { class: 'filter-value', x, y: 178, 'text-anchor': 'middle' }, `−${filter.rejected}`));
           svg.append(group);
         });
+      };
+
+      const lineageCenterY = 190;
+      const lineageSelectionLookup = new Map([
+        ...lineageStages.map((stage) => [stage.id, stage.summary]),
+        ...lineageTransitions.map((transition) => [transition.id, transition.summary])
+      ]);
+
+      const lineageStageBounds = (stage) => ({
+        left: stage.x - stage.width / 2,
+        right: stage.x + stage.width / 2,
+        top: lineageCenterY - stage.height / 2,
+        bottom: lineageCenterY + stage.height / 2
+      });
+
+      const selectLineageItem = (key) => {
+        $$('[data-lineage-select]').forEach((control) => {
+          const selected = control.dataset.lineageSelect === key;
+          control.classList.toggle('is-selected', selected);
+          control.setAttribute('aria-pressed', String(selected));
+        });
+        setText('[data-lineage-summary]', lineageSelectionLookup.get(key));
+      };
+
+      const lineageDotTone = (stage, index) => {
+        if (!stage.segments) return '';
+        let cursor = 0;
+        const toneIndex = stage.segments.findIndex((count) => {
+          cursor += count;
+          return index < cursor;
+        });
+        return toneIndex >= 0 ? ` tone-${toneIndex + 1}` : '';
+      };
+
+      const renderLineageStage = (svg, stage, stageIndex) => {
+        const bounds = lineageStageBounds(stage);
+        const group = createSvgNode('g', {
+          class: 'stage-group lineage-stage-group',
+          role: 'button',
+          tabindex: '0',
+          'aria-label': `查看 ${stage.label} 节点：${stage.count} 个${stage.kind}`,
+          'aria-pressed': 'false',
+          'data-lineage-select': stage.id,
+          'data-lineage-stage': stage.id,
+          'data-trace-view': stage.traceView,
+          'data-candidate-count': stage.count
+        });
+
+        group.append(createSvgNode('rect', {
+          class: 'stage-plane',
+          x: bounds.left - 10,
+          y: bounds.top - 12,
+          width: Math.max(40, stage.width + 20),
+          height: stage.height + 24,
+          rx: 12
+        }));
+
+        const plateWidth = Math.max(72, stage.label.length * 6.6 + 24);
+        group.append(createSvgNode('rect', {
+          class: 'stage-label-plate',
+          x: stage.x - plateWidth / 2,
+          y: 38,
+          width: plateWidth,
+          height: 24,
+          rx: 12
+        }));
+        group.append(createSvgNode('circle', {
+          class: 'stage-state-dot',
+          cx: stage.x - plateWidth / 2 + 10,
+          cy: 50,
+          r: 2.6
+        }));
+        group.append(createSvgNode('text', {
+          class: 'stage-label',
+          x: stage.x,
+          y: 53,
+          'text-anchor': 'middle'
+        }, stage.label));
+        group.append(createSvgNode('text', {
+          class: 'lineage-stage-kind',
+          x: stage.x,
+          y: 26,
+          'text-anchor': 'middle'
+        }, stage.kind));
+        group.append(createSvgNode('text', {
+          class: 'stage-count',
+          x: stage.x,
+          y: 84,
+          'text-anchor': 'middle'
+        }, stage.count));
+
+        for (let index = 0; index < stage.count; index += 1) {
+          const column = index % stage.columns;
+          const row = Math.floor(index / stage.columns);
+          const x = stage.columns === 1 ? stage.x : bounds.left + (column / (stage.columns - 1)) * stage.width;
+          const y = stage.rows === 1 ? lineageCenterY : bounds.top + (row / (stage.rows - 1)) * stage.height;
+          group.append(createSvgNode('circle', {
+            class: `candidate-dot${lineageDotTone(stage, index)}${stageIndex === lineageStages.length - 1 ? ' is-final' : ''}`,
+            cx: x,
+            cy: y,
+            r: stageIndex < 2 ? 1.75 : stageIndex < 4 ? 2.1 : 2.7
+          }));
+          if (stage.id === 'lineage-shortlist') {
+            group.append(createSvgNode('text', {
+              class: 'candidate-name',
+              x: x + 10,
+              y: y + 3
+            }, ['A', 'B', 'C'][index]));
+          }
+        }
+
+        group.append(createSvgNode('title', {}, `${stage.label}: ${stage.count} ${stage.kind}`));
+        svg.append(group);
+      };
+
+      const renderLineageExpansion = (group, transition, source, target) => {
+        const startX = source.right + 9;
+        const endX = target.left - 9;
+        const sourceHeight = source.bottom - source.top;
+        const targetHeight = target.bottom - target.top;
+        const branchTotal = transition.branches.reduce((sum, branch) => sum + branch.count, 0);
+        if (branchTotal !== transition.to) {
+          throw new Error(`${transition.label} branches do not match output`);
+        }
+
+        let sourceCursor = source.top;
+        let targetCursor = target.top;
+        transition.branches.forEach((branch, branchIndex) => {
+          const sourceThickness = sourceHeight * (branch.count / transition.to);
+          const targetThickness = targetHeight * (branch.count / transition.to);
+          const sourceTop = sourceCursor;
+          const sourceBottom = sourceTop + sourceThickness;
+          const targetTop = targetCursor;
+          const targetBottom = targetTop + targetThickness;
+          group.append(createSvgNode('path', {
+            class: `lineage-ribbon tone-${branch.tone}`,
+            d: createRiverRibbonPath({
+              startX,
+              startTop: sourceTop,
+              startBottom: sourceBottom,
+              endX,
+              endTop: targetTop,
+              endBottom: targetBottom
+            }),
+            'data-flow-count': branch.count
+          }));
+          group.append(createSvgNode('text', {
+            class: 'lineage-branch-label',
+            x: (startX + endX) / 2,
+            y: 318 + branchIndex * 13,
+            'text-anchor': 'middle'
+          }, branch.label));
+          sourceCursor = sourceBottom;
+          targetCursor = targetBottom;
+        });
+      };
+
+      const renderLineageFilter = (group, transition, source, target) => {
+        const rejected = transition.from - transition.to;
+        const categoryTotal = transition.categories.reduce((sum, [, count]) => sum + count, 0);
+        if (categoryTotal !== rejected) {
+          throw new Error(`${transition.label} rejection categories do not conserve candidates`);
+        }
+
+        const startX = source.right + 9;
+        const endX = target.left - 9;
+        const sourceHeight = source.bottom - source.top;
+        const targetHeight = target.bottom - target.top;
+        const passThickness = sourceHeight * (transition.to / transition.from);
+        const passTop = source.top;
+        const passBottom = passTop + passThickness;
+        group.append(createSvgNode('path', {
+          class: 'lineage-ribbon is-pass',
+          d: createRiverRibbonPath({
+            startX,
+            startTop: passTop,
+            startBottom: passBottom,
+            endX,
+            endTop: target.top,
+            endBottom: target.bottom
+          }),
+          'data-flow-count': transition.to
+        }));
+
+        let sourceCursor = passBottom;
+        const endpointX = endX - 4;
+        transition.categories.forEach(([label, count], categoryIndex) => {
+          const sourceThickness = sourceHeight * (count / transition.from);
+          const endpointThickness = Math.max(3, sourceThickness * .34);
+          const endpointTop = 344 + categoryIndex * 24;
+          const endpointBottom = endpointTop + endpointThickness;
+          group.append(createSvgNode('path', {
+            class: 'lineage-ribbon is-reject',
+            d: createRiverRibbonPath({
+              startX,
+              startTop: sourceCursor,
+              startBottom: sourceCursor + sourceThickness,
+              endX: endpointX,
+              endTop: endpointTop,
+              endBottom: endpointBottom
+            }),
+            'data-flow-count': count,
+            'data-rejection-category': label
+          }));
+          group.append(createSvgNode('circle', {
+            class: 'lineage-reject-dot',
+            cx: endpointX,
+            cy: endpointTop + endpointThickness / 2,
+            r: 2.4
+          }));
+          group.append(createSvgNode('text', {
+            class: 'lineage-reject-label',
+            x: endpointX,
+            y: endpointBottom + 10,
+            'text-anchor': 'end'
+          }, label));
+          sourceCursor += sourceThickness;
+        });
+      };
+
+      const renderLineageTransition = (svg, transition, transitionIndex) => {
+        const sourceStage = lineageStages[transitionIndex];
+        const targetStage = lineageStages[transitionIndex + 1];
+        const source = lineageStageBounds(sourceStage);
+        const target = lineageStageBounds(targetStage);
+        const midpoint = (sourceStage.x + targetStage.x) / 2;
+        const group = createSvgNode('g', {
+          class: 'lineage-edge-group',
+          role: 'button',
+          tabindex: '0',
+          'aria-label': `查看 ${transition.label} 连线：${transition.from} → ${transition.to}`,
+          'aria-pressed': 'false',
+          'data-lineage-select': transition.id,
+          'data-lineage-edge': transition.id,
+          'data-trace-view': transition.traceView,
+          'data-input-count': transition.from,
+          'data-output-count': transition.to
+        });
+
+        if (transition.type === 'expand') {
+          renderLineageExpansion(group, transition, source, target);
+        } else {
+          renderLineageFilter(group, transition, source, target);
+        }
+
+        group.append(createSvgNode('text', {
+          class: `lineage-edge-label ${transition.type === 'expand' ? 'is-expand' : 'is-reject'}`,
+          x: midpoint,
+          y: 92,
+          'text-anchor': 'middle'
+        }, transition.label));
+        group.append(createSvgNode('title', {}, `${transition.label}: ${transition.from} → ${transition.to}`));
+        svg.append(group);
+      };
+
+      const renderLineageMap = () => {
+        const svg = $('[data-lineage-svg]');
+        svg.replaceChildren();
+        svg.append(createSvgNode('title', { id: 'lineageMapTitle' }, 'Candidate lineage map: expansion, rejection and convergence'));
+
+        const defs = createSvgNode('defs');
+        const passGradient = createSvgNode('linearGradient', { id: 'lineage-pass-river', x1: '0%', y1: '0%', x2: '100%', y2: '0%' });
+        passGradient.append(
+          createSvgNode('stop', { offset: '0%', 'stop-color': 'var(--foreground)', 'stop-opacity': '.12' }),
+          createSvgNode('stop', { offset: '60%', 'stop-color': 'var(--primary-hover)', 'stop-opacity': '.22' }),
+          createSvgNode('stop', { offset: '100%', 'stop-color': 'var(--success)', 'stop-opacity': '.28' })
+        );
+        defs.append(passGradient);
+        svg.append(defs);
+
+        [108, lineageCenterY, 326].forEach((y) => {
+          svg.append(createSvgNode('line', { class: 'chart-guide', x1: 26, y1: y, x2: 1094, y2: y }));
+        });
+
+        lineageTransitions.forEach((transition, index) => renderLineageTransition(svg, transition, index));
+        lineageStages.forEach((stage, index) => renderLineageStage(svg, stage, index));
       };
 
       let selectedApiCategory = 'path';
@@ -2994,15 +3863,12 @@
       };
 
       const renderTraceDetail = (view) => {
-        setText('#traceTitle', view.summaryTitle);
-        setText('[data-trace-summary-copy]', view.summaryCopy);
+        setText('#traceTitle', view.title || view.summaryTitle);
         setText('[data-trace-total-label]', view.totalLabel);
         setText('[data-trace-total-value]', view.totalValue);
         setText('[data-center-meta]', view.paneMeta);
         setText('[data-status-stage]', view.status);
-        setText('[data-detail-title]', view.title);
         setText('[data-detail-subtitle]', view.subtitle);
-        setText('[data-detail-badge]', view.badge);
         setText('[data-detail-list-title]', view.listTitle);
         setText('[data-detail-output-title]', view.outputTitle);
         setText('[data-detail-output-strong]', view.outputStrong);
@@ -3052,7 +3918,6 @@
 
         if (candidatesSelected) {
           setText('#traceTitle', '设计空间如何从 288 收敛到 3');
-          setText('[data-trace-summary-copy]', '每一步记录应用的约束、被排除的候选，以及结论属于事实、估计还是建议。');
           setText('[data-trace-total-label]', 'Remaining');
           setText('[data-trace-total-value]', '3');
           setText('[data-center-meta]', 'Candidates · final design-time stage');
@@ -3068,7 +3933,7 @@
         inspectorScroll?.scrollTo({ top: 0, behavior: 'smooth' });
       };
 
-      let activeTraceSurface = 'path';
+      let activeTraceSurface = 'map';
 
       const selectTraceSurface = (key) => {
         activeTraceSurface = key;
@@ -3119,6 +3984,13 @@
           return;
         }
 
+        const lineageControl = event.target.closest('[data-lineage-select]');
+        if (lineageControl) {
+          selectLineageItem(lineageControl.dataset.lineageSelect);
+          selectTraceView(lineageControl.dataset.traceView);
+          return;
+        }
+
         const traceControl = event.target.closest('[data-trace-view]');
         if (traceControl) {
           selectTraceView(traceControl.dataset.traceView);
@@ -3129,9 +4001,20 @@
         const surfaceTab = event.target.closest('[data-trace-surface]');
         if (surfaceTab && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
           event.preventDefault();
-          const target = surfaceTab.dataset.traceSurface === 'path' ? 'map' : 'path';
-          selectTraceSurface(target);
-          $(`[data-trace-surface="${target}"]`)?.focus();
+          const tabs = $$('[data-trace-surface]');
+          const currentIndex = tabs.indexOf(surfaceTab);
+          const delta = event.key === 'ArrowRight' ? 1 : -1;
+          const targetTab = tabs[(currentIndex + delta + tabs.length) % tabs.length];
+          selectTraceSurface(targetTab.dataset.traceSurface);
+          targetTab.focus();
+          return;
+        }
+
+        const lineageControl = event.target.closest('[data-lineage-select]');
+        if (lineageControl && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          selectLineageItem(lineageControl.dataset.lineageSelect);
+          selectTraceView(lineageControl.dataset.traceView);
           return;
         }
 
@@ -3143,6 +4026,7 @@
       });
 
       renderConvergenceMap();
+      renderLineageMap();
       selectTraceSurface(activeTraceSurface);
       selectTraceView(lastTraceView);
     });
