@@ -429,25 +429,26 @@
           ctx.stroke();
           ctx.restore();
         }
+        // Rxx 独占一列：垂直居中跨「计算/通信」两条子轨
         ctx.font = "600 10px JetBrains Mono, monospace";
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         ctx.fillStyle = r.tp === 0 ? txtMain() : txtMuted();
-        ctx.fillText(`R${r.rank}`, 8, top + (COMM_SPLIT ? rowH / 4 : rowH / 2));
+        ctx.fillText(`R${r.rank}`, 8, top + rowH / 2);
         if (r.tp === 0) {
           ctx.font = "600 9px JetBrains Mono, monospace";
           ctx.textAlign = "right";
           ctx.fillStyle = txtMuted();
-          ctx.fillText(`D${r.dp}·PP${r.stage}`, GUT - 8, top + (COMM_SPLIT ? rowH / 4 : rowH / 2));
+          ctx.fillText(`D${r.dp}·PP${r.stage}`, GUT - 8, top + rowH / 2);
         }
         if (COMM_SPLIT) {
+          // 「计算」「通信」左对齐到同一列，分别标注上/下子轨
           ctx.font = "600 9px JetBrains Mono, monospace";
           ctx.textBaseline = "middle";
           ctx.textAlign = "left";
           ctx.fillStyle = txtMuted();
-          ctx.fillText("计算", 38, top + rowH / 4);
-          ctx.fillStyle = txtMain();
-          ctx.fillText("通信", 8, top + rowH * 3 / 4);
+          ctx.fillText("计算", 46, top + rowH / 4);
+          ctx.fillText("通信", 46, top + rowH * 3 / 4);
         }
         r.tasks.forEach((t) => {
           const x = xOf(t.startUs);

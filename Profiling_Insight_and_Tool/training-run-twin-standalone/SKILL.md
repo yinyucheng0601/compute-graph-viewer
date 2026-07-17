@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-`wzh_index.html` 整网图右上角「层级」下拉（L1~L5），以及 `js/opv-modelviz.js` 中的 `opv-set-level` 事件处理。
+`training-monitoring.html` 整网图右上角「层级」下拉（L1~L5），以及 `js/opv-modelviz.js` 中的 `opv-set-level` 事件处理。
 
 ## 核心原理
 
@@ -43,10 +43,10 @@ const MODULE_BY_CLUSTER = {
 
 | 文件 | 作用 |
 |---|---|
-| `wzh_index.html` 内联 `<script>` | `pickFlatLevel(level)` → `dispatchEvent('opv-set-level')` |
+| `training-monitoring.html` 内联 `<script>` | `pickFlatLevel(level)` → `dispatchEvent('opv-set-level')` |
 | `js/opv-modelviz.js` 末尾 | `document.addEventListener('opv-set-level', ...)` 设置 `state.collapsedModules` 并 `renderAll` |
 | `js/opv-modelviz.js` `DEFAULT_COLLAPSED` | `new Set(["mtp_module"])` → 默认 L5 全展开 |
-| `wzh_index.html` CSS `.seg`/`.segbtn`/`.hsel-*` | 工具栏样式 |
+| `training-monitoring.html` CSS `.seg`/`.segbtn`/`.hsel-*` | 工具栏样式 |
 
 ## 更新 schema 时检查清单
 

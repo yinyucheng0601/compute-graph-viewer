@@ -164,7 +164,7 @@
     },
     deepseek: {
       name: "Pangu 2.0 flash",
-      title: "Pangu 2.0 flash 整网图",
+      title: "Pangu 2.0 flash 训练监控",
       meta: "",
       graphKind: "moe",
       trainingGraph: makeDeepSeekTrainingGraph(),
@@ -603,11 +603,10 @@
       // 问题标注：对应进度条上 5 个诊断标记，标在整网图的首个问题节点上
       problemMarkers: [
         { id: "1", nodeId: "router",              diagnosisKey: "moe-a2a",                  label: "问题1：MoE all-to-all 超时", sub: "layer 38 router → rank 23 死锁 → loss NaN" },
-        { id: "2", nodeId: "query_tensor",        diagnosisKey: "qproj-overflow",           label: "问题2：q_proj FP8 溢出", sub: "layer 33 q_proj 输入 3.2% 超 FP8 E4M3 max(448)" },
-        { id: "3", nodeId: "query_projection",    diagnosisKey: "low-precision-training",    label: "问题3：低精训练 loss 不收敛", sub: "FP8 深层数值退化 → layer 35 偏差起点 → 梯度消失" },
-        { id: "4", nodeId: "routed_experts",      diagnosisKey: "nvlink",                   label: "问题4：NVLINK 链路掉线", sub: "node2 GPU3 lane5 inactive → MFU 骤降至 20%" },
-        { id: "5", nodeId: "lm_head",             diagnosisKey: "perf-compute-bottleneck",  label: "问题5：lm_head 带宽瓶颈", sub: "vocab 129280 非对齐256 → cube_util 仅 49%" },
-        { id: "6", nodeId: "topk_expert_select",  diagnosisKey: "perf-comm-straggler",      label: "问题6：all-to-all 快慢卡", sub: "rank 17/23/41 负载 5× → 步耗时周期性尖峰" },
+        { id: "2", nodeId: "lm_head",             diagnosisKey: "perf-compute-bottleneck",  label: "问题2：lm_head 带宽瓶颈", sub: "vocab 151552 尾块非对齐 → cube_util 仅 49%" },
+        { id: "3", nodeId: "query_tensor",        diagnosisKey: "qproj-overflow",           label: "问题3：q_proj FP8 溢出", sub: "layer 33 q_proj 输入 3.2% 超 FP8 E4M3 max(448)" },
+        { id: "4", nodeId: "query_projection",    diagnosisKey: "low-precision-training",    label: "问题4：低精训练 loss 不收敛", sub: "FP8 深层数值退化 → layer 35 偏差起点 → 梯度消失" },
+        { id: "5", nodeId: "routed_experts",      diagnosisKey: "nvlink",                   label: "问题5：NVLINK 链路掉线", sub: "node2 GPU3 lane5 inactive → MFU 骤降至 20%" },
       ],
     };
   }
@@ -1537,17 +1536,7 @@
       ],
       note: "LM Head → Logits 路径。vocab 非对齐致 cube_util 仅 49%,AICPU 回退 526ms。",
     },
-    "perf-comm-straggler": {
-      layer: "MoE FFN 区",
-      nodeIds: ["router_gate", "router_weight", "routed_expert_bank", "shared_expert_mlp", "moe_all_to_all_dispatch", "moe_all_to_all_combine"],
-      edges: [
-        ["router_gate", "routed_expert_bank"],
-        ["routed_expert_bank", "moe_all_to_all_combine"],
-        ["moe_all_to_all_dispatch", "routed_expert_bank"]
-      ],
-      clusterIds: ["moe-block"],
-      note: "Router gate bias 漂移 → 热点 rank 承接 5× token → all-to-all 尾延迟恶化。",
-    },
+
     "low-precision-training": {
       layer: "Layer 35 深层",
       nodeIds: ["query_tensor", "attention_core", "shared_expert_mlp", "routed_expert_bank"],
@@ -1563,11 +1552,10 @@
   // 进度条诊断标记:step 在 0~totalSteps 范围内,百分比自动换算
   const diagnosisMarkers = [
     { key: "moe-a2a", step: INCIDENT_STEP, severity: "p0", category: "精度", num: "一", label: "MoE all-to-all 超时 → loss NaN", sub: "layer 38 router 98% token → expert 193, EP23 死锁" },
-    { key: "qproj-overflow", step: 8500, severity: "p1", category: "精度", num: "二", label: "q_proj FP8 精度溢出 → grad_norm 发散", sub: "layer 33 q_proj 3.2% 超 FP8 max(448)" },
-    { key: "low-precision-training", stepFrom: 28000, stepTo: 35000, severity: "p1", category: "精度", num: "三", label: "低精训练 loss 不收敛 → 梯度消失", sub: "FP8 E4M3 深层激活值长尾, 峰度 +15.3, SNR 降至 6.8dB" },
-    { key: "nvlink", step: 20000, severity: "p1", category: "Infra", num: "四", label: "HCCS 链路掉线 → MFU 骤降", sub: "node2 NPU3 lane5 inactive, HCCL 回退 RoCE 慢路径" },
-    { key: "perf-compute-bottleneck", stepFrom: 20000, stepTo: 120000, severity: "p1", category: "性能", num: "五", label: "算子带宽瓶颈 + AICPU 回退", sub: "lm_head vocab 非对齐, cube_util 49%, AICPU 526ms" },
-    { key: "perf-comm-straggler", step: 18427, severity: "p1", category: "性能", num: "六", label: "MoE all-to-all 快慢卡 → 步耗时尖峰", sub: "gate bias 漂移 rank 17/23/41 承接 5× token" },
+    { key: "perf-compute-bottleneck", stepFrom: 20000, stepTo: 120000, severity: "p1", category: "性能", num: "二", label: "算子带宽瓶颈 + AICPU 回退", sub: "lm_head vocab 非对齐, cube_util 49%, AICPU 526ms" },
+    { key: "qproj-overflow", step: 8500, severity: "p1", category: "精度", num: "三", label: "q_proj FP8 精度溢出 → grad_norm 发散", sub: "layer 33 q_proj 3.2% 超 FP8 max(448)" },
+    { key: "low-precision-training", stepFrom: 28000, stepTo: 35000, severity: "p1", category: "精度", num: "四", label: "低精训练 loss 不收敛 → 梯度消失", sub: "FP8 E4M3 深层激活值长尾, 峰度 +15.3, SNR 降至 6.8dB" },
+    { key: "nvlink", step: 20000, severity: "p1", category: "Infra", num: "五", label: "HCCS 链路掉线 → MFU 骤降", sub: "node2 NPU3 lane5 inactive, HCCL 回退 RoCE 慢路径" },
   ];
 
   function renderDiagnosisMarkers() {
@@ -1905,8 +1893,7 @@
     "nvlink":            { hotCells: [19, 20], warmCells: [16,17,18,21,22,23],
                            hotWarn: "空等 · HCCS 链路掉线,HCCL 回退 RoCE 慢路径",
                            warmWarn: "空等 · PP pipeline 被慢路径拖住,等待上游数据" },
-    "perf-comm-straggler": { hotCells: [17, 23, 41],
-                           hotWarn: "空等 · straggler 承接 5× token,all-to-all 尾延迟拖慢全组" },
+
   };
 
   function applyInfraHeatHighlight(caseKey) {
@@ -2157,7 +2144,7 @@
             <div style="display:flex;flex-direction:column;gap:12px;">
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:8px 12px;background:var(--surface-2);font-size:12px;font-weight:600;color:var(--foreground)">① model_config.json</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"num_experts": 256,</div>
                   <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"top_k": 8,</div>
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;"n_group": <strong>8</strong>,</div>
@@ -2167,14 +2154,14 @@
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:8px 12px;background:var(--surface-2);font-size:12px;font-weight:600;color:var(--foreground)">② training_args.yaml</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="color:var(--foreground-muted)">&nbsp;&nbsp;aux_loss_coeff: 0.001</div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;z_loss_coeff: <strong>1e-4</strong>&nbsp;&nbsp;<span style="color:var(--foreground-muted);font-family:system-ui"># gate 前增加 z-loss 正则项，抑制 gate logit 极端值</span></div>
                 </div>
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:8px 12px;background:var(--surface-2);font-size:12px;font-weight:600;color:var(--foreground)">③ env.sh</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:10px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− export NCCL_IB_TIMEOUT=<strong>30</strong></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ export NCCL_IB_TIMEOUT=<strong>60</strong>&nbsp;&nbsp;<span style="color:var(--foreground-muted);font-family:system-ui"># all-to-all 超时延长 30→60s 兜底</span></div>
                 </div>
@@ -2199,30 +2186,130 @@
     },
     "perf-compute-bottleneck": {
       title: "定位链 · 整网耗时下钻：算子带宽瓶颈 + AICPU 回退导致步耗时超标 42%",
-      meta: "路径:迭代层 → 单/多卡均异常 → 模型层 → 算子层 → 张量层 → infra层 → 超参/代码层",
+      meta: "路径:性能表征层 → 瓶颈分类层(计算受限) → 阶段定位层 → 算子定位层 → 执行效率层 → 代码/配置层",
       steps: [
-        { label: "迭代层", short: "T_iter 3.2s", sub: "WHEN · 稳态训练步耗时 3.2s,超标 42%" },
-        { label: "分叉判定", sub: "单/多卡均异常 · 沿计算主干", branch: true },
-        { label: "模型层", short: "lm_head / logits", sub: "WHERE · lm_head / logits 路径耗时占比 38%" },
-        { label: "算子层", short: "cube_util 49%", sub: "WHAT · MatMulV2 cube_util 仅 49%,CE loss 走 AICPU 回退" },
-        { label: "张量层", short: "vocab 非对齐", sub: "WHICH · vocab 非对齐导致带宽利用率低" },
-        { label: "infra层", short: "stage7 1.82×", sub: "CONTEXT · PP stage 7 过载 1.82×,MFU 仅 38%" },
-        { label: "超参/代码层", short: "vocab padding 对齐", sub: "FIX · vocab padding 对齐 + fused CE kernel 替代 AICPU 回退" },
+        { label: "性能表征层", short: "T_iter 12.1s", sub: "WHEN · 稳态步耗时 12.1s,超标 42%,MFU 38%",
+          content: `
+            <p class="twin-locate-metric-note" style="margin:0 0 10px">128 GPU(16 节点 × 8 GPU)训练 openPangu-2.0-Flash，<strong>EP=64 / PP=8 / TP=1 / FP8</strong>，seq_len=4096，micro_batch=1，global_batch=1024。目标步耗时 ≤ 8.5s，实测 <strong style="color:#dc2626">12.1s</strong>。</p>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:2px 0 10px">
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--surface-2)">
+                <div style="font-size:11px;color:var(--foreground-muted)">步耗时 T_iter</div>
+                <div style="font-size:22px;font-weight:700;color:#dc2626;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;margin-top:4px">12.1<small style="font-size:12px;color:var(--foreground-muted)">s</small></div>
+                <div style="font-size:11px;color:#dc2626;margin-top:2px">目标 ≤8.5s · +3.6s(+42%)</div>
+              </div>
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--surface-2)">
+                <div style="font-size:11px;color:var(--foreground-muted)">MFU</div>
+                <div style="font-size:22px;font-weight:700;color:#dc2626;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;margin-top:4px">38<small style="font-size:12px;color:var(--foreground-muted)">%</small></div>
+                <div style="font-size:11px;color:#dc2626;margin-top:2px">目标 ≥50% · −12pp</div>
+              </div>
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--surface-2)">
+                <div style="font-size:11px;color:var(--foreground-muted)">PHS 评分</div>
+                <div style="font-size:22px;font-weight:700;color:#dc2626;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;margin-top:4px">D<small style="font-size:12px;color:var(--foreground-muted)">(32)</small></div>
+                <div style="font-size:11px;color:var(--foreground-muted);margin-top:2px">性能健康度</div>
+              </div>
+            </div>
+            <p class="twin-locate-metric-note"><strong>判据</strong>：步耗时超基线 &gt; 40% + MFU &lt; 40% → 显著性能劣化，非调度抖动。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【瓶颈分类层】从 <code>step_trace_time.csv</code> 拆解计算/通信/空泡占比，判定走计算分支还是通信分支。</p>
+          ` },
+        { label: "分叉判定", sub: "计算受限 · Computing 78% > 60% · 沿计算主干", branch: true },
+        { label: "阶段定位层", short: "stage7 1.82×", sub: "WHERE · PP stage 7 Computing 2152ms,过载 1.82×",
+          content: `
+            <p class="twin-locate-metric-note">从 <code>step_trace_time.csv</code> 提取整步耗时构成——计算绝对主导，通信虽有占比但非主因，判定 <strong>计算受限，走计算分支</strong>：</p>
+            <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border-subtle);font-size:10px;font-weight:600;color:#fff;margin:6px 0 4px">
+              <div style="flex:78;background:#3b6fe0;display:flex;align-items:center;justify-content:center" title="Computing 9422ms">Computing 78%</div>
+              <div style="flex:11;background:#ea580c;display:flex;align-items:center;justify-content:center" title="PP bubble ≈1337ms">Bubble 11%</div>
+              <div style="flex:9;background:#8b5cf6;display:flex;align-items:center;justify-content:center" title="未掩盖通信 1093ms">通信 9%</div>
+              <div style="flex:2;background:#94a3b8;display:flex;align-items:center;justify-content:center" title="Free 248ms">2%</div>
+            </div>
+            <p class="twin-locate-metric-note" style="margin:2px 0 12px;font-size:11px">Computing 9422ms(78%) · PP bubble ≈1337ms(11%) · 未掩盖通信 1093ms(9%) · Free 248ms(2%)</p>
+            <p class="twin-locate-metric-note">再看 Pipeline 时序泳道图，按 PP stage 0~7 拆分 Computing 段耗时。<strong style="color:#dc2626">末级 stage 7</strong>（layers 54~60 + final_layernorm + lm_head + loss）严重过载：</p>
+            <div style="display:flex;flex-direction:column;gap:5px;margin:8px 0">
+              ${[["stage 0","1310","embedding + L0~7","#64748b",1310],["stage 1","1180","L8~13 MoE","#64748b",1180],["stage 2","1180","L14~19 MoE","#64748b",1180],["stage 3","1180","L20~25 MoE","#64748b",1180],["stage 4","1180","L26~31 MoE","#64748b",1180],["stage 5","1180","L32~37 MoE","#64748b",1180],["stage 6","1180","L38~43 MoE","#64748b",1180],["stage 7","2152","+ lm_head + loss","#dc2626",2152]].map(([s,ms,note,color,val])=>`
+                <div style="display:flex;align-items:center;gap:8px;font-size:11px">
+                  <span style="flex:0 0 52px;color:var(--foreground-muted);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace">${s}</span>
+                  <div style="flex:1;background:var(--surface-2);border-radius:4px;overflow:hidden;height:16px"><div style="width:${(val/2152*100).toFixed(0)}%;height:100%;background:${color}"></div></div>
+                  <span style="flex:0 0 56px;text-align:right;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;color:${color==='#dc2626'?'#dc2626':'var(--foreground-secondary)'};font-weight:${color==='#dc2626'?'700':'400'}">${ms}ms</span>
+                  <span style="flex:0 0 118px;color:var(--foreground-muted);font-size:10px">${note}</span>
+                </div>`).join("")}
+            </div>
+            <p class="twin-locate-metric-note"><strong>判据</strong>：stage 7 耗时 / 中间 stage 均值 = 2152 / 1180 ≈ <strong style="color:#dc2626">1.82×</strong> → 末级严重过载；stage 0~6 在 stage 7 计算段期间空等，PP bubble ≈ 1337ms。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【算子定位层】拆解 stage 7 的算子 parent-child 表（<code>op_statistic.csv</code>），定位到具体过载算子。</p>
+          ` },
+        { label: "算子定位层", short: "cube_util 49%", sub: "WHAT · lm_head MatMulV2 cube_util 49% + CE loss AICPU 526ms",
+          content: `
+            <p class="twin-locate-metric-note">stage 7 算子按总耗时降序（<code>op_statistic.csv</code>，device 6）。MatMul 占比虽高但属正常计算，关键异常在 <strong style="color:#dc2626">lm_head 的 cube 利用率</strong> 与 <strong style="color:#dc2626">CE loss 的 AICPU 回退</strong>：</p>
+            <div style="overflow-x:auto;margin:6px 0">
+              <table style="width:100%;border-collapse:collapse;font-size:11px;line-height:1.5">
+                <tr style="background:var(--surface-2)"><th style="padding:4px 8px;border:1px solid var(--border-subtle);text-align:left">算子</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">耗时</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">占比</th><th style="padding:4px 8px;border:1px solid var(--border-subtle)">诊断</th></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">MatMulV3（QKV/o_proj + fc1/fc2）</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace">5936ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">63%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 cube_util 78~82% 正常</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">FlashAttentionScore + Grad</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace">723ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">7.7%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 MLA core_attention</td></tr>
+                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">↳ lm_head MatMulV2 [4096,2560]×[151552,2560]</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;color:#dc2626;font-weight:700">544ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">5.8%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">🔴 cube_util 仅 49%（预期 75%）</td></tr>
+                <tr style="background:#fef2f2"><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-weight:700">CE loss 链路（Exp/Sub/RealDiv/ArgMax/ReduceSum）</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;color:#dc2626;font-weight:700">526ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">5.6%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">🔴 手写算子链 · AICPU 回退</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">ApplyAdamWV2 / LpNormV2（优化器）</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace">64ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">0.7%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 BF16 状态,正常范围</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">RmsNorm ×92 + 残差/杂项</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace">560ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">5.9%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle)">🟢 Add/Mul/Cast/Slice</td></tr>
+              </table>
+            </div>
+            <p class="twin-locate-metric-note"><strong>产出</strong>：两个问题算子 —— ① <code>lm_head MatMulV2</code>（vocab 非对齐 → 带宽瓶颈，cube_util 49% vs 预期 75%）；② <code>CE loss 链路</code>（Exp/Sub/RealDiv/ArgMax/ReduceSum 合计 526ms，走 AICPU 回退）。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【执行效率层】用 Roofline + Timeline 判定这两个算子的根因归类（带宽瓶颈 / AICPU 回退）。</p>
+          ` },
+        { label: "执行效率层", short: "带宽瓶颈", sub: "WHY · lm_head memory-bound(vocab 尾块非对齐) + CE 手写链 AICPU 回退",
+          content: `
+            <p class="twin-locate-metric-note" style="margin:0 0 6px;font-weight:600;color:var(--foreground)">① lm_head 带宽瓶颈（Roofline memory-bound）</p>
+            <p class="twin-locate-metric-note"><code>kernel_details</code> 中 lm_head MatMulV2 <code>cube_util=49%</code>。DRAM 访存 ≈ 输入 4096×2560×2 + 权重 151552×2560×2 + 输出 4096×151552×2 ≈ <strong>2.0GB</strong>；H800 HBM 带宽 3.35TB/s，纯带宽耗时 ≈ 0.60ms，而实测 <strong style="color:#dc2626">8.5ms/call × 64 microbatch = 544ms</strong> → Roofline 落在 <strong style="color:#dc2626">memory-bound 区</strong>。根因：vocab=151552 的 tile 粒度与 hidden=2560 的 K 维不匹配，GEMM 尾块效率折半。</p>
+            <p class="twin-locate-metric-note" style="margin:14px 0 6px;font-weight:600;color:var(--foreground)">② CE loss 的 AICPU 串行链路</p>
+            <p class="twin-locate-metric-note">Timeline 中 lm_head 后有 5 个 vector 算子串行排列，每个算子间有 60~100μs 的 launch gap：</p>
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:8px 0;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px">
+              ${["Exp 128ms","Sub 126ms","RealDiv 125ms","ReduceSum 75ms","ArgMax 72ms"].map((op,i)=>`
+                <span style="padding:5px 9px;border-radius:5px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-weight:600">${op}</span>${i<4?`<span style="color:var(--foreground-muted)">→</span>`:""}`).join("")}
+              <span style="color:var(--foreground-muted);margin-left:6px">= 526ms · 5 次 HBM 读写往返</span>
+            </div>
+            <p class="twin-locate-metric-note">若替换为 <code>F.cross_entropy</code>（路由到 <code>aclnnSoftmaxCrossEntropyWithLogits</code> 融合实现），融合后仅 1 个 kernel，消除 5 次 HBM 往返与 launch gap。</p>
+            <p class="twin-locate-metric-note" style="margin-top:12px"><strong>判据</strong>：lm_head → 带宽瓶颈（memory-bound），vocab 尾块未对齐导致 cube_util 折半；CE loss → 手写算子链 × AICPU 回退；其余算子（MatMul / FA / RmsNorm）正常。合计可优化 ≈ 750ms。</p>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--foreground-secondary);line-height:1.5">↳ 需在【代码/配置层】把根因映射到具体修改项。</p>
+          ` },
+        { label: "代码/配置层", short: "3 处改动", sub: "FIX · lm_head tiling 调优 + CE loss 融合 + BF16 优化器",
+          content: `
+            <p class="twin-locate-metric-note" style="margin:0 0 12px"><strong style="color:var(--foreground)">诊断总结</strong>：lm_head vocab 尾块非对齐致带宽瓶颈 + CE loss 手写算子链走 AICPU 回退，共同拉高 stage 7 负载，拖累整网 MFU 至 38%。</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
+                <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">① lm_head tiling 调优（针对 vocab=151552 手工 tile）</div>
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;# vocab=151552 已对齐 256(151552/256=592)，但 K=hidden 2560 tile 划分不友好</div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;lm_head.set_matmul_tiling(cube_tile=(256, 128), vec_tile=256)&nbsp;<span style="color:var(--foreground-muted)"># 手工指定尾块 tile</span></div>
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;# 预期 cube_util 49% → 72%，耗时 544ms → 约 370ms（↓174ms）</div>
+                </div>
+              </div>
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
+                <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">② CE loss 融合（消除 AICPU 回退）</div>
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                  <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;p = softmax(logits); loss = -(labels * log(p)).sum()&nbsp;<span style="color:var(--foreground-muted)"># 手写 5 段 AICPU/Vector</span></div>
+                  <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;loss = F.cross_entropy(logits, labels, ignore_index=pad_id)&nbsp;<span style="color:var(--foreground-muted)"># → aclnnSoftmaxCrossEntropyWithLogits 融合</span></div>
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;# 预期 526ms → 约 50ms（↓476ms）</div>
+                </div>
+              </div>
+              <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
+                <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">③ 优化器 BF16 状态（openPangu-2.0-Flash 默认已启用）</div>
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                  <div style="color:var(--foreground-muted)">&nbsp;&nbsp;use_distributed_optimizer: True&nbsp;&nbsp;# 已启用,ApplyAdamWV2 显存/耗时已减半,无需修改</div>
+                </div>
+              </div>
+            </div>
+            <p class="twin-locate-metric-note" style="margin:12px 0 6px;font-weight:600;color:var(--foreground)">验证结果（①+② 叠加）</p>
+            <div style="overflow-x:auto;margin:6px 0">
+              <table style="width:100%;border-collapse:collapse;font-size:11px;line-height:1.5">
+                <tr style="background:var(--surface-2)"><th style="padding:4px 8px;border:1px solid var(--border-subtle)">指标</th><th style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626">修改前</th><th style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a">修改后</th></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">步耗时 T_iter</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">12100ms</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a;font-weight:600">10350ms（↓14.5%）</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">MFU</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">38%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a;font-weight:600">45%</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">lm_head cube_util</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">49%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a;font-weight:600">72%</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">AICPU 耗时占比</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">7.2%</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a;font-weight:600">1.5%</td></tr>
+                <tr><td style="padding:4px 8px;border:1px solid var(--border-subtle)">PHS 评分</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#dc2626;font-weight:600">D(32)</td><td style="padding:4px 8px;border:1px solid var(--border-subtle);color:#16a34a;font-weight:600">C+(55)</td></tr>
+              </table>
+            </div>
+            <p class="twin-locate-metric-note" style="margin-top:8px">若要进一步达到 50%+ MFU，需配合 PP bubble 优化（interleaved 1F1B + 层数分配）。</p>
+          ` },
       ],
     },
-    "perf-comm-straggler": {
-      title: "定位链 · MoE all-to-all 快慢卡：步耗时周期性尖峰、尾延迟恶化",
-      meta: "路径:迭代层 → 仅多卡异常 → 通信调度层 → 模型层 → infra层 → 超参/代码层",
-      steps: [
-        { label: "迭代层", short: "CV 27%", sub: "WHEN · 步耗时 CV=27%,周期性尖峰 8~12×" },
-        { label: "分叉判定", sub: "仅多卡异常 · 切入通信分支", branch: true },
-        { label: "通信调度层", short: "rank 17/23/41", sub: "WHY(通信) · all-to-all 耗时暴增 32×,rank 17/23/41 尾延迟" },
-        { label: "模型层", short: "gate bias 漂移", sub: "WHERE · router gate bias 漂移致 3 rank 承接 5× expert token" },
-        { label: "infra层", short: "61 rank 空等", sub: "CONTEXT · 其余 61 rank 空等,EP64 负载严重不均" },
-        { label: "超参/代码层", short: "aux-loss+重映射", sub: "FIX · aux-loss + global-balance + EP group 重新映射" },
-      ],
-      bypass: [{ from: 0, to: 2 }],
-    },
+
     "low-precision-training": {
       title: "定位链 · 低精训练 loss 尾部不收敛，量化误差累积导致梯度信号淹没",
       meta: "路径:迭代层 → 单/多卡均异常 → 张量数值分析 → 误差传递路径 → infra层 → 超参/代码层",
@@ -2339,7 +2426,7 @@
             <div style="display:flex;flex-direction:column;gap:10px">
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">① model_config.json — per-token + per-channel 混合量化</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="color:var(--foreground-muted)">&nbsp;&nbsp;"fp8_quant_mode": "per_tensor",</div>
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;"fp8_quant_mode": <strong>"per_tensor"</strong>,</div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;"fp8_quant_mode": <strong>"hybrid"</strong>,</div>
@@ -2350,14 +2437,14 @@
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">② fp8_cast.py — 动态 scale 上界保护</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;scale = <strong>compute_scale(tensor)</strong></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;scale = <strong>max(compute_scale(tensor), 512.0 / 448.0)</strong>&nbsp;<span style="color:var(--foreground-muted)"># scale ≥ ~1.14，有效 ≥ 4.2 bit</span></div>
                 </div>
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">③ attention.py — 深层启用 BF16 softmax</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="background:rgba(220,38,38,.1);color:#dc2626">− &nbsp;attn_output = softmax(scores, dtype=<strong>torch.float8_e4m3fn</strong>)</div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;dtype = torch.float8_e4m3fn <strong>if layer_idx < 30 else torch.bfloat16</strong></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;attn_output = <strong>softmax(scores, dtype=dtype)</strong></div>
@@ -2365,7 +2452,7 @@
               </div>
               <div style="border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden">
                 <div style="padding:7px 12px;background:var(--surface-2);font-size:12px;font-weight:600">④ training_args.yaml — 梯度 scale 预热</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
+                <div style="font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;line-height:1.7;padding:8px 12px;background:var(--surface-1);overflow-x:auto">
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;fp8_grad_scale_warmup_steps: <strong>5000</strong></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;fp8_grad_scale_max: <strong>4.0</strong>&nbsp;&nbsp;<span style="color:var(--foreground-muted)"># warmup 后 grad scale 上限 4×</span></div>
                   <div style="background:rgba(22,163,74,.1);color:#16a34a">+ &nbsp;fp8_grad_scale_interval: <strong>1000</strong>&nbsp;<span style="color:var(--foreground-muted)"># 每 1000 step 递增</span></div>
@@ -2395,140 +2482,18 @@
   if (window.PtoHif8Case7) { locateChains["hif8-precision"] = window.PtoHif8Case7.chain(); locateChains["qproj-overflow"] = locateChains["hif8-precision"]; }
 
   let locateChainObserver = null;
-  let _locateTrackArgs = null; // 保存 drawLocateTrackLines 参数，resize 时重绘
 
-  // 选中态底色是独立图层(z-index 压在连线下方),节点切换时把它挪到对应节点的位置/尺寸上
-  function positionLocateHighlight() {
-    const top = $("locateChainTop");
-    const highlight = top?.querySelector(".twin-locate-highlight");
-    const activeNode = top?.querySelector(".twin-locate-node.is-active");
-    if (!top || !highlight) return;
-    if (!activeNode) {
-      highlight.classList.remove("is-visible");
-      return;
-    }
-    const containerRect = top.getBoundingClientRect();
-    const nodeRect = activeNode.getBoundingClientRect();
-    highlight.style.left = `${nodeRect.left - containerRect.left}px`;
-    highlight.style.top = `${nodeRect.top - containerRect.top}px`;
-    highlight.style.width = `${nodeRect.width}px`;
-    highlight.style.height = `${nodeRect.height}px`;
-    highlight.classList.add("is-visible");
-  }
-
-  // 悬浮底色同样是独立图层(z-index 压在连线下方),鼠标移入某节点时把它挪过去,移出则隐藏
-  function positionLocateHover(node) {
-    const top = $("locateChainTop");
-    const hover = top?.querySelector(".twin-locate-hover");
-    if (!top || !hover) return;
-    if (!node) {
-      hover.classList.remove("is-visible");
-      return;
-    }
-    const containerRect = top.getBoundingClientRect();
-    const nodeRect = node.getBoundingClientRect();
-    hover.style.left = `${nodeRect.left - containerRect.left}px`;
-    hover.style.top = `${nodeRect.top - containerRect.top}px`;
-    hover.style.width = `${nodeRect.width}px`;
-    hover.style.height = `${nodeRect.height}px`;
-    hover.classList.add("is-visible");
-  }
-
-  // 定位链栏兼作锚点导航:点击/滚动联动高亮对应的 nav 节点、下方内容区块、以及走过的连线
+  // 定位链栏兼作锚点导航:点击/滚动联动点亮对应刀锋、下方内容区块;
+  // is-active=当前层(最亮+发光)；is-done=已走过的层(点亮蓝刃)
   function setActiveLocateNode(sectionId) {
-    const nodes = Array.from(document.querySelectorAll(".twin-locate-node"));
-    nodes.forEach((node) => node.classList.toggle("is-active", node.dataset.target === sectionId));
+    const segs = Array.from(document.querySelectorAll(".twin-locate-seg"));
+    const activeIndex = segs.findIndex((seg) => seg.dataset.target === sectionId);
+    segs.forEach((seg, i) => {
+      seg.classList.toggle("is-active", seg.dataset.target === sectionId);
+      seg.classList.toggle("is-done", activeIndex >= 0 && i < activeIndex);
+    });
     document.querySelectorAll(".twin-locate-section").forEach((section) => {
       section.classList.toggle("is-active", section.id === sectionId);
-    });
-    const activeIndex = nodes.findIndex((node) => node.dataset.target === sectionId);
-    document.querySelectorAll(".twin-locate-line").forEach((line) => {
-      const segTo = Number(line.dataset.segmentTo);
-      line.classList.toggle("is-current", activeIndex >= 0 && segTo <= activeIndex);
-    });
-    positionLocateHighlight();
-  }
-
-  // 量出每个圆点的真实坐标后用 SVG 画出连线:保证逐点相连、不断线不错位;
-  // 同时按 chain.bypass 画出跳过某个节点的旁路虚线弧(例如绕过「通信调度层」直达「模型层」)
-  function drawLocateTrackLines(top, nodeCount, branchBeforeIndex, bypassList) {
-    _locateTrackArgs = { top, nodeCount, branchBeforeIndex, bypassList };
-    top.querySelector(".twin-locate-track-svg")?.remove();
-    if (nodeCount < 2) return;
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("class", "twin-locate-track-svg");
-    top.insertBefore(svg, top.firstChild);
-
-    requestAnimationFrame(() => {
-      const containerRect = top.getBoundingClientRect();
-      const centers = Array.from(top.querySelectorAll(".twin-locate-node-dot")).map((dot) => {
-        const r = dot.getBoundingClientRect();
-        return {
-          x: r.left + r.width / 2 - containerRect.left,
-          y: r.top + r.height / 2 - containerRect.top,
-        };
-      });
-      svg.setAttribute("width", String(containerRect.width));
-      svg.setAttribute("height", String(containerRect.height));
-      svg.innerHTML = "";
-
-      // 箭头标记:仅用于最后一段(连到「超参/代码层」),表示定位链从左到右的走向。
-      // fill=context-stroke 让箭头颜色跟随所在连线(含 is-current 高亮蓝)。
-      const defs = document.createElementNS(svgNS, "defs");
-      const marker = document.createElementNS(svgNS, "marker");
-      marker.setAttribute("id", "twin-locate-arrow");
-      marker.setAttribute("viewBox", "0 0 10 10");
-      marker.setAttribute("refX", "8");
-      marker.setAttribute("refY", "5");
-      marker.setAttribute("markerWidth", "7");
-      marker.setAttribute("markerHeight", "7");
-      marker.setAttribute("orient", "auto-start-reverse");
-      marker.setAttribute("markerUnits", "userSpaceOnUse");
-      const arrowPath = document.createElementNS(svgNS, "path");
-      arrowPath.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
-      arrowPath.setAttribute("fill", "context-stroke");
-      marker.appendChild(arrowPath);
-      defs.appendChild(marker);
-      svg.appendChild(defs);
-
-      for (let i = 0; i < centers.length - 1; i += 1) {
-        const a = centers[i];
-        const b = centers[i + 1];
-        const isLast = i === centers.length - 2;
-        const line = document.createElementNS(svgNS, "line");
-        line.setAttribute("x1", String(a.x));
-        line.setAttribute("y1", String(a.y));
-        if (isLast) {
-          // 终点回退 10px,让箭头落在最后一个节点圆点之前而不被其遮住
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const len = Math.hypot(dx, dy) || 1;
-          line.setAttribute("x2", String(b.x - (dx / len) * 10));
-          line.setAttribute("y2", String(b.y - (dy / len) * 10));
-          line.setAttribute("marker-end", "url(#twin-locate-arrow)");
-        } else {
-          line.setAttribute("x2", String(b.x));
-          line.setAttribute("y2", String(b.y));
-        }
-        line.setAttribute("class", "twin-locate-line");
-        line.dataset.segmentTo = String(i + 1);
-        svg.appendChild(line);
-      }
-
-      bypassList.forEach(({ from, to }) => {
-        const a = centers[from];
-        const b = centers[to];
-        if (!a || !b) return;
-        const midX = (a.x + b.x) / 2;
-        const dipY = Math.max(a.y, b.y) + 22;
-        const path = document.createElementNS(svgNS, "path");
-        path.setAttribute("d", `M ${a.x} ${a.y} Q ${midX} ${dipY} ${b.x} ${b.y}`);
-        path.setAttribute("class", "twin-locate-bypass");
-        svg.appendChild(path);
-      });
-
-      positionLocateHighlight();
     });
   }
 
@@ -2540,15 +2505,12 @@
     top.innerHTML = "";
     content.innerHTML = "";
 
-    const highlight = document.createElement("div");
-    highlight.className = "twin-locate-highlight";
-    top.appendChild(highlight);
+    // 关卡进度条外壳：一条整体轨道，所有分段挂在里面（一体化 ribbon）
+    const track = document.createElement("div");
+    track.className = "twin-locate-track";
+    top.appendChild(track);
 
-    const hover = document.createElement("div");
-    hover.className = "twin-locate-hover";
-    top.appendChild(hover);
-
-    // 展开出真正会渲染成节点的层,同时记下哪些节点前面夹了一个「分叉判定」(虚线连接)
+    // 展开出真正会渲染成分段的层,同时记下哪些层前面夹了一个「分叉判定」(该段加分叉标记)
     const contentSteps = [];
     const branchBeforeIndex = new Set();
     let sawBranch = false;
@@ -2564,30 +2526,29 @@
 
     contentSteps.forEach((step, index) => {
       const sectionId = `locate-section-${caseKey}-${index}`;
+      const isBranch = branchBeforeIndex.has(index);
 
-      const node = document.createElement("div");
-      node.className = "twin-locate-node" + (index === 0 ? " is-active" : "");
-      node.dataset.target = sectionId;
-      node.setAttribute("role", "button");
-      node.setAttribute("tabindex", "0");
-      node.innerHTML = `
-        <strong class="twin-locate-node-label">${step.label}</strong>
-        <small class="twin-locate-node-sub">${step.short || ""}</small>
-        <span class="twin-locate-node-dot-row"><span class="twin-locate-node-dot"></span></span>
+      const seg = document.createElement("div");
+      seg.className = "twin-locate-seg" + (index === 0 ? " is-active" : "") + (isBranch ? " is-branch" : "");
+      seg.dataset.target = sectionId;
+      seg.setAttribute("role", "button");
+      seg.setAttribute("tabindex", "0");
+      seg.setAttribute("title", step.label + (step.short ? " · " + step.short : ""));
+      seg.innerHTML = `
+        <span class="twin-locate-seg-label">${step.label}</span>
+        ${step.short ? `<span class="twin-locate-seg-sub">${step.short}</span>` : ""}
       `;
       const jumpToSection = () => {
         setActiveLocateNode(sectionId);
         document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
       };
-      node.addEventListener("click", jumpToSection);
-      node.addEventListener("mouseenter", () => positionLocateHover(node));
-      node.addEventListener("mouseleave", () => positionLocateHover(null));
-      node.addEventListener("keydown", (event) => {
+      seg.addEventListener("click", jumpToSection);
+      seg.addEventListener("keydown", (event) => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
         jumpToSection();
       });
-      top.appendChild(node);
+      track.appendChild(seg);
 
       const section = document.createElement("section");
       section.className = "twin-locate-section" + (index === 0 ? " is-active" : "");
@@ -2607,8 +2568,6 @@
       section.appendChild(bodyEl);
       content.appendChild(section);
     });
-
-    drawLocateTrackLines(top, contentSteps.length, branchBeforeIndex, chain.bypass || []);
 
     locateChainObserver?.disconnect();
     const root = $("runTwinLocateView");
@@ -2799,12 +2758,7 @@
       hotLabel: "GPU 3 & 4 带宽降级", warmLabel: "同节点其余 GPU 受影响",
       ppStage: 4, ppLabel: "PP stage 4↔5 跨 stage p2p 被拖慢",
     },
-    "perf-comm-straggler": {
-      node: null, hotRanks: [17, 23, 41],
-      label: "2048 GPU 全局 · rank 17/23/41 straggler",
-      hotLabel: "rank 17/23/41 负载 5×", warmLabel: "其余 61 EP rank 空等",
-      ppStage: null, ppLabel: "周期性尖峰 · CV=27%",
-    },
+
   };
 
   var PP_STAGE_COLORS = ["#3b82f6","#06b6d4","#10b981","#f59e0b","#f97316","#ef4444","#8b5cf6","#ec4899"];
@@ -3703,7 +3657,7 @@
     syncLayerViewCTALabel();
   }
 
-  // ── 问题六 Canvas 图表渲染 ──
+  // ── 问题三 Canvas 图表渲染 ──
   function dprCase6(canvas, cssW, cssH) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = cssW * dpr; canvas.height = cssH * dpr;
@@ -3960,7 +3914,7 @@
     if (caseKey === "low-precision-training") renderCase6AllCharts();
     if (caseKey === "hif8-precision" || caseKey === "qproj-overflow") {
       window.PtoHif8Case7?.renderAll();
-      // 问题二默认收起底部泳道图(ide-frame 底部 dock 开关,见 wzh_index.html 内联脚本)
+      // 问题二默认收起底部泳道图(ide-frame 底部 dock 开关,见 training-monitoring.html 内联脚本)
       window.PtoTrainingTwinTimelineDock?.setVisible(false);
     }
     // 问题二(qproj-overflow / hif8-precision):把表搬到整网图位置并隐藏整网图;其余问题则复位
@@ -4160,6 +4114,9 @@
     $("twinWorkArea")?.classList.remove("is-merged"); // 还原为两块独立面板
     $("runTwinLocateView").hidden = true;
     $("runTwinDefaultView").hidden = false;
+    // 退出问题详情(返回或再点一次问题卡片)时,整网图可能残留 panToProblemNodes 平移/缩放到的局部视图,
+    // 需恢复默认全局视图:等一帧让面板尺寸变化(is-merged 还原等)落地,再触发 resize→centerView 的 Fit 逻辑
+    requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
   }
 
   function toggleDiagnosisCard(card) {
@@ -4304,7 +4261,6 @@
       syncInfraCards(false);
       syncLocateMetricCharts(false);
       if (!document.getElementById("runTwinLocateView").hidden) renderCase6AllCharts();
-      if (_locateTrackArgs) drawLocateTrackLines(_locateTrackArgs.top, _locateTrackArgs.nodeCount, _locateTrackArgs.branchBeforeIndex, _locateTrackArgs.bypassList);
     });
     // 监控侧栏宽度改由 grid 的 minmax(420px, 0.4fr) 弹性伸缩(分辨率足够时占整网图列 40%),
     // 侧栏变宽不会触发 window resize,需单独观察侧栏尺寸变化重画图表,否则 SVG(height:auto)

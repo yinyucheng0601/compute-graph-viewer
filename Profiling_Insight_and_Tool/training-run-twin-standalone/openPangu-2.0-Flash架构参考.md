@@ -1,14 +1,11 @@
 # openPangu-2.0-Flash 架构参考（Sparse MLA + DSA/SWA + 256-Expert MoE）
 
-v 20260716 · 型号：**openPangu-2.0-Flash**（华为 ascend-tribe 开源）
+v 20260717 · 型号：**openPangu-2.0-Flash**（华为 ascend-tribe 开源）
 
 > **数据来源（source-verified）**：本文规格全部取自仓库内经源码/config 校验的 canonical schema
 > `model-architecture/openpangu-2.0-flash/outputs/model_architecture.json`
 > 与校验报告 `model_architecture_validation.md`（extract 自官方 `config.json` + `openPangu-2.0-Infer` 源码，commit `1676856`）。
 >
-> ⚠️ **命名务必区分**：本模型 **不是** Pangu Pro MoE 72B（arXiv 2505.21411，GQA + MoGE 64专家/8组）。
-> 那是另一个模型。二者在注意力机制、专家数、层数、hidden 维度上**全部不同**，切勿混用参数。
-> 见文末《与 Pangu Pro MoE 72B 的区别》。
 >
 > ⚠️ **未从本地取到的量（标记为「待补」）**：总参数量 / 激活参数量 / 训练数据量 / rope_theta 数值 / 训练精度 / routed_scaling_factor。
 > 本地 checkout 的 safetensors 是 Git LFS 指针文件，未下载全权重，故这些量本文不臆造。
@@ -117,46 +114,252 @@ Param Sink Token（原创）:
 每层注意力外包一层 **mHC Attention Branch → … → mHC Attention Merge**，`S_mhc=4` 表示 4 条流；
 schema 层面确认其存在与流数，内部语义（multi-head-Cache / multi-Head-Channel 等）本地资料未给全，暂不展开释义。
 
-## 3. 单层 MoE DecoderLayer（L2~L45 核心层）
+## 3. 典型 DecoderLayer Mermaid 图
+
+46 层 decoder 按 FFN 类型分为 **Dense（L0~L1）** 和 **MoE（L2~L45）** 两大类，注意力侧 DSA/SWA 混合由 `dsa_indexer` 节点的条件存在（"仅 DSA 层"）统一表达；MTP 模块（L46~48）复用 DecoderLayer 模板并追加额外投影。
+
+### 3.1 Dense DecoderLayer（L0~L1，2 层）
 
 ```mermaid
 graph TD
     INPUT["输入 hidden [T, 2560]"]
 
     subgraph ATTN["Sparse MLA Attention (N_h=48)"]
-        NORM1["input_layernorm · RMSNorm"]
-        QA["q_a_proj [2560→1024]"]
-        QC["q_causal_conv → q_a_norm"]
-        QB["q_b_proj [1024→48×192]"]
-        KVA["kv_a_proj [2560→512(+rope=576)]"]
-        KVC["kv_causal_conv → kv_a_norm"]
-        KVB["kv_b_proj (还原 K_nope/V)"]
-        ROPE["rope_apply (D_rope=64)"]
-        DSA["dsa_indexer (仅 DSA 层, 2048→24)"]
-        CORE["attention_core · Sparse FlashAttention"]
-        OP["o_causal_conv → o_proj [→2560]"]
+        NORM1["input_layernorm<br>[算子: RMSNorm]"]
+        QA["q_a_proj [2560→1024]<br>[算子: Linear]"]
+        QCV["q_causal_conv<br>[算子: Conv1D]"]
+        QRES["q_residual_add + q_a_norm<br>[算子: Add + RMSNorm]"]
+        QB["q_b_proj [1024→48×192]<br>[算子: Linear]"]
+        KVA["kv_a_proj [2560→576]<br>[算子: Linear]"]
+        KVCV["kv_causal_conv<br>[算子: Conv1D]"]
+        KVRES["kv_residual_add + kv_a_norm<br>[算子: Add + RMSNorm]"]
+        KVB["kv_b_proj · 还原 K_nope/V<br>[算子: Linear]"]
+        ROPE["rope_apply · D_rope=64<br>[算子: RoPE]"]
+        DSA["dsa_indexer · 2048→24<br>[算子: Indexer]<br>(仅 DSA 层)"]
+        CORE["attention_core<br>[算子: FlashAttention · Sparse]"]
+        OCV["o_causal_conv<br>[算子: Conv1D]"]
+        ORES["o_residual_add<br>[算子: Add]"]
+        OP["o_proj [→2560]<br>[算子: Linear]"]
     end
 
-    subgraph MOE["MoE FFN (256 experts, top-8, +1 shared)"]
-        NORM2["post_attention_norm / pre_mlp_norm"]
-        RG["router_gate"]
-        TOPK["route_topk · top-8 / 256"]
-        BANK["routed_expert_bank · 256 专家 (SwiGLU, I=1024)"]
-        SHARED["shared_expert_mlp · 1 共享 (始终激活)"]
-        COMB["moe_combine · shared + Σ(top8×gate)"]
+    subgraph DENSE["Dense FFN (SwiGLU, I=9216)"]
+        NORM2["post_attention_norm<br>[算子: RMSNorm]"]
+        NORM3["pre_mlp_norm<br>[算子: RMSNorm]"]
+        GU["dense_gate_up [2560→18432]<br>[算子: Linear]"]
+        SILU["dense_silu<br>[算子: SiLU · Multiply]"]
+        DOWN["dense_down [9216→2560]<br>[算子: Linear]"]
+        NORM4["post_mlp_norm<br>[算子: RMSNorm]"]
     end
 
     OUT["输出 hidden [T, 2560]"]
 
-    INPUT --> NORM1 --> QA --> QC --> QB --> CORE
-    NORM1 --> KVA --> KVC --> KVB --> ROPE --> CORE
-    DSA --> CORE --> OP -->|"+ 残差"| NORM2
-    NORM2 --> RG --> TOPK
-    TOPK -->|"select top-8"| BANK
-    NORM2 --> SHARED
-    BANK --> COMB
-    SHARED --> COMB -->|"+ 残差"| OUT
+    INPUT --> NORM1
+    NORM1 --> QA --> QCV --> QRES --> QB --> CORE
+    NORM1 --> KVA --> KVCV --> KVRES --> KVB --> ROPE --> CORE
+    DSA --> CORE
+    CORE --> OCV --> ORES --> OP
+    OP -->|"+ 残差"| NORM2
+    NORM2 --> NORM3
+    NORM3 --> GU --> SILU --> DOWN
+    DOWN -->|"+ 残差"| NORM4 --> OUT
 ```
+
+> L0 为 DSA 注意力（dsa_indexer 激活），L1 为 SWA 注意力（dsa_indexer 不激活）。两者 FFN 侧结构相同：无 router、无 expert，仅一个 Dense SwiGLU MLP。
+
+### 3.2 MoE DecoderLayer（L2~L45，44 层）
+
+```mermaid
+graph TD
+    INPUT["输入 hidden [T, 2560]"]
+
+    subgraph ATTN["Sparse MLA Attention (N_h=48)"]
+        NORM1["input_layernorm<br>[算子: RMSNorm]"]
+        QA["q_a_proj [2560→1024]<br>[算子: Linear]"]
+        QCV["q_causal_conv<br>[算子: Conv1D]"]
+        QRES["q_residual_add + q_a_norm<br>[算子: Add + RMSNorm]"]
+        QB["q_b_proj [1024→48×192]<br>[算子: Linear]"]
+        KVA["kv_a_proj [2560→576]<br>[算子: Linear]"]
+        KVCV["kv_causal_conv<br>[算子: Conv1D]"]
+        KVRES["kv_residual_add + kv_a_norm<br>[算子: Add + RMSNorm]"]
+        KVB["kv_b_proj · 还原 K_nope/V<br>[算子: Linear]"]
+        ROPE["rope_apply · D_rope=64<br>[算子: RoPE]"]
+        DSA["dsa_indexer · 2048→24<br>[算子: Indexer]<br>(仅 DSA 层)"]
+        CORE["attention_core<br>[算子: FlashAttention · Sparse]"]
+        OCV["o_causal_conv<br>[算子: Conv1D]"]
+        ORES["o_residual_add<br>[算子: Add]"]
+        OP["o_proj [→2560]<br>[算子: Linear]"]
+    end
+
+    subgraph MOE["MoE FFN (256 experts, top-8, +1 shared)"]
+        NORM2["post_attention_norm<br>[算子: RMSNorm]"]
+        NORM3["pre_mlp_norm<br>[算子: RMSNorm]"]
+        RG["router_gate · W_router=3<br>[算子: Linear]"]
+        TOPK["route_topk · top-8/256<br>[算子: TopK]"]
+        BANK["routed_expert_bank<br>[算子: 256× SwiGLU Expert]<br>gate_up[Linear]+SiLU+down[Linear]"]
+        SHARED["shared_expert_mlp<br>[算子: SwiGLU Shared]<br>gate_up[Linear]+SiLU+down[Linear]"]
+        COMB["moe_combine<br>[算子: Add · shared+Σ(top8×gate)]"]
+        NORM4["post_mlp_norm<br>[算子: RMSNorm]"]
+    end
+
+    OUT["输出 hidden [T, 2560]"]
+
+    INPUT --> NORM1
+    NORM1 --> QA --> QCV --> QRES --> QB --> CORE
+    NORM1 --> KVA --> KVCV --> KVRES --> KVB --> ROPE --> CORE
+    DSA --> CORE
+    CORE --> OCV --> ORES --> OP
+    OP -->|"+ 残差"| NORM2
+    NORM2 --> NORM3
+    NORM3 --> RG --> TOPK
+    TOPK -->|"select top-8"| BANK
+    NORM3 --> SHARED
+    BANK --> COMB
+    SHARED --> COMB
+    COMB -->|"+ 残差"| NORM4 --> OUT
+```
+
+> 44 层中 DSA 层 15 层（L3,6,9,…,42）、SWA 层 29 层（其余），区别仅在 dsa_indexer 是否激活。末层 L45 也是 DSA+MoE，同本图。
+
+### 3.3 MTP DecoderLayer（L46~48，3 层）
+
+```mermaid
+graph TD
+    MAIN["主 decoder 最后一层 hidden [T, 2560]"]
+
+    subgraph MTP["Multi Token Predictor (N_mtp=3)"]
+        NORM0["mtp_input_norm<br>[算子: RMSNorm]"]
+        EH["mtp_eh_proj [5120→2560]<br>[算子: Linear]"]
+        DEC["mtp_decoder_layer<br>[算子: 复用 DecoderLayer 模板]<br>(含 Attention ~16 算子 + FFN ~4~20 算子)"]
+        HEAD["mtp_shared_head [2560→151552]<br>[算子: Linear · 3 层共享]"]
+    end
+
+    LOGITS["mtp_logits<br>(额外预测后续 3 个 token)"]
+
+    MAIN --> NORM0 --> EH --> DEC --> HEAD --> LOGITS
+```
+
+> MTP 的 `mtp_decoder_layer` 与主 decoder 的 Dense/MoE DecoderLayer 结构一致（含 Sparse MLA Attention + FFN），区别在于：（1）输入是主 decoder 最后一层 hidden 与当前 MTP 层上一 token embedding 的拼接，经 `mtp_eh_proj` 融合；（2）输出走 `mtp_shared_head`（3 层共享）而非主 `lm_head`。
+
+### 3.4 L5 整网算子图（46 层展开到算子粒度）
+
+> 下图将整网展平到 **L5 · Operator** 粒度：每个方框是一个具体算子（Linear / RMSNorm / FlashAttention / SiLU / TopK / RoPE / Conv1D / Add / Embedding），按数据流串联。Dense 层（L0~L1）和 MoE 层（L2~L45）各展开一层为代表，其余同型层折叠为 `…`；MTP 层独立展开。
+
+```mermaid
+graph TD
+    %% ═══ 输入端 ═══
+    TOK["Token IDs\n[算子: Embedding]"]
+    EMB["token_embedding\n[算子: Embedding · VocabParallel]\nvocab 151552 → 2560"]
+
+    TOK --> EMB
+
+    %% ═══ Dense 层（L0~L1）═══
+    subgraph DENSE_LAYERS["Dense DecoderLayers (L0~L1, 2 层)"]
+        direction TB
+        subgraph L0_EXPAND["L0 · DSA + Dense（展开到算子）"]
+            direction TB
+            L0_IN["input_layernorm\n[算子: RMSNorm]"]
+            L0_QA["q_a_proj\n[算子: Linear · 2560→1024]"]
+            L0_QCV["q_causal_conv\n[算子: Conv1D]"]
+            L0_QADD["q_residual_add\n[算子: Add]"]
+            L0_QAN["q_a_norm\n[算子: RMSNorm]"]
+            L0_QB["q_b_proj\n[算子: Linear · 1024→9216]"]
+            L0_KVA["kv_a_proj\n[算子: Linear · 2560→576]"]
+            L0_KVCV["kv_causal_conv\n[算子: Conv1D]"]
+            L0_KVADD["kv_residual_add\n[算子: Add]"]
+            L0_KVAN["kv_a_norm\n[算子: RMSNorm]"]
+            L0_KVB["kv_b_proj\n[算子: Linear · 还原 K_nope/V]"]
+            L0_ROPE["rope_apply\n[算子: RoPE · D_rope=64]"]
+            L0_DSA["dsa_indexer\n[算子: Indexer · 2048→24]\n(仅 DSA 层)"]
+            L0_ATTN["attention_core\n[算子: FlashAttention · Sparse]"]
+            L0_OCV["o_causal_conv\n[算子: Conv1D]"]
+            L0_OADD["o_residual_add\n[算子: Add]"]
+            L0_OP["o_proj\n[算子: Linear · →2560]"]
+            L0_PAN["post_attention_norm\n[算子: RMSNorm]"]
+            L0_PMN["pre_mlp_norm\n[算子: RMSNorm]"]
+            L0_GU["dense_gate_up\n[算子: Linear · 2560→18432]"]
+            L0_SILU["dense_silu\n[算子: SiLU · Multiply]"]
+            L0_DOWN["dense_down\n[算子: Linear · 9216→2560]"]
+            L0_PON["post_mlp_norm\n[算子: RMSNorm]"]
+
+            L0_IN --> L0_QA --> L0_QCV --> L0_QADD --> L0_QAN --> L0_QB --> L0_ATTN
+            L0_IN --> L0_KVA --> L0_KVCV --> L0_KVADD --> L0_KVAN --> L0_KVB --> L0_ROPE --> L0_ATTN
+            L0_DSA --> L0_ATTN
+            L0_ATTN --> L0_OCV --> L0_OADD --> L0_OP --> L0_PAN --> L0_PMN
+            L0_PMN --> L0_GU --> L0_SILU --> L0_DOWN --> L0_PON
+        end
+        L1_FOLD["L1 · SWA + Dense\n（同 L0 结构，dsa_indexer 不激活）\n[含 16 个算子，同上]"]
+        L0_PON --> L1_FOLD
+    end
+
+    %% ═══ MoE 层（L2~L45）═══
+    subgraph MOE_LAYERS["MoE DecoderLayers (L2~L45, 44 层)"]
+        direction TB
+        L2_FOLD["L2~L37 …\n（36 层 DSA/SWA + MoE，每层 ~20 算子）\n[算子: RMSNorm ×4 + Linear ×8 + Conv1D ×3\n+ Add ×3 + RoPE + FlashAttention + Router + TopK\n+ gate_up/down ×256 专家 + SiLU + shared gate_up/down + SiLU]"]
+        subgraph L38_EXPAND["L38 · SWA + MoE（展开到算子）"]
+            direction TB
+            L38_IN["input_layernorm\n[算子: RMSNorm]"]
+            L38_QA["q_a_proj\n[算子: Linear · 2560→1024]"]
+            L38_QCV["q_causal_conv\n[算子: Conv1D]"]
+            L38_QADD["q_residual_add\n[算子: Add]"]
+            L38_QAN["q_a_norm\n[算子: RMSNorm]"]
+            L38_QB["q_b_proj\n[算子: Linear · 1024→9216]"]
+            L38_KVA["kv_a_proj\n[算子: Linear · 2560→576]"]
+            L38_KVCV["kv_causal_conv\n[算子: Conv1D]"]
+            L38_KVADD["kv_residual_add\n[算子: Add]"]
+            L38_KVAN["kv_a_norm\n[算子: RMSNorm]"]
+            L38_KVB["kv_b_proj\n[算子: Linear · 还原 K_nope/V]"]
+            L38_ROPE["rope_apply\n[算子: RoPE · D_rope=64]"]
+            L38_ATTN["attention_core\n[算子: FlashAttention · Sparse]"]
+            L38_OCV["o_causal_conv\n[算子: Conv1D]"]
+            L38_OADD["o_residual_add\n[算子: Add]"]
+            L38_OP["o_proj\n[算子: Linear · →2560]"]
+            L38_PAN["post_attention_norm\n[算子: RMSNorm]"]
+            L38_PMN["pre_mlp_norm\n[算子: RMSNorm]"]
+            L38_RG["router_gate\n[算子: Linear · W_router=3]"]
+            L38_TK["route_topk\n[算子: TopK · top-8/256]"]
+            L38_BANK["routed_expert_bank\n[算子: 256× SwiGLU Expert]\ngate_up[Linear 2560→2048]\nSiLU[Multiply]\ndown[Linear 1024→2560]"]
+            L38_SHARED["shared_expert_mlp\n[算子: SwiGLU Shared]\ngate_up[Linear 2560→2048]\nSiLU[Multiply]\ndown[Linear 1024→2560]"]
+            L38_COMB["moe_combine\n[算子: Add · shared+Σ(top8×gate)]"]
+            L38_PON["post_mlp_norm\n[算子: RMSNorm]"]
+
+            L38_IN --> L38_QA --> L38_QCV --> L38_QADD --> L38_QAN --> L38_QB --> L38_ATTN
+            L38_IN --> L38_KVA --> L38_KVCV --> L38_KVADD --> L38_KVAN --> L38_KVB --> L38_ROPE --> L38_ATTN
+            L38_ATTN --> L38_OCV --> L38_OADD --> L38_OP --> L38_PAN --> L38_PMN
+            L38_PMN --> L38_RG --> L38_TK --> L38_BANK
+            L38_PMN --> L38_SHARED
+            L38_BANK --> L38_COMB
+            L38_SHARED --> L38_COMB --> L38_PON
+        end
+        L39_FOLD["L39~L45 …\n（7 层 DSA/SWA + MoE，每层 ~20 算子）"]
+        L2_FOLD --> L38_PON --> L39_FOLD
+    end
+
+    %% ═══ 输出端 ═══
+    FN["final_norm\n[算子: RMSNorm]"]
+    LH["lm_head\n[算子: Linear · 2560→151552]"]
+    LOGITS["logits\n（主输出）"]
+
+    L39_FOLD --> FN --> LH --> LOGITS
+
+    %% ═══ MTP 模块 ═══
+    subgraph MTP_TAIL["MTP Module (L46~L48, 3 层)"]
+        direction TB
+        MTP_IN["mtp_input_norm\n[算子: RMSNorm]"]
+        MTP_EH["mtp_eh_proj\n[算子: Linear · 5120→2560]"]
+        MTP_DEC["mtp_decoder_layer\n[复用 DecoderLayer 模板]\n[算子: 同 MoE 层 ~20 算子]"]
+        MTP_HEAD["mtp_shared_head\n[算子: Linear · 2560→151552]\n(3 层共享)"]
+        MTP_OUT["mtp_logits\n（额外预测后续 3 token）"]
+
+        MTP_IN --> MTP_EH --> MTP_DEC --> MTP_HEAD --> MTP_OUT
+    end
+
+    %% ═══ 跨模块连线 ═══
+    EMB --> L0_IN
+    L1_FOLD --> L2_FOLD
+    L0_PON -.->|"主 decoder 末层 hidden"| MTP_IN
+```
+
+> **L5 算子统计**：主 decoder 共 46 层。Dense 层（L0~L1）每层 16 个算子（RMSNorm×4 + Linear×5 + Conv1D×3 + Add×3 + RoPE + FlashAttention + SiLU）；MoE 层（L2~L45）每层 ~20 个算子（上述 Attention 算子 + Router + TopK + 256×SwiGLU Expert 各 3 算子 + shared Expert 3 算子 + Combine）。总计约 **900+ 个算子节点**，Mermaid 图仅展开 L0 和 L38 为代表，其余折叠。
 
 ## 4. 关键参数（全部 source-verified）
 
@@ -191,26 +394,6 @@ graph TD
 5. **3 层 MTP**：多 token 预测，额外预测后续 3 个 token（Pro MoE 仅 1 层）。
 6. **多重 RMSNorm**：input / post-attention / pre-mlp / post-mlp / block-post / final 多处 RMSNorm。
 
-## 6. 与 Pangu Pro MoE 72B 的区别（防混淆）
-
-> 此前 `Pangu-2.0-flash架构参考.md`（旧文件）实际写的是 **Pangu Pro MoE 72B**，与本模型不是同一个。核对如下：
-
-| 维度 | **openPangu-2.0-Flash**（本文/source-verified） | Pangu Pro MoE 72B（arXiv 2505.21411） |
-|---|---|---|
-| 注意力 | **Sparse MLA + Causal Conv1D** | GQA 64Q/4KV |
-| DSA/SWA 混合 | ✅ 16 DSA / 30 SWA | ✗ |
-| hidden | **2560** | 4608 |
-| vocab | **151552** | 153600 |
-| 层数 | **46**（Dense 0-1 + MoE 2-45） | 48（Dense 0-3 + MoE 4-47） |
-| 路由专家 | **256** | 64（MoGE 8 组×8） |
-| 共享专家 | **1** | 4 |
-| top_k | 8 | 8（每组 1） |
-| MoGE 分组均衡 | **无** | ✅ 核心特性 |
-| MTP | **3** 层 | 1 层 |
-| 最大上下文 | **512K** | 128K |
-| 总参数/激活 | 待补 | 72B / 16.5B |
-
----
 
 ### 附：数据溯源
 - canonical schema：`model-architecture/openpangu-2.0-flash/outputs/model_architecture.json`（`schema_version: model_architecture.v1`）

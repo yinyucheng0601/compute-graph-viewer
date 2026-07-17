@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-07-17 — training-run-twin 入口文件更名 wzh_index.html → training-monitoring.html
+
+- 个人前缀文件名改为语义化英文名(「训练监控」→ training monitoring)，避免与仓库内其它 `index.html`/`train/training-run-twin.html` 混淆。同步更新 `launch.html`、`launch-v2.html` 的入口链接，`SKILL.md`、`training-run-twin.css`、`training-run-twin.js`、`MindStudioNext.html` 中引用该文件名的注释；`CHANGELOG.md` 历史条目与 `prompt.md` 提示词记录保持原文不改。
+
+## 2026-07-17 — training-run-twin 问题详情顶部定位链重构为「速度刃进度轨」
+
+- `wzh_index.html` / `js/training-run-twin.js` — 顶部定位链从「圆点+连线」彻底重构为异形、有速度感/力量感的一体化进度轨：每层=一片前倾的「刀锋」分段(skewX 斜切 + 圆角，内容逆 skew 保持直立)，段间为斜向缝隙；当前层最亮 + 斜向速度条纹 + 外发光并展开(层名/子标题竖排)。三态：已通过=定向渐变蓝刃 / 当前=最亮发光 / 未到达=暗刃。整条栏做扁(高 ~62px)、去掉层号序号、去掉右侧白炽前缘(远看似缺块)、去掉底部推进光带。移除旧的 SVG 连线/高亮/悬浮图层及 `drawLocateTrackLines`/`positionLocate*` 相关代码，`setActiveLocateNode` 按分段索引点亮 is-done/is-active，浅/深色主题自适应。
+
+## 2026-07-17 — training-run-twin 问题五补全定位链详情页
+- **问题五「算子带宽瓶颈 + AICPU 回退」定位链详情**(`Profiling_Insight_and_Tool/training-run-twin-standalone/js/training-run-twin.js` 的 `locateChains["perf-compute-bottleneck"]`):将原本只有节点标签的骨架链，按定位链文档「案例一」(计算分支下钻)补齐为六层完整详情——性能表征层(T_iter 12.1s/MFU 38%/PHS D KPI 卡)、瓶颈分类层分叉(step_trace 堆叠条 + PP stage 0~7 计算段条形图)、阶段定位层(stage 7 过载 1.82×)、算子定位层(`op_statistic` 算子表,lm_head cube_util 49% + CE loss AICPU 526ms)、执行效率层(Roofline memory-bound + CE 手写 5 段串行链)、代码/配置层(lm_head tiling 调优 + `F.cross_entropy` 融合 + BF16 优化器 + 验证表)。内容为纯 HTML/CSS(复用其它问题的表格/代码 diff/metric-note 视觉),经现有 `content` innerHTML 渲染路径直出,无需新增 canvas JS。同步把整网图 lm_head 节点副标题的过时 `vocab 129280` 更正为 `151552`,与页面「训练信息」及架构参考一致。
+
 ## 2026-07-16 — openPangu Swimlane 事件详情信息收口
 - **按事件类型呈现悬浮详情**(`pangu-moe-trainviz/op-rank-time-openpangu-flash-events.html`):计算区间只显示层范围、时间与对应 activation/gradient 摘要；通信事件只显示 Tensor、通信算子和 Active/Wait/Exposed；Activation 保留区间只显示保留时长与显存，不再把无关指标堆进同一张悬浮卡。
 - **Profiling 下钻产品化**:展开区改为“模型算子 / 设备 Kernel / 集合通信”三层，头部只保留 MB、PP、阶段、事件计数与局部时间；Inspector 和 hover 统一使用所属阶段、阶段内时间、模型路径、关联 ID 等用户语义。可见界面不再暴露 `mock profile JSON`、fidelity 枚举、测试目的或点击操作说明，仅以“内置示例 Trace · 局部事件覆盖”标明数据属性。
