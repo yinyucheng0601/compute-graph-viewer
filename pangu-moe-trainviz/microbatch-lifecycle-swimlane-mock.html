@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MB07 微批次生命周期泳道</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="./vendor/swimlane-task/pattern.css">
+  <style>
+    :root {
+      --viz-forward: var(--primary);
+      --viz-backward: var(--danger);
+      --viz-wait: var(--foreground-muted);
+      --viz-comm: var(--success);
+      --viz-hold: var(--highlight-l0a-violet-source);
+      --viz-memory: var(--warning);
+      --viz-release: var(--ark-green-500);
+      --viz-grid: var(--border-subtle);
+      --hierarchy-popover-width: 360px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body {
+      margin: 0;
+      display: grid;
+      grid-template-rows: var(--comp-toolbar-height) minmax(0, 1fr) 24px;
+      min-width: 1120px;
+      min-height: 720px;
+      overflow: hidden;
+      place-items: stretch;
+      background: var(--background);
+      color: var(--foreground);
+      font: var(--text-body-sm);
+    }
+
+    button, input { font: inherit; }
+    .toolbar {
+      min-width: 0;
+      background: transparent;
+    }
+    .toolbar-logo strong { color: var(--foreground); }
+    .toolbar-logo span { color: var(--foreground-muted); font: var(--text-mono); }
+    .toolbar-r { min-width: 0; }
+    .source-note {
+      max-width: 340px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+
+    .segmented {
+      display: inline-flex;
+      gap: var(--segmented-control-gap);
+      padding: var(--segmented-control-padding);
+      border: 1px solid var(--segmented-control-border);
+      border-radius: var(--segmented-control-radius);
+      background: var(--segmented-control-bg);
+    }
+    .segmented button,
+    .chip {
+      min-height: var(--button-height-sm);
+      padding: 0 var(--button-padding-x-sm);
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--foreground-secondary);
+      cursor: pointer;
+      font: var(--button-font);
+    }
+    .segmented button:hover, .chip:hover { background: var(--state-hover); color: var(--foreground); }
+    .segmented button[aria-pressed="true"], .chip[aria-pressed="true"] {
+      background: var(--state-selected);
+      color: var(--foreground);
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pane { min-width: 0; min-height: 0; background: var(--ide-frame-pane-bg); }
+    .pane + .pane { border-left: 1px solid var(--ide-frame-pane-border); }
+    .pane__header {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding: 0 var(--space-3);
+      border-bottom: 1px solid var(--ide-frame-pane-border);
+      background: transparent;
+    }
+    .pane__title { min-width: 0; font: var(--ide-frame-title-font); color: var(--foreground); }
+    .pane__meta { color: var(--foreground-muted); font: var(--ide-frame-meta-font); white-space: nowrap; }
+    .pane__body { min-height: 0; height: calc(100% - 42px); overflow: auto; }
+
+    .tree-tools { padding: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+    .tree-search {
+      width: 100%; height: var(--input-height-md); padding: 0 var(--space-3);
+      border: 1px solid var(--input-border); border-radius: var(--input-radius);
+      outline: 0; background: var(--input-bg); color: var(--foreground); font: var(--text-body-sm);
+    }
+    .tree-search:focus { box-shadow: 0 0 0 3px var(--focus-ring); }
+    .tree { padding: var(--space-2); }
+    .tree details { margin: 0; }
+    .tree summary, .tree button {
+      width: 100%; min-height: 28px; border: 0; border-radius: var(--radius-sm);
+      background: transparent; color: var(--foreground-secondary); text-align: left; cursor: pointer;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tree summary { display: flex; align-items: center; padding: 0 var(--space-2); font-weight: var(--font-weight-semibold); }
+    .tree summary:hover, .tree button:hover { background: var(--state-hover); color: var(--foreground); }
+    .tree button { padding: 0 var(--space-2) 0 calc(var(--space-2) + var(--depth, 0) * 14px); font: var(--text-label); }
+    .tree button.is-selected { background: var(--state-selected); color: var(--foreground); }
+    .tree button small { color: var(--foreground-muted); font: var(--text-label); }
+
+    .timeline-pane { display: grid; grid-template-rows: 42px minmax(0, 1fr) 38px; }
+    .timeline-pane .pane__header { height: 42px; }
+    .timeline-toolbar { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+    .timeline-toolbar .segmented button { min-height: 26px; }
+    .timeline-actions { display: flex; align-items: center; gap: var(--space-2); }
+    .zoom-control-readout { min-width: 44px; }
+    .info-icon { font-weight: var(--font-weight-bold); }
+    .timeline-scroll {
+      position: relative;
+      min-height: 0;
+      overflow: auto;
+      background: var(--background);
+    }
+    #timelineCanvas { display: block; cursor: crosshair; }
+    .timeline-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: 0 var(--space-3);
+      border-top: 1px solid var(--border-subtle);
+      background: var(--surface-2);
+      color: var(--foreground-muted);
+      font: var(--text-label);
+    }
+    .legend { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .legend i { width: 9px; height: 9px; border-radius: 2px; background: var(--legend-color); }
+    .legend i.is-flow {
+      background-color: var(--legend-color);
+      background-repeat: repeat-x;
+      background-size: 5px 100%;
+    }
+    .legend i.is-flow.is-forward {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 9'%3E%3Cpath d='M.5 0 L4.5 4.5 L.5 9' fill='none' stroke='white' stroke-width='.55' stroke-linejoin='miter' opacity='.34'/%3E%3C/svg%3E");
+    }
+    .legend i.is-flow.is-backward {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 9'%3E%3Cpath d='M4.5 0 L.5 4.5 L4.5 9' fill='none' stroke='white' stroke-width='.55' stroke-linejoin='miter' opacity='.34'/%3E%3C/svg%3E");
+    }
+    .legend i.is-hold {
+      position: relative;
+      width: 20px;
+      height: 9px;
+      border: 1px solid var(--viz-hold);
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--viz-hold) 22%, transparent);
+    }
+    .legend i.is-hold::before,
+    .legend i.is-hold::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 5px;
+      height: 5px;
+      transform: translateY(-50%) rotate(45deg);
+    }
+    .legend i.is-hold::before { left: -3px; background: var(--viz-hold); }
+    .legend i.is-hold::after { right: -3px; background: var(--viz-release); }
+
+    .hierarchy-popover {
+      position: fixed;
+      z-index: var(--z-popover, 1100);
+      width: var(--hierarchy-popover-width);
+      max-height: min(680px, calc(100vh - 96px));
+      display: grid;
+      grid-template-rows: 42px auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      border-radius: var(--card-radius);
+      background: var(--card-bg);
+      box-shadow: var(--shadow-popover, 0 18px 48px rgba(0,0,0,.32));
+    }
+    .hierarchy-popover[hidden] { display: none; }
+    .hierarchy-popover__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding: 0 var(--space-3);
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--surface-2);
+    }
+    .hierarchy-popover__title { color: var(--foreground); font: var(--ide-frame-title-font); }
+    .hierarchy-popover__close { min-width: 28px; }
+    .hierarchy-popover .tree { min-height: 0; overflow: auto; }
+    .statusbar {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+      padding: 0 var(--space-3); border-top: 1px solid var(--border-subtle);
+      background: var(--surface-2); color: var(--foreground-muted); font: var(--text-label);
+    }
+    .statusbar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .pto-swimlane-task-tooltip { position: fixed; z-index: var(--z-overlay); }
+
+  </style>
+</head>
+<body>
+  <header class="toolbar" aria-label="微批次生命周期分析工具栏">
+    <div class="toolbar-l">
+      <div class="toolbar-logo"><strong>MB07 生命周期</strong><span>Step 18420</span></div>
+      <div class="segmented" id="rangeToggle" role="group" aria-label="选择时间范围">
+        <button type="button" data-range="global" aria-pressed="true" title="查看 MB07 从 PP0 前向到 PP0 反向完成的完整链路">训练步全貌</button>
+        <button type="button" data-range="pp2" aria-pressed="false" title="聚焦 PP2 的等待、计算、通信和激活驻留">PP2 生命周期</button>
+        <button type="button" data-range="l34" aria-pressed="false" title="聚焦 L34 模块和保存激活对象的生产/消费关系">L34 对象链</button>
+      </div>
+    </div>
+    <div class="toolbar-r">
+      <span class="source-note" title="PP2 指标来自 docs/research/microbatch_data.md；其他 PP 使用代表性对象样例补全层级">PP2 数据源 · microbatch_data.md · 其他 PP 为结构化样例</span>
+      <button class="btn btn-sm" id="themeToggle" type="button">浅色</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="pane timeline-pane">
+      <header class="pane__header">
+        <div class="timeline-toolbar">
+          <span class="pane__title">生命周期泳道</span>
+        </div>
+        <div class="timeline-actions zoom-control-group">
+          <button class="btn btn-sm btn-icon" id="zoomOut" type="button" aria-label="缩小">−</button>
+          <output class="zoom-control-readout" id="zoomValue">1.0×</output>
+          <button class="btn btn-sm btn-icon" id="zoomIn" type="button" aria-label="放大">+</button>
+          <button class="btn btn-sm btn-icon info-icon" id="objectInfoBtn" type="button" aria-label="查看对象层级" aria-expanded="false">i</button>
+        </div>
+      </header>
+      <div class="timeline-scroll" id="timelineScroll">
+        <canvas id="timelineCanvas" aria-label="MB07 微批次生命周期泳道"></canvas>
+      </div>
+      <footer class="timeline-footer">
+        <div class="legend">
+          <span title="前向计算产生激活；泳道底纹与条内箭头均指向右侧"><i class="is-flow is-forward" style="--legend-color:var(--viz-forward)"></i>前向计算</span>
+          <span title="反向计算消费保存激活并产生梯度；泳道底纹与条内箭头均指向左侧"><i class="is-flow is-backward" style="--legend-color:var(--viz-backward)"></i>反向计算</span>
+          <span title="等待上游激活或下游梯度，属于 pipeline 依赖，不等同于数值异常"><i style="--legend-color:var(--viz-wait)"></i>依赖等待</span>
+          <span title="PP stage 之间的 activation / gradient send-recv 事务"><i style="--legend-color:var(--viz-comm)"></i>通信事务</span>
+          <span title="半透明紫色带表示保存激活的生命周期；紫色左端是前向保存，绿色右端是反向消费并释放"><i class="is-hold"></i>激活驻留</span>
+        </div>
+        <span id="rangeMeta">0.00–315.61 ms · MB07 完整链路</span>
+      </footer>
+    </section>
+  </main>
+
+  <section class="hierarchy-popover" id="hierarchyPopover" hidden aria-label="对象层级面板">
+    <header class="hierarchy-popover__header">
+      <span class="hierarchy-popover__title">对象层级</span>
+      <button class="btn btn-sm btn-icon hierarchy-popover__close" id="hierarchyClose" type="button" aria-label="关闭对象层级">×</button>
+    </header>
+    <div class="tree-tools"><input class="tree-search" id="treeSearch" type="search" placeholder="搜索 PP、L34、hidden_states、grad"></div>
+    <nav class="tree" id="objectTree" aria-label="微批次对象层级"></nav>
+  </section>
+
+  <footer class="statusbar">
+    <span id="statusText">点击任意泳道事件，查看它的依赖、数据对象和通信事务</span>
+    <span>PP2 保留原始结论与指标 · 其他 PP 为层级展示样例</span>
+  </footer>
+
+  <script src="./vendor/swimlane-task/pattern.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const COLORS = {
+        summary: '#38bdf8', forward: '#4369ef', backward: '#ff4b7b', wait: '#737373', comm: '#04d793',
+        hold: '#a855f7', memory: '#ffaa3b', release: '#87c80f', loss: '#f97316'
+      };
+
+      const stageEvents = [
+        event('pp0-fwd', 'PP0 · L0–L11', '前向计算 · 低层块', 'forward', 0, 31.80, { stage: 'PP0', layers: 'L0–L11', flops: '—' }),
+        event('tx-pp0-pp1-fwd', 'PP0 → PP1', '激活传输 · L11 输出', 'comm', 31.80, 34.25, { transactionId: 'P2P-MB07-PP0-PP1-FWD', tensor: 'hidden_states_L11_out', payload: '128 MiB', bandwidth: '52.2 GB/s' }),
+        event('pp1-fwd', 'PP1 · L12–L22', '前向计算 · 中低层块', 'forward', 34.25, 63.65, { stage: 'PP1', layers: 'L12–L22' }),
+        event('tx-pp1-pp2-fwd', 'PP1 → PP2', '激活传输 · L22 输出', 'comm', 63.65, 66.18, { transactionId: 'P2P-MB07-PP1-PP2-FWD', tensor: 'hidden_states_L22_out', payload: '128 MiB', bandwidth: '50.6 GB/s', wait: '0.31 ms' }),
+        event('pp2-fwd', 'PP2 · L23–L34', '前向计算 · PP2 层段', 'forward', 66.18, 99.78, { stage: 'PP2', layers: 'L23–L34', flops: '71.4 TFLOPs', throughput: '2.13 PFLOP/s', activation: '1.56 GiB' }),
+        event('tx-pp2-pp3-fwd', 'PP2 → PP3', '激活传输 · L34 输出', 'comm', 99.78, 102.36, { transactionId: 'P2P-MB07-PP2-PP3-FWD', tensor: 'hidden_states_L34_out', payload: '128 MiB', bandwidth: '49.6 GB/s', wait: '0.46 ms', status: '轻微等待' }),
+        event('pp3-fwd', 'PP3 · L35–L45', '前向计算 · 高层块', 'forward', 102.36, 133.56, { stage: 'PP3', layers: 'L35–L45' }),
+        event('loss', 'PP3 · Loss', 'Loss 计算', 'loss', 133.56, 135.06, { loss: '8.742' }),
+        event('pp3-bwd', 'PP3 · L45–L35', '反向计算 · 高层块', 'backward', 135.06, 177.86, { stage: 'PP3', layers: 'L45–L35' }),
+        event('tx-pp3-pp2-bwd', 'PP3 → PP2', '梯度传输 · dH34', 'comm', 177.86, 180.57, { transactionId: 'P2P-MB07-PP3-PP2-BWD', tensor: 'grad_hidden_L34_out', payload: '128 MiB', bandwidth: '47.2 GB/s', wait: '0.55 ms' }),
+        event('pp2-bwd', 'PP2 · L34–L23', '反向计算 · PP2 层段', 'backward', 180.57, 226.47, { stage: 'PP2', layers: 'L34–L23', inputGradAmax: '0.091', outputGradAmax: '0.124', released: '1.56 GiB' }),
+        event('tx-pp2-pp1-bwd', 'PP2 → PP1', '梯度传输 · dH22', 'comm', 226.47, 229.14, { transactionId: 'P2P-MB07-PP2-PP1-BWD', tensor: 'grad_hidden_L22_out', payload: '128 MiB', bandwidth: '47.9 GB/s', wait: '0.37 ms' }),
+        event('pp1-bwd', 'PP1 · L22–L12', '反向计算 · 中低层块', 'backward', 229.14, 269.44, { stage: 'PP1', layers: 'L22–L12' }),
+        event('tx-pp1-pp0-bwd', 'PP1 → PP0', '梯度传输 · dH11', 'comm', 269.44, 272.01, { transactionId: 'P2P-MB07-PP1-PP0-BWD', tensor: 'grad_hidden_L11_out', payload: '128 MiB', bandwidth: '49.8 GB/s', wait: '0.22 ms' }),
+        event('pp0-bwd', 'PP0 · L11–L0', '反向计算 · 低层块', 'backward', 272.01, 315.61, { stage: 'PP0', layers: 'L11–L0' })
+      ];
+
+      const pp2Lifecycle = [
+        event('pp2-wait-act', 'PP2 生命周期', '等待上游激活', 'wait', 47.81, 66.18, { upstream: 'PP1', recvPosted: '47.81 ms', firstByte: '63.82 ms', reason: 'PP1 前向尚未完成', actualIdle: '—' }),
+        event('pp2-life-fwd', 'PP2 生命周期', '前向执行 · L23–L34', 'forward', 66.18, 99.78, { kernels: '486', utilization: '68.4%', peakMemory: '42.8 GiB' }),
+        event('pp2-life-send-act', 'PP2 生命周期', '发送 L34 激活到 PP3', 'comm', 99.78, 102.36, { transactionId: 'P2P-MB07-PP2-PP3-FWD', queue: '0.46 ms', transfer: '1.94 ms', runtime: '0.18 ms' }),
+        event('pp2-wait-grad', 'PP2 生命周期', '等待下游激活梯度', 'wait', 102.36, 180.57, { tensor: 'grad_hidden_L34_out', logicalWait: '78.21 ms', actualIdle: '1.86 ms', overlap: '97.6%', reason: '预期内的 pipeline 依赖' }),
+        event('pp2-life-bwd', 'PP2 生命周期', '反向执行 · L34–L23', 'backward', 180.57, 226.47, { weightGradient: '19.8 ms', inputGradient: '16.7 ms', tpComm: '6.4 ms', recomputation: '3.0 ms' }),
+        event('pp2-life-send-grad', 'PP2 生命周期', '发送 dH22 到 PP1', 'comm', 226.47, 229.14, { transactionId: 'P2P-MB07-PP2-PP1-BWD', queue: '0.37 ms', transfer: '2.08 ms', runtime: '0.22 ms' }),
+        event('pp2-hold-total', 'PP2 保存激活', '保存激活驻留 · 1.56 GiB', 'hold', 99.78, 180.57, { sampledTensors: '62', original: '2.74 GiB', checkpointed: '1.56 GiB', recomputed: '1.18 GiB', memoryShare: '3.64%' })
+      ];
+
+      const commEvents = [
+        event('comm-in-act-wait', '接收激活 · PP1→PP2', '接收端等待发送端就绪', 'wait', 47.81, 63.65, { transactionId: 'P2P-MB07-PP1-PP2-FWD', endpoint: '接收端', tensor: 'hidden_states_L22_out' }),
+        event('comm-in-act-transfer', '接收激活 · PP1→PP2', 'L22 激活到达 PP2', 'comm', 63.65, 66.18, { transactionId: 'P2P-MB07-PP1-PP2-FWD', recvPosted: '47.81 ms', sendPosted: '63.65 ms', firstByte: '63.82 ms', recvComplete: '66.18 ms', payload: '128 MiB' }),
+        event('comm-out-act', '发送激活 · PP2→PP3', 'L34 激活发送到 PP3', 'comm', 99.78, 102.36, { transactionId: 'P2P-MB07-PP2-PP3-FWD', tensor: 'hidden_states_L34_out', shape: '[2,4096,8192]', dtype: 'BF16', queue: '0.46 ms', transfer: '1.94 ms', runtime: '0.18 ms', bandwidth: '66.0 GiB/s' }),
+        event('comm-in-grad', '接收梯度 · PP3→PP2', 'dH34 从 PP3 返回', 'comm', 177.86, 180.57, { transactionId: 'P2P-MB07-PP3-PP2-BWD', tensor: 'grad_hidden_L34_out', meaning: '∂Loss/∂h34', payload: '128 MiB', bandwidth: '47.2 GB/s' }),
+        event('comm-out-grad', '发送梯度 · PP2→PP1', 'dH22 发送到 PP1', 'comm', 226.47, 229.14, { transactionId: 'P2P-MB07-PP2-PP1-BWD', tensor: 'grad_hidden_L22_out', meaning: '∂Loss/∂h22', queue: '0.37 ms', transfer: '2.08 ms', runtime: '0.22 ms', bandwidth: '61.5 GiB/s' })
+      ];
+
+      const l34Forward = sequence('l34-fwd', 'L34 前向模块', 96.72, 'forward', [
+        ['输入 RMSNorm', .11, { outputAmax: '4.82', saved: '64 MiB' }],
+        ['Attention 主体', 1.21, { outputAmax: '8.74', saved: '148 MiB' }],
+        ['残差合并 1', .08, { outputAmax: '10.61', saved: '128 MiB' }],
+        ['FFN 前 RMSNorm', .10, { outputAmax: '4.95', saved: '64 MiB' }],
+        ['FFN 主体', 1.39, { outputAmax: '9.76', saved: '196 MiB' }],
+        ['残差合并 2', .09, { outputAmax: '12.41', saved: '128 MiB' }],
+        ['层输出交接', .08, { outputAmax: '12.41', saved: '—' }]
+      ]);
+
+      const l34Backward = sequence('l34-bwd', 'L34 反向模块', 180.57, 'backward', [
+        ['残差合并 2 反向', .10, { inputGradAmax: '0.091', outputGradAmax: '0.091', released: '128 MiB' }],
+        ['FFN 反向', 1.87, { inputGradAmax: '0.091', outputGradAmax: '0.097', released: '196 MiB' }],
+        ['FFN 前 RMSNorm 反向', .16, { inputGradAmax: '0.097', outputGradAmax: '0.095', released: '64 MiB' }],
+        ['残差合并 1 反向', .11, { inputGradAmax: '0.095', outputGradAmax: '0.101', released: '128 MiB' }],
+        ['Attention 反向', 1.74, { inputGradAmax: '0.101', outputGradAmax: '0.106', released: '148 MiB' }],
+        ['输入 RMSNorm 反向', .17, { inputGradAmax: '0.106', outputGradAmax: '0.104', released: '64 MiB' }]
+      ]);
+
+      const tensorEvents = [
+        tensor('tensor-stage-output', '阶段输出 · hidden_states_L34_out', 99.70, 180.67, '128 MiB', '残差合并 2', '残差合并 2 反向', { amax: '12.41', mean: '0.011', std: '1.19', p99: '3.84' }),
+        tensor('tensor-ffn-input', 'L34 · FFN 输入激活', 98.22, 182.54, '196 MiB', 'FFN 前 RMSNorm', 'FFN 反向', { amax: '4.95', nonFinite: '0' }),
+        tensor('tensor-residual-2', 'L34 · 残差合并 2 输入', 99.61, 180.67, '128 MiB', 'FFN 主体', '残差合并 2 反向', { amax: '9.76', nonFinite: '0' }),
+        tensor('tensor-attn-context', 'L34 · Attention 上下文', 96.83, 184.55, '148 MiB', 'Attention 主体', 'Attention 反向', { amax: '8.74', nonFinite: '0' }),
+        tensor('tensor-layer-input', 'L34 · 层输入残差', 96.72, 184.72, '64 MiB', 'L33 输出', '输入 RMSNorm 反向', { amax: '11.57', nonFinite: '0' })
+      ];
+
+      const pp0TensorEvents = [
+        tensor('pp0-tensor-stage-output', '阶段输出 · hidden_states_L11_out', 31.70, 272.05, '128 MiB', 'L11 残差合并', 'L11 反向', { evidence: '结构化样例' }),
+        tensor('pp0-tensor-embedding-output', 'Embedding · token_embedding_out', 4.80, 310.40, '96 MiB', 'Token Embedding', 'Embedding 反向', { evidence: '结构化样例' }),
+        tensor('pp0-tensor-l8-ffn-input', 'L8 · FFN 输入激活', 21.15, 287.10, '192 MiB', 'L8 FFN 前 RMSNorm', 'L8 FFN 反向', { evidence: '结构化样例' })
+      ];
+
+      const pp1TensorEvents = [
+        tensor('pp1-tensor-stage-output', '阶段输出 · hidden_states_L22_out', 63.55, 229.19, '128 MiB', 'L22 残差合并', 'L22 反向', { evidence: '结构化样例' }),
+        tensor('pp1-tensor-l22-ffn-input', 'L22 · FFN 输入激活', 61.90, 231.50, '192 MiB', 'L22 FFN 前 RMSNorm', 'L22 FFN 反向', { evidence: '结构化样例' }),
+        tensor('pp1-tensor-l16-attn-context', 'L16 · Attention 上下文', 45.42, 253.60, '148 MiB', 'L16 Attention', 'L16 Attention 反向', { evidence: '结构化样例' })
+      ];
+
+      const pp3TensorEvents = [
+        tensor('pp3-tensor-loss-input', 'Loss · logits 输入', 133.32, 135.10, '64 MiB', 'LM Head', 'Loss 反向', { evidence: '结构化样例' }),
+        tensor('pp3-tensor-stage-output', '阶段输出 · hidden_states_L45_out', 133.45, 149.32, '128 MiB', 'L45 残差合并', 'L45 反向', { evidence: '结构化样例' }),
+        tensor('pp3-tensor-l39-ffn-input', 'L39 · FFN 输入激活', 113.80, 164.10, '196 MiB', 'L39 FFN 前 RMSNorm', 'L39 FFN 反向', { evidence: '结构化样例' })
+      ];
+
+      const pp0ForwardDetail = sequence('pp0-detail-fwd', 'PP0 前向细分', 0.00, 'forward', [
+        ['Embedding + L0–L3', 10.40, { layers: 'L0–L3', activation: '384 MiB' }],
+        ['L4–L7 Decoder', 10.80, { layers: 'L4–L7', activation: '512 MiB' }],
+        ['L8–L11 Decoder', 10.60, { layers: 'L8–L11', activation: '524 MiB' }]
+      ]);
+      const pp0BackwardDetail = sequence('pp0-detail-bwd', 'PP0 反向细分', 272.01, 'backward', [
+        ['L11–L8 反向', 14.50, { layers: 'L11–L8', released: '524 MiB' }],
+        ['L7–L4 反向', 14.10, { layers: 'L7–L4', released: '512 MiB' }],
+        ['L3–L0 + Emb 反向', 15.00, { layers: 'L3–L0', released: '384 MiB' }]
+      ]);
+      const pp1ForwardDetail = sequence('pp1-detail-fwd', 'PP1 前向细分', 34.25, 'forward', [
+        ['L12–L15 Decoder', 9.80, { layers: 'L12–L15', activation: '520 MiB' }],
+        ['L16–L19 Decoder', 9.60, { layers: 'L16–L19', activation: '516 MiB' }],
+        ['L20–L22 Decoder', 10.00, { layers: 'L20–L22', activation: '444 MiB' }]
+      ]);
+      const pp1BackwardDetail = sequence('pp1-detail-bwd', 'PP1 反向细分', 229.14, 'backward', [
+        ['L22–L20 反向', 13.20, { layers: 'L22–L20', released: '444 MiB' }],
+        ['L19–L16 反向', 13.50, { layers: 'L19–L16', released: '516 MiB' }],
+        ['L15–L12 反向', 13.60, { layers: 'L15–L12', released: '520 MiB' }]
+      ]);
+      const pp3ForwardDetail = sequence('pp3-detail-fwd', 'PP3 前向细分', 102.36, 'forward', [
+        ['L35–L38 Decoder', 10.60, { layers: 'L35–L38', activation: '492 MiB' }],
+        ['L39–L42 Decoder', 10.40, { layers: 'L39–L42', activation: '504 MiB' }],
+        ['L43–L45 + Loss 输入', 10.20, { layers: 'L43–L45', activation: '416 MiB' }]
+      ]);
+      const pp3BackwardDetail = sequence('pp3-detail-bwd', 'PP3 反向细分', 135.06, 'backward', [
+        ['Loss + L45–L43 反向', 14.20, { layers: 'L45–L43', released: '416 MiB' }],
+        ['L42–L39 反向', 14.40, { layers: 'L42–L39', released: '504 MiB' }],
+        ['L38–L35 反向', 14.20, { layers: 'L38–L35', released: '492 MiB' }]
+      ]);
+      const ppHoldEvents = [
+        event('pp0-hold-total', 'PP0 保存激活', '保存激活驻留 · 1.42 GiB', 'hold', 31.80, 272.01, { sampledTensors: '48', checkpointed: '1.42 GiB', memoryShare: '3.31%', producer: 'PP0 前向', consumer: 'PP0 反向', evidence: '结构化样例' }),
+        event('pp1-hold-total', 'PP1 保存激活', '保存激活驻留 · 1.48 GiB', 'hold', 63.65, 229.14, { sampledTensors: '53', checkpointed: '1.48 GiB', memoryShare: '3.45%', producer: 'PP1 前向', consumer: 'PP1 反向', evidence: '结构化样例' }),
+        event('pp3-hold-total', 'PP3 保存激活', '保存激活驻留 · 1.33 GiB', 'hold', 133.56, 135.06, { sampledTensors: '45', checkpointed: '1.33 GiB', memoryShare: '3.10%', producer: 'PP3 前向', consumer: 'PP3 反向', evidence: '结构化样例' })
+      ];
+
+      const mbTotalEvent = event('mb07-total', 'MB07 · Step 18420', '完整训练链路 · 315.61 ms', 'summary', 0, 315.61, {
+        microbatch: 'MB07', schedule: '1F1B', stages: 'PP0–PP3', layers: 'L0–L45'
+      });
+      function stageEventsById(ids) {
+        return ids.map(id => stageEvents.find(item => item.id === id)).filter(Boolean);
+      }
+
+      const rows = [
+        row('overview', 'MB07 · 完整链路', [mbTotalEvent], 'overview', { depth: 0 }),
+        row('pp0-stage', 'PP0 · L0–L11 生命周期', stageEventsById(['pp0-fwd', 'tx-pp0-pp1-fwd', 'tx-pp1-pp0-bwd', 'pp0-bwd']), 'overview', { depth: 1, parentRow: 'overview' }),
+        row('pp0-forward', 'PP0 · 前向模块链', pp0ForwardDetail, 'layer', { depth: 2, parentRow: 'pp0-stage' }),
+        row('pp0-comm', 'PP0 · 激活发送 / 梯度接收', stageEventsById(['tx-pp0-pp1-fwd', 'tx-pp1-pp0-bwd']), 'overview', { depth: 2, parentRow: 'pp0-stage' }),
+        row('pp0-hold', 'PP0 · 保存激活驻留', ppHoldEvents.filter(item => item.id === 'pp0-hold-total'), 'overview', { depth: 2, parentRow: 'pp0-stage' }),
+        ...pp0TensorEvents.map(item => row(item.id, objectLaneLabel(item), [item], 'object', { depth: 3, parentRow: 'pp0-hold' })),
+        row('pp0-backward', 'PP0 · 反向模块链', pp0BackwardDetail, 'layer', { depth: 2, parentRow: 'pp0-stage' }),
+        row('pp1-stage', 'PP1 · L12–L22 生命周期', stageEventsById(['pp1-fwd', 'tx-pp1-pp2-fwd', 'tx-pp2-pp1-bwd', 'pp1-bwd']), 'overview', { depth: 1, parentRow: 'overview' }),
+        row('pp1-forward', 'PP1 · 前向模块链', pp1ForwardDetail, 'layer', { depth: 2, parentRow: 'pp1-stage' }),
+        row('pp1-comm', 'PP1 · 激活/梯度双向通信', stageEventsById(['tx-pp0-pp1-fwd', 'tx-pp1-pp2-fwd', 'tx-pp2-pp1-bwd', 'tx-pp1-pp0-bwd']), 'overview', { depth: 2, parentRow: 'pp1-stage' }),
+        row('pp1-hold', 'PP1 · 保存激活驻留', ppHoldEvents.filter(item => item.id === 'pp1-hold-total'), 'overview', { depth: 2, parentRow: 'pp1-stage' }),
+        ...pp1TensorEvents.map(item => row(item.id, objectLaneLabel(item), [item], 'object', { depth: 3, parentRow: 'pp1-hold' })),
+        row('pp1-backward', 'PP1 · 反向模块链', pp1BackwardDetail, 'layer', { depth: 2, parentRow: 'pp1-stage' }),
+        row('life', 'PP2 · L23–L34 生命周期', pp2Lifecycle.filter(item => item.kind !== 'hold'), 'overview', { depth: 1, parentRow: 'overview' }),
+        row('comm-in-act', 'PP2 · 接收上游激活', commEvents.filter(item => item.id.includes('in-act')), 'overview', { depth: 2, parentRow: 'life' }),
+        row('l34-forward', 'PP2 · L34 前向模块链', l34Forward, 'layer', { depth: 2, parentRow: 'life' }),
+        row('comm-out-act', 'PP2 · 发送激活到 PP3', commEvents.filter(item => item.id === 'comm-out-act'), 'overview', { depth: 2, parentRow: 'life' }),
+        row('hold', 'PP2 · 保存激活驻留', pp2Lifecycle.filter(item => item.kind === 'hold'), 'overview', { depth: 2, parentRow: 'life' }),
+        ...tensorEvents.map(item => row(item.id, objectLaneLabel(item), [item], 'object', { depth: 3, parentRow: 'hold' })),
+        row('comm-in-grad', 'PP2 · 接收下游梯度', commEvents.filter(item => item.id === 'comm-in-grad'), 'overview', { depth: 2, parentRow: 'life' }),
+        row('l34-backward', 'PP2 · L34 反向模块链', l34Backward, 'layer', { depth: 2, parentRow: 'life' }),
+        row('comm-out-grad', 'PP2 · 发送梯度到 PP1', commEvents.filter(item => item.id === 'comm-out-grad'), 'overview', { depth: 2, parentRow: 'life' }),
+        row('pp3-stage', 'PP3 · L35–L45 生命周期', stageEventsById(['pp3-fwd', 'loss', 'pp3-bwd', 'tx-pp3-pp2-bwd']), 'overview', { depth: 1, parentRow: 'overview' }),
+        row('pp3-forward-loss', 'PP3 · 前向模块链', pp3ForwardDetail, 'layer', { depth: 2, parentRow: 'pp3-stage' }),
+        row('pp3-loss', 'PP3 · Loss 计算', stageEventsById(['loss']), 'overview', { depth: 2, parentRow: 'pp3-stage' }),
+        row('pp3-hold', 'PP3 · 保存激活驻留', ppHoldEvents.filter(item => item.id === 'pp3-hold-total'), 'overview', { depth: 2, parentRow: 'pp3-stage' }),
+        ...pp3TensorEvents.map(item => row(item.id, objectLaneLabel(item), [item], 'object', { depth: 3, parentRow: 'pp3-hold' })),
+        row('pp3-backward', 'PP3 · 反向模块链', pp3BackwardDetail, 'layer', { depth: 2, parentRow: 'pp3-stage' }),
+        row('pp3-comm', 'PP3 · 激活接收 / 梯度发送', stageEventsById(['tx-pp2-pp3-fwd', 'tx-pp3-pp2-bwd']), 'overview', { depth: 2, parentRow: 'pp3-stage' })
+      ];
+
+      const ranges = {
+        global: { start: 0, end: 315.61, label: '0.00–315.61 ms · MB07 完整链路' },
+        pp2: { start: 44, end: 232, label: '44.00–232.00 ms · 聚焦 PP2 生命周期' },
+        l34: { start: 94, end: 187, label: '94.00–187.00 ms · 聚焦 L34 生产/消费链' }
+      };
+
+      let selectedId = 'mb07-total';
+      let activeRange = 'global';
+      let activeLevel = 'object';
+      let zoom = 1;
+      let hitRects = [];
+      let hoverHit = null;
+      let expandedRowIds = new Set(['overview']);
+
+      const canvas = document.getElementById('timelineCanvas');
+      const scroll = document.getElementById('timelineScroll');
+      const tree = document.getElementById('objectTree');
+      const treeSearch = document.getElementById('treeSearch');
+      const objectInfoBtn = document.getElementById('objectInfoBtn');
+      const hierarchyPopover = document.getElementById('hierarchyPopover');
+      const hierarchyClose = document.getElementById('hierarchyClose');
+      const tooltip = window.PtoSwimlaneTaskPattern.createTooltip();
+      document.body.appendChild(tooltip);
+
+      function event(id, lane, label, kind, startMs, endMs, metrics = {}) {
+        return { id, lane, label, kind, startMs, endMs, durationMs: +(endMs - startMs).toFixed(2), metrics };
+      }
+      function sequence(prefix, lane, startMs, kind, specs) {
+        let cursor = startMs;
+        return specs.map(([label, duration, metrics], index) => {
+          const item = event(`${prefix}-${index}`, lane, label, kind, cursor, +(cursor + duration).toFixed(2), metrics);
+          cursor = item.endMs;
+          return item;
+        });
+      }
+      function tensor(id, label, startMs, endMs, memory, producer, consumer, metrics) {
+        const objectName = objectNameFromLabel(label);
+        return event(id, label, `${objectName} · 驻留到反向释放`, 'hold', startMs, endMs, {
+          objectId: id, objectType: '保存激活', memory, producer, consumer,
+          objectName,
+          shape: '[2,4096,8192]', dtype: 'BF16', ...metrics
+        });
+      }
+      function row(id, label, events, level, options = {}) { return { id, label, events, level, depth: options.depth || 0, parentRow: options.parentRow || null }; }
+
+      function visibleRows() {
+        return rows.filter(item => {
+          if (activeLevel === 'overview' && item.level !== 'overview') return false;
+          if (activeLevel === 'layer' && item.level === 'object') return false;
+          if (!isRowParentChainExpanded(item)) return false;
+          return true;
+        });
+      }
+
+      function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+      function colorFor(item) { return COLORS[item.kind] || COLORS.forward; }
+      function rgbaFromHex(hex, alpha) {
+        const clean = String(hex || '').replace('#', '');
+        const full = clean.length === 3 ? clean.split('').map(char => char + char).join('') : clean;
+        const value = Number.parseInt(full, 16);
+        if (!Number.isFinite(value)) return `rgba(168,85,247,${alpha})`;
+        const r = (value >> 16) & 255;
+        const g = (value >> 8) & 255;
+        const b = value & 255;
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      function fmt(value) { return `${Number(value).toFixed(2)} ms`; }
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+      }
+      function objectNameFromLabel(label) {
+        const text = String(label || '');
+        const hiddenState = text.match(/hidden_states_L\d+_out/);
+        if (hiddenState) return hiddenState[0];
+        return text.replace(/^L\d+ · /, '').replace(/^阶段输出 · /, '').replace(/^Embedding · /, '').replace(/^Loss · /, '').trim();
+      }
+      function objectLaneLabel(item) {
+        return `${item.metrics.objectName || objectNameFromLabel(item.lane)} · 保存激活`;
+      }
+      function childRowsForRow(rowId) {
+        return rows.filter(item => item.parentRow === rowId);
+      }
+      function isExpandableRow(item) {
+        return childRowsForRow(item.id).length > 0;
+      }
+      function isExpandedRow(item) {
+        return expandedRowIds.has(item.id);
+      }
+      function isRowParentChainExpanded(item) {
+        let parentId = item.parentRow;
+        while (parentId) {
+          if (!expandedRowIds.has(parentId)) return false;
+          const parent = rows.find(row => row.id === parentId);
+          parentId = parent?.parentRow || null;
+        }
+        return true;
+      }
+      function setActiveLevel(nextLevel) {
+        activeLevel = nextLevel;
+        document.querySelectorAll('[data-level]').forEach(item => item.setAttribute('aria-pressed', String(item.dataset.level === activeLevel)));
+      }
+      function statusFor(item) {
+        if (item.metrics.status === '轻微等待') return { label: '轻微等待', tone: 'warning' };
+        if (item.kind === 'wait') return { label: '可解释等待', tone: 'warning' };
+        return { label: '正常', tone: 'success' };
+      }
+      function itemExplanation(item) {
+        if (item.id === 'mb07-total') return '这是 MB07 的父级生命周期事件，覆盖完整 1F1B 链路。展开后按 PP stage 展示同一时间轴上的前后依赖。';
+        if (item.metrics.objectId) return '这是 forward 保存下来的激活对象。它会持续占用显存，直到对应 backward 模块消费后释放。';
+        if (item.id === 'pp2-wait-act' || item.id === 'comm-in-act-wait') return 'PP2 已经发起接收，但上游 PP1 尚未完成前向输出；这段时间表示 pipeline 依赖等待。';
+        if (item.id === 'pp2-wait-grad') return 'PP2 前向完成后等待 PP3 返回 dH34。绝大部分等待被其他 microbatch 工作覆盖，不代表 NPU 长时间空转。';
+        if (item.metrics.transactionId) return '这是跨 PP stage 的点对点通信事务。相同 transactionId 把发送端和接收端绑定为同一次 activation / gradient 传输。';
+        if (item.kind === 'forward') return '前向模块产生 activation；这些 activation 后续会被发送给下一 stage，或保存到反向阶段使用。';
+        if (item.kind === 'backward') return '反向模块消费保存激活和上游梯度，计算输入梯度/参数梯度，并触发对应激活释放。';
+        if (item.kind === 'loss') return 'Loss 位于最后一个 PP stage，是 backward 链路的起点。';
+        if (item.kind === 'hold') return '紫色驻留条表示保存激活的生命周期，重点看持续时间和显存体量。';
+        if (item.kind === 'summary') return '汇总条表示父级时间包络，本身不是一次 kernel；展开后查看 stage、模块或对象级事件。';
+        return '该事件属于 MB07 在当前时间窗内的可定位执行片段。';
+      }
+      function primaryEvidence(item) {
+        if (item.metrics.transactionId) {
+          const payload = item.metrics.payload || item.metrics.tensor || 'Activation / Gradient';
+          const bandwidth = item.metrics.bandwidth ? ` · 带宽 ${item.metrics.bandwidth}` : '';
+          const wait = item.metrics.wait ? ` · 等待 ${item.metrics.wait}` : '';
+          return `${item.metrics.transactionId} · ${payload}${bandwidth}${wait}`;
+        }
+        if (item.metrics.objectId) return `${item.metrics.memory} · producer=${item.metrics.producer} · consumer=${item.metrics.consumer} · ${item.metrics.evidence || '文档采样'}`;
+        if (item.kind === 'summary') return `${item.metrics.schedule} · ${item.metrics.stages} · ${item.metrics.layers}`;
+        if (item.kind === 'hold' && item.metrics.checkpointed) return `${item.metrics.checkpointed} · producer=${item.metrics.producer || 'forward'} · consumer=${item.metrics.consumer || 'backward'} · ${item.metrics.evidence || '文档采样'}`;
+        if (item.id === 'pp2-wait-grad') return `logical wait ${item.metrics.logicalWait} · actual idle ${item.metrics.actualIdle} · overlap ${item.metrics.overlap}`;
+        if (item.id === 'pp2-hold-total') return `checkpointed ${item.metrics.checkpointed} · recomputed ${item.metrics.recomputed} · sampled tensors ${item.metrics.sampledTensors}`;
+        if (item.metrics.throughput) return `${item.metrics.throughput} · kernels ${item.metrics.kernels} · peak memory ${item.metrics.peakMemory}`;
+        if (item.metrics.released) return `released ${item.metrics.released} · input grad amax ${item.metrics.inputGradAmax || '—'}`;
+        if (item.metrics.outputAmax) return `output amax ${item.metrics.outputAmax} · saved ${item.metrics.saved}`;
+        if (item.metrics.inputGradAmax) return `input grad amax ${item.metrics.inputGradAmax} · released ${item.metrics.released}`;
+        if (item.metrics.loss) return `loss ${item.metrics.loss}`;
+        return `${fmt(item.startMs)} → ${fmt(item.endMs)}`;
+      }
+      function visualEncoding(item) {
+        if (item.kind === 'backward') return '红色条内箭头指向左侧；纯反向模块泳道同时使用向左底纹，表示梯度反传方向。';
+        if (item.kind === 'hold') return '半透明紫色带表示激活驻留；紫色左端是前向保存，绿色右端是反向消费并释放。';
+        if (item.kind === 'summary') return '青色父级条表示完整时间包络；左侧行头的 + / − 控制子泳道展开。';
+        if (item.kind === 'comm') return '绿色条表示 send/recv 事务；同 transactionId 的事件会在 hover 时联动高亮。';
+        if (item.kind === 'wait') return '灰色条表示依赖等待；需要结合 actual idle 判断是否真空转。';
+        if (item.kind === 'forward') return '蓝色条内箭头指向右侧；纯前向模块泳道同时使用向右底纹，表示激活传播方向。';
+        return '橙色条表示 loss 计算，是反向链路的触发点。';
+      }
+
+      function renderTree(filter = '') {
+        const needle = filter.trim().toLowerCase();
+        const leaf = (item, depth = 2) => {
+          const text = `${item.label} ${item.id} ${Object.values(item.metrics || {}).join(' ')}`.toLowerCase();
+          if (needle && !text.includes(needle)) return '';
+          return `<button type="button" style="--depth:${depth}" data-select="${item.id}" class="${selectedId === item.id ? 'is-selected' : ''}" title="${escapeHtml(item.label)}">${escapeHtml(item.label)} <small>· ${item.durationMs.toFixed(2)} ms</small></button>`;
+        };
+        tree.innerHTML = `
+          <details open><summary>MB07 · Step 18420</summary>
+            <details open><summary>Pipeline 链路 · PP0–PP3</summary>${stageEvents.map(item => leaf(item, 2)).join('')}</details>
+            <details open><summary>PP0 · L0–L11</summary>
+              <details open><summary>前向模块 · 3</summary>${pp0ForwardDetail.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>保存激活对象 · 3</summary>${pp0TensorEvents.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>反向模块 · 3</summary>${pp0BackwardDetail.map(item => leaf(item, 3)).join('')}</details>
+            </details>
+            <details open><summary>PP1 · L12–L22</summary>
+              <details open><summary>前向模块 · 3</summary>${pp1ForwardDetail.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>保存激活对象 · 3</summary>${pp1TensorEvents.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>反向模块 · 3</summary>${pp1BackwardDetail.map(item => leaf(item, 3)).join('')}</details>
+            </details>
+            <details open><summary>PP2 · L23–L34</summary>
+              <details open><summary>生命周期事件</summary>${pp2Lifecycle.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>通信事务</summary>${commEvents.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>L34 前向模块 · 7</summary>${l34Forward.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>L34 反向模块 · 6</summary>${l34Backward.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>保存激活对象 · 5</summary>${tensorEvents.map(item => leaf(item, 3)).join('')}</details>
+            </details>
+            <details open><summary>PP3 · L35–L45</summary>
+              <details open><summary>前向模块 · 3</summary>${pp3ForwardDetail.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>保存激活对象 · 3</summary>${pp3TensorEvents.map(item => leaf(item, 3)).join('')}</details>
+              <details open><summary>反向模块 · 3</summary>${pp3BackwardDetail.map(item => leaf(item, 3)).join('')}</details>
+            </details>
+          </details>`;
+      }
+
+      function allEvents() {
+        return [
+          mbTotalEvent,
+          ...stageEvents,
+          ...pp0ForwardDetail, ...pp0TensorEvents, ...pp0BackwardDetail,
+          ...pp1ForwardDetail, ...pp1TensorEvents, ...pp1BackwardDetail,
+          ...pp2Lifecycle, ...commEvents, ...l34Forward, ...l34Backward,
+          ...tensorEvents,
+          ...pp3ForwardDetail, ...pp3TensorEvents, ...pp3BackwardDetail,
+          ...ppHoldEvents
+        ];
+      }
+      function selectedEvent() { return allEvents().find(item => item.id === selectedId) || pp2Lifecycle[6]; }
+
+      function relationFor(item) {
+        if (item.metrics.objectId) return [['生产者', item.metrics.producer], ['驻留成本', `${item.durationMs.toFixed(2)} ms / ${item.metrics.memory}`], ['消费者', item.metrics.consumer], ['释放时间', `${item.endMs.toFixed(2)} ms`]];
+        if (item.kind === 'summary') return [['父级范围', `${fmt(item.startMs)} → ${fmt(item.endMs)}`], ['调度', item.metrics.schedule], ['展开后查看', 'PP0 / PP1 / PP2 / PP3 生命周期']];
+        if (item.kind === 'hold') return [['生产者', item.metrics.producer || 'Forward'], ['驻留成本', `${item.durationMs.toFixed(2)} ms / ${item.metrics.checkpointed || item.metrics.memory || '—'}`], ['消费者', item.metrics.consumer || 'Backward']];
+        if (item.metrics.transactionId) return [['通信事务', item.metrics.transactionId], ['端点', item.metrics.endpoint || item.lane], ['传输对象', item.metrics.tensor || item.metrics.payload || 'Activation / Gradient'], ['配对规则', 'Send ↔ Recv 通过 transactionId 关联']];
+        if (item.id.includes('fwd')) return [['输入依赖', '上一 stage / 上一模块输出'], ['产生对象', 'Activation'], ['后续动作', '发送给下游或保存到反向阶段']];
+        if (item.id.includes('bwd')) return [['输入依赖', '激活梯度 + 保存激活'], ['产生对象', '输入梯度 / 参数梯度'], ['后续动作', '释放激活并向上游发送梯度']];
+        return [['作用域', 'MB07 · PP2'], ['数据来源', 'microbatch_data.md'], ['证据性质', '保留原始结论与指标的收敛样例']];
+      }
+
+      function kindLabel(kind) {
+        return ({ summary: '父级时间包络', forward: '前向计算', backward: '反向计算', wait: '依赖等待', comm: '通信事务', hold: '激活驻留', loss: 'Loss 计算' })[kind] || kind;
+      }
+      function humanKey(key) {
+        const labels = {
+          stage: 'Stage', layers: '层范围', flops: '计算量', transactionId: '通信事务 ID',
+          microbatch: 'Microbatch', schedule: '调度', stages: 'PP 范围',
+          tensor: '张量', payload: '载荷', bandwidth: '带宽', wait: '等待', status: '状态',
+          loss: 'Loss', inputGradAmax: '输入梯度 Amax', outputGradAmax: '输出梯度 Amax',
+          released: '释放显存', upstream: '上游依赖', recvPosted: 'Recv 提交', firstByte: '首字节',
+          reason: '原因', actualIdle: '实际空转', kernels: 'Kernel 数', utilization: '利用率',
+          peakMemory: '峰值显存', queue: '排队', transfer: '传输', runtime: 'Runtime',
+          logicalWait: '逻辑等待', overlap: '重叠比例', weightGradient: '权重梯度',
+          inputGradient: '输入梯度', tpComm: 'TP 通信', recomputation: '重计算',
+          sampledTensors: '采样张量数', original: '原始保存量', checkpointed: 'Checkpoint 后保存量',
+          recomputed: '重计算量', memoryShare: '显存占比', endpoint: '通信端点',
+          sendPosted: 'Send 提交', recvComplete: 'Recv 完成', shape: '形状', dtype: 'dtype',
+          meaning: '梯度语义', objectId: '对象 ID', objectType: '对象类型', memory: '显存',
+          producer: '生产者', consumer: '消费者', amax: 'Amax', mean: 'Mean', std: 'Std',
+          p99: 'P99', nonFinite: '非有限值', outputAmax: '输出 Amax', saved: '保存显存'
+        };
+        return labels[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase());
+      }
+      function drawLaneConnector(ctx, lane, y, rowH, color) {
+        const depth = lane.depth || 0;
+        if (!depth) return;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.72;
+        ctx.setLineDash([2, 3]);
+        for (let level = 1; level <= depth; level += 1) {
+          const guideX = 12 + level * 15;
+          ctx.beginPath();
+          ctx.moveTo(guideX + .5, y + 1);
+          ctx.lineTo(guideX + .5, y + rowH - 1);
+          ctx.stroke();
+        }
+        const branchX = 12 + depth * 15;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(branchX + .5, y + rowH / 2 + .5);
+        ctx.lineTo(branchX + 11.5, y + rowH / 2 + .5);
+        ctx.stroke();
+        ctx.restore();
+      }
+      function roundedRect(ctx, x, y, width, height, radius) {
+        if (ctx.roundRect) {
+          ctx.beginPath();
+          ctx.roundRect(x, y, width, height, radius);
+          return;
+        }
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+      }
+      function drawChevronTrack(ctx, x, y, width, height, direction, options = {}) {
+        if (width <= 0 || height <= 0 || (direction !== 'forward' && direction !== 'backward')) return;
+        const step = options.step || 6;
+        const inset = options.inset ?? .5;
+        const color = options.color || 'rgba(255,255,255,.3)';
+        const lineWidth = options.lineWidth || .6;
+        ctx.save();
+        roundedRect(ctx, x, y, width, height, options.radius ?? 3);
+        ctx.clip();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineJoin = 'miter';
+        ctx.lineCap = 'butt';
+        for (let px = x - step; px < x + width + step; px += step) {
+          ctx.beginPath();
+          if (direction === 'forward') {
+            ctx.moveTo(px + inset, y + inset);
+            ctx.lineTo(px + step - inset, y + height / 2);
+            ctx.lineTo(px + inset, y + height - inset);
+          } else {
+            ctx.moveTo(px + step - inset, y + inset);
+            ctx.lineTo(px + inset, y + height / 2);
+            ctx.lineTo(px + step - inset, y + height - inset);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+      function drawDirectionalLaneTexture(ctx, lane, x, range, y, rowH) {
+        lane.events.forEach(item => {
+          if ((item.kind !== 'forward' && item.kind !== 'backward') || item.endMs < range.start || item.startMs > range.end) return;
+          const start = Math.max(item.startMs, range.start);
+          const end = Math.min(item.endMs, range.end);
+          const trackX = x(start);
+          const trackW = Math.max(3, x(end) - trackX);
+          const color = item.kind === 'forward' ? rgbaFromHex(COLORS.forward, .24) : rgbaFromHex(COLORS.backward, .24);
+          drawChevronTrack(ctx, trackX, y + 2, trackW, rowH - 4, item.kind, {
+            step: 7, inset: .7, lineWidth: .65, radius: 3, color
+          });
+        });
+      }
+      function redrawTaskLabel(ctx, item, barX, barY, barW, barH) {
+        if (barW < 28) return;
+        const fontFamily = css('--font-mono') || 'monospace';
+        const maxChars = Math.max(4, Math.floor((barW - 8) / 6));
+        const label = item.label.length > maxChars ? `${item.label.slice(0, Math.max(0, maxChars - 1))}…` : item.label;
+        ctx.save();
+        roundedRect(ctx, barX + 1, barY + 1, Math.max(0, barW - 2), Math.max(0, barH - 2), 2);
+        ctx.clip();
+        ctx.fillStyle = 'rgba(255,255,255,.94)';
+        ctx.font = `${barW >= 72 ? '600 9px' : '600 8px'} ${fontFamily}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,.7)';
+        ctx.shadowBlur = 2;
+        ctx.fillText(label, barX + 5, barY + barH / 2 + .5);
+        ctx.restore();
+      }
+      function drawRowExpand(ctx, lane, x, y, rowH) {
+        if (!isExpandableRow(lane)) return null;
+        const size = 14;
+        const iconY = y + Math.max(2, (rowH - size) / 2);
+        const expanded = isExpandedRow(lane);
+        ctx.save();
+        roundedRect(ctx, x, iconY, size, size, 4);
+        ctx.fillStyle = css('--surface-1') || 'rgba(255,255,255,.9)';
+        ctx.strokeStyle = css('--border-strong') || 'rgba(255,255,255,.68)';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = css('--foreground') || '#111827';
+        ctx.font = `800 12px ${css('--font-mono') || 'monospace'}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(expanded ? '−' : '+', x + size / 2, iconY + size / 2 + .25);
+        ctx.restore();
+        return { x, y: iconY, w: size, h: size };
+      }
+
+      function laneHeaderParts(lane) {
+        const parts = String(lane.label || '').split(' · ');
+        if (parts.length < 2) return { object: lane.label, semantic: '' };
+        const owner = parts[0];
+        const scopeMatch = parts[1].match(/^(L\d+(?:–L\d+)?)(?:\s+(.+))?$/);
+        if (/^PP\d+$/.test(owner) && scopeMatch) {
+          return {
+            object: `${owner} · ${scopeMatch[1]}`,
+            semantic: [scopeMatch[2], ...parts.slice(2)].filter(Boolean).join(' · ')
+          };
+        }
+        return { object: owner, semantic: parts.slice(1).join(' · ') };
+      }
+
+      function fitCanvasText(ctx, value, maxWidth) {
+        const text = String(value || '');
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        let fitted = text;
+        while (fitted.length > 1 && ctx.measureText(`${fitted}…`).width > maxWidth) fitted = fitted.slice(0, -1);
+        return `${fitted}…`;
+      }
+
+      function drawLaneHeader(ctx, lane, x, y, rowH, maxWidth, textColor) {
+        const parts = laneHeaderParts(lane);
+        const tagH = 18;
+        const tagY = y + (rowH - tagH) / 2;
+        ctx.save();
+        ctx.font = `650 10px ${css('--font-mono') || 'monospace'}`;
+        const tagLimit = parts.semantic ? Math.max(42, maxWidth * .58) : maxWidth;
+        const tagText = fitCanvasText(ctx, parts.object, Math.max(24, tagLimit - 14));
+        const tagW = Math.min(tagLimit, Math.max(30, ctx.measureText(tagText).width + 14));
+        roundedRect(ctx, x, tagY, tagW, tagH, 6);
+        ctx.fillStyle = css('--surface-2') || 'rgba(255,255,255,.06)';
+        ctx.strokeStyle = css('--border-strong') || 'rgba(255,255,255,.28)';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = textColor;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tagText, x + 7, tagY + tagH / 2 + .25);
+        if (parts.semantic) {
+          const semanticX = x + tagW + 8;
+          ctx.font = `600 10px ${css('--font-mono') || 'monospace'}`;
+          ctx.fillText(fitCanvasText(ctx, parts.semantic, Math.max(18, maxWidth - tagW - 8)), semanticX, y + rowH / 2 + .25);
+        }
+        ctx.restore();
+        return { x, y, w: maxWidth, h: rowH };
+      }
+
+      function rowHeaderTooltipHtml(lane) {
+        const parts = laneHeaderParts(lane);
+        const semanticRow = parts.semantic
+          ? `<div class="pto-swimlane-task-tooltip__row"><span class="pto-swimlane-task-tooltip__key">语义</span><span class="pto-swimlane-task-tooltip__value">${escapeHtml(parts.semantic)}</span></div>`
+          : '';
+        return `<div class="pto-swimlane-task-tooltip__title">${escapeHtml(lane.label)}</div>` +
+          `<div class="pto-swimlane-task-tooltip__row"><span class="pto-swimlane-task-tooltip__key">对象</span><span class="pto-swimlane-task-tooltip__value">${escapeHtml(parts.object)}</span></div>` + semanticRow;
+      }
+
+      function draw() {
+        const list = visibleRows();
+        const range = ranges[activeRange];
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const gutter = 236;
+        const headerH = 48;
+        const rowH = 36;
+        const viewportW = Math.max(640, scroll.clientWidth);
+        const width = Math.round(gutter + Math.max(520, viewportW - gutter) * zoom);
+        const height = headerH + list.length * rowH + 12;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        hitRects = [];
+
+        const plotLeft = gutter;
+        const plotRight = width - 16;
+        const x = ms => plotLeft + ((ms - range.start) / (range.end - range.start)) * (plotRight - plotLeft);
+        const text = css('--foreground') || '#fff';
+        const muted = css('--foreground-muted') || '#888';
+        const subtle = css('--border-subtle') || 'rgba(255,255,255,.08)';
+        const surface = css('--surface-2') || '#1c1c1c';
+        ctx.fillStyle = surface;
+        ctx.fillRect(0, 0, width, headerH);
+
+        const tickStep = activeRange === 'global' ? 40 : activeRange === 'pp2' ? 20 : 10;
+        ctx.font = `500 10px ${css('--font-mono') || 'monospace'}`;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        for (let tick = Math.ceil(range.start / tickStep) * tickStep; tick <= range.end; tick += tickStep) {
+          const px = x(tick);
+          ctx.strokeStyle = subtle;
+          ctx.beginPath(); ctx.moveTo(px + .5, headerH); ctx.lineTo(px + .5, height); ctx.stroke();
+          ctx.fillStyle = muted;
+          ctx.fillText(`${tick} ms`, px, 20);
+        }
+        ctx.textAlign = 'left';
+        ctx.fillStyle = text;
+        ctx.font = `600 11px ${css('--font-sans') || 'sans-serif'}`;
+        ctx.fillText('泳道 / 对象', 12, 20);
+        ctx.fillStyle = muted;
+        ctx.font = `500 10px ${css('--font-mono') || 'monospace'}`;
+        ctx.fillText(`${range.start.toFixed(2)} ms`, gutter, 38);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${range.end.toFixed(2)} ms`, plotRight, 38);
+
+        list.forEach((lane, index) => {
+          const y = headerH + index * rowH;
+          if (index % 2) { ctx.fillStyle = css('--surface-disabled'); ctx.fillRect(0, y, width, rowH); }
+          ctx.strokeStyle = subtle;
+          ctx.beginPath(); ctx.moveTo(0, y + rowH + .5); ctx.lineTo(width, y + rowH + .5); ctx.stroke();
+          drawDirectionalLaneTexture(ctx, lane, x, range, y, rowH);
+          drawLaneConnector(ctx, lane, y, rowH, subtle);
+          const contentX = 12 + (lane.depth || 0) * 15 + (lane.depth ? 13 : 0);
+          const rowExpandRect = drawRowExpand(ctx, lane, contentX, y, rowH);
+          const labelX = contentX + (rowExpandRect ? 20 : 0);
+          const rowLabelRect = drawLaneHeader(ctx, lane, labelX, y, rowH, gutter - labelX - 10, text);
+          hitRects.push({ ...rowLabelRect, row: lane, action: 'row-label' });
+          if (rowExpandRect) hitRects.push({ ...rowExpandRect, row: lane, action: 'toggle-row' });
+
+          lane.events.forEach(item => {
+            if (item.endMs < range.start || item.startMs > range.end) return;
+            const start = Math.max(item.startMs, range.start);
+            const end = Math.min(item.endMs, range.end);
+            const barX = x(start);
+            const barW = Math.max(3, x(end) - barX);
+            const barY = y + Math.round((rowH - 18) / 2);
+            const selected = item.id === selectedId;
+            if (item.kind === 'hold') {
+              const bandH = 16;
+              const holdColor = colorFor(item);
+              ctx.save();
+              roundedRect(ctx, barX, barY, barW, bandH, 4);
+              ctx.fillStyle = rgbaFromHex(holdColor, selected ? .32 : .20);
+              ctx.strokeStyle = selected ? '#ffffff' : rgbaFromHex(holdColor, .78);
+              ctx.lineWidth = selected ? 1.6 : 1.1;
+              ctx.fill();
+              ctx.stroke();
+              ctx.fillStyle = holdColor;
+              ctx.beginPath();
+              ctx.moveTo(barX, barY + bandH / 2);
+              ctx.lineTo(barX + 4, barY + bandH / 2 - 4);
+              ctx.lineTo(barX + 8, barY + bandH / 2);
+              ctx.lineTo(barX + 4, barY + bandH / 2 + 4);
+              ctx.closePath();
+              ctx.fill();
+              ctx.beginPath();
+              const endX = barX + barW;
+              ctx.fillStyle = COLORS.release;
+              ctx.moveTo(endX, barY + bandH / 2);
+              ctx.lineTo(endX - 4, barY + bandH / 2 - 4);
+              ctx.lineTo(endX - 8, barY + bandH / 2);
+              ctx.lineTo(endX - 4, barY + bandH / 2 + 4);
+              ctx.closePath();
+              ctx.fill();
+              ctx.save();
+              roundedRect(ctx, barX, barY, barW, bandH, 4);
+              ctx.clip();
+              ctx.fillStyle = text;
+              ctx.font = `700 10px ${css('--font-mono') || 'monospace'}`;
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(item.label, barX + 10, barY + bandH / 2);
+              ctx.restore();
+              ctx.restore();
+              hitRects.push({ x: barX, y: barY - 2, w: barW, h: bandH + 12, item, action: 'select' });
+              return;
+            }
+            window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
+              x: barX, y: barY, width: barW, height: 18, baseColor: colorFor(item),
+              task: { label: item.label, opName: item.label }, isSelected: selected,
+              isRelated: hoverHit?.item?.metrics?.transactionId && hoverHit.item.metrics.transactionId === item.metrics.transactionId,
+              fontFamily: css('--font-mono') || 'monospace'
+            });
+            if (item.kind === 'forward' || item.kind === 'backward') {
+              drawChevronTrack(ctx, barX, barY, barW, 18, item.kind, {
+                step: 6, inset: .65, lineWidth: .55, radius: 3, color: 'rgba(255,255,255,.30)'
+              });
+              redrawTaskLabel(ctx, item, barX, barY, barW, 18);
+            }
+            hitRects.push({ x: barX, y: barY, w: barW, h: 22, item, action: 'select' });
+          });
+        });
+      }
+
+      function tooltipHtml(item) {
+        const rows = [
+          ['含义', itemExplanation(item)],
+          ['时间窗', `${fmt(item.startMs)} → ${fmt(item.endMs)}`],
+          ['持续', fmt(item.durationMs)],
+          ['关键证据', primaryEvidence(item)],
+          ['视觉编码', visualEncoding(item)]
+        ];
+        return `<div class="pto-swimlane-task-tooltip__title">${escapeHtml(item.label)}</div>` +
+          rows.map(([key, value]) => `<div class="pto-swimlane-task-tooltip__row"><span class="pto-swimlane-task-tooltip__key">${escapeHtml(key)}</span><span class="pto-swimlane-task-tooltip__value">${escapeHtml(value)}</span></div>`).join('');
+      }
+
+      function hitAt(event) {
+        const rect = canvas.getBoundingClientRect();
+        const px = event.clientX - rect.left;
+        const py = event.clientY - rect.top;
+        return [...hitRects].reverse().find(hit => px >= hit.x && px <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) || null;
+      }
+
+      canvas.addEventListener('mousemove', event => {
+        const hit = hitAt(event);
+        const eventHit = hit?.item ? hit : null;
+        if (eventHit?.item.id !== hoverHit?.item.id) { hoverHit = eventHit; draw(); }
+        if (hit?.action === 'row-label') {
+          canvas.style.cursor = 'help';
+          window.PtoSwimlaneTaskPattern.showTooltip(tooltip, { label: hit.row.label }, event, {
+            bounds: document.body,
+            getTooltipHtml: () => rowHeaderTooltipHtml(hit.row)
+          });
+          return;
+        }
+        if (!eventHit) {
+          window.PtoSwimlaneTaskPattern.hideTooltip(tooltip);
+          canvas.style.cursor = hit ? 'pointer' : 'crosshair';
+          return;
+        }
+        canvas.style.cursor = 'pointer';
+        window.PtoSwimlaneTaskPattern.showTooltip(tooltip, eventHit.item, event, { bounds: document.body, getTooltipHtml: () => tooltipHtml(eventHit.item) });
+      });
+      canvas.addEventListener('mouseleave', () => { hoverHit = null; window.PtoSwimlaneTaskPattern.hideTooltip(tooltip); draw(); });
+      canvas.addEventListener('click', event => {
+        const hit = hitAt(event);
+        if (!hit) return;
+        if (hit.action === 'toggle-row') {
+          toggleRowExpand(hit.row.id);
+          return;
+        }
+        if (hit.item) select(hit.item.id);
+      });
+
+      function select(id) {
+        selectedId = id;
+        renderTree(treeSearch?.value || '');
+        draw();
+        const item = selectedEvent();
+        document.getElementById('statusText').textContent = `${item.label} · ${kindLabel(item.kind)} · ${fmt(item.startMs)} → ${fmt(item.endMs)}`;
+      }
+      function toggleRowExpand(id) {
+        const lane = rows.find(row => row.id === id);
+        if (!lane || !isExpandableRow(lane)) return;
+        const opening = !expandedRowIds.has(id);
+        if (opening) expandedRowIds.add(id);
+        else expandedRowIds.delete(id);
+        const children = childRowsForRow(id);
+        if (opening && children.some(row => row.level === 'object')) setActiveLevel('object');
+        else if (opening && activeLevel === 'overview' && children.some(row => row.level === 'layer')) setActiveLevel('layer');
+        renderTree(treeSearch?.value || '');
+        draw();
+        const action = opening ? '展开' : '收起';
+        document.getElementById('statusText').textContent = `${action} ${lane.label} · ${children.length} 条子泳道`;
+      }
+
+      tree.addEventListener('click', event => { const button = event.target.closest('[data-select]'); if (button) select(button.dataset.select); });
+      treeSearch?.addEventListener('input', event => renderTree(event.target.value));
+
+      function positionHierarchyPopover() {
+        if (!objectInfoBtn || !hierarchyPopover || hierarchyPopover.hidden) return;
+        const rect = objectInfoBtn.getBoundingClientRect();
+        const width = hierarchyPopover.offsetWidth || 360;
+        const height = hierarchyPopover.offsetHeight || 520;
+        const right = Math.max(8, window.innerWidth - rect.right);
+        const top = Math.min(rect.bottom + 8, Math.max(8, window.innerHeight - height - 8));
+        hierarchyPopover.style.right = `${Math.min(right, Math.max(8, window.innerWidth - width - 8))}px`;
+        hierarchyPopover.style.top = `${top}px`;
+      }
+      function setHierarchyOpen(open) {
+        if (!objectInfoBtn || !hierarchyPopover) return;
+        hierarchyPopover.hidden = !open;
+        objectInfoBtn.setAttribute('aria-expanded', String(open));
+        if (open) {
+          renderTree(treeSearch?.value || '');
+          requestAnimationFrame(() => {
+            positionHierarchyPopover();
+            treeSearch?.focus({ preventScroll: true });
+          });
+        }
+      }
+      objectInfoBtn?.addEventListener('click', event => {
+        event.stopPropagation();
+        setHierarchyOpen(hierarchyPopover?.hidden !== false);
+      });
+      hierarchyClose?.addEventListener('click', () => setHierarchyOpen(false));
+      hierarchyPopover?.addEventListener('click', event => event.stopPropagation());
+      document.addEventListener('click', () => setHierarchyOpen(false));
+
+      document.getElementById('rangeToggle').addEventListener('click', event => {
+        const button = event.target.closest('[data-range]'); if (!button) return;
+        activeRange = button.dataset.range;
+        document.querySelectorAll('[data-range]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        document.getElementById('rangeMeta').textContent = ranges[activeRange].label;
+        scroll.scrollLeft = 0; draw();
+      });
+      function setZoom(next) {
+        zoom = Math.max(1, Math.min(3, next));
+        document.getElementById('zoomValue').textContent = `${zoom.toFixed(1)}×`;
+        draw();
+      }
+      document.getElementById('zoomOut').addEventListener('click', () => setZoom(zoom - .5));
+      document.getElementById('zoomIn').addEventListener('click', () => setZoom(zoom + .5));
+      document.getElementById('themeToggle').addEventListener('click', event => {
+        const root = document.documentElement;
+        const light = root.dataset.theme !== 'light';
+        root.dataset.theme = light ? 'light' : 'dark';
+        event.currentTarget.textContent = light ? '深色' : '浅色';
+        draw();
+      });
+      window.addEventListener('resize', () => { draw(); positionHierarchyPopover(); });
+
+      renderTree();
+      draw();
+    })();
+  </script>
+</body>
+</html>
