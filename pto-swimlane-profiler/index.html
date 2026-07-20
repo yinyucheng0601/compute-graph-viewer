@@ -657,6 +657,36 @@ body {
   margin-top: var(--space-2);
 }
 
+.sl-task-connection-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sl-task-connection-control__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sl-task-connection-control__title {
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-label-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-label);
+  letter-spacing: var(--letter-spacing-label);
+}
+
+.sl-task-connection-control__hint {
+  color: var(--foreground-muted);
+  font: var(--text-body-sm);
+}
+
 .sl-object-path {
   display: flex;
   align-items: center;
@@ -1184,6 +1214,7 @@ body {
 .sl-history-artifact-more {
   position: absolute;
   right: 0;
+  z-index: 2;
   display: inline-flex;
   width: 24px;
   min-width: 24px;
@@ -1192,7 +1223,7 @@ body {
   padding: 0;
   border-radius: var(--radius-md);
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .sl-history-artifact-more svg {
@@ -1209,7 +1240,6 @@ body {
 .sl-history-artifact:hover .sl-history-artifact-more,
 .sl-history-artifact.is-menu-open .sl-history-artifact-more {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .sl-history-artifact-menu {
@@ -1411,10 +1441,10 @@ body {
                               <button class="btn btn-sm" id="mixModeBtn" type="button" aria-pressed="false" title="按 1C2V Wrap 重排泳道">Mix模式</button>
                               <button class="btn btn-sm" id="syncPathBtn" type="button" aria-pressed="false" title="弱化无同步边的任务，聚焦核间协作">同步路径</button>
                               <span class="sl-tool-spacer"></span>
-                              <span class="sl-zoom-control" title="泳道图缩放控制滑杆，控制时间轴可见区">
+                              <span class="sl-zoom-control" title="泳道图缩放控制滑杆，支持 100%–1600% 时间轴缩放">
                                 <span class="sl-zoom-label">缩放</span>
                                 <button class="btn btn-icon btn-ghost" id="zoomOut" aria-label="缩小">−</button>
-                                <input class="sl-zoom-slider" id="zoomSlider" type="range" min="100" max="480" step="5" value="100" />
+                                <input class="sl-zoom-slider" id="zoomSlider" type="range" min="100" max="1600" step="5" value="100" />
                                 <button class="btn btn-icon btn-ghost" id="zoomIn" aria-label="放大">+</button>
                                 <span class="sl-zoom-readout" id="zoomReadout">100%</span>
                               </span>
@@ -1423,7 +1453,7 @@ body {
                               <div class="sl-timeline-head">
                                 <div class="sl-timeline-band">
                                   <div class="sl-timeline-corner">
-                                    <span class="sl-corner-title" title="Attention Score">Attention Score</span>
+                                    <span class="sl-corner-title" title="注意力得分">注意力得分</span>
                                   </div>
                                   <div class="sl-timeline-right">
                                     <div class="sl-global-ruler" id="globalRulerScale" aria-label="全局时间尺">
@@ -1510,7 +1540,7 @@ body {
                   </div>
                   <div class="pto-ide-frame__terminal-body">
                     <p class="pto-ide-frame__terminal-line"><span class="sl-terminal-prompt">pypto@swimlane-profiler %</span> 终端面板默认关闭，打开后用于承载执行日志与诊断输出。</p>
-                    <p class="pto-ide-frame__terminal-line">当前 demo 使用 L2 schema-generated / share-safe 数据；不是一次真实模型运行的原始导出。</p>
+                    <p class="pto-ide-frame__terminal-line">当前运行已加载 <span class="mono">merged_swimlane.json</span>，可从任务和关系下钻性能详情。</p>
                   </div>
                 </div>
               </section>
@@ -1841,17 +1871,18 @@ function runList() {
     operator: run.operator,
     dur: Math.round(run.model.timelineEnd),
     tasks: run.model.tasks.length,
-    completeness: run.completeness,
+    artifactStatus: `${run.artifacts.filter((artifact) => artifact.available).length}/${run.artifacts.length} 产物可用`,
     timestamp: run.timestamp,
     current: run.id === state?.selectedRunId,
   }));
 }
 
 const ROW_H = 21, SUB_ROW_H = 17, CORE_GAP_H = 6, BAR_PAD = 3, SUB_BAR_PAD = 3, BAR_H = ROW_H - 2 * BAR_PAD, SUB_BAR_H = SUB_ROW_H - 2 * SUB_BAR_PAD;
-const AXIS_H = 34, ZOOM_MIN = 100, ZOOM_MAX = 480;
+const AXIS_H = 34, ZOOM_MIN = 100, ZOOM_MAX = 1600, ZOOM_BUTTON_STEP = 50;
+const TOPOLOGY_HUB_MIN_WIDTH = 4;
 const LOW_UTILIZATION_THRESHOLD = 0.4;
 const KIND_ACCENT = Object.fromEntries(
-  ['host', 'memory', 'cpu', 'aic', 'aiv', 'mte'].map((kind) => [kind, TASK_COLORMAP.colorForLaneKind(kind)]),
+  ['host', 'memory', 'cpu', 'hub', 'aic', 'aiv', 'mte'].map((kind) => [kind, TASK_COLORMAP.colorForLaneKind(kind)]),
 );
 KIND_ACCENT.worker = KIND_ACCENT.aic;
 const AIC_SUBLANES = ['Scalar', 'MTE_2', 'MTE_1', 'Cube', 'FixPipe'];
@@ -1870,6 +1901,7 @@ const state = {
   reportTab: 'overview',
   taskReportTab: 'overview',
   pmuGroup: 2,
+  taskConnectionDepth: -1,
   level: 'overview',      // overview | group | wrap | task
   selGroup: null, selWrap: null, selTask: null, selSubtask: null,
   selectedRunId: CURRENT_RUN_ID,
@@ -1884,7 +1916,8 @@ const state = {
 const LANE_GROUPS = [
   { id: 'host', label: 'Host' },
   { id: 'ai_cpu', label: 'AI CPU' },
-  { id: 'ai_core_worker_phases', label: 'AI Core Worker Phases' },
+  { id: 'ai_core_worker_phases', label: 'AI Core 工作阶段' },
+  { id: 'ai_core_topology', label: 'AI Core 拓扑枢纽' },
   { id: 'die0', label: 'AI Core Die 0' },
   { id: 'die1', label: 'AI Core Die 1' },
 ];
@@ -2093,6 +2126,16 @@ function bodyW() {
   return Math.ceil(visibleTrackW() * (state.zoomPct / 100));
 }
 function pxPerUs() { return Math.max(0.1, (bodyW() - 8) / MODEL.timelineEnd); }
+function taskBarGeometry(task, start, end, scale) {
+  let x = start * scale;
+  let width = Math.max(0, end - start) * scale;
+  if (task.phase === 'TOPOLOGY_HUB' && width < TOPOLOGY_HUB_MIN_WIDTH) {
+    const center = ((start + end) / 2) * scale;
+    width = TOPOLOGY_HUB_MIN_WIDTH;
+    x = Math.max(0, center - width / 2);
+  }
+  return { x, width };
+}
 function bodyH() { return rowItems.reduce((sum, item) => sum + item.h, 0); }
 function rowTop(row) { return rowItems[row]?.y ?? 0; }
 function rowHeight(row) { return rowItems[row]?.h ?? ROW_H; }
@@ -2128,7 +2171,7 @@ function hexToRgba(hex, a) {
   return `rgba(${v >> 16},${(v >> 8) & 0xff},${v & 0xff},${a})`;
 }
 function laneDieLabel(core) {
-  return core?.die != null ? `DIE ${core.die - 1}` : '';
+  return core?.die != null ? `DIE ${core.die}` : '';
 }
 function laneDisplayLabel(core) {
   const die = laneDieLabel(core);
@@ -2371,9 +2414,10 @@ function renderComparisonBody() {
     const row = rowOf[task.coreIdx];
     if (!Number.isFinite(row)) continue;
     const bar = barMetricsForRow(row);
-    const x = task.start * scale;
+    const geometry = taskBarGeometry(task, task.start, task.end, scale);
+    const x = geometry.x;
     const y = rowTop(row) + bar.pad;
-    const taskWidth = Math.max(0, task.end - task.start) * scale;
+    const taskWidth = geometry.width;
     if (taskWidth < 1) continue;
     const group = task.group != null ? model.groups[task.group] : null;
     window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
@@ -2407,22 +2451,26 @@ function focusInfo() {
   let crossLayerMode = null;
   let dependencyMode = Boolean(state.selTask);
   if (state.selTask) {
-    const dep = dependencyClosure(state.selTask);
+    const dep = dependencyClosure(state.selTask, state.taskConnectionDepth);
     dep.tasks.forEach((id) => relTasks.add(id));
     dep.edges.forEach((id) => relEdges.add(id));
-    const crossLayer = crossLayerClosure(state.selTask);
-    crossLayer.tasks.forEach((id) => relTasks.add(id));
-    crossLayerMode = crossLayer.mode;
-    if (crossLayerMode) {
-      dimGroup = null;
-      dimWrap = null;
+    if (state.taskConnectionDepth === -1) {
+      const crossLayer = crossLayerClosure(state.selTask);
+      crossLayer.tasks.forEach((id) => relTasks.add(id));
+      crossLayerMode = crossLayer.mode;
+      if (crossLayerMode) {
+        dimGroup = null;
+        dimWrap = null;
+      }
     }
   } else if (focusTask) {
     const crossLayer = crossLayerClosure(focusTask);
     if (crossLayer.mode) {
-      const dep = dependencyClosure(focusTask);
-      dep.tasks.forEach((id) => relTasks.add(id));
-      dep.edges.forEach((id) => relEdges.add(id));
+      if (!isAiCoreDieTask(focusTask)) {
+        const dep = dependencyClosure(focusTask);
+        dep.tasks.forEach((id) => relTasks.add(id));
+        dep.edges.forEach((id) => relEdges.add(id));
+      }
       crossLayer.tasks.forEach((id) => relTasks.add(id));
       crossLayerMode = crossLayer.mode;
       dimGroup = null;
@@ -2448,14 +2496,25 @@ function edgeVisibleInCurrentMode(edge) {
   return state.mixMode || edge.relation !== 'sync';
 }
 
-function dependencyClosure(rootTask) {
+function taskHasSyncRelation(task) {
+  return task.syncIn.concat(task.syncOut).some((edgeId) => edgeById[edgeId]?.relation === 'sync');
+}
+
+function isAiCoreDieTask(task) {
+  const laneGroup = MODEL.cores[task?.coreIdx]?.laneGroup;
+  return laneGroup === 'die0' || laneGroup === 'die1';
+}
+
+function dependencyClosure(rootTask, maxDepth = -1) {
   const tasks = new Set([rootTask.id]);
   const edges = new Set();
+  if (maxDepth === 0) return { tasks, edges };
   const visit = (seed, edgeKey, nextKey) => {
-    const queue = [seed];
+    const queue = [{ task: seed, depth: 0 }];
     const seen = new Set([seed.id]);
     while (queue.length) {
-      const cur = queue.shift();
+      const { task: cur, depth } = queue.shift();
+      if (maxDepth >= 0 && depth >= maxDepth) continue;
       cur[edgeKey].forEach((eid) => {
         const e = edgeById[eid];
         if (!e || !edgeVisibleInCurrentMode(e)) return;
@@ -2465,7 +2524,7 @@ function dependencyClosure(rootTask) {
         tasks.add(next.id);
         if (!seen.has(next.id)) {
           seen.add(next.id);
-          queue.push(next);
+          queue.push({ task: next, depth: depth + 1 });
         }
       });
     }
@@ -2598,7 +2657,7 @@ function drawBody() {
     const baseColor = related ? taskBaseColor(t) : '#6F7480';
 
     let alpha = 1;
-    if (state.syncPathOnly && t.syncIn.length === 0 && t.syncOut.length === 0) alpha = 0.16;
+    if (state.syncPathOnly && !taskHasSyncRelation(t)) alpha = 0.16;
     if (fi.dependencyMode) {
       if (!related) alpha = Math.min(alpha, 0.24);
     } else {
@@ -2619,8 +2678,9 @@ function drawBody() {
       const segmentRow = expanded ? subRowOf[core.idx]?.[segment.sublane] : row;
       if (!Number.isFinite(segmentRow)) return;
       const bar = barMetricsForRow(segmentRow);
-      const x = segment.start * scale;
-      const width = Math.max(0, segment.end - segment.start) * scale;
+      const geometry = taskBarGeometry(t, segment.start, segment.end, scale);
+      const x = geometry.x;
+      const width = geometry.width;
       const y = rowTop(segmentRow) + bar.pad;
       const segmentSelected = segment.id
         ? state.selSubtask?.id === segment.id
@@ -2635,8 +2695,22 @@ function drawBody() {
           drawSubtaskFocus(x, y, width, bar.height, segmentSelected, segmentHovered);
         }
       } else if (segment.kind === 'set') {
+        const markerX = Math.round(x) + 0.5;
         bctx.fillStyle = '#1FB6C9';
-        bctx.fillRect(Math.round(x), y - 1, 2, bar.height + 2);
+        bctx.fillRect(markerX - 0.5, y - 1, 1, bar.height + 2);
+        bctx.beginPath();
+        bctx.arc(markerX, y - 1, 2.2, 0, Math.PI * 2);
+        bctx.fill();
+      } else if (segment.kind === 'wait-point') {
+        const markerX = Math.round(x) + 0.5;
+        bctx.fillStyle = '#FFAA3B';
+        bctx.fillRect(markerX - 0.5, y - 1, 1, bar.height + 2);
+        bctx.beginPath();
+        bctx.moveTo(markerX - 3, y - 2);
+        bctx.lineTo(markerX + 3, y - 2);
+        bctx.lineTo(markerX, y + 2.5);
+        bctx.closePath();
+        bctx.fill();
       } else if (width >= 1) {
         const renderTask = segment.id ? subtaskView(t, segment) : t;
         window.PtoSwimlaneTaskPattern.drawTaskBar(bctx, {
@@ -3330,7 +3404,7 @@ function artifactRowHtml(runId, artifact) {
   </div>` : '';
   return `<div class="sl-history-artifact ${selected ? 'is-selected' : ''} ${menuOpen ? 'is-menu-open' : ''}" data-artifact-name="${escapeHtml(artifact.name)}">
     <button class="sl-history-artifact-select" type="button" data-artifact-select="${escapeHtml(artifact.name)}" data-run-id="${escapeHtml(runId)}"
-      ${available ? '' : 'disabled aria-disabled="true" title="当前 demo 尚未接入该产物数据"'}>
+      ${available ? '' : 'disabled aria-disabled="true" title="该运行记录未包含可加载的产物数据"'}>
       <span class="nm" title="${escapeHtml(artifact.name)}">${escapeHtml(artifact.name)}</span>
       <span class="rl">${escapeHtml(ARTIFACT_ZH[artifact.role] || artifact.role || '')}</span>
     </button>
@@ -3352,7 +3426,7 @@ function runCardHtml(r) {
         <dt>算子</dt><dd class="sl-history-sm">${escapeHtml(r.operator)}</dd>
         <dt>总耗时</dt><dd>${escapeHtml(r.dur)}μs</dd>
         <dt>任务数</dt><dd>${escapeHtml(r.tasks)}</dd>
-        <dt>完整性</dt><dd style="color:var(--success)">${escapeHtml(r.completeness)}</dd>
+        <dt>产物状态</dt><dd style="color:var(--success)">${escapeHtml(r.artifactStatus)}</dd>
         <dt>运行时间</dt><dd class="sl-history-sm">${escapeHtml(r.timestamp)}</dd>
       </dl>
       <hr class="sl-history-divider">
@@ -3487,9 +3561,13 @@ function hitTest(px, py) {
       const expanded = state.expandedLaneCores.has(coreIdx);
       const sublane = expanded ? rowItems[row]?.sublane : null;
       const segments = expanded ? (t.pipelineSegments || []) : t.microSegments;
-      const segment = segments.find((candidate) => candidate.id
+      const eligible = (candidate) => candidate.id
         && (!expanded || candidate.sublane === sublane)
-        && (expanded || taskRow(t) === row)
+        && (expanded || taskRow(t) === row);
+      const marker = !expanded ? segments.find((candidate) => eligible(candidate)
+        && (candidate.kind === 'set' || candidate.kind === 'wait-point')
+        && Math.abs(px - candidate.start * scale) <= 3) : null;
+      const segment = marker || segments.find((candidate) => eligible(candidate)
         && px >= candidate.start * scale - 1 && px <= candidate.end * scale + 1);
       if (segment) return { task: t, segment };
     }
@@ -3500,7 +3578,10 @@ function hitTest(px, py) {
       if (hit) return { task: t, segment: null };
       continue;
     }
-    if (taskRow(t) === row && px >= t.start * scale - 1 && px <= t.end * scale + 1) return { task: t, segment: null };
+    const geometry = taskBarGeometry(t, t.start, t.end, scale);
+    if (taskRow(t) === row && px >= geometry.x - 1 && px <= geometry.x + geometry.width + 1) {
+      return { task: t, segment: null };
+    }
   }
   return null;
 }
@@ -3747,8 +3828,8 @@ syncPathBtn.addEventListener('click', (e) => {
   e.currentTarget.setAttribute('aria-pressed', String(state.syncPathOnly));
   drawBody();
 });
-document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoomPct + 5));
-document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoomPct - 5));
+document.getElementById('zoomIn').addEventListener('click', () => setZoom(state.zoomPct + ZOOM_BUTTON_STEP));
+document.getElementById('zoomOut').addEventListener('click', () => setZoom(state.zoomPct - ZOOM_BUTTON_STEP));
 zoomSlider.addEventListener('input', (e) => setZoom(Number(e.target.value)));
 taskSearch.addEventListener('input', (e) => {
   state.query = e.target.value;
@@ -3778,16 +3859,39 @@ function coreStats(coreIdx, group, wrap) {
   for (const t of MODEL.tasks) {
     if (t.coreIdx !== coreIdx) continue;
     if (group != null && t.group !== group) continue;
-    compute += t.computeEnd - t.start; wait += t.end - t.computeEnd; n++;
+    const blocked = taskBlockedWait(t);
+    compute += Math.max(0, t.end - t.start - blocked); wait += blocked; n++;
   }
   return { compute, wait, n, ratio: wait / (compute + wait || 1) };
+}
+function intervalUnionDuration(intervals) {
+  const sorted = intervals
+    .filter(([start, end]) => Number.isFinite(start) && Number.isFinite(end) && end > start)
+    .sort((left, right) => left[0] - right[0]);
+  const merged = [];
+  sorted.forEach(([start, end]) => {
+    const previous = merged[merged.length - 1];
+    if (!previous || start > previous[1]) merged.push([start, end]);
+    else previous[1] = Math.max(previous[1], end);
+  });
+  return merged.reduce((sum, [start, end]) => sum + end - start, 0);
+}
+function taskBlockedIntervals(task) {
+  return (task.syncIn || [])
+    .map((id) => edgeById[id])
+    .filter((edge) => edge?.relation === 'sync' && edge.waitTask?.id === task.id && edge.blockedWait > 0)
+    .map((edge) => [edge.waitTime, edge.releaseTime]);
+}
+function taskBlockedWait(task) {
+  return intervalUnionDuration(taskBlockedIntervals(task));
 }
 function groupStats(g) {
   let compute = 0, wait = 0;
   for (const t of MODEL.tasks) {
     if (t.group !== g) continue;
     if (MODEL.cores[t.coreIdx].kind !== 'aic' && MODEL.cores[t.coreIdx].kind !== 'aiv') continue;
-    compute += t.computeEnd - t.start; wait += t.end - t.computeEnd;
+    const blocked = taskBlockedWait(t);
+    compute += Math.max(0, t.end - t.start - blocked); wait += blocked;
   }
   return { compute, wait, ratio: wait / (compute + wait || 1) };
 }
@@ -3798,8 +3902,8 @@ function wrapStats(w) {
       const core = MODEL.cores[task.coreIdx];
       return core.kind === kind && (vector == null || core.vector === vector);
     });
-    const compute = selected.reduce((sum, task) => sum + task.computeEnd - task.start, 0);
-    const wait = selected.reduce((sum, task) => sum + task.end - task.computeEnd, 0);
+    const wait = selected.reduce((sum, task) => sum + taskBlockedWait(task), 0);
+    const compute = selected.reduce((sum, task) => sum + Math.max(0, task.end - task.start - taskBlockedWait(task)), 0);
     return { compute, wait, n: selected.length, ratio: wait / (compute + wait || 1) };
   };
   const all = [s('aic'), s('aiv', 0), s('aiv', 1)];
@@ -3809,9 +3913,11 @@ function wrapStats(w) {
 }
 
 function runMetricChips() {
-  let compute = 0, wait = 0;
-  MODEL.tasks.forEach((t) => { compute += t.computeEnd - t.start; wait += t.end - t.computeEnd; });
-  const ratio = (wait / (compute + wait) * 100).toFixed(1);
+  const machineDuration = MODEL.tasks
+    .filter((task) => task.phase === 'MACHINE_LEAF_TASK')
+    .reduce((sum, task) => sum + task.end - task.start, 0);
+  const wait = CURRENT_RUN.performanceStatistics.taskWaitUnionSum;
+  const ratio = (wait / Math.max(1, machineDuration) * 100).toFixed(1);
   const syncCount = MODEL.edges.filter((edge) => edge.relation === 'sync').length;
   const dependencyCount = MODEL.edges.length - syncCount;
   return `<div class="sl-report-metrics">
@@ -3824,16 +3930,14 @@ function runMetricChips() {
 }
 
 function runAggregateStats() {
-  let compute = 0, wait = 0, active = 0;
+  let machineDuration = 0;
   const laneUtils = MODEL.cores
     .filter((core) => core.kind === 'aic' || core.kind === 'aiv')
     .map((core) => laneUtil(core.idx).ratio);
-  MODEL.tasks.forEach((t) => {
-    compute += t.computeEnd - t.start;
-    wait += t.end - t.computeEnd;
-    active += t.end - t.start;
+  MODEL.tasks.filter((task) => task.phase === 'MACHINE_LEAF_TASK').forEach((task) => {
+    machineDuration += task.end - task.start;
   });
-  const total = compute + wait || 1;
+  const wait = CURRENT_RUN.performanceStatistics.taskWaitUnionSum;
   const avgLaneUtil = laneUtils.reduce((sum, ratio) => sum + ratio, 0) / Math.max(1, laneUtils.length);
   const minUtil = Math.min(...laneUtils);
   const maxUtil = Math.max(...laneUtils);
@@ -3843,21 +3947,25 @@ function runAggregateStats() {
     syncEdges: MODEL.edges.filter((edge) => edge.relation === 'sync').length,
     dependencyEdges: MODEL.edges.filter((edge) => edge.relation !== 'sync').length,
     duration: MODEL.timelineEnd,
-    waitRatio: wait / total,
+    waitRatio: wait / Math.max(1, machineDuration),
     avgLaneUtil,
     avgBubble: 1 - avgLaneUtil,
     loadBalance: balance,
     extraGmUbKiB: CURRENT_RUN.summaryMetrics.extraGmUbKiB,
     ubHeadroomKiB: CURRENT_RUN.summaryMetrics.ubHeadroomKiB,
     mte2Util: CURRENT_RUN.summaryMetrics.mte2Util,
+    pairBlockedWaitSum: CURRENT_RUN.performanceStatistics.pairBlockedWaitSum,
+    taskWaitUnionSum: CURRENT_RUN.performanceStatistics.taskWaitUnionSum,
+    overlapDoubleCount: CURRENT_RUN.performanceStatistics.overlapDoubleCount,
+    positiveBlockedPairCount: CURRENT_RUN.performanceStatistics.positiveBlockedPairCount,
   };
 }
 
 function topTasks() {
   return CURRENT_RUN.anomalies.map((anomaly) => {
     const task = taskById[anomaly.taskId];
-    const compute = task.computeEnd - task.start;
-    const wait = task.end - task.computeEnd;
+    const wait = taskBlockedWait(task);
+    const compute = Math.max(0, task.end - task.start - wait);
     const bubble = anomaly.bubbleDuration || 0;
     return { task, anomaly, compute, wait, bubble, total: task.end - task.start || 1 };
   });
@@ -3892,8 +4000,8 @@ function overviewReportHtml() {
     { label: '额外 GM / UB 搬运', value: `${s.extraGmUbKiB.toFixed(0)} KiB`, warn: s.extraGmUbKiB >= 192 },
     { label: 'UB 余量', value: `${s.ubHeadroomKiB.toFixed(1)} KiB`, warn: s.ubHeadroomKiB < 32 },
     { label: 'MTE 2 利用率', value: `${(s.mte2Util * 100).toFixed(1)}%`, warn: s.mte2Util >= 0.65 },
-    { label: '同步路径数量', value: String(s.syncEdges) },
-    { label: '同步等待占比', value: `${(s.waitRatio * 100).toFixed(1)}%`, warn: s.waitRatio >= 0.18 },
+    { label: 'Pair 累加 / Task 并集', value: `${s.pairBlockedWaitSum.toFixed(1)} / ${s.taskWaitUnionSum.toFixed(1)}μs`, warn: s.waitRatio >= 0.18 },
+    { label: '重叠重复计数', value: `${s.overlapDoubleCount.toFixed(1)}μs` },
   ];
   return `<div class="sl-report-card">
     <div class="sl-report-card__title">运行聚合指标</div>
@@ -3903,10 +4011,10 @@ function overviewReportHtml() {
         <div class="sl-metric-card__value">${m.value}</div>
       </div>`).join('')}
     </div>
-    <div class="sl-insp-hint">额外 GM/UB 搬运、UB 余量与 MTE 2 利用率为 L2 诊断指标，用于保持三条 run 的同口径比较。</div>
+    <div class="sl-insp-hint">同步 Pair 累加与按等待任务求区间并集是两种资源时间口径，二者都不等于 run 总耗时。</div>
   </div>
   <div class="sl-report-card">
-    <div class="sl-report-card__title">Top 任务</div>
+    <div class="sl-report-card__title">高耗时任务</div>
     ${topTasks().map(({ task, anomaly, wait, bubble, total }, idx) => {
       const core = MODEL.cores[task.coreIdx];
       const active = state.selTask && state.selTask.id === task.id;
@@ -3953,16 +4061,16 @@ function pmuReportHtml() {
   return `${groupButtons}<div class="sl-report-card">
     <div class="sl-report-card__title">A5 PMU Group 2 · 全图 counters 明细</div>
     <div class="sl-counter-table">
-      <div class="sl-counter-row is-head"><div>Counter</div><div class="sl-counter-val">Value</div><div>Summary</div></div>
+      <div class="sl-counter-row is-head"><div>Counter</div><div class="sl-counter-val">数值</div><div>说明</div></div>
       ${rows}
     </div>
   </div>
   <div class="sl-report-card">
-    <div class="sl-report-card__title">PMU summary</div>
+    <div class="sl-report-card__title">PMU 汇总</div>
     <div class="sl-metric-grid">
       <div class="sl-metric-card is-warn"><div class="sl-metric-card__label">主导 counter</div><div class="sl-metric-card__value">${dominant.key}</div></div>
       <div class="sl-metric-card ${mte2Ratio >= 0.65 ? 'is-warn' : ''}"><div class="sl-metric-card__label">MTE 2 / total cycle</div><div class="sl-metric-card__value">${(mte2Ratio * 100).toFixed(1)}%</div></div>
-      <div class="sl-metric-card"><div class="sl-metric-card__label">I-Cache miss rate</div><div class="sl-metric-card__value">${(missRate * 100).toFixed(1)}%</div></div>
+      <div class="sl-metric-card"><div class="sl-metric-card__label">I-Cache miss 率</div><div class="sl-metric-card__value">${(missRate * 100).toFixed(1)}%</div></div>
       <div class="sl-metric-card"><div class="sl-metric-card__label">Counter 覆盖</div><div class="sl-metric-card__value">Group 2</div></div>
     </div>
   </div>`;
@@ -4045,7 +4153,8 @@ function overviewHtml() {
   html += `<div class="sl-insp-section">
     <div class="sl-insp-hint">4 个 Stitch，按 <b>${MODEL.groups.length} 个诊断分组</b>组织。Wrap 是运行时任务分组，
     不等同于物理 Core 编号；同一物理泳道在不同调用中可承载不同 Wrap。${escapeHtml(CURRENT_RUN.iterationDefinition)}<br>
-    任务颜色按<b>语义诊断分组</b>编码，不按 Core、Wrap 或异常等级编码。虚线框表示跨多个 Wrap 的 L2 诊断分组；选中 Wrap 后出现的实线框表示当前 Wrap 的任务范围。</div>
+    任务颜色按<b>语义诊断分组</b>编码，不按 Core、Wrap 或异常等级编码。依赖实线连接 task/HUB 的结束与开始；
+    同步虚线连接 SET 与 WAIT release。青色圆点竖线是 SET，橙色三角竖线是 WAIT，橙色斜纹仅表示实际 blocked interval。</div>
   </div>
   <div class="sl-insp-section"><div class="sl-insp-section-label">${MODEL.groups.length} 个 Mix 子图 · 同步等待占比</div>`;
   MODEL.groups.forEach((g) => {
@@ -4063,7 +4172,7 @@ function overviewHtml() {
   html += `<div class="sl-callout">
     <b>剧本 · 定位提示</b><br>
     <b>${bg.name}</b> 的同步等待占比明显高于其它子图。根因疑似落在它的某个
-    1C2V Wrap —— 一个 AIC 把整组其它核拖在 SyncWait 上。
+    1C2V Wrap；沿 C→V 广播或 V→C 归约虚线定位最后到达的 SET producer。
     <button class="btn btn-sm btn-solid sl-btn-drill" data-drill="bottleneck">▶ 下钻到瓶颈 Wrap</button>
   </div>
   <div class="sl-insp-section"><div class="sl-insp-section-label">硬件拓扑</div>
@@ -4135,14 +4244,14 @@ function wrapDetailHtml(w) {
     </div>
     <div class="sl-insp-hint">Wrap 是运行时 1C2V 任务分组，不是物理 Core 编号。下表泳道名取 Stitch 1 的映射；后续 Stitch 会重映射。</div>
   </div>
-  <div class="sl-report-card"><div class="sl-report-card__title">单元内三核 · 计算与同步等待</div>`;
+  <div class="sl-report-card"><div class="sl-report-card__title">单元内三核 · 任务时间与跨核同步等待</div>`;
   cores3.forEach((c) => {
     const tot = c.st.compute + c.st.wait || 1;
     const cp = (c.st.compute / tot * 100), wp = (c.st.wait / tot * 100);
     html += `<div style="margin-top:8px">
       <div class="sl-kv" style="padding-bottom:3px;border:0">
         <span class="sl-kv-key">${c.ci != null ? laneDisplayLabel(MODEL.cores[c.ci]) : '—'} · ${c.role}</span>
-        <span class="sl-kv-val">计算 ${c.st.compute.toFixed(0)} / 等待 ${c.st.wait.toFixed(0)}μs</span></div>
+        <span class="sl-kv-val">非该类跨核等待 ${c.st.compute.toFixed(0)} / 已登记等待 ${c.st.wait.toFixed(0)}μs</span></div>
       <div class="sl-meter">
         <div class="sl-meter-fill" style="width:${cp}%;background:${grp.color};float:left"></div>
         <div class="sl-meter-fill" style="width:${wp}%;background:repeating-linear-gradient(135deg,rgba(255,170,59,0.9) 0 3px,rgba(255,170,59,0.35) 3px 6px);float:left"></div>
@@ -4157,10 +4266,9 @@ function wrapDetailHtml(w) {
   </div>`;
   if (w === topTasks()[0]?.task.wrap) {
     html += `<div class="sl-callout">
-      <b>根因锁定</b> —— <b>${laneDisplayLabel(MODEL.cores[aicCore])}</b> 在跑一个「K 维未切分」的超大 BMM,
-      单任务计算量约为正常 tile 的 2.5x。它一直没发出 SyncSet,
-      配对的两个 AIV 算完一小段后就长时间停等。<br>
-      优化方向: 对该 BMM 做 K-split, 把单核长任务拆成多个 tile, 让 AIV 不必整段等待。</div>`;
+      <b>根因锁定</b> —— 该 Wrap 的多组 SET / WAIT 中，最后到达的生产者决定了归约或广播的 release 时间。
+      应沿虚线同步边检查对应 AIC/AIV 的前序计算和负载差，而不是把整段 task 尾部都归因为同步。<br>
+      优化方向：缩短 straggler task 的前序计算，或重新切分 tile，使 C↔V 的中段同步更早释放。</div>`;
   } else {
     html += `<div class="sl-callout is-success">
       该 Wrap 三核耗时较均衡。点击任务查看单个任务的同步事件。</div>`;
@@ -4176,13 +4284,13 @@ function taskReportTabsHtml() {
 
 function taskReportPlaceholderHtml(tabId) {
   const label = TASK_REPORT_TABS.find((tab) => tab.id === tabId)?.label || '';
-  return `<div class="sl-task-tab-panel"><div class="sl-empty-state">当前 demo 暂未接入单任务${label}数据；已有任务信息统一保留在“概览”。</div></div>`;
+  return `<div class="sl-task-tab-panel"><div class="sl-empty-state">当前运行暂未接入单任务${label}数据；已有任务信息统一保留在“概览”。</div></div>`;
 }
 
 function taskOverviewHtml(t) {
   const grp = t.group != null ? MODEL.groups[t.group] : null;
-  const compute = t.computeEnd - t.start;
-  const wait = t.end - t.computeEnd;
+  const wait = taskBlockedWait(t);
+  const nonCrossCoreWait = Math.max(0, t.end - t.start - wait);
   const total = (t.end - t.start) || 1;
   const ratio = wait / total;
   const pct = (ratio * 100).toFixed(0);
@@ -4199,18 +4307,19 @@ function taskOverviewHtml(t) {
         <span class="sl-pill" style="color:${grp ? grp.color : 'var(--accent)'}">
           <span class="sl-dot" style="width:8px;height:8px;background:${grp ? grp.color : 'var(--accent)'}"></span>
           ${grp ? grp.short : MODEL.cores[t.coreIdx].section}</span>
-        <span class="sl-pill ${ratio >= 0.3 ? 'is-warn' : 'is-ok'}">${ratio >= 0.3 ? '同步瓶颈' : '计算主导'}</span>
+        <span class="sl-pill ${ratio >= 0.3 ? 'is-warn' : 'is-ok'}">${ratio >= 0.3 ? '同步瓶颈' : '跨核等待较低'}</span>
       </div>
       ${t.inputRawMagic.length + t.outputRawMagic.length > 0 ? `<div class="sl-kv"><span class="sl-kv-key">输入 / 输出</span><span class="sl-kv-val">输入 ${t.inputRawMagic.length} · 输出 ${t.outputRawMagic.length}</span></div>` : ''}
       ${t.coveredTaskIds ? `<div class="sl-kv"><span class="sl-kv-key">调度覆盖</span><span class="sl-kv-val">${t.coveredTaskIds.length} 个 AI Core 任务</span></div>` : ''}
+      ${t.syncShape ? `<div class="sl-kv"><span class="sl-kv-key">同步形态</span><span class="sl-kv-val mono">${escapeHtml(t.syncShape)}</span></div>` : ''}
     </div>
-    <div class="sl-insp-section"><div class="sl-insp-section-label">计算与同步等待</div>
+    <div class="sl-insp-section"><div class="sl-insp-section-label">任务时间与跨核同步等待</div>
       <div class="sl-meter" style="height:14px">
-        <div class="sl-meter-fill" style="width:${compute / total * 100}%;background:${grp ? grp.color : 'var(--accent)'};float:left"></div>
+        <div class="sl-meter-fill" style="width:${nonCrossCoreWait / total * 100}%;background:${grp ? grp.color : 'var(--accent)'};float:left"></div>
         <div class="sl-meter-fill" style="width:${pct}%;background:repeating-linear-gradient(135deg,rgba(255,170,59,0.9) 0 3px,rgba(255,170,59,0.35) 3px 6px);float:left"></div>
       </div>
-      <div class="sl-kv"><span class="sl-kv-key">计算段</span><span class="sl-kv-val">${compute.toFixed(1)}μs</span></div>
-      <div class="sl-kv"><span class="sl-kv-key">同步等待段</span><span class="sl-kv-val" style="color:var(--warning)">${wait.toFixed(1)}μs · ${pct}%</span></div>
+      <div class="sl-kv"><span class="sl-kv-key">非该类跨核等待时间</span><span class="sl-kv-val">${nonCrossCoreWait.toFixed(1)}μs</span></div>
+      <div class="sl-kv"><span class="sl-kv-key">已登记跨核等待并集</span><span class="sl-kv-val" style="color:var(--warning)">${wait.toFixed(1)}μs · ${pct}%</span></div>
     </div>
     <div class="sl-insp-section"><div class="sl-insp-section-label">任务关系 (${visibleRelationCount})</div>`;
   if (visibleRelationCount === 0) {
@@ -4227,17 +4336,20 @@ function taskOverviewHtml(t) {
       @ <span class="mono">${e.toT.toFixed(1)}μs</span></div>`;
   });
   incomingSync.forEach((e) => {
-    html += `<div class="sl-sync-item">▼ <b>SyncWait</b> · 等待 <span class="mono">${laneDisplayLabel(MODEL.cores[e.fromCore])}</span>
-      的 SyncSet @ <span class="mono">${e.fromT.toFixed(1)}μs</span>，虚线表示内部同步/等待；等待耗时 <span class="mono">${e.wait.toFixed(1)}μs</span></div>`;
+    html += `<div class="sl-sync-item">▼ <b>SyncWait · event ${e.eventid}</b> · 等待 <span class="mono">${laneDisplayLabel(MODEL.cores[e.fromCore])}</span>
+      的 SyncSet：WAIT <span class="mono">${e.waitTime.toFixed(1)}μs</span> → SET <span class="mono">${e.setTime.toFixed(1)}μs</span>，
+      release <span class="mono">${e.releaseTime.toFixed(1)}μs</span>，阻塞 <span class="mono">${e.blockedWait.toFixed(1)}μs</span></div>`;
   });
   outgoingSync.forEach((e) => {
-    html += `<div class="sl-sync-item">▲ <b>SyncSet</b> · 向 <span class="mono">${laneDisplayLabel(MODEL.cores[e.toCore])}</span>
-      发出信号 @ <span class="mono">${e.fromT.toFixed(1)}μs</span>（虚线）</div>`;
+    html += `<div class="sl-sync-item">▲ <b>SyncSet · event ${e.eventid}</b> · 向 <span class="mono">${laneDisplayLabel(MODEL.cores[e.toCore])}</span>
+      发出信号 @ <span class="mono">${e.setTime.toFixed(1)}μs</span>；消费端 WAIT @ <span class="mono">${e.waitTime.toFixed(1)}μs</span>，
+      release <span class="mono">${e.releaseTime.toFixed(1)}μs</span></div>`;
   });
   html += `</div>`;
   if (wait > 0) {
     html += `<div class="sl-callout">
-      该任务实际计算仅 <b>${compute.toFixed(0)}μs</b>, 另有 <b>${wait.toFixed(0)}μs</b> 在等待同步。
+      该任务中已登记的跨核同步阻塞为 <b>${wait.toFixed(0)}μs</b>；其余 <b>${nonCrossCoreWait.toFixed(0)}μs</b>
+      仍可能包含 pipeline wait、memory stall 或未采样停顿，不归类为纯计算。
       ${incomingSync.length ? '优先缩短上游 <b>' + laneDisplayLabel(MODEL.cores[incomingSync[0].fromCore]) + '</b> 的前序计算量。'
         : state.mixMode ? '检查同 Wrap 内核间负载是否均衡。' : '打开 Mix 模式可查看对应的同步/等待关系。'}</div>`;
   }
@@ -4281,10 +4393,24 @@ function taskDetailHtml(t) {
       <div class="sl-kv"><span class="sl-kv-key">子任务类型</span><span class="sl-kv-val">${t.subtaskKind === 'wait' ? '同步等待' : escapeHtml(t.primarySublane || '计算')}</span></div>` : ''}
       <div class="sl-kv"><span class="sl-kv-key">所属 Wrap</span><span class="sl-kv-val">${t.wrap != null ? 'Wrap ' + wrapInstanceDisplayId(t.wrap, t.iteration) : '—'}</span></div>
       <div class="sl-kv"><span class="sl-kv-key">Stitch</span><span class="sl-kv-val">${t.stitchIndex != null ? 'Stitch ' + (t.stitchIndex + 1) : '—'}</span></div>
-      <div class="sl-kv"><span class="sl-kv-key">原始 wrapId 示例</span><span class="sl-kv-val">${t.rawWrapId ?? '—'}</span></div>
+      <div class="sl-kv"><span class="sl-kv-key">runtime wrapId</span><span class="sl-kv-val">${t.wrapId ?? t.rawWrapId ?? '—'}</span></div>
+      <div class="sl-kv"><span class="sl-kv-key">local opWrapId</span><span class="sl-kv-val">${t.opWrapId ?? '—'}</span></div>
+      <div class="sl-kv"><span class="sl-kv-key">seqNo / taskId</span><span class="sl-kv-val mono">${t.seqNo ?? '—'} / ${t.taskId ?? '—'}</span></div>
       <div class="sl-kv"><span class="sl-kv-key">leafHash</span><span class="sl-kv-val">${t.leafHash ?? '—'}</span></div>
       <div class="sl-kv"><span class="sl-kv-key">执行区间</span><span class="sl-kv-val">${t.start.toFixed(1)}–${t.end.toFixed(1)}μs</span></div>
       <div class="sl-kv"><span class="sl-kv-key">耗时</span><span class="sl-kv-val">${total.toFixed(1)}μs</span></div>
+      <div class="sl-task-connection-control">
+        <div class="sl-task-connection-control__copy">
+          <span class="sl-task-connection-control__title">任务连线层级</span>
+          <span class="sl-task-connection-control__hint" title="−1 全部连线 · 0 仅当前任务 · N 前后各 N 跳">−1 全部 · 0 当前 · N 跳</span>
+        </div>
+        <span class="toolbar-control" role="group" aria-label="任务连线层级">
+          <button class="btn btn-icon btn-ghost" type="button" data-connection-depth-dec aria-label="减少任务连线层级"
+            ${state.taskConnectionDepth === -1 ? 'disabled aria-disabled="true"' : ''}>−</button>
+          <output class="toolbar-readout mono" aria-live="polite">${state.taskConnectionDepth}</output>
+          <button class="btn btn-icon btn-ghost" type="button" data-connection-depth-inc aria-label="增加任务连线层级">+</button>
+        </span>
+      </div>
       <div class="sl-task-basic-actions">
         <button class="btn btn-sm" type="button" data-view-block-graph>查看计算图</button>
         <button class="btn btn-sm" type="button" title="后续接入 CCE 代码映射" disabled aria-disabled="true">查看 CCE 代码</button>
@@ -4316,7 +4442,7 @@ function renderBlockGraph(t) {
   const graph = blockGraphSpec(t);
   if (!graph) return;
   blockGraphTitle.textContent = graph.name;
-  blockGraphTitle.title = `${graph.graphType} · leafHash ${graph.leafHash} · ${graph.provenance}`;
+  blockGraphTitle.title = `${graph.graphType} · leafHash ${graph.leafHash}`;
   blockGraphMount.innerHTML = '';
   blockGraphMount.style.width = `${graph.canvas.width}px`;
   blockGraphMount.style.height = `${graph.canvas.height}px`;
@@ -4610,6 +4736,18 @@ function bindInspector() {
   });
   const viewBlockGraph = body.querySelector('[data-view-block-graph]');
   if (viewBlockGraph) viewBlockGraph.addEventListener('click', () => openBlockGraph(state.selTask));
+  const depthDecrease = body.querySelector('[data-connection-depth-dec]');
+  if (depthDecrease) depthDecrease.addEventListener('click', () => {
+    state.taskConnectionDepth = Math.max(-1, state.taskConnectionDepth - 1);
+    drawBody();
+    renderInspector();
+  });
+  const depthIncrease = body.querySelector('[data-connection-depth-inc]');
+  if (depthIncrease) depthIncrease.addEventListener('click', () => {
+    state.taskConnectionDepth += 1;
+    drawBody();
+    renderInspector();
+  });
   const drill = body.querySelector('[data-drill="bottleneck"]');
   if (drill) drill.addEventListener('click', () => selectWrap(topTasks()[0].task.wrap));
 }
