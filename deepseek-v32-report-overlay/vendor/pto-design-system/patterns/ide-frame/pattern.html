@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - IDE Frame</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const applyTheme = (theme) => {
+        if (theme === 'light' || theme === 'dark' || theme === 'glass') {
+          document.documentElement.dataset.theme = theme;
+        }
+      };
+      if (params.has('embed')) {
+        document.documentElement.dataset.embedPreview = 'true';
+      }
+      const frameRatio = params.get('frameRatio');
+      if (frameRatio === 'wide' || frameRatio === 'tall') {
+        document.documentElement.dataset.frameRatio = frameRatio;
+      }
+      applyTheme(params.get('theme'));
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'pto-preview-theme') {
+          applyTheme(event.data.theme);
+        }
+      });
+    })();
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="../../css/style.css">
+  <link rel="stylesheet" href="../workbench-shell/pattern.css?v=ide-frame-v7">
+  <link rel="stylesheet" href="../floating-playback-control/pattern.css?v=ide-frame-v7">
+  <link rel="stylesheet" href="./pattern.css?v=ide-frame-v7">
+  <link rel="stylesheet" href="./vscode.css?v=ide-frame-v7">
+</head>
+<body class="pto-ide-frame-preview-page">
+  <main class="pto-ide-frame-preview">
+    <h1>IDE Frame Pattern</h1>
+    <p>
+      Clean framework shell only: host chrome, activity rail, pane slots, inspector dock, optional playback mount,
+      and resize wiring. Product pages provide all domain content.
+    </p>
+
+    <div class="pto-ide-frame-preview__stack">
+      <div class="pto-ide-frame-preview__label">Standalone host frame</div>
+      <section class="pto-ide-frame" data-ide-frame data-host="standalone" aria-label="Standalone IDE frame">
+        <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+          <div class="pto-ide-frame__topbar-left">
+            <div class="pto-ide-frame__host-chip" data-ide-slot="host-chip">
+              <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                <path d="m7 9 3 3-3 3"></path>
+                <path d="M12 15h5"></path>
+              </svg>
+            </div>
+            <div class="pto-ide-frame__workspace" data-ide-slot="workspace-switcher"></div>
+          </div>
+          <div class="pto-ide-frame__topbar-center">
+            <div class="pto-ide-frame__search" data-ide-slot="global-search" aria-label="Global search slot"></div>
+          </div>
+          <div class="pto-ide-frame__topbar-right">
+            <div class="pto-ide-frame__window-actions" data-ide-slot="window-controls" aria-label="Window controls">
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Back">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15 18 9 12l6-6"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Forward">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </button>
+              <span class="pto-ide-frame__window-separator" aria-hidden="true"></span>
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Toggle left dock">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                  <path d="M9 3v18"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action is-selected" type="button" data-ide-toggle="visualization" aria-label="Toggle bottom visualization" aria-controls="standalone-bottom-dock" aria-expanded="true" aria-pressed="true" title="Visualization">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                  <path d="M3 15h18"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action" type="button" data-ide-toggle="terminal" aria-label="Toggle terminal" aria-controls="standalone-terminal-pane" aria-expanded="false" aria-pressed="false" title="Terminal">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                  <path d="m7 9 3 3-3 3"></path>
+                  <path d="M12 15h5"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Toggle right dock">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                  <path d="M15 3v18"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Settings">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action" type="button" aria-label="Open window">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15 3h6v6"></path>
+                  <path d="M10 14 21 3"></path>
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                </svg>
+              </button>
+              <button class="pto-ide-frame__window-action pto-ide-frame__window-action--danger" type="button" aria-label="Close window">
+                <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div class="pto-ide-frame__body">
+          <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
+            <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-ide-toggle="explorer" aria-label="Toggle file explorer" aria-controls="standalone-explorer-pane" aria-expanded="true" aria-pressed="true" title="Explorer">
+              <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+              </svg>
+            </button>
+            <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Search" title="Search">
+              <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.3-4.3"></path>
+              </svg>
+            </button>
+            <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Source control" title="Source control">
+              <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="18" cy="18" r="3"></circle>
+                <circle cx="6" cy="6" r="3"></circle>
+                <path d="M13 6h3a2 2 0 0 1 2 2v7"></path>
+                <path d="M6 9v12"></path>
+              </svg>
+            </button>
+            <button class="btn btn-icon btn-ghost pto-ide-frame__rail-button" type="button" aria-label="Terminal" title="Terminal">
+              <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                <path d="m7 9 3 3-3 3"></path>
+                <path d="M12 15h5"></path>
+              </svg>
+            </button>
+          </nav>
+
+          <div class="pto-ide-frame__workarea">
+            <div class="pto-ide-frame__split" data-ide-split="standalone-vertical" data-split-direction="vertical" data-sizes="68,32" data-min-size="280,150">
+              <section class="pto-ide-frame__pane pto-ide-frame__pane--stack" data-ide-pane="main-row">
+                <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-split-direction="horizontal" data-sizes="22,50,28" data-pixel-sizes="300" data-min-size="220,360,240">
+                  <aside class="pto-ide-frame__pane pto-ide-frame__explorer" data-ide-pane="explorer" id="standalone-explorer-pane">
+                    <header class="pto-ide-frame__pane-header" data-ide-slot="navigation-header"></header>
+                    <div class="pto-ide-frame__pane-body" data-ide-slot="navigation"></div>
+                  </aside>
+
+                  <section class="pto-ide-frame__pane" data-ide-pane="editor-preview">
+                    <div class="pto-ide-frame__tabstrip" data-ide-slot="preview-tabs"></div>
+                    <header class="pto-ide-frame__pane-header" data-ide-slot="preview-header"></header>
+                    <div class="pto-ide-frame__pane-body" data-ide-slot="preview"></div>
+                  </section>
+
+                  <aside class="pto-ide-frame__pane" data-ide-pane="inspector">
+                    <header class="pto-ide-frame__pane-header" data-ide-slot="inspector-header"></header>
+                    <div class="pto-ide-frame__pane-body" data-ide-slot="inspector"></div>
+                  </aside>
+                </div>
+              </section>
+
+              <section class="pto-ide-frame__pane pto-ide-frame__bottom-dock" data-ide-pane="bottom-panel" data-ide-bottom-dock id="standalone-bottom-dock">
+                <div class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization">
+                  <header class="pto-ide-frame__pane-header">
+                    <span class="pto-ide-frame__pane-title">Visualization</span>
+                    <span class="pto-ide-frame__pane-meta">replaces terminal</span>
+                  </header>
+                  <div class="pto-ide-frame__pane-body pto-ide-frame__stage-slot pto-ide-frame__stage-slot--compact" data-ide-slot="bottom-visualization"></div>
+                </div>
+
+                <div class="pto-ide-frame__bottom-view pto-ide-frame__terminal" data-ide-bottom-panel="terminal" id="standalone-terminal-pane" hidden>
+                  <div class="pto-ide-frame__terminal-tabs" aria-label="Panel tabs">
+                    <div class="pto-ide-frame__terminal-tablist">
+                      <span class="pto-ide-frame__terminal-tab">Problems</span>
+                      <span class="pto-ide-frame__terminal-tab">Output</span>
+                      <span class="pto-ide-frame__terminal-tab">Debug Console</span>
+                      <span class="pto-ide-frame__terminal-tab is-selected">Terminal</span>
+                    </div>
+                    <div class="pto-ide-frame__terminal-actions" aria-label="Terminal actions">
+                      <button class="pto-ide-frame__terminal-action" type="button" aria-label="New terminal">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                      </button>
+                      <button class="pto-ide-frame__terminal-action" type="button" data-ide-close="terminal" aria-label="Close terminal">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="pto-ide-frame__terminal-body">
+                    <p class="pto-ide-frame__terminal-line"><span class="pto-ide-frame__terminal-prompt">yin@superYIN ~ %</span><span class="pto-ide-frame__terminal-cursor" aria-hidden="true"></span></p>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <footer class="pto-ide-frame__status-strip pto-ide-frame__standalone-chrome" data-ide-slot="status"></footer>
+          </div>
+        </div>
+      </section>
+
+      <div class="pto-ide-frame-preview__label pto-ide-frame-preview__embedded-example">VS Code webview host frame</div>
+      <section class="pto-ide-frame pto-ide-frame-preview__embedded-example" data-ide-frame data-host="vscode-webview" aria-label="VS Code embedded IDE frame">
+        <div class="pto-ide-frame__domain-toolbar" data-ide-slot="domain-toolbar"></div>
+
+        <div class="pto-ide-frame__split pto-ide-frame__embedded-layout" data-ide-split="vscode-main" data-split-direction="horizontal" data-sizes="68,32" data-min-size="320,220">
+          <section class="pto-ide-frame__pane" data-ide-pane="primary-surface">
+            <header class="pto-ide-frame__pane-header" data-ide-slot="primary-header"></header>
+            <div class="pto-ide-frame__pane-body" data-ide-slot="primary-surface"></div>
+          </section>
+
+          <aside class="pto-ide-frame__pane" data-ide-pane="inspector">
+            <header class="pto-ide-frame__pane-header" data-ide-slot="inspector-header"></header>
+            <div class="pto-ide-frame__pane-body" data-ide-slot="inspector"></div>
+          </aside>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <script src="../workbench-shell/pattern.js?v=ide-frame-v7"></script>
+  <script src="../floating-playback-control/pattern.js?v=ide-frame-v7"></script>
+  <script src="./pattern.js?v=ide-frame-v7"></script>
+</body>
+</html>

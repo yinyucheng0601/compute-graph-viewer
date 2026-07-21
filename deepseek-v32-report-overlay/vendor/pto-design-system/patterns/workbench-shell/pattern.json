@@ -1,0 +1,56 @@
+{
+  "id": "workbench-shell",
+  "name": "Workbench Split Kernel",
+  "type": "hybrid",
+  "description": "Low-level PTO split and resize kernel for horizontal, vertical, and nested panes. It owns gutter DOM, hover/focus/drag state, min sizes, default sizes, localStorage persistence, resize callbacks, keyboard resize, and destroy lifecycle. Pane sizes are ratio weights over the space left after fixed gutters, so gutters do not push the final pane outside the split frame. It does not own page chrome, IDE visuals, pane fills, pane header typography, topbars, titles, badges, canvas controls, or fixed preview heights.",
+  "source": {
+    "visualContract": [
+      "patterns/workbench-shell/pattern.css only styles split layout and gutters",
+      "patterns/workbench-shell/pattern.js owns resize behavior and persistence",
+      "patterns/ide-frame/pattern.json consumes this kernel for IDE chrome"
+    ],
+    "patternHtml": "patterns/workbench-shell/pattern.html",
+    "patternCss": "patterns/workbench-shell/pattern.css",
+    "renderScript": "patterns/workbench-shell/pattern.js",
+    "thirdParty": "none"
+  },
+  "useWhen": [
+    "adding draggable split panes to a PTO page or pattern",
+    "sharing min-size, persisted size, and gutter behavior across horizontal and vertical layouts",
+    "supporting nested split regions without copying pointer or keyboard resize code"
+  ],
+  "requiredApis": [
+    "window.PtoWorkbenchShell.initResizablePanes(options)",
+    "window.PtoWorkbenchShell.createSplitGutter(index, direction, options)",
+    "window.PtoWorkbenchShell.initNestedResizablePanes(options)"
+  ],
+  "compatibilityApis": [
+    "window.PtoWorkbenchShell.initWorkbenchShell(options) is deprecated; use initResizablePanes or ide-frame for visual shells",
+    "window.PtoWorkbenchShell.initCanvasControls(options) is deprecated in this pattern; move canvas UI into a canvas-controls or product-specific pattern"
+  ],
+  "allowedOverrides": [
+    "pane selectors, direction, initial ratio sizes, min sizes, storage key, gutter size, callbacks, and keyboard resize step",
+    "outer product layout and all pane content",
+    "custom gutter class only when the product pattern documents the alternative"
+  ],
+  "forbiddenOverrides": [
+    "putting page background, topbar, brand, title, subtitle, badge, pane background, pane header typography, or canvas controls back into workbench-shell",
+    "overriding .pto-workbench-shell__split-gutter internals from higher-level patterns",
+    "reimplementing pointer drag, keyboard resize, persisted sizes, or destroy lifecycle locally"
+  ],
+  "agentReuseRule": "Read this JSON first. Use workbench-shell only as a resize kernel. For IDE-style pages, load ide-frame and let it provide the visual shell while calling PtoWorkbenchShell.initResizablePanes for split behavior. Do not use workbench-shell as a product chrome or pane styling system.",
+  "correctUsage": [
+    "Global is window.PtoWorkbenchShell (NOT window.PtoWorkbenchShellPattern). Referencing the wrong name silently falls through and you get a gutter with no drag handle.",
+    "Do not load CDN split.js. PtoWorkbenchShell.initResizablePanes is the resize engine and persists sizes itself via storageKey.",
+    "Frame vs split are two layers: .workbench-frame is the column wrapper (header + split); .workbench-frame-split is the row panes container. Never put both classes on the same element or the panes stack vertically (column wins until something injects flex-direction:row). If the page header lives outside the panes element, give that element only .workbench-frame-split (it is display:flex row by itself).",
+    "Pane card visuals are product-owned, not workbench-shell's. For the standard gray rounded cards (see pattern.html): give the split frame padding (~10px) plus a base background so cards float; style each pane as background:var(--surface-2) + 1px solid var(--border-subtle) + border-radius:var(--radius-md). Inner content blocks use a recessed surface (surface-1).",
+    "The 3px pill drag handle in each gutter is provided for free by .pto-workbench-shell__split-gutter::before once initResizablePanes creates the gutter. Do not recreate the handle and do not override the gutter internals."
+  ],
+  "commonMistakes": [
+    "window.PtoWorkbenchShellPattern (wrong global name) -> no visible drag handle, falls back to a custom gutter.",
+    "Keeping CDN split.js plus a hand-rolled gutter that lacks the ::before handle.",
+    "Both .workbench-frame and .workbench-frame-split on one element -> vertical stacking.",
+    "Leaving panes flush/borderless because the kernel does not paint pane fills -> does not read as a PTO workbench."
+  ],
+  "consumeExample": "// 1) load kernel: <script src=\".../patterns/workbench-shell/pattern.js\"></script>\n// 2) markup: <main class=\"workbench-frame-split\"> with N child .workbench-pane (page header stays OUTSIDE this element)\n// 3) css: main{display:flex;flex-direction:row;padding:10px;background:var(--background)} .workbench-pane{background:var(--surface-2);border:1px solid var(--border-subtle);border-radius:var(--radius-md)}\n// 4) js: window.PtoWorkbenchShell.initResizablePanes({ panes:['#nav','#detail','#aside'], direction:'horizontal', sizes:[18,46,36], minSize:[200,440,360], gutterSize:10, storageKey:'my-split-v1', gutterLabel:'调整相邻栏宽度', onResize: refreshLayout })"
+}

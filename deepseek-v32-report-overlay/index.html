@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profiling Report Workbench</title>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      if (new URLSearchParams(window.location.search).has("preview")) root.dataset.preview = "true";
+      try {
+        const theme = localStorage.getItem("dsv32-report-theme");
+        const language = localStorage.getItem("dsv32-report-language");
+        if (theme === "light" || theme === "dark") root.dataset.theme = theme;
+        if (language === "zh" || language === "en") root.lang = language === "zh" ? "zh-CN" : "en";
+      } catch (_error) {
+        // Preferences are optional; dark English remains the deterministic default.
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/patterns/swimlane-task/pattern.css">
+  <link rel="stylesheet" href="./vendor/pto-design-system/patterns/model-graphviz/pattern.css">
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body class="source-report-app pto-model-graphviz-pattern-page">
+  <section id="ideFrame" class="pto-ide-frame source-report-ide" data-ide-frame data-host="standalone" data-bottom-panel-mode="visualization" aria-label="Profiling report workbench">
+    <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
+      <div class="pto-ide-frame__topbar-left">
+        <div class="pto-ide-frame__host-chip">
+          <svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+            <path d="m7 9 3 3-3 3"></path>
+            <path d="M12 15h5"></path>
+          </svg>
+          <span>IDE</span>
+        </div>
+        <div class="pto-ide-frame__workspace" data-ide-slot="workspace-switcher">
+          <span id="workspaceTitle">Profiling Report</span>
+          <span id="workspaceCrumbs" class="pto-ide-frame__crumbs">loading backend JSON</span>
+        </div>
+      </div>
+      <div class="pto-ide-frame__topbar-right">
+        <div class="pto-ide-frame__window-actions report-preference-actions" aria-label="Display preferences">
+          <button id="languageToggle" class="pto-ide-frame__window-action report-language-toggle" type="button" aria-label="切换到中文" title="切换到中文">
+            <span id="languageToggleLabel" aria-hidden="true">中</span>
+          </button>
+          <button id="themeToggle" class="pto-ide-frame__window-action" type="button" aria-label="Switch to light mode" aria-pressed="false" title="Switch to light mode">
+            <svg id="themeToggleIcon" class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2"></path>
+              <path d="M12 20v2"></path>
+              <path d="m4.93 4.93 1.41 1.41"></path>
+              <path d="m17.66 17.66 1.41 1.41"></path>
+              <path d="M2 12h2"></path>
+              <path d="M20 12h2"></path>
+              <path d="m6.34 17.66-1.41 1.41"></path>
+              <path d="m19.07 4.93-1.41 1.41"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="pto-ide-frame__window-actions" data-i18n-aria="workbenchPanels" aria-label="Workbench panels">
+          <button id="inspectorToggle" class="pto-ide-frame__window-action" type="button" aria-label="Toggle inspector" aria-controls="reportInspectorPane" aria-expanded="true" aria-pressed="true" title="Inspector">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <path d="M15 3v18"></path>
+            </svg>
+          </button>
+          <button id="bottomPanelToggle" class="pto-ide-frame__window-action is-selected" type="button" aria-label="Hide bottom panel" aria-controls="reportBottomDock" aria-expanded="true" aria-pressed="true" title="Hide bottom panel">
+            <svg class="pto-ide-frame__window-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <path d="M3 15h18"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__body">
+      <nav class="pto-ide-frame__activity-rail pto-ide-frame__standalone-chrome" data-ide-slot="activity-rail" aria-label="Activity rail">
+        <button id="nodeViewsRailButton" class="btn btn-icon btn-ghost pto-ide-frame__rail-button is-selected" type="button" data-node-view-action="operators" aria-label="Operator List" aria-controls="operatorTreePanel" title="Operator List">
+          <svg class="pto-ide-frame__rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9l-.81-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+          </svg>
+        </button>
+      </nav>
+
+      <div class="pto-ide-frame__workarea">
+        <div class="pto-ide-frame__split report-root-split" data-ide-split="report-root" data-storage-key="dsv32-report-root-v2" data-split-direction="vertical" data-sizes="68,32" data-min-size="360,220">
+          <section class="pto-ide-frame__pane pto-ide-frame__pane--stack report-main-stack" data-ide-pane="workspace">
+            <div class="pto-ide-frame__split report-main-split" data-ide-split="standalone-main" data-storage-key="dsv32-report-main-v3" data-split-direction="horizontal" data-sizes="72,28" data-min-size="420,320">
+              <section class="pto-ide-frame__pane" data-ide-pane="architecture">
+                <header class="pto-ide-frame__pane-header architecture-view-header">
+                  <div class="tab-control architecture-view-tabs" role="tablist" data-i18n-aria="nodeViews" aria-label="Node views">
+                    <button id="architectureViewTab" class="tab-control-item is-selected" type="button" role="tab" data-architecture-view="architecture" aria-selected="true" aria-controls="architectureGraphPanel" tabindex="0" data-i18n="modelArchitectureView">Model Architecture</button>
+                    <button id="operatorListViewTab" class="tab-control-item" type="button" role="tab" data-architecture-view="operators" aria-selected="false" aria-controls="operatorTreePanel" tabindex="-1" data-i18n="operatorListView">Operator List</button>
+                  </div>
+                  <span id="architectureStatus" class="pto-ide-frame__pane-meta">loading source architecture + backend overlay</span>
+                </header>
+                <div class="pto-ide-frame__pane-body architecture-pane-body">
+                  <div id="architectureGraphPanel" class="architecture-view-panel" role="tabpanel" aria-labelledby="architectureViewTab">
+                    <div id="architectureGraph" class="architecture-graph pto-model-graphviz-stage pto-model-architecture-stage" aria-label="Backend analysis architecture graph"></div>
+                  </div>
+                  <div id="operatorTreePanel" class="architecture-view-panel operator-tree-panel" role="tabpanel" aria-labelledby="operatorListViewTab" hidden>
+                    <div id="nodeList" class="operator-tree" role="tree" aria-label="Backend performance node hierarchy"></div>
+                  </div>
+                </div>
+              </section>
+
+              <aside id="reportInspectorPane" class="pto-ide-frame__pane" data-ide-pane="inspector" aria-label="Report inspector">
+                <header class="pto-ide-frame__pane-header">
+                  <h2 class="pto-ide-frame__pane-title" data-i18n="inspector">Inspector</h2>
+                  <button id="inspectorClose" class="btn btn-icon btn-ghost" type="button" aria-label="Close inspector">✕</button>
+                </header>
+                <div class="pto-ide-frame__pane-body report-inspector-body">
+                  <section class="report-inspector-section">
+                    <div class="inspector-heading">
+                      <div class="inspector-title-group">
+                        <div class="inspector-kicker"><span id="reportDimension" class="stat-chip">No selection</span></div>
+                        <h1 id="inspectorTitle" class="inspector-title">Select a backend node</h1>
+                        <div id="inspectorNodeId" class="node-id">No node_id selected</div>
+                      </div>
+                      <span id="graphCount" class="stat-chip">0 / 0</span>
+                    </div>
+                  </section>
+                  <section class="report-inspector-section">
+                    <h2 class="section-title" data-i18n="performanceMetrics">Performance Metrics</h2>
+                    <p id="inspectorSummary" class="section-copy">Choose a node in Explorer, the architecture graph, or a mapped timeline event.</p>
+                    <div id="metricGrid" class="metric-grid"></div>
+                  </section>
+                  <section class="report-inspector-section">
+                    <h2 class="section-title" data-i18n="evidence">Evidence</h2>
+                    <ul id="factList" class="fact-list"></ul>
+                  </section>
+                  <section class="report-inspector-section">
+                    <h2 class="section-title" data-i18n="operators">Operators</h2>
+                    <div id="operatorList" class="operator-list"></div>
+                  </section>
+                  <section class="report-inspector-section">
+                    <h2 class="section-title" data-i18n="actions">Actions</h2>
+                    <ul id="actionList" class="action-list"></ul>
+                  </section>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section id="reportBottomDock" class="pto-ide-frame__pane pto-ide-frame__bottom-dock" data-ide-pane="bottom-panel" data-ide-bottom-dock aria-hidden="false">
+            <div id="timelinePanel" class="pto-ide-frame__bottom-view" data-ide-bottom-panel="visualization">
+              <header class="pto-ide-frame__pane-header">
+                <div class="report-timeline-header-main">
+                  <h2 class="pto-ide-frame__pane-title" data-i18n="stepStreamTimeline">Step / Stream Timeline</h2>
+                  <span id="timelineCaption" class="timeline-caption">loading timeline</span>
+                </div>
+                <div class="report-timeline-header-actions">
+                  <div id="streamZoomControls" class="stream-zoom-controls" role="group" aria-label="Timeline zoom">
+                    <button id="streamZoomOut" class="btn btn-icon btn-ghost stream-zoom-button" type="button" aria-label="Zoom out" title="Zoom out">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8"></path></svg>
+                    </button>
+                    <button id="streamZoomReset" class="btn btn-ghost stream-zoom-readout" type="button" aria-label="Reset timeline zoom" title="Reset timeline zoom">100%</button>
+                    <button id="streamZoomIn" class="btn btn-icon btn-ghost stream-zoom-button" type="button" aria-label="Zoom in" title="Zoom in">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4v8M4 8h8"></path></svg>
+                    </button>
+                  </div>
+                  <div class="tab-control" role="tablist" aria-label="Timeline views">
+                    <button id="timelineTabSteps" class="tab-control-item" type="button" role="tab" data-timeline-tab="steps" aria-selected="false" aria-controls="stepTimelinePanel" tabindex="-1">Step</button>
+                    <button id="timelineTabStreams" class="tab-control-item is-selected" type="button" role="tab" data-timeline-tab="streams" aria-selected="true" aria-controls="streamTimelinePanel" tabindex="0" data-i18n="streams">Streams</button>
+                  </div>
+                </div>
+              </header>
+              <div class="pto-ide-frame__pane-body report-timeline-body">
+                <div id="stepTimelinePanel" class="timeline-tab-panel" role="tabpanel" aria-labelledby="timelineTabSteps" hidden></div>
+                <div id="streamTimelinePanel" class="timeline-tab-panel" role="tabpanel" aria-labelledby="timelineTabStreams"></div>
+              </div>
+            </div>
+
+          </section>
+        </div>
+
+        <footer class="pto-ide-frame__statusbar">
+          <div class="report-status-group">
+            <span>PTO 3.0</span>
+            <span id="footerStatus">loading backend JSON</span>
+          </div>
+          <span>analysis_config · perf_data · timeline</span>
+        </footer>
+      </div>
+    </div>
+  </section>
+
+  <script src="./vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="./vendor/pto-design-system/patterns/swimlane-task/pattern.js"></script>
+  <script src="./vendor/pto-design-system/patterns/model-graphviz/pattern.js"></script>
+  <script src="./vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="./report-data.js"></script>
+  <script src="./architecture-data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

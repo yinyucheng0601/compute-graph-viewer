@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTO Pattern - Model Graphviz</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const applyTheme = (theme) => {
+        if (theme === 'light' || theme === 'dark' || theme === 'glass') {
+          document.documentElement.dataset.theme = theme;
+        }
+      };
+      if (params.has('embed')) {
+        document.documentElement.dataset.embedPreview = 'true';
+      }
+      applyTheme(params.get('theme'));
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'pto-preview-theme') {
+          applyTheme(event.data.theme);
+        }
+      });
+    })();
+  </script>
+  <link rel="stylesheet" href="../../tokens/foundation.css">
+  <link rel="stylesheet" href="../../tokens/semantic.css">
+  <link rel="stylesheet" href="../../tokens/components.css">
+  <link rel="stylesheet" href="./pattern.css">
+</head>
+<body class="pto-model-graphviz-pattern-page">
+  <main class="pto-model-graphviz-pattern-main" data-view="graph-only">
+    <div class="pto-model-graphviz-iframe-stage pto-model-graphviz-iframe-stage-v32">
+      <iframe
+        class="pto-model-graphviz-source-frame"
+        src="./assets/deepseek_v32_modelviz.html?embed=1&amp;v=cmd-wheel-v1"
+        title="DeepSeek V3.2 Graphviz Source Page"></iframe>
+    </div>
+  </main>
+
+  <script>
+    (function initModelGraphvizPatternPreview() {
+      const sourceFrames = Array.from(document.querySelectorAll('.pto-model-graphviz-source-frame'));
+      const sourceFrameBaseSrc = new WeakMap(
+        sourceFrames.map((frame) => [frame, frame.getAttribute('src') || frame.src])
+      );
+      const applySourceFrameTheme = (frame, theme) => {
+        if (theme !== 'light' && theme !== 'dark' && theme !== 'glass') return;
+        try {
+          const url = new URL(sourceFrameBaseSrc.get(frame) || frame.src, window.location.href);
+          url.searchParams.set('theme', theme);
+          if (frame.src !== url.href) {
+            frame.src = url.href;
+            return;
+          }
+        } catch (_error) {}
+
+        try {
+          frame.contentWindow?.postMessage({
+            type: 'pto-preview-theme',
+            theme,
+          }, '*');
+        } catch (_error) {}
+
+        try {
+          frame.contentDocument.documentElement.dataset.theme = theme;
+        } catch (_error) {}
+      };
+      const syncSourceFrameThemes = () => {
+        const theme = document.documentElement.dataset.theme || 'dark';
+        sourceFrames.forEach((frame) => applySourceFrameTheme(frame, theme));
+      };
+      sourceFrames.forEach((frame) => frame.addEventListener('load', syncSourceFrameThemes));
+      window.addEventListener('message', (event) => {
+        if (event.data?.type === 'pto-preview-theme') {
+          window.requestAnimationFrame(syncSourceFrameThemes);
+        }
+      });
+      window.requestAnimationFrame(syncSourceFrameThemes);
+
+      const mainNode = document.querySelector('.pto-model-graphviz-pattern-main');
+      if (!mainNode) return;
+
+      const isEmbedPreview = document.documentElement.dataset.embedPreview === 'true';
+      if (!isEmbedPreview || window.parent === window) return;
+
+      let lastReportedHeight = 0;
+      const syncFrameHeight = () => {
+        const nextHeight = Math.ceil(Math.max(
+          mainNode.scrollHeight,
+          mainNode.getBoundingClientRect().height
+        ));
+        if (nextHeight <= 0) return;
+        const resolvedHeight = nextHeight;
+        if (Math.abs(resolvedHeight - lastReportedHeight) <= 1) return;
+        lastReportedHeight = resolvedHeight;
+        window.parent.postMessage({
+          type: 'pto-pattern-preview-height',
+          pathname: window.location.pathname,
+          height: resolvedHeight,
+        }, '*');
+      };
+
+      if ('ResizeObserver' in window) {
+        const resizeObserver = new ResizeObserver(() => syncFrameHeight());
+        resizeObserver.observe(mainNode);
+      }
+
+      window.requestAnimationFrame(syncFrameHeight);
+      window.requestAnimationFrame(() => window.requestAnimationFrame(syncFrameHeight));
+      window.setTimeout(syncFrameHeight, 120);
+      window.setTimeout(syncFrameHeight, 260);
+    })();
+  </script>
+</body>
+</html>

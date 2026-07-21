@@ -1,0 +1,69 @@
+{
+  "id": "ide-frame",
+  "name": "PTO IDE Frame",
+  "type": "hybrid",
+  "description": "Upper-level PTO IDE framework shell for standalone pages and VS Code webviews. It owns IDE chrome, a 4:3 host window ratio, a 100%-intensity multi-point gradient IDE skin, 80% filled translucent blurred pane wells, dense pane typography, utility window controls, optional activity rail, pane-local preview tabs, domain toolbars, status strips, preview surfaces, renderer slots, inspector docks, optional bottom terminal panel replacement, optional floating playback mounting, and split initialization. Standalone explorer defaults to a 300px initial width when the host width is known. Top chrome is transparent over the IDE window, does not draw divider borders, and does not include macOS traffic-light controls. Product pages provide all domain content. It delegates resize behavior to workbench-shell and playback chrome to floating-playback-control.",
+  "source": {
+    "visualContract": [
+      "patterns/ide-frame/pattern.css owns .pto-ide-frame* visual classes",
+      "patterns/ide-frame/pattern.css owns the default IDE skin: --ide-gradient-bg, --ide-aura-bg, --ide-frame-pane-fill at 80%, and --ide-frame-pane-backdrop-filter",
+      "patterns/ide-frame/pattern.js initializes declared split slots through PtoWorkbenchShell",
+      "patterns/ide-frame/pattern.js toggles a right-top terminal control through data-ide-toggle=\"terminal\" and swaps bottom terminal/visualization panels",
+      "patterns/ide-frame/pattern.js mounts playback slots through PtoFloatingPlaybackControl",
+      "patterns/ide-frame/vscode.css maps --vscode-* variables for extension webviews",
+      "patterns/workbench-shell/pattern.json provides the resize kernel",
+      "patterns/floating-playback-control/pattern.json provides the floating playback chrome"
+    ],
+    "patternHtml": "patterns/ide-frame/pattern.html",
+    "patternCss": "patterns/ide-frame/pattern.css",
+    "renderScript": "patterns/ide-frame/pattern.js",
+    "hostAdapter": "patterns/ide-frame/vscode.css",
+    "thirdParty": "none"
+  },
+  "dependencies": [
+    "tokens/foundation.css",
+    "tokens/semantic.css",
+    "tokens/components.css",
+    "css/style.css",
+    "patterns/workbench-shell/pattern.css",
+    "patterns/workbench-shell/pattern.js",
+    "patterns/floating-playback-control/pattern.css",
+    "patterns/floating-playback-control/pattern.js"
+  ],
+  "hosts": [
+    {
+      "value": "standalone",
+      "contract": "May render PTO-owned topbar, window controls, optional activity rail, explorer, pane-local preview tabs, playback, and local status strip. Tabs belong inside the preview/editor pane, not as a separate top-level chrome band."
+    },
+    {
+      "value": "vscode-webview",
+      "contract": "Must hide standalone chrome and rely on VS Code for explorer, editor tabs, search, git, terminal, settings, command palette, keybindings, global status, notifications, progress, theme colors, and baseline fonts."
+    }
+  ],
+  "requiredApis": [
+    "window.PtoIdeFrame.init(root, options)",
+    "window.PtoIdeFrame.initAll()"
+  ],
+  "allowedOverrides": [
+    "host mode through data-host=\"standalone\" or data-host=\"vscode-webview\"",
+    "solid pane and control compositing through data-surface=\"solid\", which preserves the frame layout while replacing translucent fills, blur, and glass shadows with semantic solid surfaces",
+    "hiding the standalone activity rail through hidden, data-activity-rail=\"hidden\", or data-hide-activity-rail=\"true\"",
+    "host window width while preserving the default 4:3 frame ratio",
+    "initial pane pixel sizing through data-pixel-sizes, with the standalone explorer defaulting to 300px",
+    "right-top terminal toggle through data-ide-toggle=\"terminal\" plus a bottom dock with data-ide-bottom-panel=\"terminal\" and optional data-ide-bottom-panel=\"visualization\"",
+    "IDE semantic tokens such as --ide-frame-page-bg, --ide-frame-bg, --ide-gradient-bg, --ide-aura-bg, --ide-frame-chrome-bg, --ide-frame-pane-bg, --ide-frame-pane-fill, --ide-frame-pane-header-fill, --ide-frame-pane-backdrop-filter, --ide-frame-pane-shadow, --ide-frame-pane-border, --ide-frame-header-height, --ide-frame-title-font, and --ide-frame-meta-font",
+    "pane content, renderer implementations, inspector content, floating playback state, and command bindings"
+  ],
+  "forbiddenOverrides": [
+    "overriding .pto-workbench-shell__* internal styles from ide-frame",
+    "replacing the shared IDE gradient skin, 80% pane fill, or pane backdrop blur with page-local opaque panels unless the shared pattern variables are updated first",
+    "adding standalone topbar or preview tabstrip background fills and divider borders",
+    "showing terminal and bottom visualization panels at the same time; they are mutually exclusive views of the same bottom dock",
+    "embedding a private design-system copy, local upload assets, remote framework runtimes, transpiler runtimes, or one-off theme files",
+    "showing fake VS Code explorer, editor tabs, global status bar, search, git, terminal, settings, notifications, or progress in data-host=\"vscode-webview\" mode",
+    "shipping business sample data, file names, kernel names, graph node data, timeline lanes, trace data, inspector values, placeholder tab names, placeholder code rows, or default textual slot content inside ide-frame",
+    "recreating playback footer, scrubber, collapse state, or playback shell chrome in ide-frame-local CSS instead of floating-playback-control",
+    "editing source code in the webview; use optional read-only slots and route real edits to the VS Code editor"
+  ],
+  "agentReuseRule": "Use ide-frame for IDE-like PTO pages as a framework shell only. Load root design-system tokens, workbench-shell, and optional floating-playback-control only when playback is requested; set data-host for standalone or vscode-webview, declare data-ide-split and data-ide-pane slots, add a right-top data-ide-toggle=\"terminal\" button when a bottom terminal is needed, and initialize PtoIdeFrame. Standalone IDE pages must consume the shared IDE skin from pattern.css: the 100%-intensity multi-point gradient background, aura layer, 80% pane fill, 20px cursor-dot grid, and backdrop blur are defaults, not product-local CSS. Keep the shared pattern clean: put all tabs, titles, file trees, code previews, charts, terminal text, inspector copy, and domain placeholders in the consuming page. Do not style workbench-shell internals; it is only the resize kernel. Do not recreate playback chrome; call PtoFloatingPlaybackControl only when playback is explicitly needed."
+}
