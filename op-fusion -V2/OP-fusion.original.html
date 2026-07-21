@@ -1,0 +1,927 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>昇腾融合算子推荐 · 计算图工作台</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151f; --panel-2:#161b27; --panel-3:#1b2233;
+    --line:#2a3245; --line-soft:#222a3b; --ink:#e6ebf5; --ink-2:#9aa6bd; --ink-3:#5e6a82;
+    --accent:#06b6d4; --accent-2:#3b82f6;
+    /* semantic operator palette (mirrors reference) */
+    --sem-embedding:#14B8A6; --sem-norm:#06B6D4; --sem-attention:#EC4899;
+    --sem-rope:#A855F7; --sem-qknorm:#0EA5E9; --sem-linear:#3B82F6;
+    --sem-gate:#F59E0B; --sem-moe:#F97316; --sem-act:#8B5CF6; --sem-comm:#22D3EE;
+    --io:#64748B; --tensor:#1e2638;
+    --fuse:#ff9d00; --fuse-soft:rgba(255,157,0,.16);
+    --p0:#FF2D7A; --p1:#FF9D00; --p2:#FFE600;
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;overflow:hidden}
+  .topbar{height:46px;display:flex;align-items:center;gap:14px;padding:0 16px;
+    border-bottom:1px solid var(--line);background:linear-gradient(180deg,#141a26,#0e121b)}
+  .topbar .logo{font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:8px}
+  .topbar .logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 10px var(--accent)}
+  .topbar .sub{color:var(--ink-3);font-size:11px;font-family:var(--mono)}
+  .topbar .spacer{flex:1}
+  .topbar .pipe{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);
+    display:flex;align-items:center;gap:7px}
+  .topbar .pipe b{color:var(--accent-2)}
+  .topbar .pipe .arr{color:var(--ink-3)}
+
+  .layout{display:grid;grid-template-columns:248px 1fr 396px;height:calc(100% - 46px)}
+  .col{height:100%;overflow:hidden;display:flex;flex-direction:column}
+  .col.left{border-right:1px solid var(--line);background:var(--panel)}
+  .col.mid{background:#0a0d13;position:relative}
+  .col.right{border-left:1px solid var(--line);background:var(--panel)}
+  .col-head{padding:11px 14px 9px;border-bottom:1px solid var(--line-soft);flex:none}
+  .col-head .t{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--ink-2)}
+  .col-head .d{font-size:10.5px;color:var(--ink-3);margin-top:3px;font-family:var(--mono)}
+  .col-body{flex:1;overflow:auto;padding:12px 12px 24px}
+  .col-body::-webkit-scrollbar{width:9px;height:9px}
+  .col-body::-webkit-scrollbar-thumb{background:#2a3245;border-radius:6px}
+
+  /* ---------- LEFT: model picker ---------- */
+  .mlist{display:flex;flex-direction:column;gap:7px}
+  .mcard{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--panel-2);
+    cursor:pointer;transition:.13s}
+  .mcard:hover{border-color:#3a445e;background:var(--panel-3)}
+  .mcard.on{border-color:var(--accent);background:linear-gradient(180deg,#13202c,#0f1722);
+    box-shadow:0 0 0 1px var(--accent) inset,0 0 18px rgba(6,182,212,.12)}
+  .mcard .nm{font-weight:700;font-size:13px;display:flex;align-items:center;gap:7px}
+  .mcard .nm .tag{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:5px;
+    background:#22304a;color:#9fc7ff;font-weight:600}
+  .mcard .nm .tag.moe{background:#3a2710;color:#ffce8a}
+  .mcard .nm .tag.new{background:#3a1030;color:#ff9ad6}
+  .mcard .meta{margin-top:5px;font-family:var(--mono);font-size:10px;color:var(--ink-3);line-height:1.55}
+  .mcard.on .meta{color:var(--ink-2)}
+
+  .upload{margin-top:13px;border:1.4px dashed #34405a;border-radius:9px;padding:13px 10px;text-align:center;
+    cursor:pointer;color:var(--ink-2);transition:.13s;background:rgba(255,255,255,.012)}
+  .upload:hover{border-color:var(--accent);color:var(--ink)}
+  .upload .ic{font-size:18px;opacity:.8}
+  .upload .h{font-size:11.5px;font-weight:600;margin-top:4px}
+  .upload .s{font-size:10px;color:var(--ink-3);margin-top:2px;font-family:var(--mono)}
+
+  .kb{margin-top:15px}
+  .kb .lbl{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px}
+  .src{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border-radius:7px;
+    background:var(--panel-2);border:1px solid var(--line-soft);margin-bottom:6px}
+  .src .ico{width:18px;height:18px;border-radius:5px;flex:none;margin-top:1px;
+    display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .src .ico.v{background:#1e2c44;color:#7db4ff}
+  .src .ico.c{background:#2c1e10;color:#ffba6b}
+  .src .ico.a{background:#102c1e;color:#6bffb0}
+  .src .nm{font-size:11px;font-weight:600}
+  .src .ds{font-size:9.5px;color:var(--ink-3);font-family:var(--mono);margin-top:2px;line-height:1.4}
+  .src .st{margin-left:auto;font-size:8.5px;color:#5fd38a;font-family:var(--mono);white-space:nowrap}
+
+  /* ---------- MIDDLE: graph ---------- */
+  .graph-toolbar{position:absolute;top:10px;left:12px;z-index:6;display:flex;gap:7px;align-items:center}
+  .gbtn{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer;transition:.12s}
+  .gbtn:hover{border-color:var(--accent);color:var(--ink)}
+  .legend{position:absolute;bottom:10px;left:12px;z-index:6;background:rgba(11,14,20,.86);
+    border:1px solid var(--line);border-radius:8px;padding:8px 11px;display:flex;flex-wrap:wrap;gap:9px 14px;
+    max-width:560px;backdrop-filter:blur(6px)}
+  .legend .li{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-2);font-family:var(--mono)}
+  .legend .sw{width:11px;height:11px;border-radius:3px}
+  .legend .ln{width:20px;height:0;border-top:2px solid var(--ink-2)}
+  .legend .ln.dash{border-top-style:dashed}
+  .legend .ln.fuse{border-top:2px solid var(--fuse)}
+
+  #stage{width:100%;height:100%;overflow:hidden;cursor:grab}
+  #stage.grabbing{cursor:grabbing}
+  #gsvg{transform-origin:0 0;font-family:var(--sans)}
+  .cl-rect{fill:#fff;fill-opacity:.045;stroke:var(--line);stroke-width:1.6}
+  .cl-rect.repeat{stroke:#3a455f;stroke-width:1.2;stroke-dasharray:4 3}
+  .cl-label{fill:var(--ink-2);font-size:11.5px;font-weight:700;letter-spacing:.4px}
+  .cl-badge-bg{fill:#1c2638;stroke:#33405a}
+  .cl-badge-tx{fill:#cfe0ff;font-size:10px;font-weight:700;font-family:var(--mono)}
+
+  .nd{cursor:pointer}
+  .nd-rect{stroke-width:1.4;transition:.12s}
+  .nd .nd-rect{fill-opacity:.92}
+  .nd-label{fill:#fff;font-size:12px;font-weight:600;text-anchor:middle;pointer-events:none}
+  .nd-type{fill:rgba(255,255,255,.66);font-size:9px;font-weight:600;text-anchor:middle;
+    pointer-events:none;font-family:var(--mono);letter-spacing:.3px}
+  .nd.tensor .nd-rect{fill:var(--tensor);stroke:#33405a}
+  .nd.tensor .nd-label{fill:#aeb8cc;font-size:11px}
+  .nd.io .nd-rect{fill:#1a2233;stroke:#3a455f}
+  .nd.io .nd-label{fill:#cdd6e8}
+  /* fusion-point ring */
+  .nd.fuse .nd-rect{stroke:var(--fuse);stroke-width:2}
+  .fuse-dot{fill:var(--fuse);filter:drop-shadow(0 0 4px var(--fuse))}
+  .fuse-star{fill:var(--fuse);font-size:13px;text-anchor:middle;dominant-baseline:central;
+    filter:drop-shadow(0 0 4px var(--fuse))}
+  .nd.dim{opacity:.28}
+  .nd.sel .nd-rect{stroke:#fff;stroke-width:2.6;filter:drop-shadow(0 0 8px rgba(255,255,255,.4))}
+  .nd.rel .nd-rect{stroke:#fff;stroke-width:2}
+
+  .edge{fill:none;stroke:var(--line);stroke-width:1.6;transition:.12s}
+  .edge.param{stroke:#5b4a6e;stroke-dasharray:7 6;stroke-width:1.4}
+  .edge.comm{stroke:#1f7e8c}
+  .edge.fuse{stroke:var(--fuse);stroke-width:2;stroke-dasharray:none;opacity:.9}
+  .edge.dim{opacity:.15}
+  .edge.rel{stroke:#cdd6e8;stroke-width:2.2}
+  .etag{font-family:var(--mono);font-size:9px;font-weight:700;fill:var(--ink-2)}
+  .etag-bg{fill:#141a26;stroke:#2a3245;rx:4}
+  .etag.param{fill:#b69ad6}
+  .etag.comm{fill:#6fe0ec}
+
+  /* fusion bracket overlay on spine */
+  .fbracket{fill:none;stroke:var(--fuse);stroke-width:2.2;opacity:.92;
+    filter:drop-shadow(0 0 5px rgba(255,157,0,.5))}
+  .fbracket-lbl{fill:var(--fuse);font-size:10px;font-weight:700;font-family:var(--mono)}
+  .fbracket-bg{fill:rgba(255,157,0,.1);stroke:var(--fuse);stroke-width:1.2;stroke-dasharray:3 3}
+
+  .gtip{position:absolute;z-index:30;pointer-events:none;max-width:280px;
+    background:#0e1320;border:1px solid var(--line);border-radius:9px;padding:10px 12px;
+    box-shadow:0 14px 34px rgba(0,0,0,.5);opacity:0;transition:opacity .1s;font-size:11px}
+  .gtip.on{opacity:1}
+  .gtip .gt-h{font-weight:700;font-size:12px;display:flex;align-items:center;gap:7px}
+  .gtip .gt-k{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:4px;color:#fff}
+  .gtip .gt-row{margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--ink-2);line-height:1.55}
+  .gtip .gt-row b{color:var(--ink)}
+  .gtip .gt-fuse{margin-top:7px;padding-top:7px;border-top:1px solid var(--line-soft);
+    color:var(--fuse);font-size:10.5px;font-weight:600}
+
+  /* ---------- RIGHT: recommendations ---------- */
+  .rsummary{display:flex;gap:8px;margin-bottom:12px}
+  .rstat{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel-2)}
+  .rstat .v{font-size:19px;font-weight:800;font-family:var(--mono);line-height:1}
+  .rstat .v.orange{color:var(--fuse)} .rstat .v.cyan{color:var(--accent)} .rstat .v.green{color:#5fd38a}
+  .rstat .l{font-size:9.5px;color:var(--ink-3);margin-top:4px;letter-spacing:.3px}
+
+  .rcard{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);margin-bottom:11px;
+    overflow:hidden;transition:.13s}
+  .rcard:hover{border-color:#3a455f}
+  .rcard.sel{border-color:var(--fuse);box-shadow:0 0 0 1px var(--fuse) inset,0 0 20px rgba(255,157,0,.12)}
+  .rc-head{padding:11px 13px;cursor:pointer;display:flex;align-items:flex-start;gap:9px}
+  .rc-prio{font-family:var(--mono);font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;flex:none;margin-top:1px}
+  .rc-prio.s{background:var(--fuse);color:#1a1206} /* star / top */
+  .rc-prio.h{background:#FF2D7A;color:#fff}
+  .rc-prio.m{background:#3b82f6;color:#fff}
+  .rc-title{flex:1}
+  .rc-title .nm{font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
+  .rc-title .nm .star{color:var(--fuse)}
+  .rc-title .chain{font-family:var(--mono);font-size:10px;color:var(--ink-2);margin-top:4px;line-height:1.5}
+  .rc-title .chain .op{color:#cdd6e8}
+  .rc-title .chain .fu{color:var(--fuse);font-weight:700}
+  .rc-title .chain .ar{color:var(--ink-3);margin:0 2px}
+  .rc-gain{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .gain{font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:5px;background:#102218;color:#6bffb0}
+  .gain.tp{background:#101e2c;color:#7db4ff}
+  .gain.mem{background:#2a1e10;color:#ffce8a}
+  .rc-exp{font-size:14px;color:var(--ink-3);flex:none}
+
+  .rc-body{display:none;padding:0 13px 13px;border-top:1px solid var(--line-soft)}
+  .rcard.open .rc-body{display:block}
+  .rc-sec{margin-top:11px}
+  .rc-sec .h{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-3);
+    font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .rc-sec .h .ic{font-size:11px}
+  .rc-reason{font-size:11.5px;color:var(--ink-2);line-height:1.62}
+  .rc-reason b{color:var(--ink)}
+  .codecmp{display:grid;grid-template-columns:1fr;gap:8px}
+  .codeblk{border:1px solid var(--line-soft);border-radius:8px;overflow:hidden}
+  .codeblk .cb-h{font-family:var(--mono);font-size:9.5px;padding:5px 9px;font-weight:700;
+    display:flex;align-items:center;gap:6px;letter-spacing:.3px}
+  .codeblk.v .cb-h{background:#16202f;color:#7db4ff}
+  .codeblk.a .cb-h{background:#2a2110;color:#ffce8a}
+  .codeblk pre{margin:0;padding:9px 10px;overflow-x:auto;background:#0c1019;font-family:var(--mono);
+    font-size:10px;line-height:1.6;color:#c4cfe2}
+  .codeblk pre::-webkit-scrollbar{height:7px}.codeblk pre::-webkit-scrollbar-thumb{background:#2a3245;border-radius:5px}
+  .tok-k{color:#c792ea}.tok-f{color:#82aaff}.tok-s{color:#c3e88d}.tok-c{color:#5e6a82;font-style:italic}.tok-n{color:#f78c6c}
+  .docref{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:7px;background:#16110a;
+    border:1px solid #3a2c14;font-family:var(--mono);font-size:10px;color:#ffce8a;margin-top:4px}
+  .docref .ic{font-size:11px}
+  .docref .pth{color:#ffba6b;text-decoration:underline;text-underline-offset:2px}
+  .affects{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .affects .chip{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:5px;
+    background:#1a2233;border:1px solid var(--line);color:var(--ink-2);cursor:pointer;transition:.1s}
+  .affects .chip:hover{border-color:var(--fuse);color:var(--fuse)}
+
+  .empty{color:var(--ink-3);font-size:12px;text-align:center;padding:40px 16px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo"><span class="dot"></span>昇腾融合算子推荐 <span class="sub">/ Ascend Fusion Advisor</span></div>
+  <div class="spacer"></div>
+  <div class="pipe">
+    <span>模型结构</span><span class="arr">→</span>
+    <b>vLLM 实现</b><span class="arr">→</span>
+    <b>CANN 算子库</b><span class="arr">→</span>
+    <span>融合方案</span>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- LEFT -->
+  <div class="col left">
+    <div class="col-head">
+      <div class="t">① 模型输入</div>
+      <div class="d">选择或上传 config.json</div>
+    </div>
+    <div class="col-body">
+      <div class="mlist" id="mlist"></div>
+
+      <label class="upload" for="cfgfile">
+        <div class="ic">⤓</div>
+        <div class="h">上传 HuggingFace config.json</div>
+        <div class="s">真实解析 · 自动建图</div>
+        <input id="cfgfile" type="file" accept=".json,application/json" style="display:none">
+      </label>
+
+      <div class="kb">
+        <div class="lbl">挂载的知识源</div>
+        <div class="src">
+          <div class="ico v">V</div>
+          <div><div class="nm">vLLM 开源实现</div>
+            <div class="ds">model_executor/layers/*</div></div>
+          <div class="st">● linked</div>
+        </div>
+        <div class="src">
+          <div class="ico c">C</div>
+          <div><div class="nm">CANN 算子文档</div>
+            <div class="ds">ascendc / aclnn 融合算子手册</div></div>
+          <div class="st">● linked</div>
+        </div>
+        <div class="src">
+          <div class="ico a">A</div>
+          <div><div class="nm">vllm-ascend 后端</div>
+            <div class="ds">platform / ops / patch</div></div>
+          <div class="st">● linked</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIDDLE -->
+  <div class="col mid">
+    <div class="col-head">
+      <div class="t">② 计算图 · Compute Graph (DAG)</div>
+      <div class="d" id="mid-d">中央算子脊柱 · 旁挂权重张量 · 橙=可融合点</div>
+    </div>
+    <div style="flex:1;position:relative;overflow:hidden">
+      <div class="graph-toolbar">
+        <div class="gbtn" id="zin">+</div>
+        <div class="gbtn" id="zout">−</div>
+        <div class="gbtn" id="zfit">适配</div>
+        <div class="gbtn" id="zbr">融合括号</div>
+      </div>
+      <div id="stage"><svg id="gsvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="legend" id="legend">
+        <div class="li"><span class="sw" style="background:var(--sem-norm)"></span>归一化</div>
+        <div class="li"><span class="sw" style="background:var(--sem-attention)"></span>注意力</div>
+        <div class="li"><span class="sw" style="background:var(--sem-qknorm)"></span>QK-Norm</div>
+        <div class="li"><span class="sw" style="background:var(--sem-rope)"></span>RoPE</div>
+        <div class="li"><span class="sw" style="background:var(--sem-linear)"></span>Linear/GEMM</div>
+        <div class="li"><span class="sw" style="background:var(--sem-act)"></span>激活</div>
+        <div class="li"><span class="sw" style="background:var(--sem-gate)"></span>Router</div>
+        <div class="li"><span class="sw" style="background:var(--sem-moe)"></span>Expert</div>
+        <div class="li"><span class="ln"></span>激活流</div>
+        <div class="li"><span class="ln dash"></span>权重</div>
+        <div class="li"><span class="ln fuse"></span>融合</div>
+      </div>
+      <div class="gtip" id="gtip"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col right">
+    <div class="col-head">
+      <div class="t">③ 融合算子推荐</div>
+      <div class="d" id="right-d">按收益排序 · 含理由与代码对照</div>
+    </div>
+    <div class="col-body" id="rbody"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   DATA LAYER  —  分离数据与渲染。
+   接真实 pipeline 时：MODELS 换成 fx-graph/ONNX 解析的 JSON，
+   recs 换成 AI 分析输出，渲染层不动。
+   ============================================================ */
+
+/* 语义颜色 -> CSS var 取值（SVG fill 用） */
+const SEM = {
+  embedding:'#14B8A6', norm:'#06B6D4', attention:'#EC4899', qknorm:'#0EA5E9',
+  rope:'#A855F7', linear:'#3B82F6', gate:'#F59E0B', moe:'#F97316',
+  act:'#8B5CF6', comm:'#22D3EE', io:'#64748B'
+};
+
+/* ---- 共享融合方案库 (recId -> 推荐卡) ---- */
+const FUSION_LIB = {
+  qknorm_rope:{
+    prio:'s', title:'QK-Norm + RoPE 融合', star:true,
+    chain:[['q_norm','fu'],['→'],['k_norm','fu'],['→'],['RoPE','fu'],['⇒'],['RmsNormRope','out']],
+    gains:[['访存 ↓42%','mem'],['吞吐 ↑1.3x','tp'],['kernel 3→1','']],
+    reason:'Qwen3 在 QKV 投影后、RoPE 前对 Q/K 按 <b>head_dim=128</b> 做 per-head RMSNorm（Qwen2/Llama 没有此算子）。单独执行时 q_norm/k_norm 是<b>访存严重受限</b>的小向量算子，归一化后的 Q/K 要落 HBM 再被 RoPE 读回。把 q_norm、k_norm 与紧随的 RoPE 融成一个 <b>AscendC Vector kernel</b>，归一化结果驻留 UB（Unified Buffer）直接喂给旋转编码，省去两次 HBM 往返。',
+    affects:['q_norm','k_norm','rotary_emb'],
+    doc:'aclnnRmsNormRope / ascendc_kernels/rms_norm_rope.h',
+    vllm:[
+      ['c','# vLLM: q/k norm 与 rope 分立 (qwen3)'],
+      ['k','q','=',' self.q_norm(q.view(-1, hd))'],
+      ['k','k','=',' self.k_norm(k.view(-1, hd))'],
+      ['k','q, k','=',' self.rotary_emb(pos, q, k)'],
+    ],
+    asc:[
+      ['c','// 昇腾: 单 kernel 完成 norm+rope'],
+      ['f','aclnnRmsNormRope','(q, k, gamma_q, gamma_k,'],
+      ['','            cos, sin, eps, &q_out, &k_out);'],
+      ['c','// Q/K 归一化结果驻留 UB，不落 HBM'],
+    ],
+  },
+  add_rmsnorm:{
+    prio:'h', title:'残差 Add + RMSNorm 融合',
+    chain:[['residual','op'],['+'],['hidden','op'],['→'],['RMSNorm','fu'],['⇒'],['AddRmsNorm','out']],
+    gains:[['访存 ↓35%','mem'],['吞吐 ↑1.2x','tp'],['kernel 2→1','']],
+    reason:'每个 decoder layer 入口都是 <b>residual add → RMSNorm</b> 的固定组合。Add 产生的中间张量本可不落 HBM。融合为 <b>AddRmsNorm</b> 后，残差加法的结果直接在片上参与归一化的平方和归约，少一次 [batch,seq,hidden] 的写回与读取——这是 decoder 中最高频、收益最稳的融合点。',
+    affects:['attn_norm','ffn_norm'],
+    doc:'aclnnAddRmsNorm / ops: add_rms_norm',
+    vllm:[
+      ['c','# vLLM: add 与 norm 分两步'],
+      ['k','hidden','=',' residual + hidden'],
+      ['k','hidden','=',' self.input_layernorm(hidden)'],
+    ],
+    asc:[
+      ['c','// 昇腾: 残差加法结果片上直接归一化'],
+      ['f','aclnnAddRmsNorm','(x, residual, gamma, eps,'],
+      ['','            &y, &new_residual);'],
+    ],
+  },
+  swiglu:{
+    prio:'h', title:'SwiGLU 激活融合 (SiluAndMul)',
+    chain:[['gate_proj','op'],['silu','fu'],['×'],['up_proj','op'],['⇒'],['SiluAndMul','out']],
+    gains:[['访存 ↓30%','mem'],['吞吐 ↑1.25x','tp']],
+    reason:'MLP 的 <b>SiLU(gate) ⊙ up</b> 若拆成 silu、elementwise-mul 两个 Vector 算子，中间结果往返 HBM。融合为 <b>SiluAndMul</b> 一个 kernel：gate 分支过 SiLU 后立即与 up 分支逐元素相乘，中间量驻留 UB。FFN 中间维大（Qwen3-14B intermediate=17408），访存收益显著。',
+    affects:['mlp_act'],
+    doc:'aclnnSwiGlu / SiluAndMul',
+    vllm:[
+      ['c','# vLLM: SiluAndMul (已是融合算子接口)'],
+      ['k','x','=',' self.act_fn(gate_up)  '],['c','# silu*mul'],
+    ],
+    asc:[
+      ['c','// 昇腾: gate 过 silu 后片上直乘 up'],
+      ['f','aclnnSwiGlu','(gate_up, dim, &out);'],
+    ],
+  },
+  qkv_merge:{
+    prio:'m', title:'QKV 合并投影 (MergedColumnParallel)',
+    chain:[['q_proj','op'],['k_proj','op'],['v_proj','op'],['⇒'],['QKVProj','out']],
+    gains:[['吞吐 ↑1.15x','tp'],['启动开销 ↓','']],
+    reason:'Q/K/V 三个 Linear 共享同一输入 hidden。合并为单个 <b>QKVParallelLinear</b> 做一次大 GEMM，更好地填满 Cube 单元、减少 kernel 启动与权重重排开销。<b>Qwen3 关键差异：attention_bias=false</b>，合并后无需 bias-add，kernel 比仍带 bias 的 Qwen2 更干净（少一路 Vector 加法）。GQA 下 K/V 头数（8）远少于 Q（40），合并需按 [q_size, kv_size, kv_size] 正确切分。',
+    affects:['qkv_proj'],
+    doc:'QKVParallelLinear / aclnnMatmul',
+    vllm:[
+      ['c','# vLLM: QKVParallelLinear 一次投影'],
+      ['k','qkv','=',' self.qkv_proj(hidden)'],
+      ['k','q, k, v','=',' qkv.split([qs, kvs, kvs], -1)'],
+    ],
+    asc:[
+      ['c','// 昇腾: 单 GEMM, 无 bias (qwen3)'],
+      ['f','aclnnMatmul','(hidden, qkv_w, &qkv);  '],['c','// no bias'],
+    ],
+  },
+  flash_paged:{
+    prio:'m', title:'FlashAttention + PagedKV 融合',
+    chain:[['QK^T','op'],['softmax','fu'],['×V','op'],['+','PagedKV'],['⇒'],['FlashAttn','out']],
+    gains:[['显存 ↓','mem'],['长序列 ↑','tp']],
+    reason:'标准注意力会物化 [seq,seq] 的打分矩阵。<b>FlashAttention</b> 分块计算 QK^T、online-softmax、加权 V，打分矩阵不落 HBM；叠加 <b>PagedAttention</b> 的分页 KV-cache，按 block 寻址非连续 KV。昇腾上对应融合注意力算子，结合 GQA（Qwen3 为 40Q:8KV）按 KV 头分组复用，进一步省显存带宽。',
+    affects:['attention'],
+    doc:'aclnnFlashAttention / PagedAttention',
+    vllm:[
+      ['c','# vLLM: 统一注意力后端入口'],
+      ['k','out','=',' self.attn(q, k, v, kv_cache,'],
+      ['','              attn_metadata)'],
+    ],
+    asc:[
+      ['c','// 昇腾: 融合 flash + 分页 KV'],
+      ['f','aclnnFlashAttentionPaged','(q, k, v,'],
+      ['','        block_tables, &out);'],
+    ],
+  },
+  grouped_matmul:{
+    prio:'s', title:'MoE 路由 + GroupedMatmul 融合', star:true,
+    chain:[['router','op'],['→'],['dispatch','fu'],['→'],['expert GEMM','fu'],['⇒'],['GroupedMatmul','out']],
+    gains:[['访存 ↓','mem'],['专家并行 ↑','tp'],['零 padding','']],
+    reason:'MoE 下每个 token 只激活 top-k 专家。朴素实现为每个专家单独发 GEMM 或做 padding，浪费算力与带宽。<b>GroupedMatmul</b> 把路由后变长的 token 分组，按 group_list 一次性发起分组矩阵乘，配合 token dispatch/combine 融合，避免 padding 浪费并填满 Cube。适用于 Mixtral / DeepSeek 等 MoE 结构。',
+    affects:['router','experts'],
+    doc:'aclnnGroupedMatmul / moe_dispatch_combine',
+    vllm:[
+      ['c','# vLLM: FusedMoE 入口'],
+      ['k','out','=',' self.experts(hidden, router_logits)'],
+    ],
+    asc:[
+      ['c','// 昇腾: 变长分组矩阵乘, 无 padding'],
+      ['f','aclnnGroupedMatmul','(x, w, group_list, &out);'],
+    ],
+  },
+};
+
+/* ============================================================
+   MODEL GRAPHS  —  中央脊柱 + 旁挂权重，坐标式布局 (mirror reference)
+   每个 op 节点可带 fuseRec=recId（橙点 / 进推荐）。
+   ============================================================ */
+function buildGraph(spec){
+  // spec: {name, dims..., variant: 'dense'|'moe', qknorm:bool, attnBias:bool}
+  const cx = 470;                  // central spine x
+  const Wp = 168, Wo = 252, Wt=190;// param width, op width, tensor width
+  const Lx = 150, Rx = 790;        // left/right param column centers
+  const N=[], E=[], CL=[];
+  let y = 56;
+  const op=(id,label,type,sem,opts={})=>{N.push({id,label,typeLabel:type,kind:'op',sem,x:cx,y,w:Wo,h:52,...opts});};
+  const tn=(id,label,type,opts={})=>{N.push({id,label,typeLabel:type,kind:'tensor',x:cx,y,w:Wt,h:44,...opts});};
+  const io=(id,label,type,opts={})=>{N.push({id,label,typeLabel:type,kind:'io',x:cx,y,w:Wt,h:44,...opts});};
+  const pL=(id,label,metric,toId,tag='W')=>{const ty=N.find(n=>n.id===toId).y;
+    N.push({id,label,typeLabel:metric,kind:'param',x:Lx,y:ty,w:Wp,h:42});
+    E.push({s:id,t:toId,tag,type:'param'});};
+  const pR=(id,label,metric,toId,tag='γ')=>{const ty=N.find(n=>n.id===toId).y;
+    N.push({id,label,typeLabel:metric,kind:'param',x:Rx,y:ty,w:Wp,h:42});
+    E.push({s:id,t:toId,tag,type:'param'});};
+  const flow=(s,t,tag='ACT',type='act')=>E.push({s,t,tag,type});
+
+  // ---- input + embedding ----
+  io('token_ids','Token IDs','Input'); y+=104;
+  op('embedding','Parallel Embedding','Op','embedding'); y+=120;
+  flow('token_ids','embedding');
+  pL('emb_w','Embedding W','[vocab, h]','embedding');
+
+  const decTop = y-30;
+
+  // ---- attention block ----
+  op('attn_norm','attn RMSNorm','Op','norm',{fuseRec:'add_rmsnorm',typeLabel:'AddRmsNorm?'}); y+=96;
+  flow('embedding','attn_norm');
+  pR('attn_g','attn γ','[h]','attn_norm');
+
+  op('qkv_proj','QKV Projection','Op','linear',{fuseRec:'qkv_merge',typeLabel:spec.attnBias?'+bias':'no-bias'}); y+=96;
+  flow('attn_norm','qkv_proj');
+  pL('qkv_w','QKV W','[h, '+(spec.attnBias?'+b':'q+2kv')+']','qkv_proj');
+
+  if(spec.qknorm){
+    op('q_norm','Q-Norm','Op','qknorm',{fuseRec:'qknorm_rope',typeLabel:'per-head RMS'}); y+=88;
+    flow('qkv_proj','q_norm','Q');
+    pR('qn_g','q_norm γ','[hd=128]','q_norm');
+    op('k_norm','K-Norm','Op','qknorm',{fuseRec:'qknorm_rope',typeLabel:'per-head RMS'}); y+=88;
+    flow('q_norm','k_norm','K');
+    pR('kn_g','k_norm γ','[hd=128]','k_norm');
+    op('rotary_emb','RoPE','Op','rope',{fuseRec:'qknorm_rope',typeLabel:'rotary'}); y+=96;
+    flow('k_norm','rotary_emb');
+  } else {
+    op('rotary_emb','RoPE','Op','rope',{typeLabel:'rotary'}); y+=96;
+    flow('qkv_proj','rotary_emb');
+  }
+
+  op('attention','Grouped Attention','Op','attention',{fuseRec:'flash_paged',
+    typeLabel:'GQA '+spec.qh+':'+spec.kvh}); y+=96;
+  flow(spec.qknorm?'rotary_emb':'rotary_emb','attention');
+  pL('o_w','O-Proj W','[hd, h]','attention');
+
+  // ---- ffn / moe block ----
+  op('ffn_norm','ffn RMSNorm','Op','norm',{fuseRec:'add_rmsnorm',typeLabel:'AddRmsNorm?'}); y+=96;
+  flow('attention','ffn_norm');
+  pR('ffn_g','ffn γ','[h]','ffn_norm');
+
+  const ffnTop = y-26;
+  if(spec.variant==='moe'){
+    op('router','Router (Gate)','Op','gate',{fuseRec:'grouped_matmul',typeLabel:'top-'+spec.topk}); y+=92;
+    flow('ffn_norm','router');
+    pL('gate_w','Gate W','[h, E='+spec.experts+']','router');
+    op('dispatch','Token Dispatch','Comm','comm',{fuseRec:'grouped_matmul',typeLabel:'all-to-all'}); y+=88;
+    flow('router','dispatch','DISPATCH','comm');
+    op('experts','Experts × '+spec.experts,'Op','moe',{fuseRec:'grouped_matmul',typeLabel:'GroupedMM'}); y+=88;
+    flow('dispatch','experts','TOKENS','comm');
+    pL('eup_w','Expert up W','[h, ffn]','experts');
+    pR('edn_w','Expert down W','[ffn, h]','experts');
+    op('mlp_act','SwiGLU (in expert)','Op','act',{fuseRec:'swiglu',typeLabel:'SiluAndMul'}); y+=92;
+    flow('experts','mlp_act','COMBINE','comm');
+    var lastBlock='mlp_act';
+    CL.push({id:'moe',label:'MoE FFN · 专家分组',x:cx-200,y:ffnTop,w:560,h:(y-ffnTop+8),repeat:false,note:'moe'});
+  } else {
+    op('gate_up','Gate/Up Proj','Op','linear',{typeLabel:'merged'}); y+=88;
+    flow('ffn_norm','gate_up');
+    pL('gu_w','Gate/Up W','[h, 2·ffn]','gate_up');
+    op('mlp_act','SwiGLU','Op','act',{fuseRec:'swiglu',typeLabel:'SiluAndMul'}); y+=88;
+    flow('gate_up','mlp_act');
+    op('down_proj','Down Proj','Op','linear',{typeLabel:'ffn→h'}); y+=92;
+    flow('mlp_act','down_proj');
+    pL('dn_w','Down W','[ffn, h]','down_proj');
+    var lastBlock='down_proj';
+  }
+
+  // decoder cluster spans attn_norm..lastBlock
+  const decBot = y-8;
+  CL.unshift({id:'decoder',label:'Decoder Layer × '+spec.layers,x:cx-300,y:decTop,w:760,h:(decBot-decTop),repeat:true});
+
+  // ---- output head ----
+  op('final_norm','final RMSNorm','Op','norm',{typeLabel:'RMSNorm'}); y+=96;
+  flow(lastBlock,'final_norm');
+  pR('fn_g','final γ','[h]','final_norm');
+  op('lm_head','LM Head','Op','linear',{typeLabel:'h→vocab'}); y+=104;
+  flow('final_norm','lm_head');
+  pL('lm_w','LM Head W','[h, vocab]','lm_head');
+  io('logits','Logits','Output'); y+=60;
+  flow('lm_head','logits','LOSS');
+
+  // transformer outer cluster
+  CL.unshift({id:'transformer',label:'Transformer',x:cx-330,y:decTop-44,w:820,h:(decBot-decTop)+44+200});
+
+  return {width:980,height:y+20,clusters:CL,nodes:N,edges:E,spec};
+}
+
+/* ---- 模型库 ---- */
+const MODELS = {
+  qwen3_14b:{
+    name:'Qwen3-14B', tags:[['Dense','def'],['QK-Norm','new']],
+    meta:'hidden 5120 · ffn 17408 · L40\nGQA 40Q:8KV · hd 128 · no-bias',
+    recs:['qknorm_rope','add_rmsnorm','swiglu','qkv_merge','flash_paged'],
+    spec:{name:'Qwen3-14B',layers:40,qh:40,kvh:8,topk:0,experts:0,variant:'dense',qknorm:true,attnBias:false},
+  },
+  qwen2_7b:{
+    name:'Qwen2-7B', tags:[['Dense','def']],
+    meta:'hidden 3584 · ffn 18944 · L28\nGQA 28Q:4KV · hd 128 · +qkv bias',
+    recs:['add_rmsnorm','swiglu','qkv_merge','flash_paged'],
+    spec:{name:'Qwen2-7B',layers:28,qh:28,kvh:4,topk:0,experts:0,variant:'dense',qknorm:false,attnBias:true},
+  },
+  llama3_8b:{
+    name:'Llama-3-8B', tags:[['Dense','def']],
+    meta:'hidden 4096 · ffn 14336 · L32\nGQA 32Q:8KV · hd 128 · no-bias',
+    recs:['add_rmsnorm','swiglu','qkv_merge','flash_paged'],
+    spec:{name:'Llama-3-8B',layers:32,qh:32,kvh:8,topk:0,experts:0,variant:'dense',qknorm:false,attnBias:false},
+  },
+  mixtral:{
+    name:'Mixtral-8x7B', tags:[['MoE','moe']],
+    meta:'hidden 4096 · ffn 14336 · L32\nGQA 32Q:8KV · 8 experts top-2',
+    recs:['grouped_matmul','add_rmsnorm','swiglu','qkv_merge','flash_paged'],
+    spec:{name:'Mixtral-8x7B',layers:32,qh:32,kvh:8,topk:2,experts:8,variant:'moe',qknorm:false,attnBias:false},
+  },
+};
+
+/* ============================================================
+   RENDER LAYER
+   ============================================================ */
+const SVGNS='http://www.w3.org/2000/svg';
+function svg(tag,attrs){const e=document.createElementNS(SVGNS,tag);
+  for(const k in attrs){if(attrs[k]!=null)e.setAttribute(k,attrs[k]);}return e;}
+function anchor(n,d){return {x:d==='l'?n.x-n.w/2:d==='r'?n.x+n.w/2:n.x,
+  y:d==='t'?n.y-n.h/2:d==='b'?n.y+n.h/2:n.y};}
+function edgePath(s,t){
+  // mostly vertical spine -> vertical bezier; param (side) -> horizontal bezier
+  if(Math.abs(s.x-t.x) < Math.abs(s.y-t.y)){
+    const a=anchor(s, s.y<t.y?'b':'t'), b=anchor(t, s.y<t.y?'t':'b'); const my=(a.y+b.y)/2;
+    return {d:`M ${a.x} ${a.y} C ${a.x} ${my}, ${b.x} ${my}, ${b.x} ${b.y}`,mx:(a.x+b.x)/2,my};
+  } else {
+    const a=anchor(s, s.x<t.x?'r':'l'), b=anchor(t, s.x<t.x?'l':'r'); const mx=(a.x+b.x)/2;
+    return {d:`M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`,mx,my:(a.y+b.y)/2};
+  }
+}
+
+let G=null, NM={}, view={tx:0,ty:0,z:1}, selNode=null, showBrackets=true, curModel=null;
+const stage=document.getElementById('stage'), gsvg=document.getElementById('gsvg'),
+      gtip=document.getElementById('gtip');
+
+function renderGraph(g){
+  G=g; NM={}; g.nodes.forEach(n=>NM[n.id]=n);
+  gsvg.innerHTML=''; gsvg.setAttribute('viewBox',`0 0 ${g.width} ${g.height}`);
+  gsvg.setAttribute('width',g.width); gsvg.setAttribute('height',g.height);
+
+  const defs=svg('defs');
+  const mk=svg('marker',{id:'arr',viewBox:'0 0 10 10',refX:8.6,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'});
+  mk.appendChild(svg('path',{d:'M0 0 L10 5 L0 10 z',fill:'#3a445e'})); defs.appendChild(mk);
+  const mkf=svg('marker',{id:'arrf',viewBox:'0 0 10 10',refX:8.6,refY:5,markerWidth:7,markerHeight:7,orient:'auto-start-reverse'});
+  mkf.appendChild(svg('path',{d:'M0 0 L10 5 L0 10 z',fill:'#ff9d00'})); defs.appendChild(mkf);
+  gsvg.appendChild(defs);
+
+  // clusters (outer first)
+  g.clusters.forEach(c=>{
+    const grp=svg('g');
+    grp.appendChild(svg('rect',{class:'cl-rect'+(c.repeat?' repeat':''),x:c.x,y:c.y,width:c.w,height:c.h,rx:16,ry:16}));
+    const lbl=svg('text',{class:'cl-label',x:c.x+18,y:c.y+22}); lbl.textContent=c.label; grp.appendChild(lbl);
+    if(c.repeat){ // ×N badge top-right
+      const bw=Math.max(40,c.label.length*0); // placeholder
+    }
+    gsvg.appendChild(grp);
+  });
+
+  // edges
+  const edgeEls=[];
+  g.edges.forEach(e=>{
+    const s=NM[e.s],t=NM[e.t]; if(!s||!t)return;
+    const p=edgePath(s,t);
+    const cls='edge '+(e.type==='param'?'param':e.type==='comm'?'comm':'');
+    const path=svg('path',{class:cls,d:p.d,'marker-end':'url(#arr)'});
+    gsvg.appendChild(path);
+    // tag pill
+    if(e.tag){
+      const tw=e.tag.length*6+12;
+      const tg=svg('g'); 
+      tg.appendChild(svg('rect',{class:'etag-bg',x:p.mx-tw/2,y:p.my-8,width:tw,height:16,rx:4}));
+      const tx=svg('text',{class:'etag '+(e.type==='param'?'param':e.type==='comm'?'comm':''),
+        x:p.mx,y:p.my+1,'text-anchor':'middle','dominant-baseline':'central'}); tx.textContent=e.tag;
+      tg.appendChild(tx); gsvg.appendChild(tg);
+    }
+    edgeEls.push({el:path,e});
+  });
+  G._edgeEls=edgeEls;
+
+  // nodes
+  g.nodes.forEach(n=>{
+    const kind=n.kind;
+    const grp=svg('g',{class:'nd '+(kind==='tensor'?'tensor':kind==='io'?'io':kind==='param'?'tensor':'op')+
+      (n.fuseRec?' fuse':''),transform:`translate(${n.x},${n.y})`});
+    grp.dataset.id=n.id;
+    const r= kind==='op'? n.h/2 : Math.min(13,n.h*0.32);
+    const fill = (kind==='op')? (SEM[n.sem]||'#3B82F6') : null;
+    grp.appendChild(svg('rect',{class:'nd-rect',x:-n.w/2,y:-n.h/2,width:n.w,height:n.h,rx:r,ry:r,
+      fill:fill, stroke: kind==='op'? 'rgba(255,255,255,.15)':null}));
+    const lbl=svg('text',{class:'nd-label',x:0,y:kind==='op'?-3:0}); lbl.textContent=n.label;
+    grp.appendChild(lbl);
+    if(kind!=='tensor'&&kind!=='io'){
+      const ty=svg('text',{class:'nd-type',x:0,y:11}); ty.textContent=n.typeLabel; grp.appendChild(ty);
+    } else if(kind==='param'){
+      const ty=svg('text',{class:'nd-type',x:0,y:11,fill:'rgba(255,255,255,.5)'}); ty.textContent=n.typeLabel; grp.appendChild(ty);
+    }
+    // fusion star/dot
+    if(n.fuseRec){
+      const rec=FUSION_LIB[n.fuseRec];
+      if(rec&&rec.star){
+        const st=svg('text',{class:'fuse-star',x:n.w/2-12,y:0}); st.textContent='★'; grp.appendChild(st);
+      } else {
+        grp.appendChild(svg('circle',{class:'fuse-dot',cx:n.w/2-11,cy:0,r:4}));
+      }
+    }
+    grp.addEventListener('click',ev=>{ev.stopPropagation();selectNode(n.id,'graph');});
+    grp.addEventListener('mousemove',ev=>showTip(n,ev));
+    grp.addEventListener('mouseleave',hideTip);
+    gsvg.appendChild(grp);
+    n._el=grp;
+  });
+
+  renderBrackets();
+  fit();
+}
+
+/* fusion brackets: group consecutive spine ops that share a fuseRec */
+function renderBrackets(){
+  document.querySelectorAll('.fbracket,.fbracket-bg,.fbracket-lbl').forEach(e=>e.remove());
+  if(!showBrackets||!G)return;
+  const spine=G.nodes.filter(n=>n.kind==='op');
+  let i=0;
+  while(i<spine.length){
+    const rec=spine[i].fuseRec;
+    if(rec){
+      let j=i; while(j+1<spine.length && spine[j+1].fuseRec===rec) j++;
+      const top=spine[i].y-spine[i].h/2-6, bot=spine[j].y+spine[j].h/2+6;
+      const x=spine[i].x+spine[i].w/2+14;
+      // bg box behind group
+      gsvg.appendChild(svg('rect',{class:'fbracket-bg',x:spine[i].x-spine[i].w/2-6,y:top,
+        width:spine[i].w+44,height:bot-top,rx:12}));
+      const br=svg('path',{class:'fbracket',
+        d:`M ${x} ${top} h 10 v ${bot-top} h -10`});
+      gsvg.appendChild(br);
+      const lab=FUSION_LIB[rec]? FUSION_LIB[rec].title.split(' ')[0]:'fuse';
+      const tl=svg('text',{class:'fbracket-lbl',x:x+15,y:(top+bot)/2,'dominant-baseline':'central',
+        transform:`rotate(90 ${x+15} ${(top+bot)/2})`}); 
+      tl.textContent='⇒ '+(FUSION_LIB[rec]?FUSION_LIB[rec].chain.slice(-1)[0][0]:'');
+      gsvg.appendChild(tl);
+      i=j+1;
+    } else i++;
+  }
+}
+
+/* zoom / pan */
+function applyT(){gsvg.style.transform=`translate(${view.tx}px,${view.ty}px) scale(${view.z})`;}
+function fit(){
+  const r=stage.getBoundingClientRect(); const pad=30;
+  const z=Math.min((r.width-pad*2)/G.width,(r.height-pad*2)/G.height,1.05);
+  view.z=Math.max(z,0.22);
+  view.tx=Math.max(pad,(r.width-G.width*view.z)/2);
+  view.ty=pad/2; applyT();
+}
+document.getElementById('zin').onclick=()=>{view.z=Math.min(2.4,view.z*1.18);applyT();};
+document.getElementById('zout').onclick=()=>{view.z=Math.max(0.2,view.z/1.18);applyT();};
+document.getElementById('zfit').onclick=fit;
+document.getElementById('zbr').onclick=()=>{showBrackets=!showBrackets;
+  document.getElementById('zbr').style.color=showBrackets?'#ff9d00':'';renderBrackets();};
+document.getElementById('zbr').style.color='#ff9d00';
+let pan=null;
+stage.addEventListener('mousedown',e=>{if(e.target.closest('.nd'))return;
+  pan={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};stage.classList.add('grabbing');});
+window.addEventListener('mousemove',e=>{if(!pan)return;
+  view.tx=pan.tx+(e.clientX-pan.x);view.ty=pan.ty+(e.clientY-pan.y);applyT();});
+window.addEventListener('mouseup',()=>{pan=null;stage.classList.remove('grabbing');});
+stage.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.1:0.9;
+  view.z=Math.max(0.2,Math.min(2.4,view.z*f));applyT();},{passive:false});
+stage.addEventListener('click',e=>{if(!e.target.closest('.nd'))clearSel();});
+
+/* tooltip */
+function showTip(n,ev){
+  const sem=SEM[n.sem]||'#64748B';
+  let html=`<div class="gt-h"><span class="gt-k" style="background:${n.kind==='op'?sem:'#33405a'}">${(n.typeLabel||n.kind).slice(0,12)}</span>${n.label}</div>`;
+  html+=`<div class="gt-row">类型：<b>${n.kind==='op'?'算子 Op':n.kind==='param'?'权重张量':n.kind==='io'?'IO 张量':'张量'}</b></div>`;
+  if(n.fuseRec){const rec=FUSION_LIB[n.fuseRec];
+    html+=`<div class="gt-fuse">${rec.star?'★ ':'● '}可融合点 → ${rec.title}</div>`;}
+  gtip.innerHTML=html; gtip.classList.add('on');
+  const r=stage.getBoundingClientRect();
+  let x=ev.clientX-r.left+16,yy=ev.clientY-r.top+16;
+  x=Math.min(x,r.width-290); yy=Math.min(yy,r.height-120);
+  gtip.style.left=x+'px'; gtip.style.top=yy+'px';
+}
+function hideTip(){gtip.classList.remove('on');}
+
+/* selection + linkage */
+function relatedOf(id){
+  const s=new Set([id]);
+  G.edges.forEach(e=>{if(e.s===id)s.add(e.t);if(e.t===id)s.add(e.s);});
+  return s;
+}
+function selectNode(id,src){
+  selNode=id; const rel=relatedOf(id);
+  G.nodes.forEach(n=>{n._el.classList.toggle('sel',n.id===id);
+    n._el.classList.toggle('rel',n.id!==id&&rel.has(n.id));
+    n._el.classList.toggle('dim',!rel.has(n.id)&&n.id!==id);});
+  G._edgeEls.forEach(({el,e})=>{const r=rel.has(e.s)&&rel.has(e.t);
+    el.classList.toggle('rel',r);el.classList.toggle('dim',!r);});
+  // sync to recommendation card
+  const node=NM[id];
+  document.querySelectorAll('.rcard').forEach(c=>c.classList.remove('sel'));
+  if(node&&node.fuseRec){
+    const card=document.querySelector(`.rcard[data-rec="${node.fuseRec}"]`);
+    if(card){card.classList.add('sel');openCard(card,true);
+      if(src==='graph')card.scrollIntoView({behavior:'smooth',block:'center'});}
+  }
+}
+function clearSel(){selNode=null;
+  G.nodes.forEach(n=>n._el.classList.remove('sel','rel','dim'));
+  G._edgeEls.forEach(({el})=>el.classList.remove('rel','dim'));
+  document.querySelectorAll('.rcard').forEach(c=>c.classList.remove('sel'));}
+
+/* ---- recommendation panel ---- */
+function tokLine(parts){
+  return parts.map(([cls,txt])=>{
+    if(cls==='')return esc(txt);
+    return `<span class="tok-${cls}">${esc(txt)}</span>`;
+  }).join('');
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function chainHtml(chain){
+  return chain.map(seg=>{
+    if(seg.length===1)return `<span class="ar">${esc(seg[0])}</span>`;
+    const[txt,t]=seg;
+    if(t==='fu')return `<span class="fu">${esc(txt)}</span>`;
+    if(t==='out')return `<span class="fu" style="color:#ffce8a">⟦${esc(txt)}⟧</span>`;
+    return `<span class="op">${esc(txt)}</span>`;
+  }).join(' ');
+}
+function renderRecs(model){
+  const rb=document.getElementById('rbody');
+  const recs=model.recs;
+  const fusePts=model.graph.nodes.filter(n=>n.fuseRec).length;
+  document.getElementById('right-d').textContent=`${recs.length} 个方案 · 计算图含 ${fusePts} 个融合点`;
+  let html=`<div class="rsummary">
+    <div class="rstat"><div class="v orange">${recs.length}</div><div class="l">推荐方案</div></div>
+    <div class="rstat"><div class="v cyan">${fusePts}</div><div class="l">融合点</div></div>
+    <div class="rstat"><div class="v green">${model.graph.nodes.filter(n=>n.kind==='op').length}</div><div class="l">算子节点</div></div>
+  </div>`;
+  recs.forEach((rid)=>{
+    const r=FUSION_LIB[rid]; if(!r)return;
+    const prioCls=r.prio, prioTx=r.prio==='s'?'★':r.prio==='h'?'HIGH':'MED';
+    html+=`<div class="rcard" data-rec="${rid}">
+      <div class="rc-head">
+        <span class="rc-prio ${prioCls}">${prioTx}</span>
+        <div class="rc-title">
+          <div class="nm">${r.star?'<span class="star">★</span>':''}${esc(r.title)}</div>
+          <div class="chain">${chainHtml(r.chain)}</div>
+          <div class="rc-gain">${r.gains.map(([g,c])=>`<span class="gain ${c||''}">${esc(g)}</span>`).join('')}</div>
+        </div>
+        <span class="rc-exp">▾</span>
+      </div>
+      <div class="rc-body">
+        <div class="rc-sec">
+          <div class="h"><span class="ic">◆</span>推荐理由</div>
+          <div class="rc-reason">${r.reason}</div>
+        </div>
+        <div class="rc-sec">
+          <div class="h"><span class="ic">⟐</span>代码对照 · vLLM 开源 → 昇腾融合</div>
+          <div class="codecmp">
+            <div class="codeblk v"><div class="cb-h">V · vLLM 原始实现</div><pre>${r.vllm.map(tokLine).join('\n')}</pre></div>
+            <div class="codeblk a"><div class="cb-h">A · 昇腾融合算子</div><pre>${r.asc.map(tokLine).join('\n')}</pre></div>
+          </div>
+        </div>
+        <div class="rc-sec">
+          <div class="h"><span class="ic">⌖</span>对应 CANN 文档</div>
+          <div class="docref"><span class="ic">▤</span><span class="pth">${esc(r.doc)}</span></div>
+        </div>
+        <div class="rc-sec">
+          <div class="h"><span class="ic">⊹</span>计算图中影响算子（点击定位）</div>
+          <div class="affects">${r.affects.filter(a=>NM[a]).map(a=>`<span class="chip" data-go="${a}">${esc(NM[a]?NM[a].label:a)}</span>`).join('')}</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  rb.innerHTML=html;
+
+  // wire cards
+  rb.querySelectorAll('.rcard').forEach(card=>{
+    const head=card.querySelector('.rc-head');
+    head.onclick=()=>{const open=card.classList.contains('open');openCard(card,!open);
+      if(!open){const rid=card.dataset.rec;highlightRec(rid);}};
+  });
+  rb.querySelectorAll('.chip[data-go]').forEach(ch=>{
+    ch.onclick=e=>{e.stopPropagation();selectNode(ch.dataset.go,'rec');
+      NM[ch.dataset.go]._el.scrollIntoView&&0;};
+  });
+}
+function openCard(card,open){card.classList.toggle('open',open);
+  const ex=card.querySelector('.rc-exp');if(ex)ex.textContent=open?'▴':'▾';}
+function highlightRec(rid){
+  // highlight all affected ops in graph
+  const r=FUSION_LIB[rid]; if(!r)return;
+  const set=new Set(r.affects.filter(a=>NM[a]));
+  G.nodes.forEach(n=>{n._el.classList.toggle('sel',set.has(n.id));
+    n._el.classList.toggle('dim',!set.has(n.id)&&n.kind!=='param');});
+  G._edgeEls.forEach(({el,e})=>{const rr=set.has(e.s)&&set.has(e.t);
+    el.classList.toggle('rel',rr);el.classList.toggle('dim',!rr);});
+  // scroll graph to first affected
+  const first=NM[r.affects.find(a=>NM[a])];
+  if(first){const r2=stage.getBoundingClientRect();
+    view.ty=r2.height/2-first.y*view.z; applyT();}
+}
+
+/* ---- left model list ---- */
+function renderModelList(){
+  const ml=document.getElementById('mlist'); ml.innerHTML='';
+  Object.entries(MODELS).forEach(([k,m])=>{
+    const c=document.createElement('div'); c.className='mcard'+(k===curModel?' on':'');
+    c.innerHTML=`<div class="nm">${esc(m.name)} ${m.tags.map(([t,cl])=>`<span class="tag ${cl==='def'?'':cl}">${esc(t)}</span>`).join('')}</div>
+      <div class="meta">${esc(m.meta).replace(/\n/g,'<br>')}</div>`;
+    c.onclick=()=>selectModel(k);
+    ml.appendChild(c);
+  });
+}
+function selectModel(k){
+  curModel=k; const m=MODELS[k];
+  if(!m.graph)m.graph=buildGraph(m.spec);
+  document.querySelectorAll('.mcard').forEach((c,i)=>c.classList.toggle('on',Object.keys(MODELS)[i]===k));
+  document.getElementById('mid-d').textContent=`${m.name} · ${m.graph.nodes.filter(n=>n.kind==='op').length} 算子 · ${m.graph.nodes.filter(n=>n.fuseRec).length} 融合点`;
+  // bind NM via renderGraph
+  renderGraph(m.graph);
+  renderRecs(m);
+  clearSel();
+}
+
+/* ---- upload: real config.json parse ---- */
+document.getElementById('cfgfile').addEventListener('change',ev=>{
+  const f=ev.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const cfg=JSON.parse(rd.result);
+      const mt=(cfg.model_type||'').toLowerCase();
+      const h=cfg.hidden_size||4096;
+      const ffn=cfg.intermediate_size||(h*4);
+      const L=cfg.num_hidden_layers||32;
+      const qh=cfg.num_attention_heads||32;
+      const kvh=cfg.num_key_value_heads||qh;
+      const hd=cfg.head_dim||Math.round(h/qh);
+      const experts=cfg.num_local_experts||cfg.num_experts||0;
+      const topk=cfg.num_experts_per_tok||cfg.moe_top_k||0;
+      const isMoe=experts>0;
+      const isQwen3=mt.includes('qwen3')||(cfg.q_norm!==undefined)||(mt.includes('qwen')&&cfg.attention_bias===false);
+      const attnBias=cfg.attention_bias===true||(mt.includes('qwen2')&&cfg.attention_bias!==false);
+      const spec={name:(cfg._name_or_path||cfg.model_type||'uploaded').split('/').pop(),
+        layers:L,qh,kvh,topk:topk||2,experts:experts||0,variant:isMoe?'moe':'dense',
+        qknorm:isQwen3,attnBias};
+      const recs=[];
+      if(spec.qknorm)recs.push('qknorm_rope');
+      recs.push('add_rmsnorm','swiglu');
+      if(isMoe)recs.push('grouped_matmul');
+      recs.push('qkv_merge','flash_paged');
+      const key='uploaded_'+Date.now();
+      MODELS[key]={name:spec.name+' (上传)',
+        tags:[[isMoe?'MoE':'Dense',isMoe?'moe':'def']].concat(spec.qknorm?[['QK-Norm','new']]:[]),
+        meta:`hidden ${h} · ffn ${ffn} · L${L}\nGQA ${qh}Q:${kvh}KV · hd ${hd}${isMoe?' · E'+experts+' top'+(topk||2):''}${spec.qknorm?' · QK-Norm':''}${attnBias?' · +bias':' · no-bias'}`,
+        recs, spec};
+      MODELS[key].graph=buildGraph(spec);
+      renderModelList(); selectModel(key);
+    }catch(e){alert('解析失败：不是合法的 config.json\n'+e.message);}
+  };
+  rd.readAsText(f);
+});
+
+/* ---- init ---- */
+renderModelList();
+selectModel('qwen3_14b');
+window.addEventListener('resize',()=>{if(G)fit();});
+</script>
+</body>
+</html>

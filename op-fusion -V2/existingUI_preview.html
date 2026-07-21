@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OP Fusion Existing UI Audit</title>
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <style>
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: var(--font-sans);
+    }
+
+    .audit-page {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: var(--space-6) 0;
+      display: grid;
+      gap: var(--space-5);
+    }
+
+    .audit-head {
+      display: grid;
+      gap: var(--space-2);
+    }
+
+    .audit-head h1 {
+      margin: 0;
+      font: var(--text-title-1);
+    }
+
+    .audit-head p {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body);
+    }
+
+    .audit-grid {
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .audit-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.1fr) minmax(210px, 1fr) minmax(160px, 0.8fr) 72px;
+      gap: var(--space-3);
+      align-items: start;
+      padding: var(--space-3);
+      border-radius: var(--radius-lg);
+      background: var(--surface-2);
+    }
+
+    .audit-row--head {
+      background: var(--surface-3);
+      color: var(--foreground-secondary);
+      font: var(--text-label);
+      text-transform: uppercase;
+      letter-spacing: var(--letter-spacing-label);
+    }
+
+    .audit-row code {
+      color: var(--foreground);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .audit-row p {
+      margin: 0;
+      color: var(--foreground-secondary);
+      font: var(--text-body-sm);
+      line-height: 1.55;
+    }
+
+    .audit-status {
+      font: var(--text-label);
+    }
+
+    .audit-status[data-state="ok"] { color: var(--success); }
+    .audit-status[data-state="warn"] { color: var(--warning); }
+    .audit-status[data-state="bad"] { color: var(--danger); }
+
+    @media (max-width: 900px) {
+      .audit-row,
+      .audit-row--head {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="audit-page">
+    <header class="audit-head">
+      <h1>OP Fusion Existing UI Audit</h1>
+      <p>Source snapshot: <code>op-fusion/OP-fusion.original.html</code>. Shell classification: <strong>ide-frame</strong>. Target entry: <code>op-fusion/index.html</code>.</p>
+    </header>
+
+    <section class="panel-shell panel-shell-quiet">
+      <div class="panel-shell-header">
+        <div>
+          <div class="panel-shell-title">Inventory</div>
+          <div class="panel-shell-meta">Legacy visual parameters and migration buckets</div>
+        </div>
+      </div>
+      <div class="panel-shell-body audit-grid">
+        <div class="audit-row audit-row--head">
+          <span>Original element</span>
+          <span>Current appearance</span>
+          <span>Target PTO mapping</span>
+          <span>Bucket / API</span>
+          <span>Status</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.topbar</code>
+          <p>46px private header, hard-coded gradient, divider border, private logo dot shadow.</p>
+          <p><code>.pto-ide-frame__topbar</code>, transparent top chrome from <code>patterns/ide-frame</code>.</p>
+          <p><code>pattern-migrate</code>; <code>PtoIdeFrame.initAll()</code>.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.layout / .col</code>
+          <p>Fixed CSS grid columns <code>248px 1fr 396px</code>; pane borders drawn locally.</p>
+          <p><code>data-ide-split</code> and <code>data-ide-pane</code> with shared resize gutters.</p>
+          <p><code>pattern-migrate</code>; <code>workbench-shell</code> via <code>ide-frame</code>.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.gbtn</code>
+          <p>Text-like graph controls with local border/radius/background/font.</p>
+          <p><code>.btn.btn-ghost.btn-icon</code> inside the IDE pane header.</p>
+          <p><code>migrate</code>; PTO button system.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.mcard</code>
+          <p>Repeated bordered cards; selected state uses cyan border, inset ring, private gradient.</p>
+          <p>Token-driven model row using neutral surface, <code>.is-selected</code>, PTO state colors.</p>
+          <p><code>migrate</code>; old gradient and inset ring removed.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.upload</code>
+          <p>Dashed upload card, hidden input inline style, private icon glyph.</p>
+          <p>Tokenized upload row; hidden input moved to CSS; icon rendered as inline SVG.</p>
+          <p><code>migrate</code>; PTO token spacing/radius.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.src</code>
+          <p>Knowledge-source cards with colored icon backgrounds and local borders.</p>
+          <p>Neutral source rows with small key badge and status text.</p>
+          <p><code>migrate</code>; private color blocks removed.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>#stage / #gsvg</code>
+          <p>Local SVG renderer, pan/zoom, graph markers, node/edge generation.</p>
+          <p>Kept as module-owned renderer inside <code>ide-frame</code> pane.</p>
+          <p><code>exempt</code>; not a shell resize implementation.</p>
+          <span class="audit-status" data-state="warn">exempt</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.nd / .edge / .fbracket</code>
+          <p>Operator semantic colors, dependency line styles, fusion bracket overlay.</p>
+          <p>Preserved as data visualization encodings; neutral strokes/text tokenized where possible.</p>
+          <p><code>exempt</code>; graph semantic colors encode op type and fusion points.</p>
+          <span class="audit-status" data-state="warn">exempt</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.legend / .gtip</code>
+          <p>Hard-coded floating legend and tooltip shell.</p>
+          <p>Tokenized overlay shell; swatches and line styles retained as data-viz legend.</p>
+          <p><code>migrate</code> plus <code>exempt</code> swatches.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.rstat</code>
+          <p>Three bordered metric cards in the recommendation rail.</p>
+          <p>Neutral summary cells using PTO surfaces and stat typography.</p>
+          <p><code>migrate</code>; stacked card borders removed.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.rcard</code>
+          <p>Expandable recommendation cards with local borders, selected inset ring, colored priority pills.</p>
+          <p>Token-driven recommendation sections; selected state uses neutral fill plus fusion focus ring.</p>
+          <p><code>migrate</code>; no new shared pattern required.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+
+        <div class="audit-row">
+          <code>.codeblk / .docref / .chip</code>
+          <p>Private code panel colors, doc link blocks, affected-op chips.</p>
+          <p>Token code surfaces, neutral doc reference, PTO button-sized affected chips.</p>
+          <p><code>migrate</code>; syntax/data colors documented as exempt.</p>
+          <span class="audit-status" data-state="ok">done</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
