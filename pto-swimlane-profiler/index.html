@@ -1,13 +1,12 @@
 <!doctype html>
 <!--
-  PyPTO 泳道分析器 — Mix 子图核间同步可视化原型
+  PyPTO 泳道分析器 — Mix 子图核间同步稳定演示版
   课题: 04-uxdesign/02-swimlane-profiler/ux-analysis.md (Issue #1121)
 
   数据等级: L2 / schema-generated / share-safe
     - task literal、schema 与数量级来自登记 L1 来源；组合关系与诊断异常为可追溯 L2 构造。
-    - 已植入「瓶颈剧本」: Attention Score 子图 Wrap 07 的 AIC 跑超大 BMM,
-      配对 AIV 长时间停等; 同组其他 Wrap 早完空转 (负载不均)。
-    - 待 Codex 补 merged_swimlane.json 真实样本后替换 buildModel()。
+    - 三条 run 分别由同步竞争、调度空泡、FFN 流水失衡构造器生成；
+      每条 run 只承载该场景需要验证的性能特征，不把全部问题拼成一次伪运行。
   分享级别: exploration-only (不可外发)
 
   设计系统: 复用 compute-graph-viewer/vendor/pto-design-system bundle
@@ -84,8 +83,14 @@ body {
 }
 .sl-axis-wrap { overflow: hidden; border-bottom: 1px solid var(--border-default); }
 .sl-lane-wrap { overflow: hidden; border-right: 1px solid var(--border-subtle); }
-.sl-body-wrap { overflow: auto; }
+.sl-body-wrap { position: relative; overflow: auto; }
 .sl-axis-wrap canvas, .sl-lane-wrap canvas, .sl-body-wrap canvas { display: block; }
+.sl-body-crisp-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 3;
+  pointer-events: none;
+}
 .sl-body-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
 .sl-body-wrap::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: var(--radius-md); border: 3px solid var(--surface-3); }
 .sl-body-wrap::-webkit-scrollbar-corner { background: var(--surface-3); }
@@ -243,7 +248,7 @@ body {
 .sl-title-stack strong {
   overflow: hidden;
   color: var(--foreground);
-  font: var(--text-title-2);
+  font: var(--ide-frame-title-font);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -264,10 +269,6 @@ body {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sl-frame .pto-ide-frame__pane-title {
-  font: var(--text-title-2);
 }
 
 .sl-frame .stat-chip {
@@ -346,6 +347,10 @@ body {
   background: transparent;
   color: var(--foreground);
   font: var(--text-body-sm);
+}
+
+.sl-searchbox:focus-within {
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .sl-searchbox input::placeholder {
@@ -1077,6 +1082,21 @@ body {
   text-align: left;
 }
 
+.sl-run-card__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sl-run-scenario {
+  overflow: hidden;
+  color: var(--foreground-muted);
+  font: 500 11px / 1.2 var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sl-run-card__toggle {
   width: 15px;
   height: 15px;
@@ -1467,7 +1487,10 @@ body {
                               </div>
                               <div class="sl-grid" id="grid">
                                 <div class="sl-lane-wrap" id="laneWrap"><canvas id="laneCanvas"></canvas></div>
-                                <div class="sl-body-wrap" id="bodyWrap"><canvas id="bodyCanvas"></canvas></div>
+                                <div class="sl-body-wrap" id="bodyWrap">
+                                  <canvas id="bodyCanvas"></canvas>
+                                  <canvas class="sl-body-crisp-canvas" id="bodyCrispCanvas" aria-hidden="true"></canvas>
+                                </div>
                               </div>
                               <div class="sl-timestamp-guide" id="timestampGuide" aria-hidden="true" hidden></div>
                             </div>
@@ -1503,7 +1526,10 @@ body {
                         <div class="sl-compare-swimlane-view" id="compareSwimlaneView" hidden aria-hidden="true">
                           <div class="sl-grid sl-compare-grid" id="compareGrid">
                             <div class="sl-lane-wrap" id="compareLaneWrap"><canvas id="compareLaneCanvas"></canvas></div>
-                            <div class="sl-body-wrap" id="compareBodyWrap"><canvas id="compareBodyCanvas"></canvas></div>
+                            <div class="sl-body-wrap" id="compareBodyWrap">
+                              <canvas id="compareBodyCanvas"></canvas>
+                              <canvas class="sl-body-crisp-canvas" id="compareBodyCrispCanvas" aria-hidden="true"></canvas>
+                            </div>
                             <div class="sl-timestamp-guide sl-compare-timestamp-guide" id="compareTimestampGuide" aria-hidden="true" hidden></div>
                           </div>
                         </div>
@@ -1869,9 +1895,12 @@ function runList() {
   return DATASET.runs.map((run) => ({
     id: run.id,
     operator: run.operator,
+    scenarioTitle: run.scenario?.title || '通用性能场景',
+    scenarioFocus: run.scenario?.focus || 'baseline',
+    characteristics: run.scenario?.characteristics || [],
+    builderId: run.dataConstructor?.id || 'legacy-single-builder',
     dur: Math.round(run.model.timelineEnd),
     tasks: run.model.tasks.length,
-    artifactStatus: `${run.artifacts.filter((artifact) => artifact.available).length}/${run.artifacts.length} 产物可用`,
     timestamp: run.timestamp,
     current: run.id === state?.selectedRunId,
   }));
@@ -1879,6 +1908,7 @@ function runList() {
 
 const ROW_H = 21, SUB_ROW_H = 17, CORE_GAP_H = 6, BAR_PAD = 3, SUB_BAR_PAD = 3, BAR_H = ROW_H - 2 * BAR_PAD, SUB_BAR_H = SUB_ROW_H - 2 * SUB_BAR_PAD;
 const AXIS_H = 34, ZOOM_MIN = 100, ZOOM_MAX = 1600, ZOOM_BUTTON_STEP = 50;
+const MAX_CANVAS_SIDE = 8192, MAX_CANVAS_PIXELS = 14_000_000, MIN_CANVAS_RENDER_SCALE = 0.25;
 const TOPOLOGY_HUB_MIN_WIDTH = 4;
 const LOW_UTILIZATION_THRESHOLD = 0.4;
 const KIND_ACCENT = Object.fromEntries(
@@ -2052,6 +2082,7 @@ function coreParticipates(coreIdx, group = null, wrap = null) {
 }
 
 const bodyCanvas = document.getElementById('bodyCanvas');
+const bodyCrispCanvas = document.getElementById('bodyCrispCanvas');
 const axisCanvas = document.getElementById('axisCanvas');
 const laneCanvas = document.getElementById('laneCanvas');
 const bodyWrap = document.getElementById('bodyWrap');
@@ -2089,22 +2120,27 @@ const compareLaneWrap = document.getElementById('compareLaneWrap');
 const compareBodyWrap = document.getElementById('compareBodyWrap');
 const compareLaneCanvas = document.getElementById('compareLaneCanvas');
 const compareBodyCanvas = document.getElementById('compareBodyCanvas');
+const compareBodyCrispCanvas = document.getElementById('compareBodyCrispCanvas');
 const compareTimestampGuide = document.getElementById('compareTimestampGuide');
 const blockGraphZoomOut = document.getElementById('blockGraphZoomOut');
 const blockGraphZoomIn = document.getElementById('blockGraphZoomIn');
 const blockGraphFit = document.getElementById('blockGraphFit');
 const closeBlockGraph = document.getElementById('closeBlockGraph');
-let bctx, actx, lctx;
+let bctx, actx, lctx, crispCtx;
 let frameController = null;
 let canvasTooltipController = null;
 let canvasResizeObserver = null;
 let frameResizeObserver = null;
 let graphResizeObserver = null;
+let zoomRenderFrame = 0;
+let crispRenderFrame = 0;
+let pendingZoomAnchor = 0.5;
 let panelActions = null;
 let responsivePaneMode = null;
 let autoCollapsedExplorer = false;
 let autoCollapsedInspector = false;
 let overviewMetricSeries = [];
+const overviewMetricCache = new Map();
 let syncingComparisonScroll = false;
 const blockGraphViewState = {
   x: 0,
@@ -2365,12 +2401,16 @@ function taskMatchesQuery(t) {
 }
 function setupCanvas(canvas, wCss, hCss) {
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(wCss * dpr);
-  canvas.height = Math.round(hCss * dpr);
+  const sideScale = Math.min(MAX_CANVAS_SIDE / Math.max(1, wCss), MAX_CANVAS_SIDE / Math.max(1, hCss));
+  const pixelScale = Math.sqrt(MAX_CANVAS_PIXELS / Math.max(1, wCss * hCss));
+  const renderScale = Math.max(MIN_CANVAS_RENDER_SCALE, Math.min(dpr, sideScale, pixelScale));
+  canvas.width = Math.max(1, Math.round(wCss * renderScale));
+  canvas.height = Math.max(1, Math.round(hCss * renderScale));
   canvas.style.width = wCss + 'px';
   canvas.style.height = hCss + 'px';
+  canvas.dataset.renderScale = renderScale.toFixed(3);
   const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   return ctx;
 }
 
@@ -2427,6 +2467,7 @@ function renderComparisonBody() {
       fontFamily: "'Inter', sans-serif", task,
     });
   }
+  scheduleCrispTaskLayer();
 }
 
 function syncComparisonCanvases() {
@@ -2615,6 +2656,147 @@ function crossLayerClosure(rootTask) {
   return { tasks, mode: null };
 }
 
+function taskVisualState(t, fi) {
+  const related = !fi.dependencyMode || fi.relTasks.has(t.id);
+  const baseColor = related ? taskBaseColor(t) : '#6F7480';
+  let alpha = 1;
+  if (state.syncPathOnly && !taskHasSyncRelation(t)) alpha = 0.16;
+  if (fi.dependencyMode) {
+    if (!related) alpha = Math.min(alpha, 0.24);
+  } else {
+    if (fi.dimWrap != null) { if (t.wrap !== fi.dimWrap) alpha = Math.min(alpha, 0.2); }
+    else if (fi.dimGroup != null) { if (t.group !== fi.dimGroup) alpha = Math.min(alpha, 0.2); }
+    if (fi.focusTask && !fi.relTasks.has(t.id)) alpha = Math.min(alpha, 0.34);
+  }
+  if (!taskMatchesQuery(t)) alpha = Math.min(alpha, 0.15);
+  const core = MODEL.cores[t.coreIdx];
+  const expanded = state.expandedLaneCores.has(core.idx);
+  const sourceSegments = expanded
+    ? (t.pipelineSegments || [])
+    : (state.mixMode && t.microSegments?.length ? t.microSegments : [
+      { kind: 'compute', start: t.start, end: t.end },
+    ]);
+  return { related, baseColor, alpha, core, expanded, sourceSegments };
+}
+
+function drawCrispTaskLayer() {
+  if (!bodyCrispCanvas || !bodyWrap.clientWidth || !bodyWrap.clientHeight) return;
+  const viewportWidth = bodyWrap.clientWidth;
+  const viewportHeight = bodyWrap.clientHeight;
+  const scrollLeft = bodyWrap.scrollLeft;
+  const scrollTop = bodyWrap.scrollTop;
+  const dpr = window.devicePixelRatio || 1;
+  const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
+  const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
+  if (bodyCrispCanvas.width !== pixelWidth) bodyCrispCanvas.width = pixelWidth;
+  if (bodyCrispCanvas.height !== pixelHeight) bodyCrispCanvas.height = pixelHeight;
+  bodyCrispCanvas.style.width = viewportWidth + 'px';
+  bodyCrispCanvas.style.height = viewportHeight + 'px';
+  bodyCrispCanvas.style.transform = `translate3d(${scrollLeft}px, ${scrollTop}px, 0)`;
+  bodyCrispCanvas.dataset.renderScale = dpr.toFixed(3);
+  crispCtx = bodyCrispCanvas.getContext('2d');
+  crispCtx.setTransform(1, 0, 0, 1, 0, 0);
+  crispCtx.clearRect(0, 0, pixelWidth, pixelHeight);
+  crispCtx.setTransform(dpr, 0, 0, dpr, -scrollLeft * dpr, -scrollTop * dpr);
+
+  const fi = focusInfo();
+  const scale = pxPerUs();
+  const viewportRight = scrollLeft + viewportWidth;
+  const viewportBottom = scrollTop + viewportHeight;
+  const fontFamily = "'Inter', sans-serif";
+  let renderedTaskBars = 0;
+  for (const t of MODEL.tasks) {
+    const row = taskRow(t);
+    if (!Number.isFinite(row)) continue;
+    const visual = taskVisualState(t, fi);
+    visual.sourceSegments.forEach((segment) => {
+      if (segment.kind !== 'compute') return;
+      const segmentRow = visual.expanded ? subRowOf[visual.core.idx]?.[segment.sublane] : row;
+      if (!Number.isFinite(segmentRow)) return;
+      const bar = barMetricsForRow(segmentRow);
+      const geometry = taskBarGeometry(t, segment.start, segment.end, scale);
+      const x = geometry.x;
+      const width = geometry.width;
+      const y = rowTop(segmentRow) + bar.pad;
+      if (width < 1 || x + width < scrollLeft || x > viewportRight
+          || y + bar.height < scrollTop || y > viewportBottom) return;
+      const segmentSelected = segment.id
+        ? state.selSubtask?.id === segment.id
+        : Boolean(state.selTask?.id === t.id && !state.selSubtask);
+      const segmentHovered = segment.id
+        ? state.hoverSubtask?.id === segment.id
+        : Boolean(state.hoverTask?.id === t.id && !state.hoverSubtask);
+      const renderTask = segment.id ? subtaskView(t, segment) : t;
+      crispCtx.globalAlpha = visual.alpha;
+      window.PtoSwimlaneTaskPattern.drawTaskBar(crispCtx, {
+        x, y, width, height: bar.height, baseColor: visual.baseColor, fontFamily, task: renderTask,
+        isSelected: segmentSelected,
+        isRelated: fi.relTasks.has(t.id) && fi.focusTask && fi.focusTask.id !== t.id,
+        isEmphasized: segmentHovered,
+      });
+      renderedTaskBars += 1;
+    });
+  }
+  crispCtx.globalAlpha = 1;
+  bodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
+}
+
+function drawCrispComparisonLayer() {
+  if (state.secondaryViewMode !== 'comparison' || !compareBodyCrispCanvas
+      || !compareBodyWrap?.clientWidth || !compareBodyWrap.clientHeight) return;
+  const run = RUN_BY_ID[state.comparisonRunId];
+  if (!run) return;
+  const model = run.model;
+  const viewportWidth = compareBodyWrap.clientWidth;
+  const viewportHeight = compareBodyWrap.clientHeight;
+  const scrollLeft = compareBodyWrap.scrollLeft;
+  const scrollTop = compareBodyWrap.scrollTop;
+  const dpr = window.devicePixelRatio || 1;
+  const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
+  const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
+  if (compareBodyCrispCanvas.width !== pixelWidth) compareBodyCrispCanvas.width = pixelWidth;
+  if (compareBodyCrispCanvas.height !== pixelHeight) compareBodyCrispCanvas.height = pixelHeight;
+  compareBodyCrispCanvas.style.width = viewportWidth + 'px';
+  compareBodyCrispCanvas.style.height = viewportHeight + 'px';
+  compareBodyCrispCanvas.style.transform = `translate3d(${scrollLeft}px, ${scrollTop}px, 0)`;
+  compareBodyCrispCanvas.dataset.renderScale = dpr.toFixed(3);
+  const ctx = compareBodyCrispCanvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, pixelWidth, pixelHeight);
+  ctx.setTransform(dpr, 0, 0, dpr, -scrollLeft * dpr, -scrollTop * dpr);
+  const scale = pxPerUs();
+  const viewportRight = scrollLeft + viewportWidth;
+  const viewportBottom = scrollTop + viewportHeight;
+  let renderedTaskBars = 0;
+  for (const task of model.tasks) {
+    const row = rowOf[task.coreIdx];
+    if (!Number.isFinite(row)) continue;
+    const bar = barMetricsForRow(row);
+    const geometry = taskBarGeometry(task, task.start, task.end, scale);
+    const x = geometry.x;
+    const y = rowTop(row) + bar.pad;
+    if (geometry.width < 1 || x + geometry.width < scrollLeft || x > viewportRight
+        || y + bar.height < scrollTop || y > viewportBottom) continue;
+    const group = task.group != null ? model.groups[task.group] : null;
+    window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
+      x, y, width: geometry.width, height: bar.height,
+      baseColor: group?.color || KIND_ACCENT[task.kind],
+      fontFamily: "'Inter', sans-serif", task,
+    });
+    renderedTaskBars += 1;
+  }
+  compareBodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
+}
+
+function scheduleCrispTaskLayer() {
+  if (crispRenderFrame) return;
+  crispRenderFrame = window.requestAnimationFrame(() => {
+    crispRenderFrame = 0;
+    drawCrispTaskLayer();
+    drawCrispComparisonLayer();
+  });
+}
+
 function drawBody() {
   const w = bodyW(), h = bodyH(), scale = pxPerUs();
   bctx.clearRect(0, 0, w, h);
@@ -2654,29 +2836,9 @@ function drawBody() {
   for (const t of MODEL.tasks) {
     const row = taskRow(t);
     if (!Number.isFinite(row)) continue;
-    const related = !fi.dependencyMode || fi.relTasks.has(t.id);
-    const baseColor = related ? taskBaseColor(t) : '#6F7480';
-
-    let alpha = 1;
-    if (state.syncPathOnly && !taskHasSyncRelation(t)) alpha = 0.16;
-    if (fi.dependencyMode) {
-      if (!related) alpha = Math.min(alpha, 0.24);
-    } else {
-      if (fi.dimWrap != null) { if (t.wrap !== fi.dimWrap) alpha = Math.min(alpha, 0.2); }
-      else if (fi.dimGroup != null) { if (t.group !== fi.dimGroup) alpha = Math.min(alpha, 0.2); }
-      if (fi.focusTask && !fi.relTasks.has(t.id)) alpha = Math.min(alpha, 0.34);
-    }
-    if (!taskMatchesQuery(t)) alpha = Math.min(alpha, 0.15);
-
-    const core = MODEL.cores[t.coreIdx];
-    const expanded = state.expandedLaneCores.has(core.idx);
-    const sourceSegments = expanded
-      ? (t.pipelineSegments || [])
-      : (state.mixMode && t.microSegments?.length ? t.microSegments : [
-        { kind: 'compute', start: t.start, end: t.end },
-      ]);
-    sourceSegments.forEach((segment) => {
-      const segmentRow = expanded ? subRowOf[core.idx]?.[segment.sublane] : row;
+    const visual = taskVisualState(t, fi);
+    visual.sourceSegments.forEach((segment) => {
+      const segmentRow = visual.expanded ? subRowOf[visual.core.idx]?.[segment.sublane] : row;
       if (!Number.isFinite(segmentRow)) return;
       const bar = barMetricsForRow(segmentRow);
       const geometry = taskBarGeometry(t, segment.start, segment.end, scale);
@@ -2689,10 +2851,10 @@ function drawBody() {
       const segmentHovered = segment.id
         ? state.hoverSubtask?.id === segment.id
         : Boolean(state.hoverTask?.id === t.id && !state.hoverSubtask);
-      bctx.globalAlpha = alpha;
+      bctx.globalAlpha = visual.alpha;
       if (segment.kind === 'wait') {
         if (width >= 1) {
-          drawWaitSegment(x, y, width, bar.height, fi.dependencyMode && !related);
+          drawWaitSegment(x, y, width, bar.height, fi.dependencyMode && !visual.related);
           drawSubtaskFocus(x, y, width, bar.height, segmentSelected, segmentHovered);
         }
       } else if (segment.kind === 'set') {
@@ -2715,7 +2877,7 @@ function drawBody() {
       } else if (width >= 1) {
         const renderTask = segment.id ? subtaskView(t, segment) : t;
         window.PtoSwimlaneTaskPattern.drawTaskBar(bctx, {
-          x, y, width, height: bar.height, baseColor, fontFamily, task: renderTask,
+          x, y, width, height: bar.height, baseColor: visual.baseColor, fontFamily, task: renderTask,
           isSelected: segmentSelected,
           isRelated: fi.relTasks.has(t.id) && fi.focusTask && fi.focusTask.id !== t.id,
           isEmphasized: segmentHovered,
@@ -2728,6 +2890,7 @@ function drawBody() {
   if (fi.showDependencyCurves) drawDependencyCurves(fi);
   else if (state.mixMode) drawSyncCurves(fi);
   copyCanvasPixels(bodyCanvas, compareBodyCanvas);
+  scheduleCrispTaskLayer();
 }
 
 function wrapBandKey(wrapId, iteration) {
@@ -3219,6 +3382,8 @@ function physicalAiCoreKey(core) {
 }
 
 function buildOverviewMetrics() {
+  const cacheKey = state.selectedRunId;
+  if (overviewMetricCache.has(cacheKey)) return overviewMetricCache.get(cacheKey);
   const samples = 72;
   const metricDefs = [
     { key: 'hostQueue', label: 'Host CPU 队列', unit: '', max: 8, color: '#7C8DB8' },
@@ -3255,6 +3420,7 @@ function buildOverviewMetrics() {
     series[3].values.push(clampMetric(34 + aiCompute * 0.72 + mteActive * 8 + 18 * bottleneck + 8 * pulse, 0, 100));
     series[4].values.push(clampMetric(120 + mteActive * 230 + 90 * pulse + 140 * Math.max(0, Math.sin(f * Math.PI * 6)), 0, 900));
   }
+  overviewMetricCache.set(cacheKey, series);
   return series;
 }
 
@@ -3427,8 +3593,8 @@ function runCardHtml(r) {
         <dt>算子</dt><dd class="sl-history-sm">${escapeHtml(r.operator)}</dd>
         <dt>总耗时</dt><dd>${escapeHtml(r.dur)}μs</dd>
         <dt>任务数</dt><dd>${escapeHtml(r.tasks)}</dd>
-        <dt>产物状态</dt><dd style="color:var(--success)">${escapeHtml(r.artifactStatus)}</dd>
         <dt>运行时间</dt><dd class="sl-history-sm">${escapeHtml(r.timestamp)}</dd>
+        <dt>特征</dt><dd class="sl-history-sm">${escapeHtml(r.characteristics.join(' · '))}</dd>
       </dl>
       <hr class="sl-history-divider">
       ${artifactHtml}`
@@ -3439,7 +3605,10 @@ function runCardHtml(r) {
       </dl>`;
   return `<section class="sl-run-card ${selected ? 'is-selected' : 'sl-run-card--past'} ${expanded ? 'is-expanded' : ''}">
     <button class="sl-run-card__head" type="button" data-run-id="${escapeHtml(r.id)}" aria-expanded="${String(expanded)}">
-      <span class="sl-run-id">${escapeHtml(r.id)}</span>
+      <span class="sl-run-card__identity">
+        <span class="sl-run-id">${escapeHtml(r.id)}</span>
+        <span class="sl-run-scenario">${escapeHtml(r.scenarioTitle)}</span>
+      </span>
       <svg class="sl-run-card__toggle ${expanded ? 'is-open' : ''}" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
     </button>
     ${detail}
@@ -3544,14 +3713,16 @@ function bindRunHistoryDismiss() {
   });
 }
 
-function layout() {
+function layout({ reuseLaneCanvas = false } = {}) {
   const w = bodyW(), h = bodyH();
   bctx = setupCanvas(bodyCanvas, w, h);
   actx = setupCanvas(axisCanvas, w, AXIS_H);
-  lctx = setupCanvas(laneCanvas, LABEL_W, h);
+  if (!reuseLaneCanvas || !lctx) lctx = setupCanvas(laneCanvas, LABEL_W, h);
   renderGlobalRuler();
   renderOverviewBand();
-  drawAxis(); drawLanes(); drawBody();
+  drawAxis();
+  if (!reuseLaneCanvas) drawLanes();
+  drawBody();
 }
 function refresh() { renderGlobalRuler(); renderOverviewBand(); drawLanes(); drawBody(); }
 
@@ -3606,6 +3777,7 @@ bodyWrap.addEventListener('scroll', () => {
   }
   syncGlobalRulerBrush();
   hideTimestampGuide();
+  scheduleCrispTaskLayer();
 });
 function forwardLaneWheel(event, targetWrap) {
   if (!targetWrap) return;
@@ -3631,6 +3803,7 @@ compareBodyWrap?.addEventListener('scroll', () => {
     syncGlobalRulerBrush();
   }
   hideTimestampGuide();
+  scheduleCrispTaskLayer();
 });
 overviewBand.addEventListener('mousemove', showOverviewTooltip);
 overviewBand.addEventListener('mouseleave', hideOverviewTooltip);
@@ -3850,11 +4023,27 @@ if (globalRulerScale) {
   });
 }
 function setZoom(pct) {
+  const renderedWidth = parseFloat(bodyCanvas.style.width) || bodyW();
+  pendingZoomAnchor = Math.max(0, Math.min(1,
+    (bodyWrap.scrollLeft + bodyWrap.clientWidth / 2) / Math.max(1, renderedWidth)));
   state.zoomPct = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(pct / 5) * 5));
   document.getElementById('zoomReadout').textContent = state.zoomPct + '%';
   zoomSlider.value = String(state.zoomPct);
-  layout();
-  syncGlobalRulerBrush();
+  canvasPane?.setAttribute('aria-busy', 'true');
+  if (zoomRenderFrame) return;
+  zoomRenderFrame = window.requestAnimationFrame(() => {
+    zoomRenderFrame = 0;
+    layout({ reuseLaneCanvas: true });
+    bodyWrap.scrollLeft = Math.max(0,
+      bodyW() * pendingZoomAnchor - bodyWrap.clientWidth / 2);
+    axisWrap.scrollLeft = bodyWrap.scrollLeft;
+    overviewWrap.scrollLeft = bodyWrap.scrollLeft;
+    if (state.secondaryViewMode === 'comparison' && compareBodyWrap) {
+      compareBodyWrap.scrollLeft = bodyWrap.scrollLeft;
+    }
+    syncGlobalRulerBrush();
+    canvasPane?.removeAttribute('aria-busy');
+  });
 }
 
 /* ============================================================
