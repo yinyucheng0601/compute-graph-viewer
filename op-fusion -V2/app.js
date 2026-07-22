@@ -2417,7 +2417,7 @@
     if (!config) return '';
     const flow = config.flow ? `<div class="op-arch-flow">${esc(config.flow)}</div>` : '';
     return `<section class="op-detail-section">
-      <div class="op-detail-section__head">硬件视角 · Ascend 910 (AIV)</div>
+      <div class="op-detail-section__head">硬件视角 · Ascend 950B 数据搬运 / 计算路径</div>
       <div class="op-arch-panel op-arch-panel--single" data-aiv-viz data-rec="${esc(recId)}" data-phase="before" role="group" aria-label="${esc(config.name)} 的数据流对照">
         <div class="op-arch-panel__head">
           <span class="op-arch-panel__title">${esc(config.name)}</span>
@@ -2428,7 +2428,25 @@
         </div>
         ${flow}
         <div class="op-arch-chip-row" data-aiv-metrics></div>
-        <div class="op-aiv-surface"><div class="op-aiv-mount" data-aiv-core data-rec="${esc(recId)}"></div></div>
+        <section class="pto-hw-viewport op-hw-viewport" data-hw-viz-shell>
+          <header class="pto-hw-viewport__toolbar">
+            <div class="pto-hw-viewport__title">昇腾抽象硬件结构 <small>Ascend 950B</small></div>
+            <div class="pto-hw-viewport__controls">
+              <div class="pto-hw-viewport__tools">
+                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-hw-detail aria-pressed="true" title="隐藏细节数据">细节开</button>
+                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-hw-zoom-out title="缩小">-</button>
+                <span class="pto-hw-viewport__readout" data-hw-readout>60%</span>
+                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-hw-zoom-in title="放大">+</button>
+                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-hw-fit title="适配">Fit</button>
+              </div>
+            </div>
+          </header>
+          <div class="pto-hw-viewport__stage op-hw-stage" data-hw-stage>
+            <div class="pto-hw-viewport__scale op-hw-scale" data-hw-scale>
+              <div class="op-hw-graph" data-hw-graph></div>
+            </div>
+          </div>
+        </section>
         <div class="op-aiv-playback" data-aiv-playback aria-label="数据流播放控制"></div>
         <ul class="op-arch-notes" data-aiv-notes></ul>
         <ol class="op-arch-steps" data-aiv-steps></ol>
@@ -2655,14 +2673,164 @@
     return driver;
   }
 
+  function hardwareSelectorForNode(nodeId) {
+    const id = String(nodeId || '');
+    const aiv = '#mem950-aiv1';
+    const aic = '#mem950-aic';
+    if (id === 'hbm:HBM') return '[data-mem950-node="rail:GM"]';
+    if (id === 'rail:L2') return '[data-mem950-node="rail:L2"]';
+    if (id === 'cache:ND-DMA Cache') return `${aiv} [data-aiv-node="cache:ND-DMA Cache"]`;
+    if (id === 'cache:DCache') return `${aiv} [data-aiv-node="cache:DCache"]`;
+    if (id === 'buffer:UB') return `${aiv} [data-aiv-node="buffer:UB"]`;
+    if (id === 'exec:SIMD') return `${aiv} [data-aiv-node="exec:SIMD"]`;
+    if (id === 'exec:SIMT') return `${aiv} [data-aiv-node="exec:SIMT"]`;
+    if (id === 'vector:Vector') return `${aiv} [data-aiv-node="vector:Vector"]`;
+    if (id === 'buffer:L1') return `${aic} [data-aic-node="buffer:L1"]`;
+    if (id === 'buffer:L0A') return `${aic} [data-aic-node="buffer:L0A"]`;
+    if (id === 'buffer:L0B') return `${aic} [data-aic-node="buffer:L0B"]`;
+    if (id === 'buffer:L0C') return `${aic} [data-aic-node="buffer:L0C"]`;
+    if (id === 'cube:CUBE') return `${aic} [data-aic-node="cube:CUBE"]`;
+    return '';
+  }
+
+  function routeIdForHardwareEdge(from, to) {
+    const edge = `${from}->${to}`;
+    const routes = {
+      'hbm:HBM->cache:ND-DMA Cache': 'gm-to-aiv1-ub',
+      'cache:ND-DMA Cache->buffer:UB': 'l2-to-aiv1',
+      'buffer:UB->hbm:HBM': 'aiv1-ub-to-gm',
+      'cache:ND-DMA Cache->hbm:HBM': 'aiv1-ub-to-gm',
+      'buffer:UB->rail:L2': 'aiv1-to-l2',
+      'rail:L2->cache:ND-DMA Cache': 'l2-to-aiv1',
+      'hbm:HBM->buffer:L0A': 'gm-to-aic-l0a',
+      'hbm:HBM->buffer:L0B': 'gm-to-aic-l0b',
+      'buffer:L0C->buffer:UB': 'aic-to-aiv1',
+      'buffer:UB->buffer:L1': 'aiv2-to-aic',
+    };
+    return routes[edge] || '';
+  }
+
+  function hardwareFocusForStep(step = {}) {
+    const selectors = new Set();
+    const routes = new Set();
+    (Array.isArray(step.nodes) ? step.nodes : []).forEach((nodeId) => {
+      const selector = hardwareSelectorForNode(nodeId);
+      if (selector) selectors.add(selector);
+    });
+    (Array.isArray(step.routes) ? step.routes : []).forEach((route) => {
+      const from = Array.isArray(route) ? route[0] : route?.from;
+      const to = Array.isArray(route) ? route[1] : route?.to;
+      const routeId = routeIdForHardwareEdge(from, to);
+      if (routeId) routes.add(routeId);
+      [from, to].forEach((nodeId) => {
+        const selector = hardwareSelectorForNode(nodeId);
+        if (selector) selectors.add(selector);
+      });
+    });
+    return { selectors: Array.from(selectors), routes: Array.from(routes) };
+  }
+
+  function fallbackHardwareSteps(recId, phase) {
+    const vectorCompute = phase === 'after'
+      ? '2) AIV Vector 在 UB 驻留数据上连续完成融合计算'
+      : '2) AIV Vector 完成单个向量 kernel，产生中间张量';
+    if (recId === 'qkv_merge') {
+      return phase === 'after'
+        ? [
+          { title: '1) hidden 与合并后的 QKV 权重搬入 AIC 本地缓冲', nodes: ['hbm:HBM', 'buffer:L0A', 'buffer:L0B'], routes: [['hbm:HBM', 'buffer:L0A'], ['hbm:HBM', 'buffer:L0B']] },
+          { title: '2) Cube 发起一次大 GEMM 产出 QKV', nodes: ['buffer:L0A', 'buffer:L0B', 'cube:CUBE', 'buffer:L0C'], routes: [] },
+          { title: '3) L0C 结果经片上路径送回 UB 做 split / 后处理', nodes: ['buffer:L0C', 'buffer:UB'], routes: [['buffer:L0C', 'buffer:UB']] },
+        ]
+        : [
+          { title: '1) Q/K/V 三个 GEMM 分别从 GM 读取同一 hidden', nodes: ['hbm:HBM', 'buffer:L0A', 'buffer:L0B'], routes: [['hbm:HBM', 'buffer:L0A'], ['hbm:HBM', 'buffer:L0B']] },
+          { title: '2) Cube 分三次执行投影，启动和搬运重复发生', nodes: ['buffer:L0A', 'buffer:L0B', 'cube:CUBE', 'buffer:L0C'], routes: [] },
+          { title: '3) Q/K/V 分别回写/进入后续 AIV 处理', nodes: ['buffer:L0C', 'buffer:UB'], routes: [['buffer:L0C', 'buffer:UB']] },
+        ];
+    }
+    return [
+      { title: '1) 输入 tile 从 GM 经 ND-DMA 搬入 AIV UB', nodes: ['hbm:HBM', 'cache:ND-DMA Cache', 'buffer:UB'], routes: [['hbm:HBM', 'cache:ND-DMA Cache'], ['cache:ND-DMA Cache', 'buffer:UB']] },
+      { title: vectorCompute, nodes: ['buffer:UB', 'exec:SIMD', 'vector:Vector'], routes: [['buffer:UB', 'vector:Vector'], ['exec:SIMD', 'vector:Vector'], ['vector:Vector', 'buffer:UB']] },
+      phase === 'after'
+        ? { title: '3) 中间结果留在 UB，直接供下一段计算或输出', nodes: ['buffer:UB', 'vector:Vector'], routes: [] }
+        : { title: '3) 中间张量经 MTE3/GM 路径回写，下一 kernel 再读回', nodes: ['buffer:UB', 'hbm:HBM'], routes: [['buffer:UB', 'hbm:HBM']] },
+    ];
+  }
+
+  function hardwareBlocks(blocks = [], recId = '') {
+    return (Array.isArray(blocks) ? blocks : []).map((block) => ({
+      ...block,
+      core: block.core || (recId === 'qkv_merge' ? 'mem950-aic' : 'mem950-aiv1'),
+      buffer: recId === 'qkv_merge' && block.buffer === 'UB' ? 'L0C' : block.buffer,
+    }));
+  }
+
+  function ensureHardwareDriver(panel) {
+    if (panel?.__opHardwareDriver) return panel.__opHardwareDriver;
+    const memoryHelper = window.PtoMemoryArchitecturePattern;
+    const viewportHelper = window.PtoHardwareArchitectureViewport;
+    const shell = panel?.querySelector?.('[data-hw-viz-shell]');
+    const stage = panel?.querySelector?.('[data-hw-graph]');
+    if (!memoryHelper || !viewportHelper || !shell || !stage) return null;
+
+    memoryHelper.renderArchitecture(stage, 'ascend950b');
+    const graph = stage.querySelector('.pto-mem950') || stage.firstElementChild || stage;
+    const frameSize = {
+      width: Math.max(1100, graph.offsetWidth || graph.scrollWidth || 1100),
+      height: Math.max(720, graph.offsetHeight || graph.scrollHeight || 720),
+    };
+    const routeOverlay = memoryHelper.createRouteOverlay(stage, 'ascend950b');
+    routeOverlay?.render();
+    memoryHelper.attachHoverInteractions?.(stage, 'ascend950b');
+    memoryHelper.attachPathFocusInteractions?.(stage, 'ascend950b');
+
+    const viewportApi = viewportHelper.mount(shell, {
+      mode: 'inline',
+      viewport: '[data-hw-stage]',
+      scaleEl: '[data-hw-scale]',
+      inlineHost: '[data-hw-graph]',
+      detailToggle: '[data-hw-detail]',
+      zoomOut: '[data-hw-zoom-out]',
+      zoomIn: '[data-hw-zoom-in]',
+      fit: '[data-hw-fit]',
+      readout: '[data-hw-readout]',
+      frameSize,
+      defaultScale: 0.6,
+      zoomLevels: [0.42, 0.5, 0.6, 0.72, 0.84, 1],
+      fitOnMount: true,
+      fitPaddingX: 24,
+      fitPaddingY: 72,
+      onScaleChange: () => routeOverlay?.render(),
+      onPanChange: () => routeOverlay?.render(),
+    });
+
+    const apply = ({ step, phaseConfig, recId }) => {
+      const focus = hardwareFocusForStep(step);
+      memoryHelper.setPathFocus(stage, 'ascend950b', focus);
+      memoryHelper.setBufferBlocks(stage, hardwareBlocks(phaseConfig?.blocks || [], recId));
+      routeOverlay?.render();
+    };
+    const clear = () => {
+      memoryHelper.clearPathFocus(stage);
+      routeOverlay?.render();
+    };
+
+    const driver = { stage, routeOverlay, viewportApi, apply, clear };
+    panel.__opHardwareDriver = driver;
+    requestAnimationFrame(() => {
+      viewportApi?.fit?.();
+      routeOverlay?.render();
+    });
+    return driver;
+  }
+
   function hydrateAivViz(root) {
-    const helper = window.PtoAivCorePattern;
+    const helper = window.PtoMemoryArchitecturePattern;
     if (!helper || !root) return;
     root.querySelectorAll('[data-aiv-viz]').forEach((panel) => {
       const playbackHelper = window.PtoFloatingPlaybackControl;
       const recId = panel.dataset.rec;
       if (!recId || !AIV_VIZ[recId]) return;
-      const mount = panel.querySelector('[data-aiv-core]');
+      const mount = panel.querySelector('[data-hw-graph]');
       const playbackMount = panel.querySelector('[data-aiv-playback]');
       const metricsRow = panel.querySelector('[data-aiv-metrics]');
       const notesList = panel.querySelector('[data-aiv-notes]');
@@ -2682,7 +2850,9 @@
 
         const phaseConfig = AIV_VIZ[recId]?.[resolvedPhase];
         if (!phaseConfig) return;
-        const steps = Array.isArray(phaseConfig.steps) ? phaseConfig.steps : [];
+        const steps = Array.isArray(phaseConfig.steps) && phaseConfig.steps.length
+          ? phaseConfig.steps
+          : fallbackHardwareSteps(recId, resolvedPhase);
 
         if (metricsRow) {
           metricsRow.innerHTML = (phaseConfig.metrics || [])
@@ -2702,15 +2872,9 @@
             .join('');
         }
         if (mount) {
-          if (mount.dataset.aivRendered !== 'true') {
-            helper.render(mount, 'aivOfficialV1');
-            mount.dataset.aivRendered = 'true';
-          }
-          const driver = ensureAivDriver(mount);
-          helper.setBufferBlocks(mount, phaseConfig.blocks || []);
-          driver?.setNodeMarkers(phaseConfig.markers || []);
-          driver?.highlightNodes([]);
-          driver?.clearActiveRoutes();
+          const driver = ensureHardwareDriver(panel);
+          driver?.clear();
+          helper.setBufferBlocks(driver?.stage || mount, hardwareBlocks(phaseConfig.blocks || [], recId));
         }
 
         if (playbackMount) {
@@ -2767,12 +2931,11 @@
 
         const applyStep = (nextStep, options = {}) => {
           if (!mount) return;
-          const driver = ensureAivDriver(mount);
+          const driver = ensureHardwareDriver(panel);
           const clamped = Math.max(0, Math.min(steps.length - 1, Number(nextStep) || 0));
           state.step = clamped;
           const step = steps[clamped];
-          driver?.highlightNodes(step?.nodes || []);
-          driver?.setActiveRoutes(step?.routes || [], { animate: true });
+          driver?.apply({ step, phaseConfig, recId });
 
           if (stepsList) {
             stepsList.querySelectorAll('[data-aiv-step]').forEach((row) => {
@@ -2877,14 +3040,12 @@
             const step = phaseConfig.steps?.[stepIndex];
             const nodes = Array.isArray(step?.nodes) ? step.nodes : [];
             const highlight = () => {
-              const driver = ensureAivDriver(mount);
-              driver?.highlightNodes(nodes);
-              driver?.setActiveRoutes(step?.routes || [], { animate: true });
+              const driver = ensureHardwareDriver(panel);
+              driver?.apply({ step, phaseConfig, recId });
             };
             const clear = () => {
-              const driver = ensureAivDriver(mount);
-              driver?.highlightNodes([]);
-              driver?.clearActiveRoutes();
+              const driver = ensureHardwareDriver(panel);
+              driver?.clear();
             };
             button.addEventListener('mouseenter', highlight);
             button.addEventListener('mouseleave', clear);

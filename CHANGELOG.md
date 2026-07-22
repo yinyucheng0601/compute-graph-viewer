@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-07-22 — `deepseek-v32-report-V2` 融合选中高亮 + 融合前后可视化对比
+
+- 选中推荐后，中间模型图进入「聚焦模式」：非相关算子整体淡出（`.is-fusion-dim`，保留被选算子及其祖先容器不淡出以避免子节点被连带变暗），被选中的几个可融合算子逐个绘制高亮光晕矩形（`fusion-focus-halo`，脉冲发光），并用虚线连接线（`fusion-focus-link`）把它们串起来，顶部悬浮「N 个算子 ⇒ 融合算子名」标签；`opportunity` 用主色、`applied` 用成功色区分。覆盖层在图重渲染/折叠展开后自动重建，取消选中或关闭标记时清除。
+- `app.js` 新增 `fusionActiveItems`（用 controller.graph 的真实节点/簇坐标求融合算子几何）与 `applyFusionFocus`（淡出 + 光晕 + 连线 + 标签），并在 `applyFusionMarkers`、`setActiveFusionRec` 中挂接；`app.css` 新增聚焦淡出、光晕/连线/标签动画样式（走设计系统 token）。
+- 每条推荐卡片新增「融合前 → 融合后」可视化：以竖向数据流对比未融合(多 kernel，中间结果经 HBM `⇅` 往返 / 阻塞集合通信 `⇄`)与融合后(单 kernel、中间结果驻留片上)，并给出 Kernel 数、HBM·通信往返次数的前后条形对比与降幅百分比。
+- `fusion-advisor.js` 每条推荐新增 `fused`(融合算子短名，用于图上标签)与 `flow`(`{io, before, after}`，token 为 kernel 名 / `hbm` / `comm:Label`)；`app.js` 新增 `renderFusionFlow` 及相关 i18n（中英双语），卡片在代码对照之前插入该可视化。
+
+## 2026-07-22 — `deepseek-v32-report-V2` 融合推荐面板按真实算子与昇腾约束重构
+
+- 依据本负载真实 profiling（`data/ds3_2_perf_data.json`）重写 `fusion-advisor.js` 推荐：原 6 条推荐的融合算子（AddRmsNormCast、MlaPrologV3、DequantSwigluQuant、GroupedMatmul、QuantBatchMatmulV3、MoeDistribute*）实为图中已存在的算子，改为区分 `status`：`opportunity`（尚未融合的真实热点）与 `applied`（已融合，作为覆盖校验）。
+- 新增 3 条实测驱动的待融合机会：① MTP 投机验证融合（`spec_token_verify_main` ReverseV2 占 87.5%、3.18 ms＝整步 35.7%，本负载最大热点）；② MC2 TP Matmul+集合通信融合/通信掩盖（`step_start_init` 0.96 ms、`eh_proj`、lm_head 的 MatMul 与 HcomAllGather/ReduceScatter/allReduce 串行）；③ Transpose+Cast 折叠进 Matmul 尾处理（约 0.40 ms Transpose＋0.16 ms Cast 独立算子）。每条含硬件单元、实测热点证据与昇腾约束。
+- 每条推荐新增 `status`/`unit`/`evidence`/`constraint` 字段；`graphOps` 对齐真实节点主导算子（ReverseV2/MatMul/Hcom*/Transpose 等），图标记正确落点（25 个标记）。
+- `app.js`：卡片新增状态徽章、硬件单元 chips、实测热点与昇腾约束分区，面板按「推荐 — 尚未融合 / 本图已应用」分组并更新副标题计数；新增中英双语 i18n。`app.css`：新增分组标题、状态徽章、单元 chip、证据/约束块样式（走设计系统 token）。
+
+## 2026-07-21 — `deepseek-v32-report-V2` 融合方案标记到模型可视化图层
+
+- 在中间模型架构图上标记 6 个融合推荐方案的候选点：按各方案 `graphOps` 匹配节点主导算子，映射到架构图节点并只保留最深层（剔除仅为汇总的父级），叶子被折叠时标记自动落到最近可见的父簇；标记以角标形式渲染（⚡，多方案节点显示数量），按优先级着色。
+- 图↔面板联动：点击图上标记会打开融合推荐面板并展开/高亮对应方案；展开面板卡片或点击「在图中定位」会高亮并居中对应图节点；架构视图头部新增「融合标记」开关可整体显隐标记。
+- `fusion-advisor.js` 为每条推荐新增 `graphOps`（图标记专用主导算子，独立于面板 `affects`）；`app.js` 增加融合↔节点索引、标记渲染与联动逻辑及 i18n；`app.css` 增加标记、定位按钮与激活态样式（走设计系统 token）。
+
+## 2026-07-21 — `deepseek-v32-report-V2` 新增融合算子推荐面板
+
+- 顶栏右上角新增融合算子推荐图标按钮，可开关右侧滑出的融合推荐抽屉面板（支持关闭按钮、点击遮罩、Esc 关闭）。
+- 新增 `fusion-advisor.js` 融合推荐知识库，规则与结构参考 `op-fusion` 模块：每条推荐含优先级、融合算子链、收益、推荐理由、框架→昇腾代码对照、对应 CANN 算子与影响算子；内容面向 DeepSeek V3.2（AddRmsNormCast、MlaPrologV3、DequantSwigluQuant、MoE 路由+GroupedMatmul、QuantBatchMatmulV3、MoE dispatch/combine），`affects` 与报告算子对齐，描述中英双语。
+- `app.js` 增加对应 i18n、卡片渲染、展开与开关逻辑并随语言切换重渲染，`app.css` 增加抽屉、优先级徽章、收益 chips、算子链、代码对照等样式（全部走设计系统 token）。
+
+## 2026-07-21 — `deepseek-v32-report-V2` 检查器新增算子详情分类页签
+
+- 将检查器面板改为分类页签：原有性能内容归入「性能」页签，新增「算子定义 / 支持情况 / 精度 / API 学习」四个页签。
+- 新增 `operator-knowledge.js` 算子知识库（按类别默认值 + 逐算子精选，未收录算子按名称推断类别兜底），提供公式、输入输出、昇腾硬件/数据类型/格式、精度模式与误差、API 文档与仓库链接，内容中英双语。
+- 详情页签顶部提供该节点算子选择 chips，切换算子在四个详情页签间保持一致；`app.js` 增加对应 i18n、渲染与事件逻辑，`app.css` 增加相应样式。
+
 ## 2026-07-21 — `training-monitoring-v3.html` 合并入 `training-monitoring-v2.html`
 
 - 删除旧 `training-monitoring-v2.html`（SVG 整网图版），将 `training-monitoring-v3.html`（3D deck 整网图版）重命名为 `training-monitoring-v2.html`。
