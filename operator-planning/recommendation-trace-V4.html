@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MatMul + Bias + GELU · Recommendation Trace</title>
+  <title>MatMul + Bias + GELU · Recommendation Trace V4</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="../../pto-design-system/tokens/foundation.css">
   <link rel="stylesheet" href="../../pto-design-system/tokens/semantic.css">
@@ -1915,27 +1915,81 @@
       font: var(--text-body-sm);
     }
 
-    .intended-kem {
-      display: grid;
-      gap: var(--space-3);
-      margin-top: var(--space-4);
-      padding: var(--space-3);
-      background: var(--surface-1);
-      border-radius: var(--radius-md);
-    }
-
-    .intended-kem[hidden] { display: none; }
-    .intended-kem__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-    .intended-kem__head h3 { margin: 0; color: var(--foreground); font: var(--text-title-2); }
-    .intended-kem__head p { margin: var(--space-1) 0 0; color: var(--foreground-secondary); font: var(--text-body-sm); }
-    .intended-kem__chain { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-    .intended-kem__stage { min-width: 0; padding: var(--space-2); background: var(--surface-2); border-radius: var(--radius-sm); }
-    .intended-kem__stage span { display: block; color: var(--foreground-muted); font: var(--text-label); }
-    .intended-kem__stage strong { display: block; margin-top: 3px; color: var(--foreground); font: var(--text-body-sm); }
-    .intended-kem__stage code { display: block; margin-top: 3px; overflow: hidden; color: var(--foreground-secondary); font: var(--text-mono); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-    .intended-kem__note { color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.5; }
-    @media (max-width: 780px) { .intended-kem__chain { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    }
+    .target-model { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+    .target-model[hidden] { display: none; }
+    .target-model__compare { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+    .target-model__candidate { min-width: 0; padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-2); color: var(--foreground); text-align: left; cursor: pointer; }
+    .target-model__candidate:hover, .target-model__candidate.is-selected { background: var(--surface-3); border-color: var(--border-strong); }
+    .target-model__candidate strong, .target-model__candidate span, .target-model__candidate small { display: block; }
+    .target-model__candidate span { margin-top: 3px; color: var(--foreground-secondary); font: var(--text-body-sm); }
+    .target-model__candidate small { margin-top: var(--space-2); color: var(--foreground-muted); font: var(--text-label); }
+    .target-model__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+    .target-model__head h3 { margin: 0; color: var(--foreground); font: var(--text-title-2); }
+    .target-model__head p, .target-model__notice { margin: var(--space-1) 0 0; color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.55; }
+    .target-model__tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .target-model__tabs .btn.is-selected { background: var(--surface-4); color: var(--foreground); }
+    .target-model__workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, .34fr); gap: var(--space-3); align-items: start; }
+    .target-model__views { min-width: 0; display: grid; }
+    .target-model__projection[hidden] { display: none; }
+    .target-model__view { min-width: 0; padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-1); }
+    .target-model__view-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
+    .target-model__view-head h4 { margin: 0; color: var(--foreground); font: var(--text-body-md); }
+    .target-model__view-head span { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-pipeline { min-width: 760px; display: grid; grid-template-columns: 132px repeat(var(--kem-steps), minmax(72px, 1fr)); gap: var(--space-2); align-items: stretch; }
+    .kem-pipeline__corner, .kem-pipeline__step { min-height: 24px; color: var(--foreground-muted); font: var(--text-label); text-align: center; }
+    .kem-pipeline__corner { text-align: left; }
+    .kem-pipeline__lane-label { display: grid; align-content: center; gap: 2px; min-height: 54px; color: var(--foreground); font: var(--text-body-sm); }
+    .kem-pipeline__lane-label small { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-pipeline__lane { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(var(--kem-steps), minmax(72px, 1fr)); gap: var(--space-1); min-height: 54px; padding: var(--space-1); border-radius: var(--radius-sm); background: repeating-linear-gradient(90deg, transparent 0 calc((100% / var(--kem-steps)) - 1px), color-mix(in srgb, var(--foreground) 7%, transparent) calc((100% / var(--kem-steps)) - 1px) calc(100% / var(--kem-steps))), color-mix(in srgb, var(--foreground) 4%, transparent); }
+    .kem-pipeline__block { min-width: 0; display: grid; place-items: center; padding: var(--space-1); border: 0; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--tile-color) 68%, var(--surface-3)); color: white; font: 700 10px / 1.15 var(--font-sans); cursor: pointer; }
+    .kem-pipeline__block.is-active { outline: 2px solid color-mix(in srgb, var(--foreground) 82%, transparent); outline-offset: -2px; }
+    .kem-pipeline-note { margin: var(--space-3) 0 0; color: var(--foreground-muted); font: var(--text-body-sm); }
+    .kem-lifecycle { min-width: 820px; display: grid; gap: var(--space-1); }
+    .kem-lifecycle__row { display: grid; grid-template-columns: minmax(150px, .7fr) repeat(6, minmax(96px, 1fr)); gap: var(--space-1); align-items: stretch; }
+    .kem-lifecycle__header { min-height: 24px; color: var(--foreground-muted); font: var(--text-label); text-align: center; }
+    .kem-lifecycle__header:first-child { text-align: left; }
+    .kem-lifecycle__label, .kem-lifecycle__cell { min-width: 0; padding: var(--space-2); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--foreground-secondary); font: var(--text-body-sm); }
+    .kem-lifecycle__label { display: grid; align-content: center; gap: 3px; color: var(--foreground); font-family: var(--font-mono); text-align: left; cursor: pointer; border: 0; }
+    .kem-lifecycle__label small { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-lifecycle__cell { display: grid; align-content: center; gap: 4px; color: var(--foreground-muted); font-size: 11px; text-align: left; }
+    .kem-lifecycle__cell.is-owned { background: color-mix(in srgb, var(--tile-color) 15%, var(--surface-2)); color: var(--foreground-secondary); }
+    .kem-lifecycle__cell b { color: var(--tile-color); font: 700 11px / 1 var(--font-mono); }
+    .kem-lifecycle__cell small { color: inherit; font: 500 9px / 1.35 var(--font-mono); }
+    .kem-lifecycle__cell em { color: var(--foreground-muted); font: var(--text-label); font-style: normal; }
+    .kem-lifecycle__cell.is-active, .kem-lifecycle__label.is-active, .kem-path.is-active, .kem-dependency.is-active { background: color-mix(in srgb, var(--primary) 22%, var(--surface-2)); color: var(--foreground); box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent); }
+    .kem-paths, .kem-dependencies { display: grid; gap: var(--space-2); }
+    .kem-stage-sequence { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .kem-stage-sequence .btn.is-selected { background: var(--surface-4); color: var(--foreground); }
+    .kem-path, .kem-dependency { width: 100%; display: grid; grid-template-columns: minmax(76px, .5fr) 20px minmax(76px, .5fr) minmax(0, 1fr); gap: var(--space-2); align-items: center; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--foreground-secondary); text-align: left; cursor: pointer; }
+    .kem-path code { color: var(--foreground); font: var(--text-mono); font-size: 11px; }
+    .kem-path i { height: 1px; background: var(--accent); position: relative; }
+    .kem-path i::after { content: ''; position: absolute; right: 0; top: -3px; border: 4px solid transparent; border-left-color: var(--accent); }
+    .kem-path small, .kem-dependency small { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-dependency { grid-template-columns: minmax(82px, .6fr) 18px minmax(82px, .6fr) minmax(0, 1fr); }
+    .kem-dependency b { color: var(--foreground); font: var(--text-body-sm); }
+    .kem-dependency em { color: var(--accent); font-style: normal; text-align: center; }
+    .kem-tiling-meta { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+    .kem-tiling-meta .btn.is-selected { background: color-mix(in srgb, var(--primary) 20%, var(--surface-3)); color: var(--foreground); }
+    .kem-memory-viewport { height: 560px; }
+    .kem-memory-stage { min-height: 0; }
+    .kem-memory-scale { min-width: 0; width: max-content; transform-origin: 0 0; }
+    .kem-memory-graph { width: max-content; min-width: 0; min-height: 0; }
+    .kem-memory-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+    .kem-memory-step { min-width: 0; display: grid; gap: 3px; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: var(--surface-2); color: var(--foreground-secondary); text-align: left; cursor: pointer; }
+    .kem-memory-step.is-active { background: color-mix(in srgb, var(--primary) 22%, var(--surface-2)); color: var(--foreground); }
+    .kem-memory-step b { color: var(--foreground); font: var(--text-body-sm); }
+    .kem-memory-step small { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-inspector { padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-1); }
+    .kem-inspector h4 { margin: 0; color: var(--foreground); font: var(--text-body-md); }
+    .kem-inspector__summary { margin: var(--space-2) 0 var(--space-3); color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.55; }
+    .kem-inspector dl { display: grid; gap: var(--space-2); margin: 0; }
+    .kem-inspector__row { display: grid; gap: 3px; padding-top: var(--space-2); border-top: 1px solid var(--border-subtle); }
+    .kem-inspector dt { color: var(--foreground-muted); font: var(--text-label); }
+    .kem-inspector dd { margin: 0; color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.45; }
+    .target-model__validation { padding: var(--space-3); border-radius: var(--radius-md); background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)); color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.55; }
+    .target-model__validation strong { color: var(--foreground); }
+    @media (max-width: 900px) { .target-model__workspace { grid-template-columns: 1fr; } }
+    @media (max-width: 780px) { .target-model__compare { grid-template-columns: 1fr; } .target-model__view { overflow-x: auto; } .kem-memory-steps { grid-template-columns: 1fr; } .kem-path, .kem-dependency { grid-template-columns: 1fr 16px 1fr; } .kem-path small, .kem-dependency small { grid-column: 1 / -1; } }
 
     .candidate-code-preview[hidden] { display: none; }
 
@@ -2854,27 +2908,89 @@
                       <div aria-hidden="true"></div>
                       <div class="candidate-action-cell">
                         <button class="btn btn-sm" type="button" data-candidate-code-preview="stable" aria-haspopup="dialog">代码预览</button>
-                        <a class="btn btn-sm" href="recommendation-trace-V4.html#candidate=stable">在 V4 深检目标模型</a>
+                        <button class="btn btn-sm" type="button" data-show-target-model="stable">深检目标模型</button>
                         <button class="btn btn-sm btn-solid" type="button" data-generate-candidate-project="stable">生成算子工程</button>
                       </div>
                       <div class="candidate-action-cell is-recommended">
                         <button class="btn btn-sm" type="button" data-candidate-code-preview="balanced" aria-haspopup="dialog">代码预览</button>
-                        <a class="btn btn-sm" href="recommendation-trace-V4.html#candidate=balanced">在 V4 深检目标模型</a>
+                        <button class="btn btn-sm" type="button" data-show-target-model="balanced">深检目标模型</button>
                         <button class="btn btn-sm btn-solid" type="button" data-generate-candidate-project="balanced">生成算子工程</button>
                       </div>
                       <div class="candidate-action-cell">
                         <button class="btn btn-sm" type="button" data-candidate-code-preview="aggressive" aria-haspopup="dialog">代码预览</button>
-                        <a class="btn btn-sm" href="recommendation-trace-V4.html#candidate=aggressive">在 V4 深检目标模型</a>
+                        <button class="btn btn-sm" type="button" data-show-target-model="aggressive">深检目标模型</button>
                         <button class="btn btn-sm btn-solid" type="button" data-generate-candidate-project="aggressive">生成算子工程</button>
                       </div>
                     </div>
                     <div class="candidate-project-status" data-candidate-project-status aria-live="polite">工程内容尚未写入本地目录。</div>
                   </div>
 
-                  <section class="intended-kem" data-intended-kem hidden aria-live="polite">
-                    <header class="intended-kem__head"><div><h3 data-intended-kem-title>候选的意图执行模型</h3><p data-intended-kem-meta></p></div><button class="btn btn-sm" type="button" data-close-intended-model>收起</button></header>
-                    <div class="intended-kem__chain" data-intended-kem-chain></div>
-                    <div class="intended-kem__note" data-intended-kem-note></div>
+                  <section class="target-model" data-target-model hidden aria-live="polite" aria-labelledby="targetModelTitle">
+                    <header class="target-model__head">
+                      <div>
+                        <h3 id="targetModelTitle" data-target-model-title>候选目标执行模型</h3>
+                        <p data-target-model-meta></p>
+                      </div>
+                      <button class="btn btn-sm" type="button" data-close-target-model>返回候选比较</button>
+                    </header>
+                    <p class="target-model__notice">这是由候选参数和规则导出的逻辑执行模型：表达预期资源状态、数据路径与偏序，不表示任何一次运行的精确时间线。</p>
+                    <div class="target-model__compare" data-target-model-compare aria-label="切换候选目标模型"></div>
+                    <div class="target-model__tabs" data-kem-view-tabs role="tablist" aria-label="目标执行模型视图"></div>
+                    <div class="target-model__workspace">
+                      <div class="target-model__views">
+                        <section class="target-model__view target-model__projection" data-kem-view-panel="pipeline" aria-labelledby="targetPipelineTitle">
+                          <header class="target-model__view-head"><h4 id="targetPipelineTitle">Pipeline view</h4><span>逻辑步 / producer–consumer / sync</span></header>
+                          <div style="overflow:auto"><div data-kem-pipeline></div></div>
+                        </section>
+                        <section class="target-model__view target-model__projection" data-kem-view-panel="lifecycle" aria-labelledby="targetLifecycleTitle" hidden>
+                          <header class="target-model__view-head"><h4 id="targetLifecycleTitle">Buffer lifecycle</h4><span>tile / slot 逻辑轮转</span></header>
+                          <div style="overflow:auto"><div class="kem-lifecycle" data-kem-lifecycle></div></div>
+                        </section>
+                        <section class="target-model__view target-model__projection" data-kem-view-panel="tiling" aria-labelledby="targetTilingTitle" hidden>
+                          <header class="target-model__view-head"><h4 id="targetTilingTitle">Tiling view</h4><span>global tensor → core → tile → slot</span></header>
+                          <div class="kem-tiling-meta" data-kem-tiling-meta></div>
+                          <section class="tiling-core-split" data-kem-tiling-core-split aria-label="候选 Tiling 切分">
+                            <header class="tiling-core-split-head">
+                              <div class="tiling-core-split-heading"><strong>核间与核内切分</strong><span data-kem-tiling-summary></span></div>
+                              <span class="stat-chip">Mock · static estimate</span>
+                            </header>
+                            <div class="tiling-core-strip" data-kem-tiling-core-strip aria-label="核心分配"></div>
+                            <div class="tiling-split-diagrams" data-kem-tiling-diagrams></div>
+                            <p class="tiling-core-split-formula" data-kem-tiling-formula></p>
+                            <p class="tiling-core-split-note" data-kem-tiling-note></p>
+                          </section>
+                        </section>
+                        <section class="target-model__view target-model__projection" data-kem-view-panel="memory" aria-labelledby="targetPathTitle" hidden>
+                          <header class="target-model__view-head"><h4 id="targetPathTitle">Memory path</h4><span>硬件资源上的预期计算与数据移动</span></header>
+                          <section class="pto-hw-viewport kem-memory-viewport" data-kem-memory-viewport aria-label="Ascend 910B 目标数据路径">
+                            <header class="pto-hw-viewport__toolbar">
+                              <div class="pto-hw-viewport__title"><strong>Hardware mapping</strong><small>Ascend 910B · design-time target</small></div>
+                              <div class="pto-hw-viewport__controls"><div class="pto-hw-viewport__tools" aria-label="Memory path viewport controls">
+                                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-kem-memory-detail aria-pressed="true">细节开</button>
+                                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-kem-memory-zoom-out aria-label="缩小内存路径图">−</button>
+                                <span class="pto-hw-viewport__readout" data-kem-memory-readout>60%</span>
+                                <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-kem-memory-zoom-in aria-label="放大内存路径图">+</button>
+                              </div></div>
+                            </header>
+                            <div class="pto-hw-viewport__stage kem-memory-stage" data-kem-memory-stage>
+                              <div class="pto-hw-viewport__scale kem-memory-scale" data-kem-memory-scale>
+                                <div class="kem-memory-graph" data-kem-memory-graph></div>
+                              </div>
+                            </div>
+                          </section>
+                          <div class="kem-memory-steps" data-kem-paths></div>
+                        </section>
+                        <section class="target-model__view target-model__projection" data-kem-view-panel="dependencies" aria-labelledby="targetDependencyTitle" hidden>
+                          <header class="target-model__view-head"><h4 id="targetDependencyTitle">Logical dependencies</h4><span>偏序，不是 runtime trace</span></header>
+                          <div class="kem-dependencies" data-kem-dependencies></div>
+                        </section>
+                      </div>
+                      <aside class="kem-inspector" aria-live="polite" aria-labelledby="targetInspectorTitle">
+                        <h4 id="targetInspectorTitle">Model inspector</h4>
+                        <div data-kem-inspector></div>
+                      </aside>
+                    </div>
+                    <div class="target-model__validation" data-kem-validation></div>
                   </section>
 
                   <footer class="candidate-footer">
@@ -4884,17 +5000,79 @@
           bufferNum: 3, schedule: 'Deeper pipeline', estimatedTime: '1.79 ms', headroom: '4% / 8%'
         }
       };
-      const intendedKemStages = {
-        stable: [
-          ['MTE2', 'CopyIn', 'GM → L1'], ['AIC', 'Load + Mmad', 'L1 → L0A/B → L0C'], ['AIV', 'Bias + GELU', 'GM staged → UB'], ['MTE3', 'CopyOut', 'UB → GM']
-        ],
-        balanced: [
-          ['MTE2', 'CopyIn', 'GM → L1 · next tile'], ['AIC', 'Load + Mmad', 'L1 → L0A/B → L0C'], ['AIC → AIV', 'C→V handoff', 'on-chip · ping-pong'], ['AIV / MTE3', 'Bias + GELU + Out', 'UB → GM · prior tile']
-        ],
-        aggressive: [
-          ['MTE2', 'CopyIn', 'GM → L1 · deeper pipe'], ['AIC', 'Load + Mmad', 'L0A/B → L0C'], ['AIC → AIV', 'C→V handoff', 'on-chip · 3 buffers'], ['AIV / MTE3', 'Epilogue + Out', 'UB → GM · high pressure']
-        ]
+      // 设计期目标执行模型：所有关系均由候选参数和规则生成，不是 runtime trace。
+      const candidateExecutionModels = {
+        stable: {
+          summary: '单缓冲以资源余量换取可预测的串行交接；同一 slot 仅在上一 tile 释放后才能接收下一 tile。',
+          confidence: '硬约束 + 静态推断', parallel: '串行 C→V', risk: '性能上限：Copy、Cube 与 Vector 没有目标重叠。',
+          tiling: { coreKey: 'm', coreGrid: '16×1', blockDim: 16, cubeTile: { label: '64×64×32', m: 64, n: 64, k: 32 }, vectorBlock: { mode: 'Same M×N', m: 64, n: 64 }, tail: 'Full tile', slotRule: 'tileId % 1' },
+          buffers: [
+            { id: 'l1-slot0', label: 'L1 input · slot 0', resource: 'L1 input queue', slot: 0, ring: 1, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · depth 1', '生成依据', 'BUFFER_NUM=1；资源模型可行', '实现核对', 'AllocTensor → EnQue → DeQue → FreeTensor 闭合', '复用边界', 'tile t+1 只能在 tile t 被 Cube 消费并 release 后写入', '实测验证', '确认不存在意外并发或 slot 泄漏'] },
+            { id: 'ub-out', label: 'UB epilogue · slot 0', resource: 'Vector output queue', slot: 0, ring: 1, phase: 'handoff', inspector: ['Buffer / queue', 'VECCALC output queue · depth 1', '生成依据', 'GM staged C→V path', '实现核对', 'DataCopy 输入与输出长度、tail、FreeTensor', '复用边界', 'CopyOut 完成并 release 后才允许下一 tile 占用', '实测验证', '检查 UB 峰值与输出正确性'] }
+          ],
+          paths: [
+            { id: 'path-gm-l1', source: 'GM A/B', target: 'L1 slot 0', detail: 'CopyIn · tile t0', objects: ['l1-slot0', 'stage-copyin'] },
+            { id: 'path-l1-l0', source: 'L1 slot 0', target: 'L0A/B → L0C', detail: 'LoadData + Mmad', objects: ['l1-slot0', 'stage-load', 'stage-cube'] },
+            { id: 'path-staged', source: 'L0C → GM', target: 'UB epilogue', detail: 'GM staged C→V', objects: ['ub-out', 'stage-handoff'] },
+            { id: 'path-out', source: 'UB epilogue', target: 'GM Z', detail: 'CopyOut', objects: ['ub-out', 'stage-copyout'] }
+          ],
+          dependencies: [
+            { id: 'dep-copy-cube', from: 'CopyIn', to: 'Load + Mmad', via: 'queue ready', detail: 'Cube 只能消费已入队的 L1 tile。', objects: ['l1-slot0', 'stage-copyin', 'stage-cube'] },
+            { id: 'dep-cube-handoff', from: 'Mmad', to: 'GM staged C→V', via: 'C ready', detail: 'C 先写回 GM，再由 Vector 侧读取。', objects: ['stage-cube', 'stage-handoff', 'ub-out'] },
+            { id: 'dep-vector-out', from: 'Bias + GELU', to: 'CopyOut', via: 'V → MTE3', detail: '输出 slot 释放后，下一 tile 才可复用。', objects: ['ub-out', 'stage-vector', 'stage-copyout'] }
+          ],
+          validation: '实现后先验证队列生命周期是否闭合和 tail 是否正确；profiling 只用于确认串行路径的真实成本，不会改变该逻辑模型的证据身份。'
+        },
+        balanced: {
+          summary: '两个 L1 / C→V slot 按 Ping/Pong 轮转：CopyIn(t+1) 的目标是与 Cube(t) 逻辑并行，C→V handoff 后由 AIV 消费前一 tile。',
+          confidence: '硬约束 + 代价模型估计', parallel: 'tile-stream Ping/Pong', risk: '若 handoff event 或 FreeTensor 位置过早/过晚，双缓冲会退化为串行。',
+          tiling: { coreKey: '2d', coreGrid: '4×4', blockDim: 16, cubeTile: { label: '128×128×64', m: 128, n: 128, k: 64 }, vectorBlock: { mode: 'Same M×N', m: 128, n: 128 }, tail: 'Full tile', slotRule: 'tileId % 2' },
+          buffers: [
+            { id: 'l1-ping', label: 'L1 Ping · slot 0', resource: 'L1 input queue', slot: 0, ring: 2, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · slot 0', '生成依据', 'BUFFER_NUM=2；tileIndex % 2 = 0', '实现核对', 'CopyIn(t2) 只能在 t0 的 Cube 消费完成后复用', '复用边界', 'release(t0) → allocate(t2)', '实测验证', '观察 slot 0 是否在预期边界回收'] },
+            { id: 'l1-pong', label: 'L1 Pong · slot 1', resource: 'L1 input queue', slot: 1, ring: 2, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · slot 1', '生成依据', 'BUFFER_NUM=2；tileIndex % 2 = 1', '实现核对', 'Queue depth 与实际 LocalTensor 数量一致', '复用边界', 'release(t1) → allocate(t3)', '实测验证', '确认 t1 CopyIn 未被 t0 Compute 错误阻塞'] },
+            { id: 'ub-cv-ping', label: 'C→V Ping · slot 0', resource: 'UB handoff queue', slot: 0, ring: 2, phase: 'handoff', inspector: ['Buffer / queue', 'On-chip C→V handoff · slot 0', '生成依据', 'On-chip path + ping-pong schedule', '实现核对', 'AIC → AIV event 与 tile t0/t2 的所有权转移', '复用边界', 'AIV epilogue 与 CopyOut 释放 t0 后才接收 t2', '实测验证', '验证 AIC/AIV 的真实重叠与 handoff stall'] },
+            { id: 'ub-cv-pong', label: 'C→V Pong · slot 1', resource: 'UB handoff queue', slot: 1, ring: 2, phase: 'handoff', inspector: ['Buffer / queue', 'On-chip C→V handoff · slot 1', '生成依据', 'On-chip path + ping-pong schedule', '实现核对', 'eventId 与 slot 1 / odd tile 一一对应', '复用边界', 'AIV epilogue 与 CopyOut 释放 t1 后才接收 t3', '实测验证', '确认输出 back pressure 不扩大驻留'] }
+          ],
+          paths: [
+            { id: 'path-gm-l1', source: 'GM A/B', target: 'L1 Ping / Pong', detail: 'CopyIn · next tile', objects: ['l1-ping', 'l1-pong', 'stage-copyin'] },
+            { id: 'path-l1-l0', source: 'L1 Ping / Pong', target: 'L0A/B → L0C', detail: 'LoadData + Mmad', objects: ['l1-ping', 'l1-pong', 'stage-load', 'stage-cube'] },
+            { id: 'path-cv', source: 'L0C', target: 'UB C→V Ping / Pong', detail: 'on-chip handoff · 目标关系', objects: ['ub-cv-ping', 'ub-cv-pong', 'stage-handoff'] },
+            { id: 'path-out', source: 'UB C→V Ping / Pong', target: 'GM Z', detail: 'Bias + GELU + CopyOut', objects: ['ub-cv-ping', 'ub-cv-pong', 'stage-vector', 'stage-copyout'] }
+          ],
+          dependencies: [
+            { id: 'dep-copy-cube', from: 'CopyIn(t+1)', to: 'Mmad(t)', via: 'different slots', detail: '不同 Ping/Pong slot 允许逻辑并行；并非实测 overlap。', objects: ['l1-ping', 'l1-pong', 'stage-copyin', 'stage-cube'] },
+            { id: 'dep-cube-handoff', from: 'Mmad(t)', to: 'C→V handoff(t)', via: 'AIC → AIV event', detail: 'AIV 必须在 C 已就绪后读取同一 tile。', objects: ['ub-cv-ping', 'ub-cv-pong', 'stage-cube', 'stage-handoff'] },
+            { id: 'dep-vector-out', from: 'Bias + GELU(t-1)', to: 'CopyOut(t-1)', via: 'V → MTE3', detail: '前一 tile 写回不应占用下一 tile 的 C→V slot。', objects: ['ub-cv-ping', 'ub-cv-pong', 'stage-vector', 'stage-copyout'] }
+          ],
+          validation: '实现时核对 Ping/Pong 轮转、event 配对和每个 queue 的 Allocate/Free 边界；profiling 应验证 CopyIn 与 Cube 的实际 overlap、AIC→AIV handoff stall 及峰值 L1/UB 驻留。'
+        },
+        aggressive: {
+          summary: '三缓冲增加前瞻空间以容纳搬运抖动，但第三 slot 必须在不挤占 C→V 与 UB 驻留预算的前提下产生可验证收益。',
+          confidence: '硬约束 + 工程建议', parallel: 'deeper pipeline', risk: '资源余量低；任何额外 scratch、tail padding 或同步扩大都可能使方案失效。',
+          tiling: { coreKey: '2d', coreGrid: '4×4', blockDim: 16, cubeTile: { label: '128×128×64', m: 128, n: 128, k: 64 }, vectorBlock: { mode: 'N-split ×2', m: 128, n: 64 }, tail: 'Full tile', slotRule: 'tileId % 3' },
+          buffers: [
+            { id: 'l1-slot0', label: 'L1 · slot 0', resource: 'L1 input queue', slot: 0, ring: 3, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · slot 0', '生成依据', 'BUFFER_NUM=3；tileIndex % 3 = 0', '实现核对', 'slot 0 只在 t0 消费后接受 t3', '复用边界', 'release(t0) → allocate(t3)', '实测验证', '验证第三 slot 是否减少真实等待'] },
+            { id: 'l1-slot1', label: 'L1 · slot 1', resource: 'L1 input queue', slot: 1, ring: 3, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · slot 1', '生成依据', 'BUFFER_NUM=3；tileIndex % 3 = 1', '实现核对', '队列深度与资源预算一致', '复用边界', 'release(t1) → allocate(t4)', '实测验证', '检查 L1 峰值是否越界'] },
+            { id: 'l1-slot2', label: 'L1 · slot 2', resource: 'L1 input queue', slot: 2, ring: 3, phase: 'input', inspector: ['Buffer / queue', 'L1 input queue · slot 2', '生成依据', 'BUFFER_NUM=3；tileIndex % 3 = 2', '实现核对', '第三 slot 不得覆盖尚未完成的 tile', '复用边界', 'release(t2) → allocate(t5)', '实测验证', '比较对 B 的额外吞吐贡献'] },
+            { id: 'ub-cv-slot0', label: 'C→V · slot 0', resource: 'UB handoff ring', slot: 0, ring: 3, phase: 'handoff', inspector: ['Buffer / queue', 'C→V ring · slot 0', '生成依据', '深流水与 on-chip handoff', '实现核对', 'event、slot 与 tile ID 一一对应', '复用边界', 'release(t0) → produce C(t3)', '实测验证', '检查 AIC/AIV 竞争与 UB 峰值'] },
+            { id: 'ub-cv-slot1', label: 'C→V · slot 1', resource: 'UB handoff ring', slot: 1, ring: 3, phase: 'handoff', inspector: ['Buffer / queue', 'C→V ring · slot 1', '生成依据', '深流水与 on-chip handoff', '实现核对', 'slot 1 保持 odd/even 映射一致', '复用边界', 'release(t1) → produce C(t4)', '实测验证', '检查 handoff stall'] },
+            { id: 'ub-cv-slot2', label: 'C→V · slot 2', resource: 'UB handoff ring', slot: 2, ring: 3, phase: 'handoff', inspector: ['Buffer / queue', 'C→V ring · slot 2', '生成依据', '第三 handoff slot 的工程建议', '实现核对', '第三 slot 不得挤占 GELU scratch', '复用边界', 'release(t2) → produce C(t5)', '实测验证', '验证第三 slot 是否真正产生收益'] }
+          ],
+          paths: [
+            { id: 'path-gm-l1', source: 'GM A/B', target: 'L1 slots 0/1/2', detail: 'prefetch · t+2', objects: ['l1-slot0', 'l1-slot1', 'l1-slot2', 'stage-copyin'] },
+            { id: 'path-l1-l0', source: 'L1 slot', target: 'L0A/B → L0C', detail: 'LoadData + Mmad', objects: ['l1-slot0', 'l1-slot1', 'l1-slot2', 'stage-load', 'stage-cube'] },
+            { id: 'path-cv', source: 'L0C', target: 'UB C→V ring', detail: 'on-chip handoff · 目标关系', objects: ['ub-cv-slot0', 'ub-cv-slot1', 'ub-cv-slot2', 'stage-handoff'] },
+            { id: 'path-out', source: 'UB C→V ring', target: 'GM Z', detail: 'Vector epilogue + out', objects: ['ub-cv-slot0', 'ub-cv-slot1', 'ub-cv-slot2', 'stage-vector', 'stage-copyout'] }
+          ],
+          dependencies: [
+            { id: 'dep-copy-cube', from: 'CopyIn(t+2)', to: 'Mmad(t)', via: 'three slots', detail: '第三 slot 仅提供更深的前瞻，不等于确定更高吞吐。', objects: ['l1-slot0', 'l1-slot1', 'l1-slot2', 'stage-copyin', 'stage-cube'] },
+            { id: 'dep-cube-handoff', from: 'Mmad(t)', to: 'C→V handoff(t)', via: 'AIC → AIV event', detail: 'handoff 完成前，C 对应 slot 不可回收。', objects: ['ub-cv-slot0', 'ub-cv-slot1', 'ub-cv-slot2', 'stage-cube', 'stage-handoff'] },
+            { id: 'dep-vector-out', from: 'Epilogue(t-1)', to: 'CopyOut(t-1)', via: 'V → MTE3', detail: '高压资源下需验证输出路径不会扩大驻留。', objects: ['ub-cv-slot0', 'ub-cv-slot1', 'ub-cv-slot2', 'stage-vector', 'stage-copyout'] }
+          ],
+          validation: '先用静态资源计算确认三 slot、scratch 与 tail padding 仍在预算内；profiling 再比较 B/C 的实际吞吐差、MTE 等待和峰值驻留，不能预设第三缓冲一定更快。'
+        }
       };
+      const kemState = { candidate: 'balanced', view: 'pipeline', object: null };
       let activeCandidateEngineeringPlan = 'balanced';
       let candidatePreviewFiles = {};
       let candidatePreviewOpener = null;
@@ -5137,21 +5315,216 @@
         setGeneratedProjectMode(key);
       };
 
-      const showIntendedKem = (key) => {
-        const plan = candidateEngineeringPlans[key];
-        const root = $('[data-intended-kem]');
-        if (!plan || !root) return;
+      const kemViewCatalog = [
+        ['pipeline', 'Pipeline'], ['lifecycle', 'Buffer lifecycle'], ['tiling', 'Tiling'], ['memory', 'Memory path'], ['dependencies', 'Dependencies']
+      ];
+      const kemStageCatalog = [
+        ['stage-copyin', 'CopyIn'], ['stage-load', 'LoadData'], ['stage-cube', 'Mmad'], ['stage-handoff', 'C→V handoff'], ['stage-vector', 'Bias + GELU'], ['stage-copyout', 'CopyOut']
+      ];
+      const kemPipelineLanes = [
+        ['stage-copyin', 'MTE2 / CopyIn', 'GM → L1'],
+        ['stage-load', 'MTE1 / LoadData', 'L1 → L0A/B'],
+        ['stage-cube', 'Cube / MMAD', 'L0A/B → L0C'],
+        ['stage-handoff', 'FLOWCTRL / Handoff', 'C ready / event'],
+        ['stage-vector', 'Vector / Epilogue', 'Bias + GELU'],
+        ['stage-copyout', 'MTE3 / CopyOut', 'UB → GM']
+      ];
+      const kemTileColors = ['var(--operator-blue)', 'var(--operator-purple)', 'var(--operator-cyan)', 'var(--warning)', 'var(--success)', 'var(--primary-hover)'];
+
+      const kemRelatedIds = (model, selectedId) => {
+        if (!selectedId) return [];
+        const related = new Set([selectedId]);
+        const relations = [...model.paths, ...model.dependencies];
+        relations.forEach((relation) => {
+          if (relation.id === selectedId || relation.objects.includes(selectedId)) {
+            related.add(relation.id);
+            relation.objects.forEach((id) => related.add(id));
+          }
+        });
+        return [...related];
+      };
+
+      const kemInspectorRows = (model, selectedId) => {
+        const buffer = model.buffers.find((item) => item.id === selectedId);
+        if (buffer) return { title: buffer.label, summary: 'Buffer 生命周期由候选的 slot 轮转与队列契约推导。', rows: buffer.inspector };
+        const path = model.paths.find((item) => item.id === selectedId);
+        if (path) return { title: `${path.source} → ${path.target}`, summary: path.detail, rows: ['类型', '预期数据路径', '生成依据', model.confidence, '实现核对', '确认搬运方向、长度、tier 与所有权一致', '实测验证', '带宽、驻留与路径是否符合预期'] };
+        const dependency = model.dependencies.find((item) => item.id === selectedId);
+        if (dependency) return { title: `${dependency.from} → ${dependency.to}`, summary: dependency.detail, rows: ['类型', `逻辑依赖 · ${dependency.via}`, '生成依据', model.confidence, '实现核对', '核对 SetFlag / WaitFlag、EnQue / DeQue 与释放顺序', '实测验证', '确认依赖未导致意外阻塞'] };
+        if (selectedId === 'partition-core') return { title: 'Core partition', summary: '全局 M×N×K 计算域映射到激活核；当前是候选 Tiling 的静态切分。', rows: ['类型', 'partition / maps-to', '生成依据', model.confidence, '当前映射', `${model.tiling.blockDim} cores · ${model.tiling.coreGrid}`, '实现核对', 'blockDim、core index 与 tail core 分支', '未确定项', '实际 core 利用率需由 profiling 确认'] };
+        if (selectedId === 'tile-domain') return { title: 'Tile domain', summary: '选中核内的 Cube tile 与 Vector processing block。', rows: ['类型', 'tile-domain / maps-to', 'Cube tile', model.tiling.cubeTile.label, 'Vector block', `${model.tiling.vectorBlock.mode} · ${model.tiling.vectorBlock.m}×${model.tiling.vectorBlock.n}`, '实现核对', 'M/N/K 循环、tail 与 C→V tile 边界', '证据', '候选参数 · Mock static estimate'] };
+        if (selectedId === 'slot-map') return { title: 'Slot rotation', summary: 'tile 在本地 queue slot 间的逻辑轮转规则。', rows: ['类型', 'tile → slot maps-to', '规则', model.tiling.slotRule, '生成依据', `BUFFER_NUM=${model.tiling.slotRule.split(' ').pop()}`, '实现核对', 'loop index、queue depth、event id 与 slot 一致', '实测验证', '峰值驻留与复用等待'] };
+        const stage = kemStageCatalog.find(([id]) => id === selectedId);
+        if (!selectedId) return { title: '未选择对象', summary: '选择任一 stage、buffer、tile 或 memory path，其他视图会聚焦同一组 stable id。', rows: ['模型范围', '设计期目标模型', '生成依据', model.confidence, '预期并行策略', model.parallel, '主要风险', model.risk, '未确定项', '真实调度、时延、overlap 与资源竞争需由运行证据确认'] };
+        return { title: stage?.[1] || '目标执行模型', summary: model.summary, rows: ['类型', '候选 stage', '生成依据', model.confidence, '预期并行策略', model.parallel, '主要风险', model.risk, '未确定项', '真实调度、时延与竞争需由运行证据确认'] };
+      };
+
+      const renderKemPipeline = (model, plan, related) => {
+        const tileCount = plan.bufferNum === 1 ? 2 : plan.bufferNum + 1;
+        const tileOffset = plan.bufferNum === 1 ? kemStageCatalog.length : 1;
+        const totalSteps = tileOffset * (tileCount - 1) + kemStageCatalog.length;
+        const selected = (id) => related.includes(id) ? ' is-active' : '';
+        $('[data-kem-pipeline]').innerHTML = `
+          <div class="kem-pipeline" style="--kem-steps:${totalSteps}">
+            <div class="kem-pipeline__corner">Pipe / logical step</div>
+            ${Array.from({ length: totalSteps }, (_, index) => `<div class="kem-pipeline__step">P${index}</div>`).join('')}
+            ${kemPipelineLanes.map(([stageId, title, meta], stageIndex) => `
+              <div class="kem-pipeline__lane-label"><b>${title}</b><small>${meta}</small></div>
+              <div class="kem-pipeline__lane">
+                ${Array.from({ length: tileCount }, (_, tileIndex) => {
+                  const column = tileIndex * tileOffset + stageIndex + 1;
+                  return `<button type="button" class="kem-pipeline__block${selected(stageId)}" data-kem-object="${stageId}" style="grid-column:${column};--tile-color:${kemTileColors[tileIndex]}">t${tileIndex}</button>`;
+                }).join('')}
+              </div>`).join('')}
+          </div>
+          <p class="kem-pipeline-note">每列是逻辑推进步，不是时间刻度；同列 block 仅表示候选允许并发，真实 overlap 与 stall 必须由 profiling 覆盖。</p>`;
+      };
+
+      const renderKemLifecycle = (model, related) => {
+        const stateCopy = {
+          input: 'allocate → write → ready/enqueue → consume → release',
+          handoff: 'produce C → event ready → wait/consume → epilogue → release'
+        };
+        const tiles = Array.from({ length: 6 }, (_, index) => index);
+        const selected = (id) => related.includes(id) ? ' is-active' : '';
+        $('[data-kem-lifecycle]').innerHTML = `
+          <div class="kem-lifecycle__row"> <div class="kem-lifecycle__header">physical buffer / slot</div>${tiles.map((tile) => `<div class="kem-lifecycle__header">tile t${tile}</div>`).join('')}</div>
+          ${model.buffers.map((buffer) => `
+            <div class="kem-lifecycle__row">
+              <button type="button" class="kem-lifecycle__label${selected(buffer.id)}" data-kem-object="${buffer.id}">${buffer.label}<small>${buffer.resource} · ${buffer.ring}-slot ring</small></button>
+              ${tiles.map((tile) => {
+                const owns = tile % buffer.ring === buffer.slot;
+                const reuseFrom = tile >= buffer.ring ? tile - buffer.ring : null;
+                return owns
+                  ? `<div class="kem-lifecycle__cell is-owned${selected(buffer.id)}" style="--tile-color:${kemTileColors[tile % kemTileColors.length]}"><b>owns t${tile}</b><small>${stateCopy[buffer.phase]}</small>${reuseFrom == null ? '<em>first allocation</em>' : `<em>reuse only after release(t${reuseFrom})</em>`}</div>`
+                  : '<div class="kem-lifecycle__cell"><em>not owner</em></div>';
+              }).join('')}
+            </div>`).join('')}`;
+      };
+
+      const renderKemTiling = (model, related) => {
+        const tiling = model.tiling;
+        const partition = deriveTilingCorePartition(tiling);
+        const selected = (id) => related.includes(id) ? ' is-selected' : '';
+        $('[data-kem-tiling-meta]').innerHTML = `
+          <button type="button" class="btn btn-sm${selected('partition-core')}" data-kem-object="partition-core">${tiling.blockDim} cores · ${tiling.coreGrid}</button>
+          <button type="button" class="btn btn-sm${selected('tile-domain')}" data-kem-object="tile-domain">Cube ${tiling.cubeTile.label} · Vector ${tiling.vectorBlock.mode}</button>
+          <button type="button" class="btn btn-sm${selected('slot-map')}" data-kem-object="slot-map">${tiling.slotRule}</button>`;
+        setText('[data-kem-tiling-summary]', `${partition.splitLabel}：${tiling.blockDim} 个核 × ${partition.local.m} × ${partition.local.n} × ${partition.local.k}`);
+        $('[data-kem-tiling-core-strip]').innerHTML = Array.from({ length: 16 }, (_, index) => {
+          const active = index < Math.min(tiling.blockDim, 16);
+          return `<button type="button" class="tiling-core-cell${active ? ' is-active' : ''}${index === 0 ? ' is-selected' : ''}" data-kem-object="partition-core" aria-label="${index === 0 ? '选中核' : active ? '激活核' : '未参与核'} C${String(index).padStart(2, '0')}">C${String(index).padStart(2, '0')}</button>`;
+        }).join('');
+        const createFigure = (title, meta, svg) => {
+          const figure = document.createElement('figure');
+          const head = document.createElement('figcaption');
+          figure.className = 'tiling-core-figure';
+          head.className = 'tiling-core-figure-head';
+          head.innerHTML = `<strong>${title}</strong><span>${meta}</span>`;
+          figure.append(head, svg);
+          return figure;
+        };
+        $('[data-kem-tiling-diagrams]').replaceChildren(
+          createFigure('全局计算空间', `${tilingGlobalShape.m} × ${tilingGlobalShape.n} × ${tilingGlobalShape.k}`, createTilingVolumeSvg('global', tiling, partition)),
+          createFigure('选中核 C00 的核内 tile', `${partition.local.m} × ${partition.local.n} × ${partition.local.k}`, createTilingVolumeSvg('local', tiling, partition))
+        );
+        const loopCount = partition.loops.m * partition.loops.n * partition.loops.k;
+        setText('[data-kem-tiling-formula]', `M: ${partition.loops.m} × N: ${partition.loops.n} × K: ${partition.loops.k} = ${loopCount.toLocaleString('en-US')} Cube tiles / core`);
+        setText('[data-kem-tiling-note]', `C00–C${String(Math.min(15, tiling.blockDim - 1)).padStart(2, '0')}；每个 Cube tile：Vector ${tiling.vectorBlock.mode} ${tiling.vectorBlock.m}×${tiling.vectorBlock.n}；slot = ${tiling.slotRule}。`);
+      };
+
+      const kemMemoryState = { mounted: false, viewport: null, routeOverlay: null, hover: null };
+      const kemMemoryFocusForPath = (pathId) => ({
+        'path-gm-l1': { selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aic [data-aic-node="buffer:L1"]'], routes: ['l2-to-aic'] },
+        'path-l1-l0': { selectors: ['#mem950-aic [data-aic-node="buffer:L1"]', '#mem950-aic [data-aic-node="buffer:L0A"]', '#mem950-aic [data-aic-node="buffer:L0B"]', '#mem950-aic [data-aic-node="cube:CUBE"]', '#mem950-aic [data-aic-node="buffer:L0C"]'] },
+        'path-staged': { selectors: ['#mem950-aic [data-aic-node="buffer:L0C"]', '[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'], routes: ['l2-to-aiv1'] },
+        'path-cv': { selectors: ['#mem950-aic [data-aic-node="buffer:L0C"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'] },
+        'path-out': { selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]', '[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'], routes: ['aiv1-to-l2'] }
+      }[pathId] || {});
+
+      const mountKemMemory = () => {
+        if (kemMemoryState.mounted) return true;
+        const root = $('[data-kem-memory-viewport]');
+        const graph = $('[data-kem-memory-graph]');
+        const memoryPattern = window.PtoMemoryArchitecturePattern;
+        const viewportPattern = window.PtoHardwareArchitectureViewport;
+        if (!root || !graph || !memoryPattern?.renderArchitecture || !viewportPattern?.mount) return false;
+        memoryPattern.renderArchitecture(graph, 'ascend910b');
+        kemMemoryState.routeOverlay = memoryPattern.createRouteOverlay(graph, 'ascend910b');
+        kemMemoryState.hover = memoryPattern.attachHoverInteractions(graph, 'ascend910b');
+        kemMemoryState.viewport = viewportPattern.mount(root, {
+          mode: 'inline', viewport: '[data-kem-memory-stage]', scaleEl: '[data-kem-memory-scale]', inlineHost: '[data-kem-memory-graph]',
+          detailToggle: '[data-kem-memory-detail]', zoomOut: '[data-kem-memory-zoom-out]', zoomIn: '[data-kem-memory-zoom-in]', readout: '[data-kem-memory-readout]',
+          scale: .6, defaultScale: .6, fitted: false, fitOnMount: false, fitPaddingX: 32, fitPaddingY: 64, detailsVisible: true,
+          onDetailChange: () => kemMemoryState.routeOverlay?.render?.(),
+          onScaleChange: (scale) => { kemMemoryState.hover?.setViewportScale?.(scale); kemMemoryState.routeOverlay?.render?.(); },
+          onPanChange: () => kemMemoryState.routeOverlay?.render?.()
+        });
+        kemMemoryState.mounted = Boolean(kemMemoryState.viewport);
+        if (kemMemoryState.mounted) requestAnimationFrame(() => {
+          const stage = graph.querySelector('.pto-mem950');
+          kemMemoryState.viewport.setFrameSize(Math.ceil(stage?.scrollWidth || 1200), Math.ceil(stage?.scrollHeight || 820));
+          kemMemoryState.viewport.fit();
+          kemMemoryState.routeOverlay?.render?.();
+        });
+        return kemMemoryState.mounted;
+      };
+
+      const renderKemMemory = (model, related) => {
+        $('[data-kem-paths]').innerHTML = model.paths.map((path, index) => `
+          <button type="button" class="kem-memory-step${related.includes(path.id) ? ' is-active' : ''}" data-kem-object="${path.id}">
+            <b>${index + 1}. ${path.source} → ${path.target}</b><small>${path.detail}</small>
+          </button>`).join('');
+        if (kemState.view !== 'memory' || !mountKemMemory()) return;
+        const graph = $('[data-kem-memory-graph]');
+        const memoryPattern = window.PtoMemoryArchitecturePattern;
+        const activePath = model.paths.find((path) => related.includes(path.id));
+        if (activePath) memoryPattern.setPathFocus(graph, 'ascend910b', kemMemoryFocusForPath(activePath.id));
+        else memoryPattern.clearPathFocus(graph);
+        requestAnimationFrame(() => kemMemoryState.routeOverlay?.render?.());
+      };
+
+      const renderTargetExecutionModel = () => {
+        const root = $('[data-target-model]');
+        const plan = candidateEngineeringPlans[kemState.candidate];
+        const model = candidateExecutionModels[kemState.candidate];
+        if (!root || !plan || !model) return;
+        const related = kemRelatedIds(model, kemState.object);
+        const selected = (id) => related.includes(id) ? ' is-active' : '';
+        const selectedButton = (id) => kemState.object === id ? ' is-selected' : '';
+        setText('[data-target-model-title]', `${plan.title} · 目标执行模型`);
+        setText('[data-target-model-meta]', `推荐规则生成 · ${plan.schedule} · Buffer ${plan.bufferNum} · ${model.confidence} · 不是运行时 trace`);
+        $('[data-target-model-compare]').innerHTML = Object.entries(candidateEngineeringPlans).map(([key, item]) => `
+          <button type="button" class="target-model__candidate${key === kemState.candidate ? ' is-selected' : ''}" data-kem-candidate="${key}" aria-pressed="${key === kemState.candidate}">
+            <strong>${item.title}</strong><span>${item.bufferNum} Buffer · ${item.path}</span><small>${item.schedule} · 余量 ${item.headroom}</small>
+          </button>`).join('');
+        $('[data-kem-view-tabs]').innerHTML = kemViewCatalog.map(([key, label]) => `<button type="button" role="tab" class="btn btn-sm${kemState.view === key ? ' is-selected' : ''}" data-kem-view="${key}" aria-selected="${kemState.view === key}">${label}</button>`).join('');
+        $$('[data-kem-view-panel]', root).forEach((panel) => { panel.hidden = panel.dataset.kemViewPanel !== kemState.view; });
+        renderKemPipeline(model, plan, related);
+        renderKemLifecycle(model, related);
+        renderKemTiling(model, related);
+        renderKemMemory(model, related);
+        $('[data-kem-dependencies]').innerHTML = `
+          <div class="kem-stage-sequence" aria-label="选择逻辑 stage">${kemStageCatalog.map(([id, label]) => `<button type="button" class="btn btn-sm${selectedButton(id)}" data-kem-object="${id}" aria-pressed="${kemState.object === id}">${label}</button>`).join('')}</div>
+          ${model.dependencies.map((dependency) => `
+            <button type="button" class="kem-dependency${selected(dependency.id)}" data-kem-object="${dependency.id}">
+              <b>${dependency.from}</b><em>→</em><b>${dependency.to}</b><small>${dependency.via} · ${dependency.detail}</small>
+            </button>`).join('')}`;
+        const inspected = kemInspectorRows(model, kemState.object);
+        $('[data-kem-inspector]').innerHTML = `<p class="kem-inspector__summary"><strong>${inspected.title}</strong><br>${inspected.summary}</p><dl>${Array.from({ length: inspected.rows.length / 2 }, (_, index) => `<div class="kem-inspector__row"><dt>${inspected.rows[index * 2]}</dt><dd>${inspected.rows[index * 2 + 1]}</dd></div>`).join('')}</dl>`;
+        $('[data-kem-validation]').innerHTML = `<strong>验证建议：</strong>${model.validation}`;
+      };
+
+      const showTargetExecutionModel = (key, options = {}) => {
+        if (!candidateExecutionModels[key]) return;
+        const wasVisible = !$('[data-target-model]')?.hidden;
+        kemState.candidate = key;
+        kemState.object = null;
+        if (!wasVisible || options.resetView !== false) kemState.view = options.view || 'pipeline';
+        const root = $('[data-target-model]');
         root.hidden = false;
-        setText('[data-intended-kem-title]', `${plan.title} · 意图执行模型`);
-        setText('[data-intended-kem-meta]', `推荐规则生成 · ${plan.schedule} · Buffer ${plan.bufferNum} · 不是运行时 trace`);
-        $('[data-intended-kem-chain]').replaceChildren(...(intendedKemStages[key] || []).map(([pipe, label, path]) => {
-          const node = document.createElement('div');
-          node.className = 'intended-kem__stage';
-          node.innerHTML = `<span>${pipe}</span><strong>${label}</strong><code>${path}</code>`;
-          return node;
-        }));
-        setText('[data-intended-kem-note]', `这是一份由候选参数导出的“应该如何执行”的逻辑模型。后续 Code Recovery 应用于核对代码是否实现相同 buffer、handoff 与依赖；仿真或 profiling 只为这些对象附加实际时延、stall 与 overlap 证据。`);
-        root.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        renderTargetExecutionModel();
+        if (options.scroll !== false) root.scrollIntoView({ block: 'start', behavior: 'smooth' });
       };
 
       const operatorApis = {
@@ -6584,14 +6957,34 @@
         const projectTrigger = target.closest('[data-generate-candidate-project]');
         if (projectTrigger) {
           prepareCandidateProject(projectTrigger.dataset.generateCandidateProject || activeCandidateEngineeringPlan);
-        }
-        const intendedModelTrigger = target.closest('[data-show-intended-model]');
-        if (intendedModelTrigger) {
-          showIntendedKem(intendedModelTrigger.dataset.showIntendedModel);
           return;
         }
-        if (target.closest('[data-close-intended-model]')) {
-          $('[data-intended-kem]').hidden = true;
+        const targetModelTrigger = target.closest('[data-show-target-model]');
+        if (targetModelTrigger) {
+          showTargetExecutionModel(targetModelTrigger.dataset.showTargetModel);
+          return;
+        }
+        const candidateTrigger = target.closest('[data-kem-candidate]');
+        if (candidateTrigger) {
+          showTargetExecutionModel(candidateTrigger.dataset.kemCandidate, { scroll: false, resetView: false });
+          return;
+        }
+        const viewTrigger = target.closest('[data-kem-view]');
+        if (viewTrigger) {
+          kemState.view = viewTrigger.dataset.kemView;
+          renderTargetExecutionModel();
+          return;
+        }
+        const objectTrigger = target.closest('[data-kem-object]');
+        if (objectTrigger) {
+          kemState.object = objectTrigger.dataset.kemObject;
+          renderTargetExecutionModel();
+          return;
+        }
+        if (target.closest('[data-close-target-model]')) {
+          $('[data-target-model]').hidden = true;
+          $('[data-show-target-model="balanced"]')?.focus();
+          return;
         }
       });
 
@@ -6606,6 +6999,8 @@
       renderLineageMap();
       selectLineageItem(finalLineageStageId);
       selectTraceView('candidates');
+      const initialCandidate = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('candidate');
+      if (initialCandidate && candidateExecutionModels[initialCandidate]) showTargetExecutionModel(initialCandidate, { scroll: false });
 
       const traceResizeObserver = new ResizeObserver(queueLineageLayout);
       traceResizeObserver.observe($('.trace-section'));
