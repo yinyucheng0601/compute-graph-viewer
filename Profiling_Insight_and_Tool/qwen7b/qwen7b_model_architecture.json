@@ -1,0 +1,388 @@
+{
+  "schema_version": "model_architecture.v1",
+  "model": {
+    "name": "Qwen-7B",
+    "framework": "pytorch",
+    "source_root": "/Users/yin/gitcode/perf-breakdown-skill-optimize2/run_1/qwen7b/model"
+  },
+  "extraction_scope": {
+    "kind": "hybrid",
+    "full_main_layers": 32,
+    "trace_main_layers": 32,
+    "notes": [
+      "Canonical graph is folded from source/config; profiling outputs are supporting coverage evidence.",
+      "All decoder layers are structurally identical in the inspected source."
+    ]
+  },
+  "sources": [
+    {
+      "id": "qwen_config",
+      "kind": "source",
+      "path": "/Users/yin/gitcode/perf-breakdown-skill-optimize2/run_1/qwen7b/model/configuration_qwen.py",
+      "role": "source_of_truth"
+    },
+    {
+      "id": "qwen_model",
+      "kind": "source",
+      "path": "/Users/yin/gitcode/perf-breakdown-skill-optimize2/run_1/qwen7b/model/modeling_qwen.py",
+      "role": "source_of_truth"
+    },
+    {
+      "id": "qwen_analysis_config",
+      "kind": "profiling_summary",
+      "path": "/Users/yin/gitcode/perf-breakdown-skill-optimize2/run_1/qwen7b/outputs/analysis_config.json",
+      "role": "supporting_evidence"
+    }
+  ],
+  "symbol_table": {
+    "B": "batch",
+    "T": "sequence",
+    "V": 151936,
+    "H": 4096,
+    "L": 32,
+    "N_h": 32,
+    "D": 128,
+    "I": 22016,
+    "I_half": 11008,
+    "S_max": 2048
+  },
+  "nodes": [
+    {
+      "id": "input_tokens",
+      "kind": "input",
+      "label": "Token IDs",
+      "provenance": [{"source": "qwen_model", "line": 964, "fact": "QWenLMHeadModel accepts input_ids for generation"}]
+    },
+    {
+      "id": "lm_head_model",
+      "kind": "module",
+      "label": "QWen LM Head Model",
+      "module_type": "causal_lm",
+      "provenance": [{"source": "qwen_model", "line": 929, "fact": "class QWenLMHeadModel"}]
+    },
+    {
+      "id": "transformer",
+      "kind": "module",
+      "label": "QWen Transformer",
+      "module_type": "decoder_only_transformer",
+      "provenance": [{"source": "qwen_model", "line": 679, "fact": "class QWenModel"}]
+    },
+    {
+      "id": "token_embedding",
+      "kind": "op",
+      "label": "Embedding Lookup",
+      "op_type": "Embedding",
+      "attrs": {"vocab_size_symbol": "V", "hidden_size_symbol": "H"},
+      "provenance": [{"source": "qwen_model", "line": 695, "fact": "self.wte = nn.Embedding(self.vocab_size, self.embed_dim)"}]
+    },
+    {
+      "id": "rope_cache",
+      "kind": "state",
+      "label": "RoPE Cache",
+      "state_type": "rotary_embedding_cache",
+      "attrs": {"base": 10000, "rotary_pct": 1.0},
+      "provenance": [{"source": "qwen_model", "line": 710, "fact": "self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)"}]
+    },
+    {
+      "id": "kv_cache",
+      "kind": "state",
+      "label": "KV Cache",
+      "state_type": "attention_cache",
+      "attrs": {"cache_quantization": false},
+      "provenance": [{"source": "qwen_config", "line": 33, "fact": "use_cache=True and use_cache_quantization=False"}]
+    },
+    {
+      "id": "decoder_layer",
+      "kind": "module",
+      "label": "QWen Decoder Layer",
+      "module_type": "decoder_layer_template",
+      "provenance": [{"source": "qwen_model", "line": 574, "fact": "class QWenBlock"}]
+    },
+    {
+      "id": "attn_norm",
+      "kind": "op",
+      "label": "Attention RMSNorm",
+      "op_type": "RMSNorm",
+      "attrs": {"epsilon": 0.000001},
+      "provenance": [{"source": "qwen_model", "line": 582, "fact": "self.ln_1 = RMSNorm(hidden_size, eps=config.layer_norm_epsilon)"}]
+    },
+    {
+      "id": "attention",
+      "kind": "module",
+      "label": "Self Attention",
+      "module_type": "multi_head_attention",
+      "attrs": {"num_heads_symbol": "N_h", "head_dim_symbol": "D"},
+      "provenance": [{"source": "qwen_model", "line": 247, "fact": "class QWenAttention"}]
+    },
+    {
+      "id": "qkv_linear",
+      "kind": "op",
+      "label": "QKV Linear",
+      "op_type": "Linear",
+      "attrs": {"bias": false, "output_multiplier": 3},
+      "provenance": [{"source": "qwen_model", "line": 268, "fact": "self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size)"}]
+    },
+    {
+      "id": "rotary_apply",
+      "kind": "op",
+      "label": "Apply RoPE",
+      "op_type": "RotaryEmbedding",
+      "attrs": {"dynamic_ntk": true, "logn_attention": true},
+      "provenance": [{"source": "qwen_config", "line": 28, "fact": "use_dynamic_ntk=True and use_logn_attn=True"}]
+    },
+    {
+      "id": "scaled_attention",
+      "kind": "op",
+      "label": "Scaled Attention",
+      "op_type": "Attention",
+      "attrs": {"causal": true, "flash_attention": "auto"},
+      "provenance": [{"source": "qwen_model", "line": 287, "fact": "FlashSelfAttention(causal=True) is used when available"}]
+    },
+    {
+      "id": "attn_output_linear",
+      "kind": "op",
+      "label": "Attention Output Linear",
+      "op_type": "Linear",
+      "attrs": {"bias": false},
+      "provenance": [{"source": "qwen_model", "line": 270, "fact": "self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias=not config.no_bias)"}]
+    },
+    {
+      "id": "mlp_norm",
+      "kind": "op",
+      "label": "MLP RMSNorm",
+      "op_type": "RMSNorm",
+      "attrs": {"epsilon": 0.000001},
+      "provenance": [{"source": "qwen_model", "line": 586, "fact": "self.ln_2 = RMSNorm(hidden_size, eps=config.layer_norm_epsilon)"}]
+    },
+    {
+      "id": "mlp",
+      "kind": "module",
+      "label": "SwiGLU MLP",
+      "module_type": "feed_forward",
+      "provenance": [{"source": "qwen_model", "line": 558, "fact": "class QWenMLP"}]
+    },
+    {
+      "id": "mlp_gate_linear",
+      "kind": "op",
+      "label": "Gate Linear",
+      "op_type": "Linear",
+      "attrs": {"output_size_symbol": "I_half", "bias": false},
+      "provenance": [{"source": "qwen_model", "line": 561, "fact": "self.w1 maps hidden_size to intermediate_size // 2"}]
+    },
+    {
+      "id": "mlp_up_linear",
+      "kind": "op",
+      "label": "Up Linear",
+      "op_type": "Linear",
+      "attrs": {"output_size_symbol": "I_half", "bias": false},
+      "provenance": [{"source": "qwen_model", "line": 564, "fact": "self.w2 maps hidden_size to intermediate_size // 2"}]
+    },
+    {
+      "id": "silu_multiply",
+      "kind": "op",
+      "label": "SiLU Multiply",
+      "op_type": "ActivationMultiply",
+      "attrs": {"activation": "silu"},
+      "provenance": [{"source": "qwen_model", "line": 570, "fact": "intermediate_parallel = a1 * F.silu(a2)"}]
+    },
+    {
+      "id": "mlp_down_linear",
+      "kind": "op",
+      "label": "MLP Output Linear",
+      "op_type": "Linear",
+      "attrs": {"output_size_symbol": "H", "bias": false},
+      "provenance": [{"source": "qwen_model", "line": 567, "fact": "self.c_proj maps intermediate_size // 2 to hidden_size"}]
+    },
+    {
+      "id": "final_norm",
+      "kind": "op",
+      "label": "Final RMSNorm",
+      "op_type": "RMSNorm",
+      "attrs": {"epsilon": 0.000001},
+      "provenance": [{"source": "qwen_model", "line": 724, "fact": "self.ln_f = RMSNorm(self.embed_dim, eps=config.layer_norm_epsilon)"}]
+    },
+    {
+      "id": "lm_head",
+      "kind": "op",
+      "label": "LM Head Linear",
+      "op_type": "Linear",
+      "attrs": {"bias": false, "tie_word_embeddings": false},
+      "provenance": [{"source": "qwen_model", "line": 957, "fact": "self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)"}]
+    },
+    {
+      "id": "output_logits",
+      "kind": "output",
+      "label": "Logits",
+      "provenance": [{"source": "qwen_model", "line": 1010, "fact": "forward returns logits through QWenLMHeadModel"}]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_input_to_model",
+      "source": "input_tokens",
+      "target": "lm_head_model",
+      "tensor": {"name": "input_ids", "shape": "[B,T]", "dtype": "int64", "constraints": ["T<=S_max"]},
+      "provenance": [{"source": "qwen_config", "line": 24, "fact": "seq_length=2048"}]
+    },
+    {
+      "id": "e_model_to_transformer",
+      "source": "lm_head_model",
+      "target": "transformer",
+      "tensor": {"name": "input_ids", "shape": "[B,T]", "dtype": "int64"},
+      "provenance": [{"source": "qwen_model", "line": 957, "fact": "QWenLMHeadModel owns self.transformer"}]
+    },
+    {
+      "id": "e_tokens_to_embedding",
+      "source": "transformer",
+      "target": "token_embedding",
+      "tensor": {"name": "input_ids", "shape": "[B,T]", "dtype": "int64"},
+      "provenance": [{"source": "qwen_model", "line": 695, "fact": "token ids enter wte embedding"}]
+    },
+    {
+      "id": "e_embedding_to_decoder",
+      "source": "token_embedding",
+      "target": "decoder_layer",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_config", "line": 14, "fact": "hidden_size=4096"}]
+    },
+    {
+      "id": "e_decoder_to_attn_norm",
+      "source": "decoder_layer",
+      "target": "attn_norm",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 606, "fact": "layernorm_output = self.ln_1(hidden_states)"}]
+    },
+    {
+      "id": "e_attn_norm_to_attention",
+      "source": "attn_norm",
+      "target": "attention",
+      "tensor": {"name": "layernorm_output", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 608, "fact": "self.attn(layernorm_output, ...)"}]
+    },
+    {
+      "id": "e_attention_to_qkv",
+      "source": "attention",
+      "target": "qkv_linear",
+      "tensor": {"name": "attention_input", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 268, "fact": "QKV projection consumes hidden_size"}]
+    },
+    {
+      "id": "e_qkv_to_rope",
+      "source": "qkv_linear",
+      "target": "rotary_apply",
+      "tensor": {"name": "query_key_value", "shape": "[B,T,3*H]", "dtype": "bf16/fp16/fp32", "constraints": ["N_h=32", "D=128"]},
+      "provenance": [{"source": "qwen_model", "line": 252, "fact": "head_dim = hidden_size // num_attention_heads"}]
+    },
+    {
+      "id": "e_rope_cache_to_rope",
+      "source": "rope_cache",
+      "target": "rotary_apply",
+      "tensor": {"name": "rotary_pos_emb", "shape": "[T,D]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 710, "fact": "RotaryEmbedding provides rotary position tensors"}]
+    },
+    {
+      "id": "e_rope_to_attention_score",
+      "source": "rotary_apply",
+      "target": "scaled_attention",
+      "tensor": {"name": "query_key_value_rotary", "shape": "[B,T,3*H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 608, "fact": "attention receives rotary_pos_emb_list"}]
+    },
+    {
+      "id": "e_kv_cache_to_attention",
+      "source": "kv_cache",
+      "target": "scaled_attention",
+      "tensor": {"name": "past_key_values", "shape": "[B,S_cache,H]", "dtype": "bf16/fp16/fp32", "constraints": ["S_cache<=S_max"]},
+      "provenance": [{"source": "qwen_config", "line": 21, "fact": "use_cache=True"}]
+    },
+    {
+      "id": "e_attention_score_to_output",
+      "source": "scaled_attention",
+      "target": "attn_output_linear",
+      "tensor": {"name": "attn_output", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 624, "fact": "attn_output is added to residual after attention"}]
+    },
+    {
+      "id": "e_attn_output_to_mlp_norm",
+      "source": "attn_output_linear",
+      "target": "mlp_norm",
+      "tensor": {"name": "layernorm_input", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 626, "fact": "layernorm_output = self.ln_2(layernorm_input)"}]
+    },
+    {
+      "id": "e_mlp_norm_to_mlp",
+      "source": "mlp_norm",
+      "target": "mlp",
+      "tensor": {"name": "layernorm_output", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 629, "fact": "mlp_output = self.mlp(layernorm_output)"}]
+    },
+    {
+      "id": "e_mlp_to_gate",
+      "source": "mlp",
+      "target": "mlp_gate_linear",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 568, "fact": "a1 = self.w1(hidden_states)"}]
+    },
+    {
+      "id": "e_mlp_to_up",
+      "source": "mlp",
+      "target": "mlp_up_linear",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 569, "fact": "a2 = self.w2(hidden_states)"}]
+    },
+    {
+      "id": "e_gate_to_silu_mul",
+      "source": "mlp_gate_linear",
+      "target": "silu_multiply",
+      "tensor": {"name": "gate_projection", "shape": "[B,T,I_half]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_config", "line": 30, "fact": "intermediate_size=22016"}]
+    },
+    {
+      "id": "e_up_to_silu_mul",
+      "source": "mlp_up_linear",
+      "target": "silu_multiply",
+      "tensor": {"name": "up_projection", "shape": "[B,T,I_half]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 570, "fact": "a1 * F.silu(a2)"}]
+    },
+    {
+      "id": "e_silu_to_down",
+      "source": "silu_multiply",
+      "target": "mlp_down_linear",
+      "tensor": {"name": "intermediate_parallel", "shape": "[B,T,I_half]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 571, "fact": "output = self.c_proj(intermediate_parallel)"}]
+    },
+    {
+      "id": "e_decoder_to_final_norm",
+      "source": "mlp_down_linear",
+      "target": "final_norm",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 724, "fact": "QWenModel applies final RMSNorm after decoder layers"}]
+    },
+    {
+      "id": "e_final_norm_to_lm_head",
+      "source": "final_norm",
+      "target": "lm_head",
+      "tensor": {"name": "hidden_states", "shape": "[B,T,H]", "dtype": "bf16/fp16/fp32"},
+      "provenance": [{"source": "qwen_model", "line": 957, "fact": "LM head consumes transformer hidden states"}]
+    },
+    {
+      "id": "e_lm_head_to_logits",
+      "source": "lm_head",
+      "target": "output_logits",
+      "tensor": {"name": "logits", "shape": "[B,T,V]", "dtype": "fp32", "constraints": ["V=151936"]},
+      "provenance": [{"source": "qwen_config", "line": 13, "fact": "vocab_size=151936"}]
+    }
+  ],
+  "repeats": [
+    {
+      "id": "repeat_decoder_layers",
+      "template_node": "decoder_layer",
+      "range": "0-31",
+      "count": 32,
+      "provenance": [{"source": "qwen_config", "line": 15, "fact": "num_hidden_layers=32"}]
+    }
+  ],
+  "branches": [],
+  "warnings": [
+    "No separate checkpoint config.json was present in the inspected local tree; source config defaults and existing analysis_config are used as model facts."
+  ]
+}

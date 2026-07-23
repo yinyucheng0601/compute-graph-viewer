@@ -1,0 +1,1204 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qwen-7B Model Architecture</title>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get('theme');
+      if (theme === 'light' || theme === 'dark' || theme === 'glass') {
+        document.documentElement.dataset.theme = theme;
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="./foundation.css">
+  <link rel="stylesheet" href="./semantic.css">
+  <link rel="stylesheet" href="./components.css">
+  <link rel="stylesheet" href="./pattern.css">
+  <style>
+    :root {
+      --qwen-shell-bg: var(--background);
+      --qwen-panel-bg: color-mix(in srgb, var(--panel-shell-bg) 94%, transparent);
+      --qwen-panel-soft: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      --qwen-border: var(--border-subtle);
+      --qwen-border-strong: var(--border-strong);
+      --qwen-text: var(--foreground);
+      --qwen-muted: var(--foreground-secondary);
+      --qwen-dim: var(--foreground-muted);
+      --qwen-accent: var(--highlight-copy-blue-300);
+      --qwen-selected: #FFFFFF;
+      --qwen-radius: var(--radius-lg);
+      --model-graphviz-bg: var(--qwen-shell-bg);
+      --model-graphviz-surface: var(--qwen-panel-bg);
+      --model-graphviz-surface-soft: var(--qwen-panel-soft);
+      --model-graphviz-stage-bg: var(--qwen-shell-bg);
+      --model-graphviz-line: color-mix(in srgb, var(--qwen-muted) 86%, transparent);
+      --model-graphviz-line-soft: var(--qwen-border-strong);
+      --model-graphviz-node-label: var(--qwen-text);
+      --model-graphviz-node-type: var(--qwen-muted);
+      --model-graphviz-cluster-label: var(--qwen-muted);
+      --model-graphviz-toggle-bg: color-mix(in srgb, var(--qwen-accent) 64%, var(--qwen-panel-bg));
+      --model-graphviz-toggle-border: color-mix(in srgb, var(--qwen-accent) 70%, var(--qwen-border-strong));
+      --model-graphviz-toggle-icon: var(--qwen-text);
+      --model-graphviz-tensor-fill: color-mix(in srgb, var(--qwen-panel-soft) 70%, var(--qwen-accent));
+      --model-graphviz-tensor-stroke: var(--qwen-border-strong);
+      --model-graphviz-report-p0: #ff2d7a;
+      --model-graphviz-report-p1: #ff9d00;
+      --model-graphviz-report-p2: #ffe600;
+      --model-graphviz-report-priority-on-dark: var(--foreground);
+      --model-graphviz-report-priority-on-light: var(--background);
+      --model-graphviz-node-shadow: none;
+      --model-graphviz-parent-shadow: none;
+      --model-graphviz-panel-shadow: none;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--qwen-shell-bg);
+      color: var(--qwen-text);
+      font-family: var(--font-sans);
+      overflow: hidden;
+    }
+
+    .qwen-app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      min-height: 720px;
+    }
+
+    .qwen-topbar {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) auto;
+      gap: var(--space-4);
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--qwen-border);
+      background: color-mix(in srgb, var(--qwen-panel-bg) 96%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .qwen-title-block {
+      min-width: 0;
+    }
+
+    .qwen-kicker {
+      display: block;
+      color: var(--qwen-muted);
+      font-size: var(--font-size-label-sm);
+      line-height: var(--line-height-label);
+      margin-bottom: 3px;
+    }
+
+    .qwen-title {
+      margin: 0;
+      font-size: var(--font-size-title-lg);
+      line-height: var(--line-height-title);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0;
+    }
+
+    .qwen-link,
+    .qwen-file-button {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--qwen-border);
+      border-radius: var(--radius-sm);
+      padding: 0 var(--space-2);
+      color: var(--qwen-muted);
+      background: var(--qwen-panel-soft);
+      font-size: var(--font-size-label-sm);
+      line-height: var(--line-height-label);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .qwen-link:hover,
+    .qwen-file-button:hover {
+      color: var(--qwen-text);
+      border-color: var(--qwen-border-strong);
+      background: var(--state-hover);
+    }
+
+    .qwen-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .qwen-file-button input {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .qwen-main {
+      min-height: 0;
+    }
+
+    .qwen-graph-shell {
+      min-width: 0;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .qwen-graph-stage {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .qwen-graph-stage.is-panning {
+      cursor: grabbing;
+    }
+
+    .qwen-graph-stage svg {
+      display: block;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-node,
+    .qwen-graph-stage .pto-model-graphviz-cluster {
+      cursor: pointer;
+    }
+
+    .qwen-graph-stage [tabindex]:focus,
+    .qwen-graph-stage [tabindex]:focus-visible {
+      outline: none;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-node.is-selected rect {
+      stroke: var(--qwen-selected);
+      stroke-width: 3px;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-cluster.is-selected > rect:first-child {
+      stroke: var(--qwen-selected);
+      stroke-width: 2.4px;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-toggle,
+    .qwen-graph-stage .pto-model-graphviz-toggle-icon {
+      display: none;
+    }
+
+    .qwen-graph-stage .qwen-overlay-toggle {
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .qwen-graph-stage .qwen-overlay-toggle circle {
+      fill: var(--model-graphviz-toggle-bg);
+      stroke: var(--model-graphviz-toggle-border);
+      stroke-width: 1.1px;
+    }
+
+    .qwen-graph-stage .qwen-overlay-toggle text {
+      fill: var(--model-graphviz-toggle-icon);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: var(--font-weight-bold);
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .qwen-graph-stage .qwen-layer-tag text {
+      fill: var(--qwen-text);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: var(--font-weight-semibold);
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-node-type {
+      font-size: 9.5px;
+    }
+
+    .qwen-graph-stage .pto-model-graphviz-edge {
+      stroke-opacity: 0.86;
+    }
+
+    .qwen-status {
+      position: absolute;
+      left: var(--space-4);
+      bottom: var(--space-4);
+      max-width: min(520px, calc(100% - 32px));
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--qwen-border);
+      border-radius: var(--radius-sm);
+      color: var(--qwen-muted);
+      background: color-mix(in srgb, var(--qwen-panel-bg) 92%, transparent);
+      backdrop-filter: blur(16px);
+      font-size: var(--font-size-label-sm);
+      line-height: var(--line-height-label);
+      pointer-events: none;
+    }
+
+    @media (max-width: 980px) {
+      body {
+        overflow: auto;
+      }
+
+      .qwen-app {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .qwen-topbar,
+      .qwen-main {
+        grid-template-columns: 1fr;
+      }
+
+      .qwen-main {
+        min-height: 1200px;
+      }
+
+      .qwen-side {
+        border-left: 0;
+        border-top: 1px solid var(--qwen-border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="qwen-app">
+    <header class="qwen-topbar">
+      <div class="qwen-title-block">
+        <span class="qwen-kicker">Qwen-7B source-checked architecture schema</span>
+        <h1 class="qwen-title">QWen LM Head Model</h1>
+      </div>
+      <div class="qwen-actions">
+        <a class="qwen-link" href="./qwen7b_model_architecture.json">Schema JSON</a>
+        <a class="qwen-link" href="file:///Users/yin/gitcode/qwen7b-source/modeling_qwen.py">modeling_qwen.py</a>
+        <a class="qwen-link" href="file:///Users/yin/gitcode/qwen7b-source/config.json">config.json</a>
+        <label class="qwen-file-button">
+          <span>Open JSON</span>
+          <input id="schemaFileInput" type="file" accept=".json,application/json">
+        </label>
+      </div>
+    </header>
+
+    <section class="qwen-main">
+      <div class="qwen-graph-shell">
+        <div class="qwen-graph-stage" id="graphStage" aria-label="Qwen-7B architecture graph"></div>
+        <div class="qwen-status" id="statusText">Default Qwen-7B schema loaded.</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./pattern.js"></script>
+  <script>
+    const DEFAULT_SCHEMA = {
+      schema_version: 'model_architecture.v1',
+      model: {
+        name: 'Qwen-7B',
+        framework: 'pytorch',
+        source_root: '/Users/yin/gitcode/qwen7b-source',
+      },
+      extraction_scope: {
+        kind: 'hybrid',
+        full_main_layers: 32,
+        trace_main_layers: 32,
+        notes: [
+          'Canonical graph is folded from source/config; profiling outputs are supporting coverage evidence.',
+          'All decoder layers are structurally identical in the inspected source.',
+        ],
+      },
+      sources: [
+        { id: 'qwen_config', kind: 'source', path: '/Users/yin/gitcode/qwen7b-source/configuration_qwen.py', role: 'source_of_truth' },
+        { id: 'qwen_model', kind: 'source', path: '/Users/yin/gitcode/qwen7b-source/modeling_qwen.py', role: 'source_of_truth' },
+        { id: 'qwen_runtime_config', kind: 'runtime_config', path: '/Users/yin/gitcode/qwen7b-source/config.json', role: 'source_of_truth' },
+      ],
+      symbol_table: {
+        B: 'batch',
+        T: 'sequence',
+        V: 151936,
+        H: 4096,
+        L: 32,
+        N_h: 32,
+        D: 128,
+        I: 22016,
+        I_half: 11008,
+        S_max: 2048,
+      },
+      repeats: [
+        { id: 'repeat_decoder_layers', template_node: 'decoder_layer', range: '0-31', count: 32 },
+      ],
+      nodes: [
+        { id: 'input_tokens', kind: 'input', label: 'Token IDs', role: 'input token ids' },
+        { id: 'lm_head_model', kind: 'module', label: 'QWen LM Head Model', module_type: 'causal_lm', role: 'owns transformer and output head' },
+        { id: 'transformer', kind: 'module', label: 'QWen Transformer', module_type: 'decoder_only_transformer', role: 'embedding, decoder stack, final norm' },
+        { id: 'token_embedding', kind: 'op', label: 'Embedding Lookup', op_type: 'Embedding', role: 'vocabulary embedding' },
+        { id: 'rope_cache', kind: 'state', label: 'RoPE Cache', state_type: 'rotary_embedding_cache', role: 'rotary position embedding state' },
+        { id: 'kv_cache', kind: 'state', label: 'KV Cache', state_type: 'attention_cache', role: 'past key value state' },
+        { id: 'decoder_layer', kind: 'module', label: 'QWen Decoder Layer', module_type: 'decoder_layer_template', role: 'folded repeated layer template' },
+        { id: 'attn_norm', kind: 'op', label: 'Attention RMSNorm', op_type: 'RMSNorm', role: 'pre-attention normalization' },
+        { id: 'attention', kind: 'module', label: 'Self Attention', module_type: 'multi_head_attention', role: 'multi-head causal self-attention' },
+        { id: 'qkv_linear', kind: 'op', label: 'QKV Linear', op_type: 'Linear', role: 'fused qkv projection' },
+        { id: 'rotary_apply', kind: 'op', label: 'Apply RoPE', op_type: 'RotaryEmbedding', role: 'apply rotary position embedding' },
+        { id: 'scaled_attention', kind: 'op', label: 'Scaled Attention', op_type: 'Attention', role: 'causal attention' },
+        { id: 'attn_output_linear', kind: 'op', label: 'Attention Output Linear', op_type: 'Linear', role: 'attention output projection' },
+        { id: 'mlp_norm', kind: 'op', label: 'MLP RMSNorm', op_type: 'RMSNorm', role: 'pre-MLP normalization' },
+        { id: 'mlp', kind: 'module', label: 'SwiGLU MLP', module_type: 'feed_forward', role: 'feed-forward branch' },
+        { id: 'mlp_gate_linear', kind: 'op', label: 'Gate Linear', op_type: 'Linear', role: 'SwiGLU gate projection' },
+        { id: 'mlp_up_linear', kind: 'op', label: 'Up Linear', op_type: 'Linear', role: 'SwiGLU up projection' },
+        { id: 'silu_multiply', kind: 'op', label: 'SiLU Multiply', op_type: 'ActivationMultiply', role: 'activation and elementwise multiply' },
+        { id: 'mlp_down_linear', kind: 'op', label: 'MLP Output Linear', op_type: 'Linear', role: 'MLP output projection' },
+        { id: 'final_norm', kind: 'op', label: 'Final RMSNorm', op_type: 'RMSNorm', role: 'final transformer normalization' },
+        { id: 'lm_head', kind: 'op', label: 'LM Head Linear', op_type: 'Linear', role: 'vocabulary projection' },
+        { id: 'output_logits', kind: 'output', label: 'Logits', role: 'output logits' },
+      ],
+      edges: [
+        { id: 'e_input_to_model', source: 'input_tokens', target: 'lm_head_model', tensor: { name: 'input_ids', shape: '[B,T]', dtype: 'int64', constraints: ['T<=S_max'] } },
+        { id: 'e_model_to_transformer', source: 'lm_head_model', target: 'transformer', tensor: { name: 'input_ids', shape: '[B,T]', dtype: 'int64' } },
+        { id: 'e_tokens_to_embedding', source: 'transformer', target: 'token_embedding', tensor: { name: 'input_ids', shape: '[B,T]', dtype: 'int64' } },
+        { id: 'e_embedding_to_decoder', source: 'token_embedding', target: 'decoder_layer', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_decoder_to_attn_norm', source: 'decoder_layer', target: 'attn_norm', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_attn_norm_to_attention', source: 'attn_norm', target: 'attention', tensor: { name: 'layernorm_output', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_attention_to_qkv', source: 'attention', target: 'qkv_linear', tensor: { name: 'attention_input', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_qkv_to_rope', source: 'qkv_linear', target: 'rotary_apply', tensor: { name: 'query_key_value', shape: '[B,T,3*H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_rope_cache_to_rope', source: 'rope_cache', target: 'rotary_apply', tensor: { name: 'rotary_pos_emb', shape: '[T,D]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_rope_to_attn', source: 'rotary_apply', target: 'scaled_attention', tensor: { name: 'query_key_value_rotary', shape: '[B,T,3*H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_kv_cache_to_attn', source: 'kv_cache', target: 'scaled_attention', tensor: { name: 'past_key_values', shape: '[B,S_cache,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_attn_to_output', source: 'scaled_attention', target: 'attn_output_linear', tensor: { name: 'attn_output', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_attn_output_to_mlp_norm', source: 'attn_output_linear', target: 'mlp_norm', tensor: { name: 'layernorm_input', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_mlp_norm_to_mlp', source: 'mlp_norm', target: 'mlp', tensor: { name: 'layernorm_output', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_mlp_to_gate', source: 'mlp', target: 'mlp_gate_linear', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_mlp_to_up', source: 'mlp', target: 'mlp_up_linear', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_gate_to_silu', source: 'mlp_gate_linear', target: 'silu_multiply', tensor: { name: 'gate_projection', shape: '[B,T,I_half]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_up_to_silu', source: 'mlp_up_linear', target: 'silu_multiply', tensor: { name: 'up_projection', shape: '[B,T,I_half]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_silu_to_down', source: 'silu_multiply', target: 'mlp_down_linear', tensor: { name: 'intermediate_parallel', shape: '[B,T,I_half]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_down_to_final_norm', source: 'mlp_down_linear', target: 'final_norm', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_final_norm_to_lm_head', source: 'final_norm', target: 'lm_head', tensor: { name: 'hidden_states', shape: '[B,T,H]', dtype: 'bf16/fp16/fp32' } },
+        { id: 'e_lm_head_to_logits', source: 'lm_head', target: 'output_logits', tensor: { name: 'logits', shape: '[B,T,V]', dtype: 'fp32' } },
+      ],
+    };
+
+    // Single vertical column at x=640 — a decoder layer is a linear chain, so the
+    // flow reads top→bottom; Gate/Up are the only parallel pair (SwiGLU).
+    // Only sizing/lane is static here; y is reflowed per collapse state (see
+    // computeQwenLayout) so collapsing a module compacts the column instead of
+    // leaving a tall empty parent box.
+    const COL_X = 640;
+    const NODE_SPEC = {
+      input_tokens:       { w: 170, h: 48, colorKey: 'io:input' },
+      transformer:        { w: 280, h: 58, colorKey: 'module:transformer' },
+      token_embedding:    { w: 240, h: 56, colorKey: 'sem:embedding', parent: 'transformer-core' },
+      rope_cache:         { w: 188, h: 52, colorKey: 'io:state', lane: 250 },
+      kv_cache:           { w: 176, h: 52, colorKey: 'io:state', lane: 250 },
+      decoder_layer:      { w: 288, h: 58, colorKey: 'module:decoder-layer', parent: 'transformer-core' },
+      attn_norm:          { w: 230, h: 56, colorKey: 'sem:norm', parent: 'decoder-stack' },
+      attention:          { w: 220, h: 58, colorKey: 'module:attention', parent: 'decoder-stack' },
+      qkv_linear:         { w: 186, h: 54, colorKey: 'sem:linear', parent: 'attention-block' },
+      rotary_apply:       { w: 184, h: 54, colorKey: 'sem:rope', parent: 'attention-block' },
+      scaled_attention:   { w: 212, h: 54, colorKey: 'sem:attention', parent: 'attention-block' },
+      attn_output_linear: { w: 256, h: 54, colorKey: 'sem:linear', parent: 'attention-block' },
+      mlp_norm:           { w: 198, h: 56, colorKey: 'sem:norm', parent: 'decoder-stack' },
+      mlp:                { w: 190, h: 58, colorKey: 'module:mlp', parent: 'decoder-stack' },
+      mlp_gate_linear:    { w: 176, h: 54, colorKey: 'sem:linear', parent: 'mlp-block', lane: 540 },
+      mlp_up_linear:      { w: 158, h: 54, colorKey: 'sem:linear', parent: 'mlp-block', lane: 748 },
+      silu_multiply:      { w: 196, h: 54, colorKey: 'sem:activation', parent: 'mlp-block' },
+      mlp_down_linear:    { w: 224, h: 54, colorKey: 'sem:linear', parent: 'mlp-block' },
+      final_norm:         { w: 196, h: 56, colorKey: 'sem:norm', parent: 'transformer-core' },
+      lm_head:            { w: 210, h: 56, colorKey: 'sem:linear' },
+      output_logits:      { w: 166, h: 48, colorKey: 'io:output' },
+    };
+
+    const QWEN_CLUSTERS = [
+      { id: 'transformer-core', label: 'QWen Transformer', colorKey: 'module:transformer', parentCluster: null },
+      { id: 'decoder-stack', label: 'Decoder Layer Template', colorKey: 'module:decoder-layer', repeat: true, parentCluster: 'transformer-core' },
+      { id: 'attention-block', label: 'Self Attention', colorKey: 'module:attention', parentCluster: 'decoder-stack' },
+      { id: 'mlp-block', label: 'SwiGLU MLP', colorKey: 'module:mlp', parentCluster: 'decoder-stack' },
+    ];
+
+    // Cluster boxes are derived from the bounding box of their visible children,
+    // not hand-placed — node x/y are centers (see pattern.js nodeAnchor) while
+    // cluster rects use top-left, so fixed rectangles never lined up.
+    const CLUSTER_MARGIN = 34;
+    const CLUSTER_TOP_PAD = 46;
+    const CLUSTER_DEPTH = { 'transformer-core': 1, 'decoder-stack': 2, 'attention-block': 3, 'mlp-block': 3 };
+    const ROW_GAP = 46; // same-depth breathing room; boundaries add cluster margin/top-pad
+    const CLUSTER_CHILD_NODES = {};
+    Object.entries(NODE_SPEC).forEach(([id, spec]) => {
+      if (!spec.parent) return;
+      (CLUSTER_CHILD_NODES[spec.parent] ||= []).push(id);
+    });
+    const CLUSTER_CHILD_CLUSTERS = {};
+    QWEN_CLUSTERS.forEach((cluster) => {
+      if (!cluster.parentCluster) return;
+      (CLUSTER_CHILD_CLUSTERS[cluster.parentCluster] ||= []).push(cluster.id);
+    });
+    function nodeDepth(id) {
+      const parent = NODE_SPEC[id]?.parent;
+      return parent ? CLUSTER_DEPTH[parent] : 0;
+    }
+
+    const CLUSTERS_BY_ID = new Map(QWEN_CLUSTERS.map((cluster) => [cluster.id, cluster]));
+    const MODULE_BY_CLUSTER = {
+      'transformer-core': 'transformer',
+      'decoder-stack': 'decoder_layer',
+      'attention-block': 'attention',
+      'mlp-block': 'mlp',
+    };
+    const COLLAPSIBLE_MODULES = {
+      transformer: {
+        clusterId: 'transformer-core',
+        descendants: [
+          'token_embedding',
+          'rope_cache',
+          'kv_cache',
+          'decoder_layer',
+          'attn_norm',
+          'attention',
+          'qkv_linear',
+          'rotary_apply',
+          'scaled_attention',
+          'attn_output_linear',
+          'mlp_norm',
+          'mlp',
+          'mlp_gate_linear',
+          'mlp_up_linear',
+          'silu_multiply',
+          'mlp_down_linear',
+          'final_norm',
+        ],
+      },
+      decoder_layer: {
+        clusterId: 'decoder-stack',
+        descendants: [
+          'attn_norm',
+          'attention',
+          'qkv_linear',
+          'rotary_apply',
+          'scaled_attention',
+          'attn_output_linear',
+          'mlp_norm',
+          'mlp',
+          'mlp_gate_linear',
+          'mlp_up_linear',
+          'silu_multiply',
+          'mlp_down_linear',
+        ],
+      },
+      attention: {
+        clusterId: 'attention-block',
+        descendants: ['qkv_linear', 'rotary_apply', 'scaled_attention', 'attn_output_linear'],
+      },
+      mlp: {
+        clusterId: 'mlp-block',
+        descendants: ['mlp_gate_linear', 'mlp_up_linear', 'silu_multiply', 'mlp_down_linear'],
+      },
+    };
+    const MODEL_TITLE_NODE_IDS = new Set(['lm_head_model']);
+    const MODULE_NODE_IDS = new Set(Object.keys(COLLAPSIBLE_MODULES));
+    const ZOOM_MIN = 0.2;
+    const ZOOM_MAX = 2.6;
+
+    const state = {
+      schema: DEFAULT_SCHEMA,
+      graph: null,
+      selectedNodeId: 'token_embedding',
+      collapsedModules: new Set(),
+      zoom: 1,
+      tx: 0,
+      ty: 0,
+      svg: null,
+      pan: null,
+      suppressClick: false,
+    };
+
+    function nodeVisualKind(kind) {
+      const normalized = String(kind || '').toLowerCase();
+      if (normalized === 'input' || normalized === 'output' || normalized === 'tensor' || normalized === 'state' || normalized === 'buffer' || normalized === 'cache') return 'tensor';
+      if (normalized === 'module') return 'module';
+      return 'op';
+    }
+
+    function nodeTypeLabel(kind) {
+      const normalized = String(kind || '').toLowerCase();
+      if (normalized === 'input') return 'Input';
+      if (normalized === 'output') return 'Output';
+      if (normalized === 'state' || normalized === 'buffer' || normalized === 'cache') return 'State';
+      if (normalized === 'module') return 'Module';
+      if (normalized === 'op' || normalized === 'operation') return 'Op';
+      return 'Node';
+    }
+
+    function stageColorKey(node) {
+      const text = `${node.id || ''} ${node.label || ''} ${node.op_type || ''} ${node.module_type || ''} ${node.state_type || ''}`.toLowerCase();
+      if (text.includes('embedding')) return 'sem:embedding';
+      if (text.includes('rope') || text.includes('rotary')) return 'sem:rope';
+      if (text.includes('cache')) return 'io:state';
+      if (text.includes('attention') || text.includes('qkv')) return 'sem:attention';
+      if (text.includes('mlp') || text.includes('swiglu') || text.includes('silu')) return 'sem:mlp';
+      if (text.includes('norm')) return 'sem:norm';
+      if (text.includes('linear') || text.includes('head')) return 'sem:linear';
+      if (node.kind === 'input') return 'io:input';
+      if (node.kind === 'output') return 'io:output';
+      if (node.kind === 'module') return 'module:model';
+      return 'sem:op';
+    }
+
+    function fallbackLayout(index) {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      return {
+        x: 210 + column * 260,
+        y: 110 + row * 96,
+        width: 210,
+        height: 54,
+      };
+    }
+
+    function isHiddenByCollapsedAncestor(nodeId) {
+      return Object.entries(COLLAPSIBLE_MODULES).some(([moduleId, meta]) => (
+        state.collapsedModules.has(moduleId)
+        && nodeId !== moduleId
+        && meta.descendants.includes(nodeId)
+      ));
+    }
+
+    function isGraphNodeVisible(nodeId) {
+      if (MODEL_TITLE_NODE_IDS.has(nodeId)) return false;
+      if (MODULE_NODE_IDS.has(nodeId)) {
+        return state.collapsedModules.has(nodeId) && !isHiddenByCollapsedAncestor(nodeId);
+      }
+      return !isHiddenByCollapsedAncestor(nodeId);
+    }
+
+    // Ordered rows of the visible column; a row holds one node, except the
+    // SwiGLU Gate/Up pair which share a row.
+    function qwenRows() {
+      const collapsed = state.collapsedModules;
+      const rows = [['input_tokens']];
+      if (collapsed.has('transformer')) {
+        rows.push(['transformer'], ['lm_head'], ['output_logits']);
+        return rows;
+      }
+      rows.push(['token_embedding']);
+      if (collapsed.has('decoder_layer')) {
+        rows.push(['decoder_layer']);
+      } else {
+        rows.push(['attn_norm']);
+        if (collapsed.has('attention')) {
+          rows.push(['attention']);
+        } else {
+          rows.push(['qkv_linear'], ['rotary_apply'], ['scaled_attention'], ['attn_output_linear']);
+        }
+        rows.push(['mlp_norm']);
+        if (collapsed.has('mlp')) {
+          rows.push(['mlp']);
+        } else {
+          rows.push(['mlp_gate_linear', 'mlp_up_linear'], ['silu_multiply'], ['mlp_down_linear']);
+        }
+      }
+      rows.push(['final_norm'], ['lm_head'], ['output_logits']);
+      return rows;
+    }
+
+    function rowGap(prevDepth, depth) {
+      if (depth > prevDepth) return (depth - prevDepth) * CLUSTER_TOP_PAD + 8;
+      if (depth < prevDepth) return (prevDepth - depth) * CLUSTER_MARGIN + 16;
+      return ROW_GAP;
+    }
+
+    function computeQwenLayout() {
+      const rows = qwenRows().filter((row) => row.every((id) => isGraphNodeVisible(id)));
+      const positions = {};
+      let cursor = 46;
+      let prevDepth = 0;
+      rows.forEach((row, index) => {
+        const depth = nodeDepth(row[0]);
+        if (index > 0) cursor += rowGap(prevDepth, depth);
+        const rowHeight = Math.max(...row.map((id) => NODE_SPEC[id].h));
+        const cy = cursor + rowHeight / 2;
+        row.forEach((id) => {
+          positions[id] = { x: NODE_SPEC[id].lane ?? COL_X, y: cy };
+        });
+        cursor += rowHeight;
+        prevDepth = depth;
+      });
+      // Side caches sit on the left lane, aligned to whichever node consumes them.
+      const ropeTarget = ['rotary_apply', 'attention', 'decoder_layer'].find((id) => positions[id]);
+      const kvTarget = ['scaled_attention', 'attention', 'decoder_layer'].find((id) => positions[id]);
+      if (isGraphNodeVisible('rope_cache') && ropeTarget) {
+        const sameTarget = ropeTarget === kvTarget;
+        positions.rope_cache = { x: NODE_SPEC.rope_cache.lane, y: positions[ropeTarget].y - (sameTarget ? 30 : 0) };
+      }
+      if (isGraphNodeVisible('kv_cache') && kvTarget) {
+        const sameTarget = ropeTarget === kvTarget;
+        positions.kv_cache = { x: NODE_SPEC.kv_cache.lane, y: positions[kvTarget].y + (sameTarget ? 30 : 0) };
+      }
+      const bottom = Math.max(...Object.entries(positions).map(([id, p]) => p.y + NODE_SPEC[id].h / 2));
+      return { positions, height: Math.round(bottom + 46) };
+    }
+
+    function qwenLayoutForNode(id) {
+      const spec = NODE_SPEC[id];
+      const pos = state.qwenLayout?.positions[id];
+      if (!spec || !pos) return null;
+      return { x: pos.x, y: pos.y, width: spec.w, height: spec.h, colorKey: spec.colorKey, parent: spec.parent };
+    }
+
+    function isClusterActive(clusterId) {
+      const moduleId = MODULE_BY_CLUSTER[clusterId];
+      if (!moduleId) return true;
+      return !state.collapsedModules.has(moduleId) && !isHiddenByCollapsedAncestor(moduleId);
+    }
+
+    function nodeRect(id) {
+      const layout = qwenLayoutForNode(id);
+      if (!layout) return null;
+      return {
+        left: layout.x - layout.width / 2,
+        right: layout.x + layout.width / 2,
+        top: layout.y - layout.height / 2,
+        bottom: layout.y + layout.height / 2,
+      };
+    }
+
+    function computeClusterBox(clusterId) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      (CLUSTER_CHILD_NODES[clusterId] || []).forEach((nodeId) => {
+        if (!isGraphNodeVisible(nodeId)) return;
+        const rect = nodeRect(nodeId);
+        if (!rect) return;
+        minX = Math.min(minX, rect.left);
+        maxX = Math.max(maxX, rect.right);
+        minY = Math.min(minY, rect.top);
+        maxY = Math.max(maxY, rect.bottom);
+      });
+      (CLUSTER_CHILD_CLUSTERS[clusterId] || []).forEach((childId) => {
+        if (!isClusterActive(childId)) return;
+        const box = computeClusterBox(childId);
+        if (!box) return;
+        minX = Math.min(minX, box.x);
+        maxX = Math.max(maxX, box.x + box.width);
+        minY = Math.min(minY, box.y);
+        maxY = Math.max(maxY, box.y + box.height);
+      });
+      if (minX === Infinity) return null;
+      const x = minX - CLUSTER_MARGIN;
+      const y = minY - CLUSTER_TOP_PAD;
+      return {
+        x,
+        y,
+        width: (maxX + CLUSTER_MARGIN) - x,
+        height: (maxY + CLUSTER_MARGIN) - y,
+      };
+    }
+
+    function activeQwenClusters() {
+      if (state.collapsedModules.has('transformer')) return [];
+      return QWEN_CLUSTERS
+        .filter((cluster) => isClusterActive(cluster.id))
+        .map((cluster) => {
+          const box = computeClusterBox(cluster.id);
+          return box ? { ...cluster, ...box } : null;
+        })
+        .filter(Boolean);
+    }
+
+    function addDisplayEdge(edges, visibleIds, source, target, options = {}) {
+      if (!visibleIds.has(source) || !visibleIds.has(target)) return;
+      const key = `${source}->${target}`;
+      if (edges.some((edge) => `${edge.source}->${edge.target}` === key)) return;
+      edges.push({ source, target, ...options });
+    }
+
+    function buildQwenDisplayEdges(visibleIds) {
+      const edges = [];
+      const collapsed = state.collapsedModules;
+
+      if (collapsed.has('transformer')) {
+        addDisplayEdge(edges, visibleIds, 'input_tokens', 'transformer');
+        addDisplayEdge(edges, visibleIds, 'transformer', 'lm_head');
+        addDisplayEdge(edges, visibleIds, 'lm_head', 'output_logits');
+        return edges;
+      }
+
+      addDisplayEdge(edges, visibleIds, 'input_tokens', 'token_embedding');
+
+      if (collapsed.has('decoder_layer')) {
+        addDisplayEdge(edges, visibleIds, 'token_embedding', 'decoder_layer');
+        addDisplayEdge(edges, visibleIds, 'rope_cache', 'decoder_layer', { dashed: true });
+        addDisplayEdge(edges, visibleIds, 'kv_cache', 'decoder_layer', { dashed: true });
+        addDisplayEdge(edges, visibleIds, 'decoder_layer', 'final_norm');
+      } else {
+        addDisplayEdge(edges, visibleIds, 'token_embedding', 'attn_norm');
+
+        if (collapsed.has('attention')) {
+          addDisplayEdge(edges, visibleIds, 'attn_norm', 'attention');
+          addDisplayEdge(edges, visibleIds, 'rope_cache', 'attention', { dashed: true });
+          addDisplayEdge(edges, visibleIds, 'kv_cache', 'attention', { dashed: true });
+          addDisplayEdge(edges, visibleIds, 'attention', 'mlp_norm');
+        } else {
+          addDisplayEdge(edges, visibleIds, 'attn_norm', 'qkv_linear');
+          addDisplayEdge(edges, visibleIds, 'qkv_linear', 'rotary_apply');
+          addDisplayEdge(edges, visibleIds, 'rope_cache', 'rotary_apply', { dashed: true });
+          addDisplayEdge(edges, visibleIds, 'rotary_apply', 'scaled_attention');
+          addDisplayEdge(edges, visibleIds, 'kv_cache', 'scaled_attention', { dashed: true });
+          addDisplayEdge(edges, visibleIds, 'scaled_attention', 'attn_output_linear');
+          addDisplayEdge(edges, visibleIds, 'attn_output_linear', 'mlp_norm');
+        }
+
+        if (collapsed.has('mlp')) {
+          addDisplayEdge(edges, visibleIds, 'mlp_norm', 'mlp');
+          addDisplayEdge(edges, visibleIds, 'mlp', 'final_norm');
+        } else {
+          addDisplayEdge(edges, visibleIds, 'mlp_norm', 'mlp_gate_linear');
+          addDisplayEdge(edges, visibleIds, 'mlp_norm', 'mlp_up_linear');
+          addDisplayEdge(edges, visibleIds, 'mlp_gate_linear', 'silu_multiply');
+          addDisplayEdge(edges, visibleIds, 'mlp_up_linear', 'silu_multiply');
+          addDisplayEdge(edges, visibleIds, 'silu_multiply', 'mlp_down_linear');
+          addDisplayEdge(edges, visibleIds, 'mlp_down_linear', 'final_norm');
+        }
+      }
+
+      addDisplayEdge(edges, visibleIds, 'final_norm', 'lm_head');
+      addDisplayEdge(edges, visibleIds, 'lm_head', 'output_logits');
+      return edges;
+    }
+
+    function buildGraphFromSchema(schema) {
+      const nodes = Array.isArray(schema.nodes) ? schema.nodes : [];
+      const edges = Array.isArray(schema.edges) ? schema.edges : [];
+      const useQwenLayout = String(schema.model?.name || '').toLowerCase().includes('qwen');
+      state.qwenLayout = useQwenLayout ? computeQwenLayout() : null;
+      const graphNodes = nodes.filter((node) => !useQwenLayout || isGraphNodeVisible(node.id)).map((node, index) => {
+        const layout = (useQwenLayout && qwenLayoutForNode(node.id)) || fallbackLayout(index);
+        return {
+          id: node.id,
+          label: node.label || node.id,
+          kind: nodeVisualKind(node.kind),
+          typeLabel: nodeTypeLabel(node.kind),
+          x: layout.x,
+          y: layout.y,
+          width: layout.width,
+          height: layout.height,
+          colorKey: layout.colorKey || stageColorKey(node),
+          parent: layout.parent,
+          collapsed: useQwenLayout ? state.collapsedModules.has(node.id) : Boolean(layout.collapsed),
+        };
+      });
+      const visibleIds = new Set(graphNodes.map((node) => node.id));
+      return {
+        width: 1280,
+        height: useQwenLayout ? state.qwenLayout.height : Math.max(680, Math.ceil(nodes.length / 4) * 110 + 120),
+        clusters: useQwenLayout ? activeQwenClusters() : [],
+        nodes: graphNodes,
+        edges: useQwenLayout ? buildQwenDisplayEdges(visibleIds) : edges.map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+          dashed: edge.source === 'rope_cache' || edge.source === 'kv_cache',
+        })),
+      };
+    }
+
+    function tensorSummary(edge) {
+      const tensor = edge?.tensor || {};
+      const parts = [];
+      if (tensor.name) parts.push(tensor.name);
+      if (tensor.shape) parts.push(tensor.shape);
+      if (tensor.dtype) parts.push(tensor.dtype);
+      if (Array.isArray(tensor.constraints) && tensor.constraints.length) {
+        parts.push(tensor.constraints.join(', '));
+      }
+      return parts.join(' | ') || 'tensor';
+    }
+
+    function getNode(id) {
+      return (state.schema.nodes || []).find((node) => node.id === id);
+    }
+
+    function getNodeEdges(id) {
+      return (state.schema.edges || []).filter((edge) => edge.source === id || edge.target === id);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[char]);
+    }
+
+    function setStatus(message) {
+      document.getElementById('statusText').textContent = message;
+    }
+
+    function setModuleCollapsed(moduleId, collapsed) {
+      if (!COLLAPSIBLE_MODULES[moduleId]) return;
+      if (collapsed) {
+        state.collapsedModules.add(moduleId);
+      } else {
+        state.collapsedModules.delete(moduleId);
+      }
+      state.selectedNodeId = moduleId;
+      const node = getNode(moduleId);
+      const label = node?.label || moduleId;
+      renderAll(`${label} ${collapsed ? 'collapsed' : 'expanded'}.`, { preserveZoom: true });
+    }
+
+    function wireToggle(target, moduleId, collapsed) {
+      if (!target || !moduleId) return;
+      target.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setModuleCollapsed(moduleId, collapsed);
+      });
+    }
+
+    function createSvgElement(tag, attrs = {}) {
+      const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      Object.entries(attrs).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        element.setAttribute(key, value);
+      });
+      return element;
+    }
+
+    function appendOverlayToggle(svg, x, y, moduleId, collapsed) {
+      const node = getNode(moduleId);
+      const group = createSvgElement('g', {
+        class: 'qwen-overlay-toggle',
+        transform: `translate(${x}, ${y})`,
+        role: 'button',
+        tabindex: '0',
+        'aria-label': `${node?.label || moduleId} ${collapsed ? 'collapse' : 'expand'}`,
+      });
+      group.appendChild(createSvgElement('circle', { cx: 0, cy: 0, r: 7.5 }));
+      const icon = createSvgElement('text', { x: 0, y: 0.2 });
+      icon.textContent = collapsed ? '-' : '+';
+      group.appendChild(icon);
+      const title = createSvgElement('title');
+      title.textContent = `${node?.label || moduleId} ${collapsed ? 'collapse' : 'expand'}`;
+      group.appendChild(title);
+      group.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setModuleCollapsed(moduleId, collapsed);
+      });
+      group.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        setModuleCollapsed(moduleId, collapsed);
+      });
+      svg.appendChild(group);
+    }
+
+    function appendLayerTag(svg, x, y, text) {
+      const group = createSvgElement('g', {
+        class: 'qwen-layer-tag',
+        transform: `translate(${x}, ${y})`,
+        'pointer-events': 'none',
+      });
+      const width = Math.max(60, text.length * 7 + 18);
+      group.appendChild(createSvgElement('rect', {
+        x: 0,
+        y: -9,
+        width,
+        height: 18,
+        rx: 9,
+        ry: 9,
+        fill: 'color-mix(in srgb, var(--qwen-panel-bg) 84%, var(--qwen-accent))',
+        stroke: 'color-mix(in srgb, var(--qwen-border-strong) 68%, var(--qwen-accent))',
+        'stroke-width': '0.9px',
+      }));
+      const label = createSvgElement('text', { x: width / 2, y: 0 });
+      label.textContent = text;
+      group.appendChild(label);
+      svg.appendChild(group);
+    }
+
+    function appendToggleOverlay() {
+      const svg = state.svg;
+      if (!svg || !state.graph) return;
+      state.graph.clusters.forEach((cluster) => {
+        const moduleId = MODULE_BY_CLUSTER[cluster.id];
+        if (!moduleId) return;
+        appendOverlayToggle(svg, cluster.x + cluster.width - 13, cluster.y + 13, moduleId, true);
+      });
+      state.graph.nodes.forEach((node) => {
+        if (!MODULE_NODE_IDS.has(node.id) || !state.collapsedModules.has(node.id)) return;
+        appendOverlayToggle(svg, node.x + node.width / 2 - 14, node.y, node.id, false);
+      });
+      const decoderBox = state.graph.clusters.find((cluster) => cluster.id === 'decoder-stack');
+      if (decoderBox) {
+        // Top-left, below the cluster title — matches DeepSeek's repeat badge (x:18, y:42).
+        appendLayerTag(svg, decoderBox.x + 16, decoderBox.y + 42, '32 layers');
+      }
+    }
+
+    function wireGraphSelection() {
+      const groups = Array.from(document.querySelectorAll('#graphStage .pto-model-graphviz-node'));
+      groups.forEach((group, index) => {
+        const graphNode = state.graph.nodes[index];
+        if (!graphNode) return;
+        group.dataset.nodeId = graphNode.id;
+        group.setAttribute('tabindex', '0');
+        group.setAttribute('role', 'button');
+        group.setAttribute('aria-label', graphNode.label);
+        const schemaNode = getNode(graphNode.id);
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${schemaNode?.label || graphNode.label} | ${nodeTypeLabel(schemaNode?.kind)} | ${schemaNode?.role || schemaNode?.module_type || schemaNode?.op_type || schemaNode?.state_type || ''}`;
+        group.appendChild(title);
+        group.addEventListener('click', () => selectNode(graphNode.id));
+        wireToggle(group.querySelector('.pto-model-graphviz-toggle'), graphNode.id, false);
+        group.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectNode(graphNode.id);
+          }
+        });
+      });
+      const clusters = Array.from(document.querySelectorAll('#graphStage .pto-model-graphviz-cluster'));
+      clusters.forEach((clusterGroup, index) => {
+        const cluster = state.graph.clusters[index];
+        const moduleId = MODULE_BY_CLUSTER[cluster?.id];
+        if (!cluster || !moduleId) return;
+        clusterGroup.dataset.nodeId = moduleId;
+        clusterGroup.setAttribute('tabindex', '0');
+        clusterGroup.setAttribute('role', 'button');
+        clusterGroup.setAttribute('aria-label', cluster.label || moduleId);
+        clusterGroup.addEventListener('click', () => selectNode(moduleId));
+        wireToggle(clusterGroup.querySelector('.pto-model-graphviz-toggle'), moduleId, true);
+        clusterGroup.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectNode(moduleId);
+          }
+        });
+      });
+      syncGraphSelection();
+    }
+
+    function syncGraphSelection() {
+      document.querySelectorAll('#graphStage .pto-model-graphviz-node, #graphStage .pto-model-graphviz-cluster').forEach((group) => {
+        group.classList.toggle('is-selected', group.dataset.nodeId === state.selectedNodeId);
+      });
+      document.querySelectorAll('.qwen-node-button').forEach((button) => {
+        button.classList.toggle('is-selected', button.dataset.nodeId === state.selectedNodeId);
+      });
+    }
+
+    function selectNode(id) {
+      if (!id) return;
+      state.selectedNodeId = id;
+      syncGraphSelection();
+    }
+
+    function clampZoom(value) {
+      return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
+    }
+
+    function computeFitZoom() {
+      const stage = document.getElementById('graphStage');
+      const availableWidth = Math.max(640, stage.clientWidth - 72);
+      const availableHeight = Math.max(640, stage.clientHeight - 72);
+      const graphWidth = state.graph?.width || 1280;
+      const graphHeight = state.graph?.height || 1600;
+      const fitScale = Math.min(availableWidth / graphWidth, availableHeight / graphHeight);
+      return clampZoom(Math.min(1.08, fitScale));
+    }
+
+    // Transform-based pan/zoom: svg is sized 1:1 to the graph and moved with a
+    // CSS transform (translate + scale). Pan adjusts tx/ty; zoom keeps the graph
+    // point under the cursor fixed. This anchors correctly regardless of size.
+    function applyTransform() {
+      const svg = state.svg || document.getElementById('graphStage').querySelector('svg');
+      if (!svg || !state.graph) return;
+      svg.style.width = `${state.graph.width}px`;
+      svg.style.height = `${state.graph.height}px`;
+      svg.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.zoom})`;
+    }
+
+    function setStatusZoom(prefix = 'Zoom') {
+      setStatus(`${prefix} ${Math.round(state.zoom * 100)}%.`);
+    }
+
+    // Zoom about a point given in stage-local coordinates (px from stage top-left).
+    function zoomAtStagePoint(factor, px, py, prefix = 'Zoom') {
+      const z0 = state.zoom;
+      const z1 = clampZoom(z0 * factor);
+      if (z1 === z0) return;
+      state.tx = px - (px - state.tx) * (z1 / z0);
+      state.ty = py - (py - state.ty) * (z1 / z0);
+      state.zoom = z1;
+      applyTransform();
+      setStatusZoom(prefix);
+    }
+
+    function zoomAtPoint(factor, clientX, clientY) {
+      const rect = document.getElementById('graphStage').getBoundingClientRect();
+      zoomAtStagePoint(factor, clientX - rect.left, clientY - rect.top);
+    }
+
+    function zoomBy(factor) {
+      const stage = document.getElementById('graphStage');
+      zoomAtStagePoint(factor, stage.clientWidth / 2, stage.clientHeight / 2);
+    }
+
+    function centerView() {
+      const stage = document.getElementById('graphStage');
+      state.tx = (stage.clientWidth - state.graph.width * state.zoom) / 2;
+      state.ty = Math.max(24, (stage.clientHeight - state.graph.height * state.zoom) / 2);
+      applyTransform();
+    }
+
+    function resetZoom() {
+      state.zoom = computeFitZoom();
+      centerView();
+      setStatusZoom('Fit zoom');
+    }
+
+    function beginPan(event) {
+      if (event.button !== 0) return;
+      state.suppressClick = false;
+      if (event.target.closest?.('.qwen-overlay-toggle, a, button, input, label')) return;
+      state.pan = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        tx: state.tx,
+        ty: state.ty,
+        moved: false,
+      };
+    }
+
+    function movePan(event) {
+      const stage = document.getElementById('graphStage');
+      if (!state.pan || state.pan.pointerId !== event.pointerId) return;
+      const dx = event.clientX - state.pan.x;
+      const dy = event.clientY - state.pan.y;
+      if (!state.pan.moved) {
+        if (Math.hypot(dx, dy) < 4) return; // distinguish click from drag
+        state.pan.moved = true;
+        stage.classList.add('is-panning');
+        try { stage.setPointerCapture(event.pointerId); } catch (e) {}
+      }
+      state.tx = state.pan.tx + dx;
+      state.ty = state.pan.ty + dy;
+      applyTransform();
+      event.preventDefault();
+    }
+
+    function endPan(event) {
+      const stage = document.getElementById('graphStage');
+      if (!state.pan || state.pan.pointerId !== event.pointerId) return;
+      if (state.pan.moved) state.suppressClick = true; // swallow the click a drag would fire
+      state.pan = null;
+      stage.classList.remove('is-panning');
+      if (stage.hasPointerCapture(event.pointerId)) {
+        stage.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    function renderAll(status, options = {}) {
+      state.graph = buildGraphFromSchema(state.schema);
+      state.svg = window.PtoModelGraphvizPattern.render(
+        document.getElementById('graphStage'),
+        state.graph,
+        { ariaLabel: `${state.schema.model?.name || 'Model'} architecture graph` }
+      );
+      if (options.preserveZoom) {
+        state.zoom = clampZoom(state.zoom);
+        applyTransform();
+      } else {
+        state.zoom = computeFitZoom();
+        centerView();
+      }
+      wireGraphSelection();
+      appendToggleOverlay();
+      setStatus(status || `${state.schema.model?.name || 'Model'} architecture loaded.`);
+    }
+
+    const graphStage = document.getElementById('graphStage');
+    graphStage.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      if (event.metaKey || event.ctrlKey) {
+        zoomAtPoint(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
+      } else {
+        state.tx -= event.deltaX;
+        state.ty -= event.deltaY;
+        applyTransform();
+      }
+    }, { passive: false });
+
+    graphStage.addEventListener('pointerdown', beginPan);
+    graphStage.addEventListener('pointermove', movePan);
+    graphStage.addEventListener('pointerup', endPan);
+    graphStage.addEventListener('pointercancel', endPan);
+    graphStage.addEventListener('lostpointercapture', endPan);
+    // Capture-phase: suppress the click that follows a drag so it doesn't select.
+    graphStage.addEventListener('click', (event) => {
+      if (!state.suppressClick) return;
+      state.suppressClick = false;
+      event.stopPropagation();
+      event.preventDefault();
+    }, true);
+
+    window.addEventListener('keydown', (event) => {
+      if (!event.metaKey && !event.ctrlKey) return;
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        zoomBy(1.14);
+      } else if (event.key === '-') {
+        event.preventDefault();
+        zoomBy(1 / 1.14);
+      } else if (event.key === '0') {
+        event.preventDefault();
+        resetZoom();
+      }
+    });
+
+    document.getElementById('schemaFileInput').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const schema = JSON.parse(text);
+        if (!Array.isArray(schema.nodes) || !Array.isArray(schema.edges)) {
+          throw new Error('Expected nodes[] and edges[]');
+        }
+        state.schema = schema;
+        state.collapsedModules = new Set();
+        state.selectedNodeId = schema.nodes.find((node) => !MODEL_TITLE_NODE_IDS.has(node.id))?.id || schema.nodes[0]?.id || '';
+        renderAll(`${file.name} loaded.`);
+      } catch (error) {
+        document.getElementById('statusText').textContent = `Could not load schema: ${error.message}`;
+      }
+    });
+
+    renderAll('Default Qwen-7B schema loaded.');
+  </script>
+</body>
+</html>
+
