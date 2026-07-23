@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Code Recovery · Vector Add</title>
+  <title>Code Recovery</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="../../pto-design-system/tokens/foundation.css">
-  <link rel="stylesheet" href="../../pto-design-system/tokens/semantic.css">
-  <link rel="stylesheet" href="../../pto-design-system/tokens/components.css">
-  <link rel="stylesheet" href="../../pto-design-system/css/style.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/workbench-shell/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/ide-frame/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/aic-core-object/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/aiv-core-object/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/memory-architecture/pattern.css">
-  <link rel="stylesheet" href="../../pto-design-system/patterns/hardware-architecture-viewport/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.css">
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; min-height: 100%; margin: 0; overflow: auto; background: var(--ide-frame-page-bg); color: var(--foreground); font-family: var(--font-sans); }
@@ -28,6 +28,7 @@
     .workspace-meta { color: var(--foreground-muted); font: var(--ide-frame-meta-font); }
     .pane-scroll { min-height: 0; overflow: auto; }
     .source-toolbar, .view-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+    .source-toolbar-actions { display: inline-flex; align-items: center; gap: var(--space-2); }
     .source-toolbar span, .view-toolbar span { color: var(--foreground-secondary); font: var(--text-body-sm); }
     .source-surface { min-width: 0; padding: var(--space-2) 0 var(--space-4); }
     .source-editor-pane .pto-ide-frame__pane-body {
@@ -45,11 +46,23 @@
     .source-editor-pane .pto-ide-frame__pane-body::-webkit-scrollbar-track { background: transparent; }
     .source-editor-pane .pto-ide-frame__pane-body::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: var(--radius-pill); background: var(--foreground-muted); background-clip: padding-box; }
     .source-editor-pane .pto-ide-frame__tabstrip { padding-left: var(--space-2); }
-    .source-editor-tab { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--space-3); border-bottom: 1px solid var(--primary); color: var(--foreground); font: var(--text-body-sm); }
-    .source-line { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; min-height: 22px; padding-right: var(--space-3); color: var(--foreground-secondary); font: var(--text-mono); font-size: 11px; line-height: 22px; }
+    .source-editor-tab { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--space-3); border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--foreground-muted); font: var(--text-body-sm); cursor: pointer; }
+    .source-editor-tab.is-active { border-bottom-color: var(--primary); color: var(--foreground); }
+    .source-line { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: start; min-height: 22px; padding-right: var(--space-3); color: var(--foreground-secondary); font: var(--text-mono); font-size: 11px; line-height: 22px; }
+    .source-line.is-annotated { cursor: pointer; }
+    .source-line.is-annotated:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
     .source-line-number { padding-right: var(--space-2); color: var(--foreground-disabled); text-align: right; user-select: none; }
     .source-line-code { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
     .source-line.is-evidence { background: color-mix(in srgb, var(--primary) 13%, transparent); color: var(--foreground); }
+    .source-line-tag {  align-self: center; min-height: 20px; margin-left: var(--space-3); padding: 0 var(--space-3); border-color:color-mix(in srgb, var(--warning) 28%, transparent);border:1px solid var(--comp-tag-border); border-radius: var(--radius-pill); background: color-mix(in srgb, currentColor 10%, transparent); color: var(--foreground-secondary); font: 500 12px/20px var(--font-sans); letter-spacing: .01em; white-space: nowrap; }
+    .source-line-tag.is-tiling,
+    .source-line-tag.is-buffer,
+    .source-line-tag.is-compute,
+    .source-line-tag.is-sync { color: var(--warning); }
+    .source-line-tag.is-memory { color: var(--primary-hover); }
+    .source-line-detail { border-color:color-mix(in srgb, var(--primary) 60%, var(--border-default));margin: 2px var(--space-3) var(--space-3) 44px; padding: var(--space-3); border-radius: var(--radius-md); background: color-mix(in srgb, var(--primary) 10%, var(--surface-2)); color: var(--foreground-secondary); border:1px solid var(--border-subtle);font: var(--text-body-sm); line-height: 1.5; }
+    .source-line-detail strong { color: var(--foreground); }
+    .source-line-detail code { display: block; margin-top: var(--space-1); color: var(--foreground-muted); font: var(--text-label); }
     .syntax-keyword { color: #c792ea; }
     .syntax-type { color: #82aaff; }
     .syntax-api { color: #89ddff; }
@@ -63,7 +76,7 @@
     .model-anchor-nav .tab-control-item { display: inline-flex; align-items: center; justify-content: center; color: var(--foreground-secondary); text-decoration: none; padding: 0 var(--space-3); }
     .model-anchor-nav .tab-control-item.is-selected { color: var(--foreground); }
     .model-scroll { padding: var(--space-4); scroll-behavior: smooth; }
-    .model-view { margin-bottom: var(--space-4); padding: var(--space-6); border: 0; border-radius: var(--radius-lg); background: var(--surface-1); scroll-margin-top: var(--space-4); }
+    .model-view { margin-bottom: var(--space-4); padding: 16px; border: 0; border-radius: var(--radius-lg); background: var(--surface-1); scroll-margin-top: var(--space-4); }
     .model-view:last-child { margin-bottom: 0; }
     .view-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
     .view-heading h1 { margin: 0 0 var(--space-1); font: var(--text-title-2); font-size: 16px;}
@@ -81,14 +94,14 @@
     .pipeline-row { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: var(--space-2); align-items: center; }
     .pipeline-label { display: grid; gap: 2px; color: var(--foreground-secondary); font: var(--text-label); }
     .pipeline-label strong { color: var(--foreground); font: var(--text-body-sm); }
-    .pipeline-track { min-height: 64px; display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-md); background: color-mix(in srgb, var(--foreground) 4%, transparent); }
+    .pipeline-track { min-height: 64px; display: grid; grid-template-columns: repeat(var(--stage-count, 3), minmax(120px, 1fr)); gap: var(--space-2); padding: var(--space-2); border-radius: var(--radius-md); background: color-mix(in srgb, var(--foreground) 4%, transparent); }
     .pipeline-block { min-width: 0; min-height: 48px; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--block-color) 72%, var(--surface-3)); color: white; text-align: left; cursor: pointer; }
     .pipeline-block strong, .pipeline-block span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pipeline-block strong { font: 700 11px/1.2 var(--font-sans); }
     .pipeline-block span { margin-top: 3px; font: 500 9px/1.2 var(--font-mono); opacity: .82; }
     .pipeline-block.is-selected { box-shadow: 0 0 0 2px var(--foreground); }
     .pipeline-spacer { min-height: 1px; }
-    .queue-boundaries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0 0 140px; }
+    .queue-boundaries { display: grid; grid-template-columns: repeat(var(--fact-count, 3), minmax(0, 1fr)); gap: var(--space-2); margin: var(--space-3) 0 0 140px; }
     .queue-boundary { padding: var(--space-2); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--foreground-secondary); font: var(--text-body-sm); }
     .queue-boundary strong { color: var(--foreground); }
     .pipeline-note, .unknown-note { margin-top: var(--space-4); padding: var(--space-3); border-radius: var(--radius-md); background: color-mix(in srgb, var(--warning) 9%, var(--surface-2)); color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.55; }
@@ -97,7 +110,7 @@
     .memory-path-viewport { height: 480px; min-height: 0; overflow: hidden; }
     .memory-path-stage { height: 424px; min-height: 0; overflow: hidden; }
     .memory-path-graph { min-width: 1120px; min-height: 760px; }
-    .path-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+    .path-summary { display: grid; grid-template-columns: repeat(var(--path-count, 3), minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
     .path-step { padding: var(--space-3); border: 0; border-radius: var(--radius-md); background: var(--surface-2); color: var(--foreground); text-align: left; cursor: pointer; }
     .path-step span { display: block; color: var(--foreground-muted); font: var(--text-label); }
     .path-step strong { display: block; margin-top: var(--space-1); font: var(--text-body-sm); }
@@ -146,13 +159,26 @@
     .formula-op { color: var(--success); font: var(--text-title-1); }
     .tiling-factline { padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); color: var(--foreground-secondary); font: var(--text-body-sm); line-height: 1.55; }
     .tiling-factline strong { color: var(--foreground); }
+    .matmul-tiling-diagrams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); margin-top: var(--space-4); }
+    .matmul-tiling-figure { min-width: 0; margin: 0; }
+    .matmul-tiling-figure-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+    .matmul-tiling-figure-head strong { font: var(--text-title-2); font-size: 12px; }
+    .matmul-tiling-figure-head span { color: var(--foreground-muted); font: var(--text-body-sm); }
+    .matmul-matrix-svg { display: block; width: 100%; min-width: 0; color: var(--foreground-muted); }
+    .matmul-matrix-svg .matrix-cell { fill: color-mix(in srgb, var(--foreground) 3%, transparent); stroke: color-mix(in srgb, var(--foreground) 30%, transparent); stroke-width: 1; }
+    .matmul-matrix-svg .matrix-cell.is-active { fill: color-mix(in srgb, var(--primary) 35%, var(--surface-3)); stroke: var(--primary-hover); stroke-width: 1.5; }
+    .matmul-matrix-svg .matrix-cell.is-shared { fill: color-mix(in srgb, var(--warning) 20%, var(--surface-3)); stroke: var(--warning); stroke-width: 1.5; }
+    .matmul-matrix-svg .matrix-cell.is-output { fill: color-mix(in srgb, var(--success) 20%, var(--surface-3)); stroke: var(--success); stroke-width: 1.5; }
+    .matmul-matrix-svg .matrix-label { fill: var(--foreground); font: 600 10px var(--font-sans); }
+    .matmul-matrix-svg .matrix-axis { fill: var(--foreground-muted); font: 9px var(--font-mono); }
+    .matmul-tiling-formula { margin-top: var(--space-4); }
     .kv-list { display: grid; gap: var(--space-2); }
     .kv { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: var(--space-2); color: var(--foreground-secondary); font: var(--text-body-sm); }
     .kv span { color: var(--foreground-muted); }
     .kv code { overflow-wrap: anywhere; }
     @media (max-width: 1080px) {
       .context-strip, .path-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .lifecycle-layout, .tiling-spaces { grid-template-columns: 1fr; }
+      .lifecycle-layout, .tiling-spaces, .matmul-tiling-diagrams { grid-template-columns: 1fr; }
       .core-strip { grid-template-columns: repeat(4, minmax(64px, 1fr)); }
     }
   </style>
@@ -162,7 +188,7 @@
     <header class="pto-ide-frame__topbar pto-ide-frame__standalone-chrome">
       <div class="pto-ide-frame__topbar-left">
         <div class="pto-ide-frame__host-chip"><svg class="pto-ide-frame__host-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z"></path><path d="m8 9 3 3-3 3"></path><path d="M13 15h3"></path></svg><span>IDE</span></div>
-        <div class="pto-ide-frame__workspace"><span class="workspace-title">Code Recovery</span><span class="workspace-meta">GM-001 · Vector Add / TPipe + TQue</span></div>
+        <div class="pto-ide-frame__workspace"><span class="workspace-title">Code Recovery</span><span class="workspace-meta" data-workspace-meta>GM-001 · Vector Add / TPipe + TQue</span></div>
       </div>
       <div class="pto-ide-frame__topbar-center"></div>
       <div class="pto-ide-frame__topbar-right"></div>
@@ -177,8 +203,8 @@
       <div class="pto-ide-frame__workarea">
         <div class="pto-ide-frame__split" data-ide-split="standalone-main" data-storage-key="code-recovery-gm001-editor-split-v1" data-split-direction="horizontal" data-sizes="42,58" data-min-size="360,560">
           <section class="pto-ide-frame__pane source-editor-pane" data-ide-pane="editor-preview" aria-label="Source editor">
-            <div class="pto-ide-frame__tabstrip" aria-label="Open source files"><span class="source-editor-tab">add_tpipe_tque.asc</span></div>
-            <div class="pto-ide-frame__pane-body pane-scroll" data-source-scroll tabindex="0" aria-label="Scrollable Ascend C source editor"><div class="source-toolbar"><span>Golden Model GM-001</span><button class="btn btn-sm" type="button" data-recover>重新恢复</button></div><div class="source-surface" data-source-lines aria-label="Ascend C source"></div><div class="source-status" data-source-status>加载完整算子源码并恢复模型…</div></div>
+            <div class="pto-ide-frame__tabstrip" role="tablist" aria-label="Open source files"><button class="source-editor-tab is-active" type="button" role="tab" aria-selected="true" data-operator-tab="vector">add_tpipe_tque.asc</button><button class="source-editor-tab" type="button" role="tab" aria-selected="false" data-operator-tab="matmul">matmul_basic_api.asc</button></div>
+            <div class="pto-ide-frame__pane-body pane-scroll" data-source-scroll tabindex="0" aria-label="Scrollable Ascend C source editor"><div class="source-toolbar"><span data-golden-label>Golden Model GM-001</span><div class="source-toolbar-actions"><button class="btn btn-sm btn-ghost" type="button" data-toggle-annotations aria-pressed="true">隐藏标注</button><button class="btn btn-sm" type="button" data-recover>重新恢复</button></div></div><div class="source-surface" data-source-lines aria-label="Ascend C source"></div><div class="source-status" data-source-status>加载完整算子源码并恢复模型…</div></div>
           </section>
           <main class="pto-ide-frame__pane" data-ide-pane="editor-preview" aria-label="Implemented execution model editor">
             <header class="pto-ide-frame__pane-header"><h2 class="pto-ide-frame__pane-title">Implemented execution model</h2><span class="pto-ide-frame__pane-meta">代码确认 + 静态边界</span></header>
@@ -195,19 +221,37 @@
     </div>
   </section>
 
-  <script src="../../pto-design-system/patterns/workbench-shell/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/ide-frame/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/aiv-core-object/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/aic-core-object/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/memory-architecture/pattern.js"></script>
-  <script src="../../pto-design-system/patterns/hardware-architecture-viewport/pattern.js"></script>
-  <script>
-  (() => {
-    const $ = (selector, root = document) => root.querySelector(selector);
-    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-    const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const sourceUrl = '../../asc-devkit/examples/01_simd_cpp_api/00_introduction/01_add/add_tpipe_tque/add_tpipe_tque.asc';
-    const fallbackSource = `__global__ __vector__ void add_custom(__gm__ uint8_t* x, __gm__ uint8_t* y, __gm__ uint8_t* z, uint32_t totalLength)
+  <script src="../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aiv-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-architecture/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js"></script>
+  <script type="text/plain" id="source-vector-add">
+/**
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/* !
+ * \file add_tpipe_tque.asc
+ * \brief 基于TPipe和TQue的Add向量加法样例，演示按核切分输入数据，
+ *        并通过队列完成GM到UB搬入、UB内向量加法和结果写回GM的完整流程。
+ */
+#include "acl/acl.h"
+#include "kernel_operator.h"
+#include "data_utils.h"
+
+#ifdef ASCENDC_CPU_DEBUG
+#include "cpu_debug_launch.h"
+#endif
+
+__global__ __vector__ void add_custom(__gm__ uint8_t* x, __gm__ uint8_t* y, __gm__ uint8_t* z, uint32_t totalLength)
 {
     AscendC::TPipe pipe;
     AscendC::TQue<AscendC::TPosition::VECIN, 1> inQueueX;
@@ -216,19 +260,28 @@
     AscendC::GlobalTensor<float> xGm;
     AscendC::GlobalTensor<float> yGm;
     AscendC::GlobalTensor<float> zGm;
+
+    // totalLength 表示全局输入长度；GetBlockNum() 返回本次启动的核数，
+    // 这里按核数均分每个 block 的处理区间。
     uint32_t blockLength = totalLength / AscendC::GetBlockNum();
+    // 根据 block_idx 计算当前核在 GM 中的起始地址，确保各核访问互不重叠的数据分片。
     xGm.SetGlobalBuffer((__gm__ float*)x + blockLength * AscendC::GetBlockIdx(), blockLength);
     yGm.SetGlobalBuffer((__gm__ float*)y + blockLength * AscendC::GetBlockIdx(), blockLength);
     zGm.SetGlobalBuffer((__gm__ float*)z + blockLength * AscendC::GetBlockIdx(), blockLength);
+    // 为输入和输出队列申请与 blockLength 对应的 UB 缓冲，保持 TPipe/TQue 的编程范式。
     pipe.InitBuffer(inQueueX, 1, blockLength * sizeof(float));
     pipe.InitBuffer(inQueueY, 1, blockLength * sizeof(float));
     pipe.InitBuffer(outQueueZ, 1, blockLength * sizeof(float));
+
+    // 使用 DataCopy 将输入从 GM 搬运到 UB，并通过 EnQue 将 LocalTensor 入队，供后续计算阶段 DeQue 取用。
     AscendC::LocalTensor<float> xLocal = inQueueX.AllocTensor<float>();
     AscendC::LocalTensor<float> yLocal = inQueueY.AllocTensor<float>();
     AscendC::DataCopy(xLocal, xGm, blockLength);
     AscendC::DataCopy(yLocal, yGm, blockLength);
     inQueueX.EnQue(xLocal);
     inQueueY.EnQue(yLocal);
+
+    // DeQue 取出输入张量，在 UB 内执行 Add，并将结果 EnQue 到输出队列，供后续写回 GM。
     xLocal = inQueueX.DeQue<float>();
     yLocal = inQueueY.DeQue<float>();
     AscendC::LocalTensor<float> zLocal = outQueueZ.AllocTensor<float>();
@@ -236,6 +289,8 @@
     outQueueZ.EnQue<float>(zLocal);
     inQueueX.FreeTensor(xLocal);
     inQueueY.FreeTensor(yLocal);
+
+    // 从输出队列取出结果，并写回当前核负责的 GM 分片。
     zLocal = outQueueZ.DeQue<float>();
     AscendC::DataCopy(zGm, zLocal, blockLength);
     outQueueZ.FreeTensor(zLocal);
@@ -243,194 +298,556 @@
 
 int32_t main(int32_t argc, char* argv[])
 {
+    // 启动 8 个核并行处理，每个核负责总长度的 1/8。
     uint32_t numBlocks = 8;
     constexpr uint32_t totalLength = 8 * 2048;
-    add_custom<<<numBlocks, 0, stream>>>(xDevice, yDevice, zDevice, totalLength);
-}`;
+    size_t inputByteSize = totalLength * sizeof(float);
+    size_t outputByteSize = totalLength * sizeof(float);
+    uint8_t* xHost = nullptr;
+    uint8_t* yHost = nullptr;
+    uint8_t* zHost = nullptr;
+    uint8_t* xDevice = nullptr;
+    uint8_t* yDevice = nullptr;
+    uint8_t* zDevice = nullptr;
 
-    const model = {
-      context: { operator: 'add_custom', kind: 'Vector', dtype: 'float', format: 'ND', shape: '[8, 2048]', cores: 8, total: 16384, perCore: 2048, bytesPerBuffer: '8 KiB', tail: '当前样例无 tail' },
+    aclInit(nullptr);
+    int32_t deviceId = 0;
+    aclrtSetDevice(deviceId);
+    aclrtStream stream = nullptr;
+    aclrtCreateStream(&stream);
+
+    aclrtMallocHost((void**)(&xHost), inputByteSize);
+    aclrtMallocHost((void**)(&yHost), inputByteSize);
+    aclrtMallocHost((void**)(&zHost), outputByteSize);
+    aclrtMalloc((void**)&xDevice, inputByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&yDevice, inputByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&zDevice, outputByteSize, ACL_MEM_MALLOC_HUGE_FIRST);
+
+    ReadFile("./input/input_x.bin", inputByteSize, xHost, inputByteSize);
+    ReadFile("./input/input_y.bin", inputByteSize, yHost, inputByteSize);
+    aclrtMemcpy(xDevice, inputByteSize, xHost, inputByteSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    aclrtMemcpy(yDevice, inputByteSize, yHost, inputByteSize, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    add_custom<<<numBlocks, 0, stream>>>(xDevice, yDevice, zDevice, totalLength);
+    aclrtSynchronizeStream(stream);
+    aclrtMemcpy(zHost, outputByteSize, zDevice, outputByteSize, ACL_MEMCPY_DEVICE_TO_HOST);
+    WriteFile("./output/output.bin", zHost, outputByteSize);
+
+    aclrtFree(xDevice);
+    aclrtFree(yDevice);
+    aclrtFree(zDevice);
+    aclrtFreeHost(xHost);
+    aclrtFreeHost(yHost);
+    aclrtFreeHost(zHost);
+
+    aclrtDestroyStream(stream);
+    aclrtResetDevice(deviceId);
+    aclFinalize();
+
+    return 0;
+}
+  </script>
+  <script type="text/plain" id="source-matmul-basic">
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/* !
+ * \file matmul_basic_api.asc
+ * \brief 使用静态Tensor编程模式实现矩阵乘法，展示Cube单元的基本使用方法
+ */
+
+#include "acl/acl.h"
+#include "kernel_operator.h"
+#include "data_utils.h"
+
+#ifdef ASCENDC_CPU_DEBUG
+#include "cpu_debug_launch.h"
+#endif
+
+// half type, cube block: [16, 16]
+constexpr uint32_t CUBE_BLOCK = 16;
+
+template <uint32_t M, uint32_t K, uint32_t N, uint32_t singleCoreM, uint32_t baseM, uint32_t baseK, uint32_t baseN>
+__global__ __cube__ void mmad_custom(__gm__ uint8_t* a, __gm__ uint8_t* b, __gm__ uint8_t* c)
+{
+    AscendC::InitSocState();
+    AscendC::GlobalTensor<half> aGM;
+    AscendC::GlobalTensor<half> bGM;
+    AscendC::GlobalTensor<half> cGM;
+    uint32_t mIterIdx = AscendC::GetBlockIdx() % (M / singleCoreM);
+    aGM.SetGlobalBuffer((__gm__ half*)a + mIterIdx * singleCoreM * K);
+    bGM.SetGlobalBuffer((__gm__ half*)b);
+    cGM.SetGlobalBuffer((__gm__ half*)c + mIterIdx * singleCoreM * N);
+    AscendC::LocalMemAllocator<AscendC::Hardware::L1> l1Allocator;
+    AscendC::LocalMemAllocator<AscendC::Hardware::L0A> l0aAllocator;
+    AscendC::LocalMemAllocator<AscendC::Hardware::L0B> l0bAllocator;
+    AscendC::LocalMemAllocator<AscendC::Hardware::L0C> l0cAllocator;
+    // 使用LocalMemAllocator按申请顺序分配片上内存，避免手动维护LocalTensor地址偏移。
+    AscendC::LocalTensor<half> a1Local = l1Allocator.Alloc<AscendC::TPosition::A1, half>(baseM * baseK);
+    AscendC::LocalTensor<half> b1Local = l1Allocator.Alloc<AscendC::TPosition::B1, half>(baseK * baseN);
+    AscendC::LocalTensor<half> a2Local = l0aAllocator.Alloc<AscendC::TPosition::A2, half>(baseM * baseK);
+    AscendC::LocalTensor<half> b2Local = l0bAllocator.Alloc<AscendC::TPosition::B2, half>(baseK * baseN);
+    AscendC::LocalTensor<float> cLocal = l0cAllocator.Alloc<AscendC::TPosition::CO1, float>(baseM * baseN);
+    // A矩阵GM->L1调用DataCopy接口 + Nd2NzParams结构体参数:
+    // {ndNum, nValue, dValue, srcNdMatrixStride, srcDValue,
+    //  dstNzC0Stride, dstNzNStride, dstNzMatrixStride}
+    AscendC::DataCopy(a1Local, aGM, AscendC::Nd2NzParams{1, baseM, baseK, 0, K, baseM, 1, 0});
+    // B矩阵GM->L1调用DataCopy接口 + Nd2NzParams结构体参数:
+    // {ndNum, nValue, dValue, srcNdMatrixStride, srcDValue,
+    //  dstNzC0Stride, dstNzNStride, dstNzMatrixStride}
+    AscendC::DataCopy(b1Local, bGM, AscendC::Nd2NzParams{1, baseK, baseN, 0, N, baseK, 1, 0});
+    // SetFlag用于在生产者流水完成当前任务后写入同步事件，WaitFlag用于让消费者流水等待该事件；
+    // HardEvent模板参数描述同步方向，EVENT_ID用于区分同类同步事件。
+    // GM->L1的DataCopy由MTE2流水完成，后续L1->L0的LoadData由MTE1流水读取L1数据；
+    // 这里设置MTE2_MTE1事件，使MTE1等待MTE2，避免LoadData读取到尚未搬运完成的数据。
+    AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(EVENT_ID0);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
+    // A矩阵L1->L0A（Nz->Zz）
+    // A矩阵L1->L0A调用LoadData接口 + LoadData2DParams结构体参数：
+    // {startIndex, repeatTimes, srcStride, sid, dstGap, ifTranspose, addrMode}
+    for (int i = 0; i < baseM / CUBE_BLOCK; ++i) {
+        AscendC::LoadData(
+            a2Local[i * baseK * CUBE_BLOCK], a1Local[i * 512 / sizeof(half)],
+            AscendC::LoadData2DParams{0, baseK / CUBE_BLOCK, baseM / CUBE_BLOCK, 0, 0, false, 0});
+    }
+    // B矩阵L1->L0B（Nz->Zn）
+    // B矩阵L1->L0B调用LoadData接口 + LoadData2DParams结构体参数：
+    // {startIndex, repeatTimes, srcStride, sid, dstGap, ifTranspose, addrMode}
+    for (int i = 0; i < baseK / CUBE_BLOCK; ++i) {
+        AscendC::LoadData(
+            b2Local[i * baseN * CUBE_BLOCK], b1Local[i * 512 / sizeof(half)],
+            AscendC::LoadData2DParams{0, baseN / CUBE_BLOCK, baseK / CUBE_BLOCK, 0, 0, true, 0});
+    }
+#elif defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    // A矩阵L1->L0A（Nz->Nz）
+    // A矩阵L1->L0A调用LoadData接口 + LoadData2DParamsV2结构体参数：
+    // {mStartPosition, kStartPosition, mStep, kStep, srcStride, dstStride, ifTranspose, sid}
+    AscendC::LoadData(
+        a2Local, a1Local,
+        AscendC::LoadData2DParamsV2{
+            0, 0, baseM / CUBE_BLOCK, baseK / CUBE_BLOCK, baseM / CUBE_BLOCK, baseM / CUBE_BLOCK, false, 0});
+    // B矩阵L1->L0B（Nz->Zn）
+    // B矩阵L1->L0B调用LoadData接口 + LoadData2DParamsV2结构体参数：
+    // {mStartPosition, kStartPosition, mStep, kStep, srcStride, dstStride, ifTranspose, sid}
+    AscendC::LoadData(
+        b2Local, b1Local,
+        AscendC::LoadData2DParamsV2{
+            0, 0, baseK / CUBE_BLOCK, baseN / CUBE_BLOCK, baseK / CUBE_BLOCK, baseN / CUBE_BLOCK, true, 0});
+#endif
+    // L1->L0的LoadData由MTE1流水完成，后续Mmad由M流水读取L0A/L0B数据；
+    // 这里设置MTE1_M事件，使M流水等待MTE1，避免Mmad读取到尚未搬运完成的数据。
+    AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+    AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+    // 矩阵乘调用Mmad接口 + MmadParams结构体参数：{m, n, k, unitFlag, cmatrixSource, cmatrixInitVal}
+    AscendC::Mmad(cLocal, a2Local, b2Local, AscendC::MmadParams{baseM, baseN, baseK, 0, false, true});
+
+    // Mmad由M流水完成并写入L0C，后续Fixpipe由FIX流水读取L0C并搬运到GM；
+    // 这里设置M_FIX事件，使FIX流水等待M流水，避免Fixpipe读取到尚未计算完成的数据。
+    AscendC::SetFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+    AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(EVENT_ID0);
+    // L0C->GM搬运调用Fixpipe+FixpipeParamsV220结构体参数：
+    // {nSize, mSize, srcStride, dstStride, reluEn, quantPre, deqScalar,
+    //  ndNum, srcNdStride, dstNdStride, unitFlag}
+    AscendC::Fixpipe(
+        cGM, cLocal, AscendC::FixpipeParamsV220{baseN, baseM, baseM, N, false, QuantMode_t::F322F16, 0, 1, 0, 0, 0});
+    AscendC::PipeBarrier<PIPE_ALL>();
+}
+
+int32_t main(int32_t argc, char* argv[])
+{
+    // matmul参数
+    constexpr uint32_t M = 256;
+    constexpr uint32_t K = 64;
+    constexpr uint32_t N = 256;
+    // 单核计算量
+    constexpr uint32_t singleCoreM = 128;
+    // 矩阵乘执行单元Tile参数
+    constexpr uint32_t baseM = 128;
+    constexpr uint32_t baseK = 64;
+    constexpr uint32_t baseN = 256;
+
+    size_t aFileSize = M * K * sizeof(half);
+    size_t bFileSize = K * N * sizeof(half);
+    size_t cFileSize = M * N * sizeof(half);
+    uint32_t numBlocks = 2;
+
+    aclInit(nullptr);
+    int32_t deviceId = 0;
+    aclrtSetDevice(deviceId);
+    aclrtStream stream = nullptr;
+    aclrtCreateStream(&stream);
+
+    uint8_t* aHost;
+    uint8_t* aDevice;
+    aclrtMallocHost((void**)(&aHost), aFileSize);
+    aclrtMalloc((void**)&aDevice, aFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    ReadFile("./input/x1_gm.bin", aFileSize, aHost, aFileSize);
+    aclrtMemcpy(aDevice, aFileSize, aHost, aFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    uint8_t* bHost;
+    uint8_t* bDevice;
+    aclrtMallocHost((void**)(&bHost), bFileSize);
+    aclrtMalloc((void**)&bDevice, bFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    ReadFile("./input/x2_gm.bin", bFileSize, bHost, bFileSize);
+    aclrtMemcpy(bDevice, bFileSize, bHost, bFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    uint8_t* cHost;
+    uint8_t* cDevice;
+    aclrtMallocHost((void**)(&cHost), cFileSize);
+    aclrtMalloc((void**)&cDevice, cFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+
+    mmad_custom<M, K, N, singleCoreM, baseM, baseK, baseN><<<numBlocks, 0, stream>>>(aDevice, bDevice, cDevice);
+    aclrtSynchronizeStream(stream);
+
+    aclrtMemcpy(cHost, cFileSize, cDevice, cFileSize, ACL_MEMCPY_DEVICE_TO_HOST);
+    WriteFile("./output/output.bin", cHost, cFileSize);
+
+    aclrtFree(aDevice);
+    aclrtFreeHost(aHost);
+    aclrtFree(bDevice);
+    aclrtFreeHost(bHost);
+    aclrtFree(cDevice);
+    aclrtFreeHost(cHost);
+    aclrtDestroyStream(stream);
+    aclrtResetDevice(deviceId);
+    aclFinalize();
+    return 0;
+}
+  </script>
+  <script>
+(() => {
+  window.__CODE_RECOVERY_UNIFIED__ = true;
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const cases = {
+    vector: {
+      id: 'GM-001',
+      label: 'Vector Add / TPipe + TQue',
+      fileName: 'add_tpipe_tque.asc',
+      sourceId: 'source-vector-add',
+      sourceUrl: '../../asc-devkit/examples/01_simd_cpp_api/00_introduction/01_add/add_tpipe_tque/add_tpipe_tque.asc',
+      context: { operator: 'add_custom', kind: 'Vector', dtype: 'float', format: 'ND', shape: '[8, 2048]', cores: 8, total: 16384, perCore: 2048, partitionUnit: 'elements', memoryKind: 'vector' },
+      annotations: [
+        [/AscendC::TPipe\s+pipe/, 'Pipeline', 'compute', 'TPipe 承载本 kernel 的队列和 UB buffer 管理；此处没有可直接观察的 kernel 内 event / barrier。'],
+        [/TQue<AscendC::TPosition::VECIN,\s*1>\s+inQueueX/, 'UB 队列', 'buffer', '声明 x 的 VECIN 队列，depth = 1，后续由 InitBuffer 配置其 UB slot。'],
+        [/TQue<AscendC::TPosition::VECIN,\s*1>\s+inQueueY/, 'UB 队列', 'buffer', '声明 y 的 VECIN 队列，depth = 1；代码没有核内 tile loop，不能由此推断 Ping/Pong。'],
+        [/TQue<AscendC::TPosition::VECOUT,\s*1>\s+outQueueZ/, 'UB 队列', 'buffer', '声明 z 的 VECOUT 队列，承接 Vector 写入的 zLocal。'],
+        [/blockLength\s*=\s*totalLength\s*\/\s*AscendC::GetBlockNum/, 'Core 切分', 'tiling', '按启动核数均分每个 core 的连续元素区间：16384 elements / 8 cores = 2048。'],
+        [/xGm\.SetGlobalBuffer\(/, 'GM 地址', 'tiling', 'x 的地址 = 基址 + blockLength × GetBlockIdx()；建立当前 core 的连续 GM slice。'],
+        [/yGm\.SetGlobalBuffer\(/, 'GM 地址', 'tiling', 'y 使用同一 core index 和 blockLength，映射到对应的输入 slice。'],
+        [/zGm\.SetGlobalBuffer\(/, 'GM 地址', 'tiling', 'z 使用同一 core slice 作为写回地址，各 core 的输出区域互不重叠。'],
+        [/InitBuffer\(inQueueX/, 'UB 分配', 'buffer', '为 inQueueX 配置一个 UB slot，容量为 blockLength × sizeof(float)；此时 slot 尚未写入 x。'],
+        [/InitBuffer\(inQueueY/, 'UB 分配', 'buffer', '为 inQueueY 配置一个 UB slot，容量匹配当前 core 的 y slice。'],
+        [/InitBuffer\(outQueueZ/, 'UB 分配', 'buffer', '为 outQueueZ 配置一个 UB slot，之后作为 zLocal 的写入目标与 CopyOut 读取源。'],
+        [/xLocal\s*=\s*inQueueX\.AllocTensor<float>\(\)/, 'UB 获取', 'buffer', '资源状态：inQueueX 的 free slot → xLocal 可写 LocalTensor。'],
+        [/yLocal\s*=\s*inQueueY\.AllocTensor<float>\(\)/, 'UB 获取', 'buffer', '资源状态：inQueueY 的 free slot → yLocal 可写 LocalTensor。'],
+        [/DataCopy\(xLocal,\s*xGm/, 'GM→UB 写入', 'memory', 'CopyIn：当前 core 的 x GM slice → VECIN / UB xLocal，由逻辑 MTE2 路径完成。'],
+        [/DataCopy\(yLocal,\s*yGm/, 'GM→UB 写入', 'memory', 'CopyIn：当前 core 的 y GM slice → VECIN / UB yLocal，由逻辑 MTE2 路径完成。'],
+        [/inQueueX\.EnQue\(xLocal\)/, '队列就绪', 'buffer', '资源状态：已写入的 xLocal → inQueueX ready，交接给后续 Vector 阶段。'],
+        [/inQueueY\.EnQue\(yLocal\)/, '队列就绪', 'buffer', '资源状态：已写入的 yLocal → inQueueY ready。EnQue / DeQue 表达队列交接与先后约束。'],
+        [/xLocal\s*=\s*inQueueX\.DeQue<float>\(\)/, '队列消费', 'buffer', '资源状态：inQueueX ready → Vector 持有 xLocal；不是源码可见的硬件 event 同步。'],
+        [/yLocal\s*=\s*inQueueY\.DeQue<float>\(\)/, '队列消费', 'buffer', '资源状态：inQueueY ready → Vector 持有 yLocal。'],
+        [/zLocal\s*=\s*outQueueZ\.AllocTensor<float>\(\)/, 'UB 获取', 'buffer', '资源状态：outQueueZ 的 free slot → zLocal 可写 LocalTensor。'],
+        [/AscendC::Add\(zLocal/, 'UB 读→写', 'compute', 'Vector Add：读取 UB 中的 xLocal / yLocal，写入 UB 中的 zLocal。'],
+        [/outQueueZ\.EnQue<float>\(zLocal\)/, '队列就绪', 'buffer', '资源状态：已写入 zLocal → outQueueZ ready，交接给 CopyOut 阶段。'],
+        [/inQueueX\.FreeTensor\(xLocal\)/, 'UB 释放', 'buffer', '资源状态：Vector 已消费的 xLocal → inQueueX free slot。'],
+        [/inQueueY\.FreeTensor\(yLocal\)/, 'UB 释放', 'buffer', '资源状态：Vector 已消费的 yLocal → inQueueY free slot。'],
+        [/zLocal\s*=\s*outQueueZ\.DeQue<float>\(\)/, '队列消费', 'buffer', '资源状态：outQueueZ ready → CopyOut 持有 zLocal。'],
+        [/DataCopy\(zGm,\s*zLocal/, 'UB→GM 写回', 'memory', 'CopyOut：VECOUT / UB zLocal → 当前 core 的 GM z slice，由逻辑 MTE3 路径完成。'],
+        [/outQueueZ\.FreeTensor\(zLocal\)/, 'UB 释放', 'buffer', '资源状态：CopyOut 已读取的 zLocal → outQueueZ free slot。'],
+        [/numBlocks\s*=\s*8/, 'Launch 配置', 'tiling', 'Host 配置 8 个 block；它与 kernel 内 GetBlockNum / GetBlockIdx 共同定义 core partition。'],
+        [/aclrtMallocHost\(\(void\*\*\)\(&xHost/, 'Host 分配', 'buffer', '在 Host 侧为 x 输入分配页锁定内存。y / z 在后续两行以同样方式分配。'],
+        [/aclrtMalloc\(\(void\*\*\)&xDevice/, 'Device 分配', 'buffer', '在 Device 侧为 x 分配全局内存；y / z 在后续两行以同样方式分配。'],
+        [/aclrtMemcpy\(xDevice.*ACL_MEMCPY_HOST_TO_DEVICE/, 'Host→Device 拷贝', 'memory', '运行时数据路径：Host x → Device GM x。y 在下一行走同一方向。'],
+        [/add_custom<<<numBlocks/, 'Kernel Launch', 'tiling', '在 stream 上提交 add_custom；每个 block 执行一个 kernel core slice。'],
+        [/aclrtSynchronizeStream\(stream\)/, 'Host 同步', 'sync', 'Host 等待 stream 上已提交任务完成，再读取输出。它是 host / runtime 同步，不是 kernel 内流水同步。'],
+        [/aclrtMemcpy\(zHost.*ACL_MEMCPY_DEVICE_TO_HOST/, 'Device→Host 拷贝', 'memory', '运行时数据路径：Device GM z → Host z，用于输出文件写入。']
+      ],
       stages: [
-        { id: 'stage:copyin', label: 'CopyIn', lane: 'MTE2', detail: 'GM x/y → UB LocalTensor → VECIN EnQue', lines: [47, 52], evidence: 'confirmed', color: 'var(--primary)' },
-        { id: 'stage:add', label: 'Vector Add', lane: 'V', detail: 'VECIN DeQue → Add → VECOUT EnQue', lines: [55, 61], evidence: 'confirmed', color: 'var(--success)' },
-        { id: 'stage:copyout', label: 'CopyOut', lane: 'MTE3', detail: 'VECOUT DeQue → UB z → GM z → Free', lines: [64, 66], evidence: 'confirmed', color: 'var(--warning)' }
+        { id:'copyin', lane:'MTE2', laneDetail:'GM → UB', label:'CopyIn', detail:'GM x/y → UB → VECIN EnQue', match:/DataCopy\(xLocal/, color:'var(--primary)' },
+        { id:'compute', lane:'V', laneDetail:'Vector compute', label:'Vector Add', detail:'VECIN DeQue → Add → VECOUT EnQue', match:/AscendC::Add\(zLocal/, color:'var(--success)' },
+        { id:'copyout', lane:'MTE3', laneDetail:'UB → GM', label:'CopyOut', detail:'VECOUT DeQue → GM z → Free', match:/DataCopy\(zGm/, color:'var(--warning)' }
+      ],
+      pipelineFacts: [
+        ['VECIN ready', 'CopyIn 后 x/y EnQue'],
+        ['VECIN consumed', 'Add 前 DeQue，完成后 Free'],
+        ['VECOUT drained', 'z DeQue 后 CopyOut + Free']
       ],
       buffers: [
-        { id: 'buffer:queue:x', label: 'xLocal', queue: 'inQueueX', position: 'VECIN / UB', depth: 1, lines: [27, 27], role: 'input' },
-        { id: 'buffer:queue:y', label: 'yLocal', queue: 'inQueueY', position: 'VECIN / UB', depth: 1, lines: [28, 28], role: 'input' },
-        { id: 'buffer:queue:z', label: 'zLocal', queue: 'outQueueZ', position: 'VECOUT / UB', depth: 1, lines: [29, 29], role: 'output' }
+        { id:'x', label:'xLocal', owner:'inQueueX', position:'VECIN / UB · depth 1', match:/AllocTensor<float>\(\)/, states:[['Alloc','queue grants slot'],['CopyIn','MTE2 writes x'],['EnQue','ready in VECIN'],['DeQue','Vector owns x'],['Add consumes','read by Vector'],['Free','slot reusable']] },
+        { id:'y', label:'yLocal', owner:'inQueueY', position:'VECIN / UB · depth 1', match:/LocalTensor<float> yLocal/, states:[['Alloc','queue grants slot'],['CopyIn','MTE2 writes y'],['EnQue','ready in VECIN'],['DeQue','Vector owns y'],['Add consumes','read by Vector'],['Free','slot reusable']] },
+        { id:'z', label:'zLocal', owner:'outQueueZ', position:'VECOUT / UB · depth 1', match:/LocalTensor<float> zLocal/, states:[['Alloc','queue grants slot'],['Add writes','Vector produces z'],['EnQue','ready in VECOUT'],['DeQue','MTE3 owns z'],['CopyOut','write to GM'],['Free','slot reusable']] }
       ],
-      partition: { id: 'partition:core', lines: [36, 40], launchLines: [72, 73] }
-    };
-    let sourceText = fallbackSource;
-    let selected = null;
-    let selectedCore = 0;
-    let memoryMounted = false;
-    let memoryPattern = null;
-    let memoryViewport = null;
-    let routeOverlay = null;
+      lifecycleNote:'每个 queue 只有一个 slot，kernel 没有核内 tile loop；没有 Ping/Pong 轮转。',
+      memorySteps:[
+        ['copyin','01 · MTE2','CopyIn','GM/L2 → UB · xLocal/yLocal'],
+        ['compute','02 · Vector','Add','UB x/y → Vector → UB z'],
+        ['copyout','03 · MTE3','CopyOut','UB z → GM/L2']
+      ],
+      memoryBlocks:[
+        { core:'mem950-aiv1', buffer:'UB', label:'xLocal · 8 KiB', state:'enqueued', tone:'input', cellRange:[0,9], sourceTile:'tensor:x/core-slice' },
+        { core:'mem950-aiv1', buffer:'UB', label:'yLocal · 8 KiB', state:'enqueued', tone:'input', cellRange:[11,20], sourceTile:'tensor:y/core-slice' },
+        { core:'mem950-aiv1', buffer:'UB', label:'zLocal · 8 KiB', state:'produced', tone:'output', cellRange:[22,31], sourceTile:'tensor:z/core-slice' }
+      ],
+      recoveryChecks:[/TQue<AscendC::TPosition::VECIN,\s*1>/,/TQue<AscendC::TPosition::VECOUT,\s*1>/,/DataCopy\(xLocal/,/Add\(zLocal/,/DataCopy\(zGm/,/GetBlockIdx/],
+      recoverySummary:'3 queues · 3 logical stages · 8 core slices · 0 runtime observations'
+    },
+    matmul: {
+      id: 'GM-002',
+      label: 'Matmul Basic API / Static Tensor + Cube',
+      fileName: 'matmul_basic_api.asc',
+      sourceId: 'source-matmul-basic',
+      sourceUrl: '../../asc-devkit/examples/01_simd_cpp_api/00_introduction/02_matrix/matmul_basic_api/matmul_basic_api.asc',
+      context: { operator:'mmad_custom', kind:'Cube', dtype:'half → float → half', format:'ND → NZ/ZN → ND', shape:'A[256,64] × B[64,256] → C[256,256]', cores:2, total:256, perCore:128, partitionUnit:'M rows', memoryKind:'cube' },
+      annotations: [
+        [/GetBlockIdx\(\).*singleCoreM/, 'Tiling', 'tiling', '两个 core 沿 M 轴切分 A 与 C；B 不偏移。'],
+        [/LocalMemAllocator<AscendC::Hardware::L1>/, 'Buffer', 'buffer', 'A1 与 B1 由同一 L1 allocator 按申请顺序分配。'],
+        [/DataCopy\(a1Local/, 'ND→NZ', 'memory', 'MTE2 将 A 从 GM ND 搬到 L1 NZ。'],
+        [/MTE2_MTE1/, 'Event', 'sync', 'MTE1 必须等待 GM→L1 的 MTE2 完成。'],
+        [/AscendC::LoadData\(/, 'LoadData', 'memory', 'MTE1 将 L1 输入送往 L0A/L0B。'],
+        [/MTE1_M/, 'Event', 'sync', 'M 流水必须等待 L0A/L0B 就绪。'],
+        [/AscendC::Mmad\(/, 'Cube', 'compute', 'Cube Mmad 写入 L0C float 累加结果。'],
+        [/M_FIX/, 'Event', 'sync', 'FIX 流水必须等待 Mmad 完成。'],
+        [/AscendC::Fixpipe\(/, 'F32→F16', 'memory', 'Fixpipe 将 L0C float 转为 half 并写回 GM。'],
+        [/numBlocks\s*=\s*2/, 'Launch', 'tiling', 'Host 侧启动 2 个 Cube block。']
+      ],
+      stages: [
+        { id:'copyin', lane:'MTE2', laneDetail:'GM → L1', label:'DataCopy', detail:'A/B ND → L1 NZ', match:/DataCopy\(a1Local/, color:'var(--primary)' },
+        { id:'load', lane:'MTE1', laneDetail:'L1 → L0', label:'LoadData', detail:'A1→L0A · B1→L0B ZN', match:/AscendC::LoadData\(/, color:'var(--accent)' },
+        { id:'compute', lane:'M', laneDetail:'Cube compute', label:'Mmad', detail:'L0A × L0B → L0C float', match:/AscendC::Mmad\(/, color:'var(--success)' },
+        { id:'copyout', lane:'FIX', laneDetail:'L0C → GM', label:'Fixpipe', detail:'F32→F16 · C ND writeback', match:/AscendC::Fixpipe\(/, color:'var(--warning)' }
+      ],
+      pipelineFacts: [
+        ['MTE2 → MTE1', 'DataCopy 完成后 LoadData'],
+        ['MTE1 → M', 'L0A/L0B ready 后 Mmad'],
+        ['M → FIX', 'L0C ready 后 Fixpipe'],
+        ['PIPE_ALL', 'kernel 结束前全流水屏障']
+      ],
+      buffers: [
+        { id:'a1', label:'a1Local', owner:'L1 allocator', position:'A1 / L1 · 16 KiB', match:/LocalTensor<half> a1Local/, states:[['Alloc','L1 allocation'],['DataCopy','ND→NZ'],['Ready','MTE2_MTE1'],['LoadData','read by MTE1'],['A2 produced','L0A ready'],['Static end','kernel lifetime']] },
+        { id:'b1', label:'b1Local', owner:'L1 allocator', position:'B1 / L1 · 32 KiB', match:/LocalTensor<half> b1Local/, states:[['Alloc','L1 allocation'],['DataCopy','ND→NZ'],['Ready','MTE2_MTE1'],['LoadData','read by MTE1'],['B2 produced','L0B ready'],['Static end','kernel lifetime']] },
+        { id:'a2', label:'a2Local', owner:'L0A allocator', position:'A2 / L0A · 16 KiB', match:/LocalTensor<half> a2Local/, states:[['Alloc','L0A allocation'],['LoadData','A1→A2'],['Ready','MTE1_M'],['Mmad reads','Cube input A'],['Consumed','single Mmad'],['Static end','kernel lifetime']] },
+        { id:'b2', label:'b2Local', owner:'L0B allocator', position:'B2 / L0B · 32 KiB', match:/LocalTensor<half> b2Local/, states:[['Alloc','L0B allocation'],['LoadData','B1→B2 ZN'],['Ready','MTE1_M'],['Mmad reads','Cube input B'],['Consumed','single Mmad'],['Static end','kernel lifetime']] },
+        { id:'c0', label:'cLocal', owner:'L0C allocator', position:'CO1 / L0C · 128 KiB', match:/LocalTensor<float> cLocal/, states:[['Alloc','L0C allocation'],['Mmad writes','float accumulation'],['Ready','M_FIX'],['Fixpipe reads','F32 source'],['CopyOut','F32→F16 GM'],['Static end','kernel lifetime']] }
+      ],
+      lifecycleNote:'这些是静态 LocalTensor，不存在 TQue 的 EnQue/DeQue 所有权或 slot rotation。',
+      memorySteps:[
+        ['copyin','01 · MTE2','DataCopy','GM/L2 → L1 · ND→NZ'],
+        ['load','02 · MTE1','LoadData','L1 → L0A/L0B · B→ZN'],
+        ['compute','03 · M','Mmad','L0A × L0B → L0C float'],
+        ['copyout','04 · FIX','Fixpipe','L0C → GM · F32→F16']
+      ],
+      memoryBlocks:[
+        { core:'mem950-aic', buffer:'L1', label:'A1 16 KiB · B1 32 KiB', state:'loaded', tone:'input', cellRange:[0,15], sourceTile:'A/B ND→NZ' },
+        { core:'mem950-aic', buffer:'L0A', label:'A2 · 16 KiB', state:'loaded', tone:'input', cellRange:[0,7], sourceTile:'A NZ' },
+        { core:'mem950-aic', buffer:'L0B', label:'B2 · 32 KiB', state:'loaded', tone:'input', cellRange:[0,15], sourceTile:'B ZN' },
+        { core:'mem950-aic', buffer:'L0C', label:'CO1 · 128 KiB float', state:'produced', tone:'output', cellRange:[0,23], sourceTile:'C accumulation' }
+      ],
+      recoveryChecks:[/__global__\s+__cube__/,/LocalMemAllocator<AscendC::Hardware::L1>/,/DataCopy\(a1Local/,/AscendC::LoadData\(/,/AscendC::Mmad\(/,/AscendC::Fixpipe\(/,/MTE2_MTE1/,/MTE1_M/,/M_FIX/],
+      recoverySummary:'5 static buffers · 4 logical stages · 2 M-axis core slices · 3 event dependencies · 0 runtime observations'
+    }
+  };
 
-    function highlightCppCode(code) {
-      return escapeHtml(code)
-        .replace(/\b(__global__|__vector__|void|return|const|auto|if|else|for|while|class|struct|template|typename|using|namespace)\b/g, '<span class="syntax-keyword">$1</span>')
-        .replace(/\b(uint8_t|uint32_t|int32_t|float|double|bool|size_t)\b/g, '<span class="syntax-type">$1</span>')
-        .replace(/\b(AscendC|TPipe|TQue|TPosition|GlobalTensor|LocalTensor)\b/g, '<span class="syntax-api">$1</span>')
-        .replace(/\b(InitBuffer|SetGlobalBuffer|AllocTensor|DataCopy|EnQue|DeQue|FreeTensor|GetBlockNum|GetBlockIdx|Add)\b/g, '<span class="syntax-function">$1</span>')
+  let activeKey = 'vector';
+  let model = cases[activeKey];
+  let sourceText = '';
+  let selectedId = null;
+  let selectedCore = 0;
+  let annotationsVisible = true;
+  let openAnnotationIndex = null;
+  let memoryPattern = null;
+  let memoryViewport = null;
+  let routeOverlay = null;
+
+  function embeddedSource(item) {
+    return document.getElementById(item.sourceId).textContent.replace(/^\n/, '').replace(/\s+$/, '');
+  }
+  function highlightCpp(line) {
+    const fragments = line.split(/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/);
+    return fragments.map((fragment) => {
+      if (!fragment) return '';
+      if (fragment.startsWith('//')) return '<span class="syntax-comment">' + escapeHtml(fragment) + '</span>';
+      if (fragment.startsWith('"') || fragment.startsWith("'")) return '<span class="syntax-string">' + escapeHtml(fragment) + '</span>';
+      return escapeHtml(fragment)
+        .replace(/\b(__global__|__vector__|__cube__|void|return|const|constexpr|auto|if|else|for|while|class|struct|template|typename|using|namespace)\b/g, '<span class="syntax-keyword">$1</span>')
+        .replace(/\b(uint8_t|uint32_t|int32_t|float|half|double|bool|size_t)\b/g, '<span class="syntax-type">$1</span>')
+        .replace(/\b(AscendC|TPipe|TQue|TPosition|GlobalTensor|LocalTensor|LocalMemAllocator|Hardware)\b/g, '<span class="syntax-api">$1</span>')
+        .replace(/\b(InitBuffer|SetGlobalBuffer|AllocTensor|DataCopy|LoadData|Mmad|Fixpipe|SetFlag|WaitFlag|EnQue|DeQue|FreeTensor|GetBlockNum|GetBlockIdx|Add|PipeBarrier)\b/g, '<span class="syntax-function">$1</span>')
         .replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="syntax-number">$1</span>');
+    }).join('');
+  }
+  function annotationFor(line) {
+    const index = model.annotations.findIndex((entry) => entry[0].test(line));
+    return index < 0 ? null : { index, entry:model.annotations[index] };
+  }
+  function renderSource() {
+    $('[data-toggle-annotations]').textContent = annotationsVisible ? '隐藏标注' : '显示标注';
+    $('[data-toggle-annotations]').setAttribute('aria-pressed', String(annotationsVisible));
+    let previousAnnotationTag = null;
+    $('[data-source-lines]').innerHTML = sourceText.split('\n').map((line, index) => {
+      const rawAnnotation = annotationsVisible ? annotationFor(line) : null;
+      const annotation = rawAnnotation && rawAnnotation.entry[1] === previousAnnotationTag ? null : rawAnnotation;
+      previousAnnotationTag = rawAnnotation ? rawAnnotation.entry[1] : null;
+      const open = annotation && annotation.index === openAnnotationIndex;
+      const row = '<div class="source-line' + (annotation ? ' is-annotated' : '') + '" data-source-line="' + (index + 1) + '"' + (annotation ? ' data-annotation-index="' + annotation.index + '" role="button" tabindex="0" aria-expanded="' + open + '"' : '') + '><span class="source-line-number">' + (index + 1) + '</span><code class="source-line-code">' + (highlightCpp(line) || ' ') + '</code>' + (annotation ? '<span class="source-line-tag is-' + annotation.entry[2] + '">' + annotation.entry[1] + '</span>' : '<span></span>') + '</div>';
+      const detail = open ? '<div class="source-line-detail"><strong>' + annotation.entry[3] + '</strong><code>' + model.id + ' · ' + model.fileName + ':' + (index + 1) + '</code></div>' : '';
+      return row + detail;
+    }).join('');
+    $$('[data-annotation-index]').forEach((row) => {
+      const toggle = () => { const value = Number(row.dataset.annotationIndex); openAnnotationIndex = openAnnotationIndex === value ? null : value; renderSource(); };
+      row.onclick = toggle;
+      row.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } };
+    });
+  }
+  function focusMatch(match) {
+    const lines = sourceText.split('\n');
+    const index = lines.findIndex((line) => match.test(line));
+    if (index < 0) return;
+    $$('.source-line').forEach((line) => line.classList.remove('is-evidence'));
+    const target = $('[data-source-line="' + (index + 1) + '"]');
+    target?.classList.add('is-evidence');
+    target?.scrollIntoView({ block:'center', behavior:'smooth' });
+  }
+  function contextStrip() {
+    const c = model.context;
+    return '<div class="context-strip"><div class="context-fact"><span>Kernel</span><code>' + c.operator + ' · ' + c.kind + '</code></div><div class="context-fact"><span>Tensor contract</span><code>' + c.dtype + ' · ' + c.format + ' · ' + c.shape + '</code></div><div class="context-fact"><span>Partition</span><code>' + c.cores + ' cores × ' + c.perCore + ' ' + c.partitionUnit + '</code></div><div class="context-fact"><span>Runtime evidence</span><strong>Not attached</strong></div></div>';
+  }
+  function renderPipeline() {
+    const count = model.stages.length;
+    const rows = model.stages.map((stage, laneIndex) => '<div class="pipeline-row"><div class="pipeline-label"><strong>' + stage.lane + '</strong><span>' + stage.laneDetail + '</span></div><div class="pipeline-track" style="--stage-count:' + count + '">' + model.stages.map((_, column) => column === laneIndex ? '<button class="pipeline-block' + (selectedId === 'stage:' + stage.id ? ' is-selected' : '') + '" type="button" data-stage="' + stage.id + '" style="--block-color:' + stage.color + '"><strong>' + stage.label + '</strong><span>' + stage.detail + '</span></button>' : '<div class="pipeline-spacer"></div>').join('') + '</div></div>').join('');
+    const facts = model.pipelineFacts.map((fact) => '<div class="queue-boundary"><strong>' + fact[0] + '</strong><br>' + fact[1] + '</div>').join('');
+    $('[data-model-view="pipeline"]').innerHTML = '<div class="view-heading"><div><h1>Pipeline</h1><p>横向位置只表达源码确认的阶段偏序与事件依赖，不表示真实耗时、overlap 或吞吐。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div>' + contextStrip() + '<div class="pipeline-shell">' + rows + '</div><div class="queue-boundaries" style="--fact-count:' + model.pipelineFacts.length + '">' + facts + '</div><div class="pipeline-note"><strong>不能从源码推出：</strong>lane 的实际开始时间、长度、stall、带宽与利用率；这些需要 trace / profiling。</div>';
+  }
+  function matmulMatrixSvg(variant, coreIndex) {
+    const cellGrid = (x, y, columns, rows, className, activeRows) => Array.from({ length: rows }, (_, row) => Array.from({ length: columns }, (_, column) => {
+      const active = activeRows?.includes(row);
+      return '<rect class="matrix-cell' + (active ? ' is-active' : '') + (className ? ' ' + className : '') + '" x="' + (x + column * 15) + '" y="' + (y + row * 15) + '" width="12" height="12" rx="2"></rect>';
+    }).join('')).join('');
+    if (variant === 'global') {
+      const selectedRows = coreIndex === 0 ? [0, 1] : [2, 3];
+      return '<svg class="matmul-matrix-svg" viewBox="0 0 390 178" role="img" aria-label="全局矩阵按 M 轴分配到两个 core，B 矩阵由两个 core 共享"><text class="matrix-label" x="18" y="18">A · 256×64</text><text class="matrix-label" x="142" y="18">B · 64×256</text><text class="matrix-label" x="274" y="18">C · 256×256</text>' + cellGrid(18, 34, 4, 4, '', selectedRows) + cellGrid(142, 56, 7, 2, 'is-shared') + cellGrid(274, 34, 6, 4, '', selectedRows) + '<text class="matrix-axis" x="18" y="110">M</text><text class="matrix-axis" x="68" y="110">K</text><text class="matrix-axis" x="142" y="96">K</text><text class="matrix-axis" x="232" y="96">N</text><text class="matrix-axis" x="274" y="110">M</text><text class="matrix-axis" x="350" y="110">N</text><text class="matrix-label" x="18" y="142">C' + String(coreIndex).padStart(2, '0') + ' · A/C M-slice</text><text class="matrix-axis" x="18" y="160">蓝色：当前 core 的 128 行；橙色：B 对两个 core 共享。</text></svg>';
     }
-    function highlightCppLine(line) {
-      const fragments = line.split(/(\/\/.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/);
-      return fragments.map((fragment) => {
-        if (!fragment) return '';
-        if (fragment.startsWith('//')) return `<span class="syntax-comment">${escapeHtml(fragment)}</span>`;
-        if (fragment.startsWith('"') || fragment.startsWith("'")) return `<span class="syntax-string">${escapeHtml(fragment)}</span>`;
-        return highlightCppCode(fragment);
-      }).join('');
-    }
-    function renderSource() {
-      $('[data-source-lines]').innerHTML = sourceText.split('\n').map((line, index) => `<div class="source-line" data-source-line="${index + 1}"><span class="source-line-number">${index + 1}</span><code class="source-line-code">${highlightCppLine(line) || ' '}</code></div>`).join('');
-    }
-    function focusLines(range) {
-      $$('.source-line').forEach((line) => line.classList.remove('is-evidence'));
-      if (!range) return;
-      for (let number = range[0]; number <= range[1]; number += 1) $(`[data-source-line="${number}"]`)?.classList.add('is-evidence');
-      $(`[data-source-line="${range[0]}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-    function inspect(item) {
-      selected = item;
-      focusLines(item.lines);
-      renderPipeline();
-      renderLifecycle();
-      renderTiling();
-      bindViewActions();
-    }
-
-    function contextStrip() {
-      const c = model.context;
-      return `<div class="context-strip"><div class="context-fact"><span>Kernel</span><code>${c.operator} · ${c.kind}</code></div><div class="context-fact"><span>Tensor contract</span><code>${c.dtype} · ${c.format} · ${c.shape}</code></div><div class="context-fact"><span>Partition</span><code>${c.cores} cores × ${c.perCore} elements</code></div><div class="context-fact"><span>Runtime evidence</span><strong>Not attached</strong></div></div>`;
-    }
-    function renderPipeline() {
-      const laneOrder = ['MTE2', 'V', 'MTE3'];
-      $('[data-model-view="pipeline"]').innerHTML = `<div class="view-heading"><div><h1>Pipeline</h1><p>复用 Operator Planning 的 lane 语言，但横向位置只表示 CopyIn → Add → CopyOut 的偏序，不表示真实耗时或 overlap。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div>${contextStrip()}<div class="pipeline-shell">${laneOrder.map((lane, laneIndex) => { const stage = model.stages.find((item) => item.lane === lane); return `<div class="pipeline-row"><div class="pipeline-label"><strong>${lane}</strong><span>${lane === 'V' ? 'Vector compute' : lane === 'MTE2' ? 'GM → UB' : 'UB → GM'}</span></div><div class="pipeline-track">${[0,1,2].map((column) => column === laneIndex ? `<button class="pipeline-block${selected?.id === stage.id ? ' is-selected' : ''}" type="button" data-select-id="${stage.id}" style="--block-color:${stage.color}"><strong>${stage.label}</strong><span>${stage.detail}</span></button>` : '<div class="pipeline-spacer"></div>').join('')}</div></div>`; }).join('')}</div><div class="queue-boundaries"><div class="queue-boundary"><strong>VECIN ready</strong><br>CopyIn 后 x/y <code>EnQue</code></div><div class="queue-boundary"><strong>VECIN consumed</strong><br>Add 前 <code>DeQue</code>，完成后 Free</div><div class="queue-boundary"><strong>VECOUT drained</strong><br>z <code>DeQue</code> 后 CopyOut + Free</div></div><div class="pipeline-note"><strong>不能从源码推出：</strong>lane 的实际开始时间、长度、硬件 overlap、stall 与吞吐。TQue depth 1 只确认队列容量，不等价于性能结论。</div>`;
-    }
-
-    function memoryMarkup() {
-      return `<div class="view-heading"><div><h1>Memory Path</h1><p>整张图是 Ascend 910B 的硬件映射；Memory Path 是其中被代码证据激活的路径。当前 Vector Add 只使用 AIV 的 GM/L2、UB、Vector、MTE2/MTE3，不使用 AIC/Cube。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div><div class="path-summary"><button class="path-step" type="button" data-memory-focus="copyin"><span>01 · MTE2</span><strong>CopyIn</strong><code>GM/L2 → UB · xLocal/yLocal</code></button><button class="path-step" type="button" data-memory-focus="compute"><span>02 · Vector</span><strong>Add</strong><code>UB x/y → Vector → UB z</code></button><button class="path-step" type="button" data-memory-focus="copyout"><span>03 · MTE3</span><strong>CopyOut</strong><code>UB z → GM/L2</code></button></div><section class="pto-hw-viewport memory-path-viewport" data-memory-viewport><header class="pto-hw-viewport__toolbar"><div class="pto-hw-viewport__title"><strong>Hardware mapping</strong><small>Ascend 910B · implemented path</small></div><div class="pto-hw-viewport__controls"><div class="pto-hw-viewport__tools"><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-detail aria-pressed="true">细节开</button><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-zoom-out aria-label="缩小">−</button><span class="pto-hw-viewport__readout" data-memory-readout>60%</span><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-zoom-in aria-label="放大">+</button></div></div></header><div class="pto-hw-viewport__stage memory-path-stage" data-memory-stage><div class="pto-hw-viewport__scale" data-memory-scale><div class="memory-path-graph" data-memory-graph></div></div></div></section><div class="unknown-note"><strong>AIC/Cube 灰显不代表异常：</strong>它们属于芯片结构，但不是 GM-001 的执行路径。Memory Path 表达资源与搬运；Pipeline 表达阶段与依赖，两者不能合并成同一语义。</div>`;
-    }
-    function refreshMemoryOverlay() { requestAnimationFrame(() => routeOverlay?.render?.()); }
-    function mountMemory() {
-      if (memoryMounted) return;
-      const root = $('[data-memory-viewport]');
-      const graph = $('[data-memory-graph]');
-      memoryPattern = window.PtoMemoryArchitecturePattern;
-      const viewportPattern = window.PtoHardwareArchitectureViewport;
-      if (!root || !graph || !memoryPattern?.renderArchitecture || !viewportPattern?.mount) return;
-      memoryPattern.renderArchitecture(graph, 'ascend910b');
-      routeOverlay = memoryPattern.createRouteOverlay(graph, 'ascend910b');
-      memoryPattern.attachHoverInteractions?.(graph, 'ascend910b');
-      memoryPattern.attachPathFocusInteractions?.(graph, 'ascend910b');
-      memoryPattern.setBufferBlocks?.(graph, [
-        { core: 'mem950-aiv1', buffer: 'UB', label: 'xLocal · 8 KiB', state: 'enqueued', tone: 'input', cellRange: [0, 9], sourceTile: 'tensor:x/core-slice' },
-        { core: 'mem950-aiv1', buffer: 'UB', label: 'yLocal · 8 KiB', state: 'enqueued', tone: 'input', cellRange: [11, 20], sourceTile: 'tensor:y/core-slice' },
-        { core: 'mem950-aiv1', buffer: 'UB', label: 'zLocal · 8 KiB', state: 'produced', tone: 'output', cellRange: [22, 31], sourceTile: 'tensor:z/core-slice' }
-      ]);
-      memoryViewport = viewportPattern.mount(root, { mode: 'inline', viewport: '[data-memory-stage]', scaleEl: '[data-memory-scale]', inlineHost: '[data-memory-graph]', detailToggle: '[data-memory-detail]', zoomOut: '[data-memory-zoom-out]', zoomIn: '[data-memory-zoom-in]', readout: '[data-memory-readout]', scale: .6, defaultScale: .6, fitted: false, fitOnMount: false, fitPaddingX: 32, fitPaddingY: 48, detailsVisible: true, onDetailChange: refreshMemoryOverlay, onScaleChange: refreshMemoryOverlay, onPanChange: refreshMemoryOverlay });
-      routeOverlay?.render?.();
-      memoryMounted = true;
-      requestAnimationFrame(() => { const stage = $('.pto-mem950', graph); if (stage && memoryViewport) { memoryViewport.setFrameSize(Math.ceil(stage.scrollWidth || 1200), Math.ceil(stage.scrollHeight || 820)); memoryViewport.fit(); } refreshMemoryOverlay(); });
-    }
-    function focusMemory(kind, button) {
-      $$('.path-step').forEach((item) => item.classList.toggle('is-selected', item === button));
-      const graph = $('[data-memory-graph]');
-      const payload = kind === 'copyin'
-        ? { selectors: ['[data-mem950-node="rail:GM"]', '[data-mem950-node="rail:L2"]', '#mem950-aiv1 [data-aiv-node="buffer:UB"]'], routes: ['l2-to-aiv1'] }
-        : kind === 'compute'
-          ? { selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '#mem950-aiv1 [data-aiv-node="vector:Vector"]'], routes: [] }
-          : { selectors: ['#mem950-aiv1 [data-aiv-node="buffer:UB"]', '[data-mem950-node="rail:L2"]', '[data-mem950-node="rail:GM"]'], routes: ['aiv1-to-l2'] };
-      memoryPattern?.setPathFocus?.(graph, 'ascend910b', payload);
-      refreshMemoryOverlay();
-      const stage = model.stages.find((item) => item.id === (kind === 'copyin' ? 'stage:copyin' : kind === 'compute' ? 'stage:add' : 'stage:copyout'));
-      if (stage) inspect(stage, 'pipeline');
-    }
-
-    const inputStates = [
-      ['Alloc', 'Queue owns free slot'], ['CopyIn', 'MTE2 writes LocalTensor'], ['EnQue', 'ready in VECIN'], ['DeQue', 'compute owns tensor'], ['Add consumes', 'read by Vector'], ['Free', 'slot reusable']
-    ];
-    const outputStates = [
-      ['Alloc', 'Queue grants slot'], ['Add writes', 'Vector produces z'], ['EnQue', 'ready in VECOUT'], ['DeQue', 'CopyOut owns tensor'], ['CopyOut', 'MTE3 reads z'], ['Free', 'slot reusable']
-    ];
-    function renderLifecycle() {
-      const rows = model.buffers.map((buffer) => { const states = buffer.role === 'input' ? inputStates : outputStates; return `<div class="lifecycle-row${selected?.id === buffer.id ? ' is-selected' : ''}"><div class="lifecycle-label"><strong>${buffer.label}</strong><span>${buffer.queue}</span></div>${states.map(([name, detail], index) => `<button class="lifecycle-state${name === 'EnQue' || name === 'DeQue' ? ' is-queue' : name.includes('Add') || name === 'CopyOut' ? ' is-consume' : name === 'Free' ? ' is-release' : ''}${selected?.id === `${buffer.id}:${index}` ? ' is-selected' : ''}" type="button" data-buffer-id="${buffer.id}" data-state-index="${index}"><strong>${name}</strong><span>${detail}</span></button>`).join('')}</div>`; }).join('');
-      $('[data-model-view="lifecycle"]').innerHTML = `<div class="view-heading"><div><h1>Buffer Lifecycle</h1><p>生命周期不是“buffer 活跃了多久”，而是 LocalTensor 在 TQue 与 stage 之间何时可写、ready、被谁持有、何时释放。EnQue / DeQue 是所有权边界。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div>${contextStrip()}<div class="lifecycle-layout"><div class="lifecycle-table">${rows}</div><aside class="queue-ownership"><div class="queue-owner"><span>VECIN · depth 1</span><strong>inQueueX owns xLocal</strong><code>Alloc → EnQue → DeQue → Free</code></div><div class="queue-owner"><span>VECIN · depth 1</span><strong>inQueueY owns yLocal</strong><code>Alloc → EnQue → DeQue → Free</code></div><div class="queue-owner"><span>VECOUT · depth 1</span><strong>outQueueZ owns zLocal</strong><code>Alloc → EnQue → DeQue → Free</code></div><div class="unknown-note"><strong>当前事实：</strong>每个 queue 只有一个 slot，kernel 没有 tile loop，因此这里没有 Ping/Pong 轮转，也不能声称出现了 double buffering。</div></aside></div>`;
-    }
-
-    function renderTiling() {
-      const c = model.context;
-      const coreButtons = Array.from({ length: c.cores }, (_, index) => `<button class="core-cell${index === selectedCore ? ' is-selected' : ''}" type="button" data-core="${index}">C${String(index).padStart(2, '0')}</button>`).join('');
-      const tensorRows = ['x', 'y', 'z'].map((tensor) => `<div class="tensor-partition"><strong>${tensor}</strong>${Array.from({ length: c.cores }, (_, index) => `<button class="tensor-slice${index === selectedCore ? ' is-selected' : ''}" type="button" data-core="${index}">${index}</button>`).join('')}</div>`).join('');
+    return '<svg class="matmul-matrix-svg" viewBox="0 0 390 178" role="img" aria-label="选中 core 的 A、B、C base tile"><text class="matrix-label" x="18" y="18">A tile</text><text class="matrix-label" x="142" y="18">B tile</text><text class="matrix-label" x="274" y="18">C tile</text>' + cellGrid(18, 34, 4, 4, 'is-active') + cellGrid(142, 34, 5, 4, 'is-shared') + cellGrid(274, 34, 6, 4, 'is-output') + '<text class="matrix-axis" x="18" y="112">128×64</text><text class="matrix-axis" x="142" y="112">64×256</text><text class="matrix-axis" x="274" y="112">128×256</text><text class="matrix-label" x="87" y="66">×</text><text class="matrix-label" x="244" y="66">=</text><text class="matrix-axis" x="18" y="145">A1 → L0A</text><text class="matrix-axis" x="142" y="145">B1 → L0B</text><text class="matrix-axis" x="274" y="145">L0C → GM</text><text class="matrix-axis" x="18" y="162">蓝 / 橙 / 绿分别表示 A、B、C 的单个 base tile。</text></svg>';
+  }
+  function renderTiling() {
+    const c = model.context;
+    const coreButtons = Array.from({ length:c.cores }, (_, index) => '<button class="core-cell' + (index === selectedCore ? ' is-selected' : '') + '" type="button" data-core="' + index + '">C' + String(index).padStart(2,'0') + '</button>').join('');
+    if (activeKey === 'vector') {
+      const tensorRows = ['x','y','z'].map((tensor) => '<div class="tensor-partition"><strong>' + tensor + '</strong>' + Array.from({ length:c.cores }, (_, index) => '<button class="tensor-slice' + (index === selectedCore ? ' is-selected' : '') + '" type="button" data-core="' + index + '">' + index + '</button>').join('') + '</div>').join('');
       const offset = selectedCore * c.perCore;
-      $('[data-model-view="tiling"]').innerHTML = `<div class="view-heading"><div><h1>Tiling</h1><p>GM-001 没有核内 tile loop，所以视图止于 per-core slice，不虚构更细 tile。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div><div class="tiling-head"><div><h2>核间切分</h2><p>线性均分：8 个核 × 2048 elements · float</p></div><span class="evidence-chip is-confirmed">8 cores · no tail</span></div><div class="core-strip">${coreButtons}</div><div class="tiling-spaces"><section class="tiling-space"><div class="space-head"><strong>全局计算空间</strong><code>[8, 2048] · 16384 elements</code></div>${tensorRows}<div class="tiling-factline"><strong>映射规则：</strong><code>blockLength = totalLength / GetBlockNum()</code>；x/y/z 对同一 core 使用相同连续范围。</div></section><section class="tiling-space"><div class="space-head"><strong>选中核 C${String(selectedCore).padStart(2, '0')}</strong><code>offset ${offset} · length ${c.perCore}</code></div><div class="selected-core-space"><div class="core-formula"><div class="formula-buffer"><strong>x slice</strong><code>[${offset}, ${offset + c.perCore})</code></div><span class="formula-op">+</span><div class="formula-buffer"><strong>y slice</strong><code>[${offset}, ${offset + c.perCore})</code></div><span class="formula-op">=</span><div class="formula-buffer"><strong>z slice</strong><code>[${offset}, ${offset + c.perCore})</code></div></div><div class="tiling-factline"><strong>UB footprint / core：</strong>xLocal 8 KiB + yLocal 8 KiB + zLocal 8 KiB，queue depth 均为 1。</div><div class="tiling-factline"><strong>Tail：</strong>当前 16384 可被 8 整除。代码没有 remainder 分支；换成不整除输入时是静态风险，不是当前样例的运行错误。</div></div></section></div>`;
+      $('[data-model-view="tiling"]').innerHTML = '<div class="view-heading"><div><h1>Tiling</h1><p>GM-001 没有核内 tile loop，视图止于 per-core slice。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div><div class="tiling-head"><div><h2>核间切分</h2><p>线性均分：8 cores × 2048 elements</p></div><span class="evidence-chip is-confirmed">no tail</span></div><div class="core-strip">' + coreButtons + '</div><div class="tiling-spaces"><section class="tiling-space"><div class="space-head"><strong>全局计算空间</strong><code>[8, 2048] · 16384 elements</code></div>' + tensorRows + '<div class="tiling-factline"><strong>映射规则：</strong>同一 core 的 x/y/z 使用相同连续范围。</div></section><section class="tiling-space"><div class="space-head"><strong>选中核 C' + String(selectedCore).padStart(2,'0') + '</strong><code>offset ' + offset + ' · length 2048</code></div><div class="selected-core-space"><div class="core-formula"><div class="formula-buffer"><strong>x slice</strong><code>[' + offset + ', ' + (offset + c.perCore) + ')</code></div><span class="formula-op">+</span><div class="formula-buffer"><strong>y slice</strong><code>same range</code></div><span class="formula-op">=</span><div class="formula-buffer"><strong>z slice</strong><code>same range</code></div></div><div class="tiling-factline"><strong>UB footprint：</strong>3 × 8 KiB；queue depth 均为 1。</div><div class="tiling-factline"><strong>Tail：</strong>当前样例无 tail；代码没有 remainder 分支。</div></div></section></div>';
+    } else {
+      const start = selectedCore * 128;
+      $('[data-model-view="tiling"]').innerHTML = '<div class="view-heading"><div><h1>Tiling</h1><p>GM-002 只有一个 base tile / core；A 与 C 沿 M 轴切分，B 被两个 core 完整读取。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div><div class="tiling-head"><div><h2>M-axis partition</h2><p>2 cores × 128 M rows · base 128×64×256</p></div><span class="evidence-chip is-confirmed">no tail</span></div><div class="core-strip">' + coreButtons + '</div><div class="matmul-tiling-diagrams"><figure class="matmul-tiling-figure"><figcaption class="matmul-tiling-figure-head"><strong>全局矩阵空间</strong><span>A[256,64] × B[64,256] → C[256,256]</span></figcaption>' + matmulMatrixSvg('global', selectedCore) + '</figure><figure class="matmul-tiling-figure"><figcaption class="matmul-tiling-figure-head"><strong>选中核 C0' + selectedCore + ' 的 base tile</strong><span>M rows [' + start + ', ' + (start + 128) + ')</span></figcaption>' + matmulMatrixSvg('local', selectedCore) + '</figure></div><div class="tiling-factline matmul-tiling-formula"><strong>核间映射：</strong>A / C 按 M 轴二分；B 不分核、由两个 core 共享。每个 core 正好执行 1 个 128×64×256 base tile。</div><div class="tiling-factline"><strong>GM offsets：</strong>A = ' + (start * 64) + ' elements；C = ' + (start * 256) + ' elements；B = 0。当前 M/K/N 均整除，代码没有 tail 分支。</div>';
     }
+  }
+  function renderLifecycle() {
+    const rows = model.buffers.map((buffer) => '<div class="lifecycle-row' + (selectedId === 'buffer:' + buffer.id ? ' is-selected' : '') + '"><div class="lifecycle-label"><strong>' + buffer.label + '</strong><span>' + buffer.owner + '</span></div>' + buffer.states.map((state, index) => '<button class="lifecycle-state' + (index === 2 ? ' is-queue' : index === 3 || index === 4 ? ' is-consume' : index === 5 ? ' is-release' : '') + '" type="button" data-buffer="' + buffer.id + '" data-state="' + index + '"><strong>' + state[0] + '</strong><span>' + state[1] + '</span></button>').join('') + '</div>').join('');
+    const owners = model.buffers.map((buffer) => '<div class="queue-owner"><span>' + buffer.position + '</span><strong>' + buffer.owner + ' owns ' + buffer.label + '</strong><code>' + buffer.states.map((state) => state[0]).join(' → ') + '</code></div>').join('');
+    $('[data-model-view="lifecycle"]').innerHTML = '<div class="view-heading"><div><h1>Buffer Lifecycle</h1><p>保持统一的资源生命周期表：何时分配、由哪个阶段写入、何时 ready、被谁读取，以及何时结束。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div>' + contextStrip() + '<div class="lifecycle-layout"><div class="lifecycle-table">' + rows + '</div><aside class="queue-ownership">' + owners + '<div class="unknown-note"><strong>当前事实：</strong>' + model.lifecycleNote + '</div></aside></div>';
+  }
+  function memoryMarkup() {
+    const steps = model.memorySteps.map((step) => '<button class="path-step" type="button" data-memory-focus="' + step[0] + '"><span>' + step[1] + '</span><strong>' + step[2] + '</strong><code>' + step[3] + '</code></button>').join('');
+    const description = activeKey === 'vector' ? '当前 Vector Add 激活 AIV 的 GM/L2、UB、Vector、MTE2/MTE3 路径。' : '当前 Matmul 激活 AIC 的 GM/L2、L1、L0A/L0B、L0C、MTE2/MTE1/M/FIX 路径。';
+    return '<div class="view-heading"><div><h1>Memory Path</h1><p>' + description + ' 资源和搬运来自代码证据，不表示真实时序。</p></div><span class="evidence-chip is-confirmed">代码确认</span></div><div class="path-summary" style="--path-count:' + model.memorySteps.length + '">' + steps + '</div><section class="pto-hw-viewport memory-path-viewport" data-memory-viewport><header class="pto-hw-viewport__toolbar"><div class="pto-hw-viewport__title"><strong>Hardware mapping</strong><small>Ascend 910B · implemented path</small></div><div class="pto-hw-viewport__controls"><div class="pto-hw-viewport__tools"><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-detail aria-pressed="true">细节开</button><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-zoom-out>−</button><span class="pto-hw-viewport__readout" data-memory-readout>60%</span><button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-memory-zoom-in>+</button></div></div></header><div class="pto-hw-viewport__stage memory-path-stage" data-memory-stage><div class="pto-hw-viewport__scale" data-memory-scale><div class="memory-path-graph" data-memory-graph></div></div></div></section><div class="unknown-note"><strong>未知边界：</strong>没有附加 trace / profiling；不显示实际 duration、overlap、stall、带宽或利用率。</div>';
+  }
+  function destroyMemory() {
+    routeOverlay?.destroy?.();
+    memoryViewport?.destroy?.();
+    routeOverlay = null;
+    memoryViewport = null;
+  }
+  function mountMemory() {
+    const root = $('[data-memory-viewport]');
+    const graph = $('[data-memory-graph]');
+    memoryPattern = window.PtoMemoryArchitecturePattern;
+    const viewportPattern = window.PtoHardwareArchitectureViewport;
+    if (!root || !graph || !memoryPattern?.renderArchitecture || !viewportPattern?.mount) return;
+    memoryPattern.renderArchitecture(graph, 'ascend910b');
+    routeOverlay = memoryPattern.createRouteOverlay(graph, 'ascend910b');
+    memoryPattern.attachHoverInteractions?.(graph, 'ascend910b');
+    memoryPattern.attachPathFocusInteractions?.(graph, 'ascend910b');
+    memoryPattern.setBufferBlocks?.(graph, model.memoryBlocks);
+    memoryViewport = viewportPattern.mount(root, { mode:'inline', viewport:'[data-memory-stage]', scaleEl:'[data-memory-scale]', inlineHost:'[data-memory-graph]', detailToggle:'[data-memory-detail]', zoomOut:'[data-memory-zoom-out]', zoomIn:'[data-memory-zoom-in]', readout:'[data-memory-readout]', scale:.6, defaultScale:.6, fitted:false, fitOnMount:false, detailsVisible:true, onDetailChange:() => routeOverlay?.render?.(), onScaleChange:() => routeOverlay?.render?.(), onPanChange:() => routeOverlay?.render?.() });
+    requestAnimationFrame(() => { const stage = $('.pto-mem950', graph); if (stage && memoryViewport) { memoryViewport.setFrameSize(Math.ceil(stage.scrollWidth || 1200), Math.ceil(stage.scrollHeight || 820)); memoryViewport.fit(); } routeOverlay?.render?.(); });
+  }
+  function memoryFocus(kind) {
+    const graph = $('[data-memory-graph]');
+    let payload;
+    if (activeKey === 'vector') {
+      payload = kind === 'copyin' ? { selectors:['[data-mem950-node="rail:GM"]','[data-mem950-node="rail:L2"]','#mem950-aiv1 [data-aiv-node="buffer:UB"]'], routes:['l2-to-aiv1'] } : kind === 'compute' ? { selectors:['#mem950-aiv1 [data-aiv-node="buffer:UB"]','#mem950-aiv1 [data-aiv-node="vector:Vector"]'], routes:[] } : { selectors:['#mem950-aiv1 [data-aiv-node="buffer:UB"]','[data-mem950-node="rail:L2"]','[data-mem950-node="rail:GM"]'], routes:['aiv1-to-l2'] };
+    } else {
+      payload = kind === 'copyin' ? { selectors:['[data-mem950-node="rail:GM"]','[data-mem950-node="rail:L2"]','#mem950-aic [data-aic-node="buffer:L1"]'], routes:['l2-to-aic'] } : kind === 'load' ? { selectors:['#mem950-aic [data-aic-node="buffer:L1"]','#mem950-aic [data-aic-node="buffer:L0A"]','#mem950-aic [data-aic-node="buffer:L0B"]'], routes:[] } : kind === 'compute' ? { selectors:['#mem950-aic [data-aic-node="buffer:L0A"]','#mem950-aic [data-aic-node="buffer:L0B"]','#mem950-aic [data-aic-node="buffer:L0C"]'], routes:[] } : { selectors:['#mem950-aic [data-aic-node="buffer:L0C"]','[data-mem950-node="rail:L2"]','[data-mem950-node="rail:GM"]'], routes:['l2-to-aic'] };
+    }
+    memoryPattern?.setPathFocus?.(graph, 'ascend910b', payload);
+    const stage = model.stages.find((item) => item.id === (kind === 'mmad' ? 'compute' : kind === 'fix' ? 'copyout' : kind));
+    if (stage) focusMatch(stage.match);
+    routeOverlay?.render?.();
+  }
+  function bindActions() {
+    $$('[data-stage]').forEach((button) => button.onclick = () => { const stage = model.stages.find((item) => item.id === button.dataset.stage); selectedId = 'stage:' + stage.id; focusMatch(stage.match); renderPipeline(); bindActions(); });
+    $$('[data-buffer]').forEach((button) => button.onclick = () => { const buffer = model.buffers.find((item) => item.id === button.dataset.buffer); selectedId = 'buffer:' + buffer.id; focusMatch(buffer.match); renderLifecycle(); bindActions(); });
+    $$('[data-core]').forEach((button) => button.onclick = () => { selectedCore = Number(button.dataset.core); focusMatch(activeKey === 'vector' ? /GetBlockIdx/ : /mIterIdx\s*=/); renderTiling(); bindActions(); });
+    $$('[data-memory-focus]').forEach((button) => button.onclick = () => { $$('.path-step').forEach((item) => item.classList.toggle('is-selected', item === button)); memoryFocus(button.dataset.memoryFocus); });
+  }
+  function renderAll() {
+    renderTiling();
+    destroyMemory();
+    $('[data-model-view="memory"]').innerHTML = memoryMarkup();
+    mountMemory();
+    renderPipeline();
+    renderLifecycle();
+    bindActions();
+  }
+  function recover() {
+    const complete = model.recoveryChecks.every((check) => check.test(sourceText));
+    $('[data-source-status]').innerHTML = complete ? '<strong>已恢复 ' + model.id + '：</strong>' + model.recoverySummary + '。' : '<strong>恢复不完整：</strong>未满足 ' + model.id + ' 的关键证据，缺失部分不会补成确定事实。';
+    selectedId = null;
+    renderSource();
+    renderAll();
+  }
+  function loadCase(key) {
+    activeKey = key;
+    model = cases[key];
+    selectedCore = 0;
+    openAnnotationIndex = null;
+    sourceText = embeddedSource(model);
+    document.title = 'Code Recovery · ' + model.fileName;
+    $('[data-workspace-meta]').textContent = model.id + ' · ' + model.label;
+    $$('[data-operator-tab]').forEach((tab) => {
+      const isActive = tab.dataset.operatorTab === key;
+      tab.classList.toggle('is-active', isActive);
+      tab.setAttribute('aria-selected', String(isActive));
+    });
+    $('[data-golden-label]').textContent = 'Golden Model ' + model.id;
+    recover();
+    fetch(model.sourceUrl).then((response) => response.ok ? response.text() : Promise.reject(new Error('source unavailable'))).then((text) => { if (activeKey !== key) return; sourceText = text.replace(/\s+$/, ''); recover(); $('[data-source-status]').innerHTML += ' 已从 asc-devkit 原文件加载。'; }).catch(() => { if (activeKey !== key) return; sourceText = embeddedSource(model); recover(); $('[data-source-status]').innerHTML += ' 当前使用页面内嵌的完整原始源码。'; });
+  }
+  function initAnchorNavigation() {
+    const scrollRoot = $('[data-model-scroll]');
+    const sections = $$('[data-model-view]');
+    const setActive = (view) => $$('[data-anchor-view]').forEach((link) => { const active = link.dataset.anchorView === view; link.classList.toggle('is-selected', active); if (active) link.setAttribute('aria-current','location'); else link.removeAttribute('aria-current'); });
+    $$('[data-anchor-view]').forEach((link) => link.onclick = (event) => { event.preventDefault(); const target = $(link.getAttribute('href')); target?.scrollIntoView({ behavior:'smooth', block:'start' }); setActive(link.dataset.anchorView); });
+    scrollRoot.addEventListener('scroll', () => { const rootTop = scrollRoot.getBoundingClientRect().top + 32; let current = sections[0]; sections.forEach((section) => { if (section.getBoundingClientRect().top <= rootTop) current = section; }); setActive(current.dataset.modelView); }, { passive:true });
+  }
 
-    function renderAllViews() {
-      renderPipeline();
-      if (!memoryMounted) {
-        $('[data-model-view="memory"]').innerHTML = memoryMarkup();
-        mountMemory();
-      }
-      renderLifecycle();
-      renderTiling();
-      bindViewActions();
-    }
-    function setActiveAnchor(view) {
-      $$('[data-anchor-view]').forEach((link) => {
-        const active = link.dataset.anchorView === view;
-        link.classList.toggle('is-selected', active);
-        if (active) link.setAttribute('aria-current', 'location');
-        else link.removeAttribute('aria-current');
-      });
-    }
-    function initAnchorNavigation() {
-      const scrollRoot = $('[data-model-scroll]');
-      const sections = $$('[data-model-view]');
-      if (!scrollRoot || !sections.length) return;
-      $$('[data-anchor-view]').forEach((link) => link.addEventListener('click', (event) => {
-        event.preventDefault();
-        const target = $(`#${link.getAttribute('href').slice(1)}`);
-        if (!target) return;
-        setActiveAnchor(link.dataset.anchorView);
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        history.replaceState(null, '', link.getAttribute('href'));
-      }));
-      const syncAnchor = () => {
-        const rootTop = scrollRoot.getBoundingClientRect().top + 32;
-        const atBottom = scrollRoot.scrollTop + scrollRoot.clientHeight >= scrollRoot.scrollHeight - 2;
-        let current = atBottom ? sections[sections.length - 1] : sections[0];
-        if (!atBottom) sections.forEach((section) => { if (section.getBoundingClientRect().top <= rootTop) current = section; });
-        setActiveAnchor(current.dataset.modelView);
-      };
-      scrollRoot.addEventListener('scroll', syncAnchor, { passive: true });
-      syncAnchor();
-    }
-    function bindViewActions() {
-      $$('[data-select-id]').forEach((button) => button.onclick = () => { const item = model.stages.find((stage) => stage.id === button.dataset.selectId); if (item) inspect(item, 'pipeline'); });
-      $$('[data-buffer-id]').forEach((button) => button.onclick = () => { const buffer = model.buffers.find((item) => item.id === button.dataset.bufferId); if (!buffer) return; const stateIndex = Number(button.dataset.stateIndex); const states = buffer.role === 'input' ? inputStates : outputStates; inspect({ ...buffer, id: `${buffer.id}:${stateIndex}`, label: `${buffer.label} · ${states[stateIndex][0]}`, detail: states[stateIndex][1], lines: buffer.role === 'input' ? [47, 61] : [57, 66], evidence: 'confirmed' }, 'lifecycle'); });
-      $$('[data-core]').forEach((button) => button.onclick = () => { selectedCore = Number(button.dataset.core); inspect({ id: `partition:core:${selectedCore}`, label: `Core ${selectedCore} 分片`, detail: `offset ${selectedCore * model.context.perCore} · length ${model.context.perCore}`, lines: model.partition.lines, evidence: 'confirmed' }, 'tiling'); });
-      $$('[data-memory-focus]').forEach((button) => button.onclick = () => focusMemory(button.dataset.memoryFocus, button));
-    }
-    function recover() {
-      const hasQueues = /TQue<AscendC::TPosition::VECIN,\s*1>/.test(sourceText) && /TQue<AscendC::TPosition::VECOUT,\s*1>/.test(sourceText);
-      const hasStages = /DataCopy\(xLocal/.test(sourceText) && /Add\(zLocal/.test(sourceText) && /DataCopy\(zGm/.test(sourceText);
-      const hasPartition = /GetBlockNum\(\)/.test(sourceText) && /GetBlockIdx\(\)/.test(sourceText);
-      $('[data-source-status]').innerHTML = hasQueues && hasStages && hasPartition ? `<strong>已恢复 GM-001：</strong>3 queues · 3 logical stages · 8 core slices · 0 runtime observations。` : `<strong>恢复不完整：</strong>未满足 GM-001 的 queue、stage 或 partition 证据；缺失部分不会补成确定事实。`;
-      selected = null; focusLines(null); renderAllViews();
-    }
-
-    window.PtoIdeFrame?.initAll?.();
-    $('[data-recover]').addEventListener('click', recover);
-    renderSource(); renderAllViews(); initAnchorNavigation();
-    fetch(sourceUrl).then((response) => response.ok ? response.text() : Promise.reject(new Error('source unavailable'))).then((text) => { sourceText = text; renderSource(); recover(); }).catch(() => { sourceText = fallbackSource; renderSource(); recover(); $('[data-source-status]').innerHTML += ' 当前宿主未加载原文件，已使用同语义内嵌源码。'; });
-  })();
+  window.PtoIdeFrame?.initAll?.();
+  $$('[data-operator-tab]').forEach((tab) => { tab.onclick = () => loadCase(tab.dataset.operatorTab); });
+  $('[data-recover]').onclick = recover;
+  $('[data-toggle-annotations]').onclick = () => { annotationsVisible = !annotationsVisible; if (!annotationsVisible) openAnnotationIndex = null; renderSource(); };
+  initAnchorNavigation();
+  loadCase('vector');
+})();
   </script>
 </body>
 </html>
