@@ -81,7 +81,7 @@ body {
   font: 500 11px / 1.2 var(--font-sans); color: var(--foreground-muted);
   text-transform: uppercase; letter-spacing: var(--letter-spacing-label);
 }
-.sl-axis-wrap { overflow: hidden; border-bottom: 1px solid var(--border-default); }
+.sl-axis-wrap { position: relative; overflow: hidden; border-bottom: 1px solid var(--border-default); }
 .sl-lane-wrap { overflow: hidden; border-right: 1px solid var(--border-subtle); }
 .sl-body-wrap { position: relative; overflow: auto; }
 .sl-axis-wrap canvas, .sl-lane-wrap canvas, .sl-body-wrap canvas { display: block; }
@@ -89,6 +89,12 @@ body {
   position: absolute;
   inset: 0 auto auto 0;
   z-index: 3;
+  pointer-events: none;
+}
+.sl-axis-crisp-canvas {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 2;
   pointer-events: none;
 }
 .sl-body-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
@@ -1480,7 +1486,10 @@ body {
                                       <div id="globalRulerTicks"></div>
                                       <div class="sl-global-ruler__brush" id="globalRulerBrush"></div>
                                     </div>
-                                    <div class="sl-axis-wrap" id="axisWrap"><canvas id="axisCanvas"></canvas></div>
+                                    <div class="sl-axis-wrap" id="axisWrap">
+                                      <canvas id="axisCanvas"></canvas>
+                                      <canvas class="sl-axis-crisp-canvas" id="axisCrispCanvas" aria-hidden="true"></canvas>
+                                    </div>
                                     <div class="sl-overview-wrap" id="overviewWrap"><div class="sl-overview" id="overviewBand"></div></div>
                                   </div>
                                 </div>
@@ -2084,6 +2093,7 @@ function coreParticipates(coreIdx, group = null, wrap = null) {
 const bodyCanvas = document.getElementById('bodyCanvas');
 const bodyCrispCanvas = document.getElementById('bodyCrispCanvas');
 const axisCanvas = document.getElementById('axisCanvas');
+const axisCrispCanvas = document.getElementById('axisCrispCanvas');
 const laneCanvas = document.getElementById('laneCanvas');
 const bodyWrap = document.getElementById('bodyWrap');
 const axisWrap = document.getElementById('axisWrap');
@@ -2134,6 +2144,7 @@ let frameResizeObserver = null;
 let graphResizeObserver = null;
 let zoomRenderFrame = 0;
 let crispRenderFrame = 0;
+let renderedWrapBandSpecs = [];
 let pendingZoomAnchor = 0.5;
 let panelActions = null;
 let responsivePaneMode = null;
@@ -2414,6 +2425,15 @@ function setupCanvas(canvas, wCss, hCss) {
   return ctx;
 }
 
+function setupCanvasSpacer(canvas, wCss, hCss) {
+  canvas.width = 1;
+  canvas.height = 1;
+  canvas.style.width = wCss + 'px';
+  canvas.style.height = hCss + 'px';
+  canvas.dataset.renderScale = 'spacer';
+  return canvas.getContext('2d');
+}
+
 function copyCanvasPixels(source, target) {
   if (!source || !target || state.secondaryViewMode !== 'comparison') return;
   if (target === compareBodyCanvas) {
@@ -2444,29 +2464,6 @@ function renderComparisonBody() {
     ctx.fillStyle = 'rgba(255,255,255,0.026)';
     ctx.fillRect(0, rowTop(row), width, rowHeight(row));
   });
-  model.layerMarks.forEach((mark) => {
-    const x = Math.round(mark.t * scale) + 0.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-    ctx.setLineDash([]);
-  });
-  for (const task of model.tasks) {
-    const row = rowOf[task.coreIdx];
-    if (!Number.isFinite(row)) continue;
-    const bar = barMetricsForRow(row);
-    const geometry = taskBarGeometry(task, task.start, task.end, scale);
-    const x = geometry.x;
-    const y = rowTop(row) + bar.pad;
-    const taskWidth = geometry.width;
-    if (taskWidth < 1) continue;
-    const group = task.group != null ? model.groups[task.group] : null;
-    window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
-      x, y, width: taskWidth, height: bar.height,
-      baseColor: group?.color || KIND_ACCENT[task.kind],
-      fontFamily: "'Inter', sans-serif", task,
-    });
-  }
   scheduleCrispTaskLayer();
 }
 
@@ -2679,6 +2676,46 @@ function taskVisualState(t, fi) {
   return { related, baseColor, alpha, core, expanded, sourceSegments };
 }
 
+function drawForegroundLayerMarks(ctx, marks, scale, height, viewport) {
+  let rendered = 0;
+  for (const mark of marks) {
+    const x = Math.round(mark.t * scale) + 0.5;
+    if (x < viewport.left - 1 || x > viewport.right + 1) continue;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+    ctx.restore();
+    rendered += 1;
+  }
+  return rendered;
+}
+
+function drawSetMarker(ctx, x, y, height) {
+  const markerX = Math.round(x) + 0.5;
+  ctx.fillStyle = '#1FB6C9';
+  ctx.fillRect(markerX - 0.5, y - 1, 1, height + 2);
+  ctx.beginPath();
+  ctx.arc(markerX, y - 1, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawWaitPointMarker(ctx, x, y, height) {
+  const markerX = Math.round(x) + 0.5;
+  ctx.fillStyle = '#FFAA3B';
+  ctx.fillRect(markerX - 0.5, y - 1, 1, height + 2);
+  ctx.beginPath();
+  ctx.moveTo(markerX - 3, y - 2);
+  ctx.lineTo(markerX + 3, y - 2);
+  ctx.lineTo(markerX, y + 2.5);
+  ctx.closePath();
+  ctx.fill();
+}
+
 function drawCrispTaskLayer() {
   if (!bodyCrispCanvas || !bodyWrap.clientWidth || !bodyWrap.clientHeight) return;
   const viewportWidth = bodyWrap.clientWidth;
@@ -2703,14 +2740,29 @@ function drawCrispTaskLayer() {
   const scale = pxPerUs();
   const viewportRight = scrollLeft + viewportWidth;
   const viewportBottom = scrollTop + viewportHeight;
+  const viewport = {
+    left: scrollLeft,
+    top: scrollTop,
+    right: viewportRight,
+    bottom: viewportBottom,
+  };
   const fontFamily = "'Inter', sans-serif";
+  const renderedWrapLabels = state.mixMode
+    ? drawCrispWrapLabels(crispCtx, fi, renderedWrapBandSpecs, viewport)
+    : 0;
+  const renderedLayerMarks = drawForegroundLayerMarks(
+    crispCtx, MODEL.layerMarks, scale, bodyH(), viewport,
+  );
+  drawSeparators(crispCtx, bodyW());
   let renderedTaskBars = 0;
+  let renderedWaitSegments = 0;
+  let renderedSetMarkers = 0;
+  let renderedWaitPointMarkers = 0;
   for (const t of MODEL.tasks) {
     const row = taskRow(t);
     if (!Number.isFinite(row)) continue;
     const visual = taskVisualState(t, fi);
     visual.sourceSegments.forEach((segment) => {
-      if (segment.kind !== 'compute') return;
       const segmentRow = visual.expanded ? subRowOf[visual.core.idx]?.[segment.sublane] : row;
       if (!Number.isFinite(segmentRow)) return;
       const bar = barMetricsForRow(segmentRow);
@@ -2718,7 +2770,9 @@ function drawCrispTaskLayer() {
       const x = geometry.x;
       const width = geometry.width;
       const y = rowTop(segmentRow) + bar.pad;
-      if (width < 1 || x + width < scrollLeft || x > viewportRight
+      const isPointMarker = segment.kind === 'set' || segment.kind === 'wait-point';
+      const visibleWidth = isPointMarker ? 7 : width;
+      if ((!isPointMarker && width < 1) || x + visibleWidth < scrollLeft || x > viewportRight
           || y + bar.height < scrollTop || y > viewportBottom) return;
       const segmentSelected = segment.id
         ? state.selSubtask?.id === segment.id
@@ -2728,17 +2782,36 @@ function drawCrispTaskLayer() {
         : Boolean(state.hoverTask?.id === t.id && !state.hoverSubtask);
       const renderTask = segment.id ? subtaskView(t, segment) : t;
       crispCtx.globalAlpha = visual.alpha;
-      window.PtoSwimlaneTaskPattern.drawTaskBar(crispCtx, {
-        x, y, width, height: bar.height, baseColor: visual.baseColor, fontFamily, task: renderTask,
-        isSelected: segmentSelected,
-        isRelated: fi.relTasks.has(t.id) && fi.focusTask && fi.focusTask.id !== t.id,
-        isEmphasized: segmentHovered,
-      });
-      renderedTaskBars += 1;
+      if (segment.kind === 'wait') {
+        drawWaitSegment(crispCtx, x, y, width, bar.height, fi.dependencyMode && !visual.related);
+        drawSubtaskFocus(crispCtx, x, y, width, bar.height, segmentSelected, segmentHovered);
+        renderedWaitSegments += 1;
+      } else if (segment.kind === 'set') {
+        drawSetMarker(crispCtx, x, y, bar.height);
+        renderedSetMarkers += 1;
+      } else if (segment.kind === 'wait-point') {
+        drawWaitPointMarker(crispCtx, x, y, bar.height);
+        renderedWaitPointMarkers += 1;
+      } else {
+        window.PtoSwimlaneTaskPattern.drawTaskBar(crispCtx, {
+          x, y, width, height: bar.height, baseColor: visual.baseColor, fontFamily, task: renderTask,
+          isSelected: segmentSelected,
+          isRelated: fi.relTasks.has(t.id) && fi.focusTask && fi.focusTask.id !== t.id,
+          isEmphasized: segmentHovered,
+        });
+        renderedTaskBars += 1;
+      }
     });
   }
   crispCtx.globalAlpha = 1;
+  if (fi.showDependencyCurves) drawDependencyCurves(crispCtx, fi);
+  else if (state.mixMode) drawSyncCurves(crispCtx, fi);
   bodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
+  bodyCrispCanvas.dataset.renderedWaitSegments = String(renderedWaitSegments);
+  bodyCrispCanvas.dataset.renderedSetMarkers = String(renderedSetMarkers);
+  bodyCrispCanvas.dataset.renderedWaitPointMarkers = String(renderedWaitPointMarkers);
+  bodyCrispCanvas.dataset.renderedLayerMarks = String(renderedLayerMarks);
+  bodyCrispCanvas.dataset.renderedWrapLabels = String(renderedWrapLabels);
 }
 
 function drawCrispComparisonLayer() {
@@ -2767,6 +2840,16 @@ function drawCrispComparisonLayer() {
   const scale = pxPerUs();
   const viewportRight = scrollLeft + viewportWidth;
   const viewportBottom = scrollTop + viewportHeight;
+  const viewport = {
+    left: scrollLeft,
+    top: scrollTop,
+    right: viewportRight,
+    bottom: viewportBottom,
+  };
+  const renderedLayerMarks = drawForegroundLayerMarks(
+    ctx, model.layerMarks, scale, bodyH(), viewport,
+  );
+  drawSeparators(ctx, Math.max(bodyW(), Math.ceil(model.timelineEnd * scale + 8)));
   let renderedTaskBars = 0;
   for (const task of model.tasks) {
     const row = rowOf[task.coreIdx];
@@ -2786,6 +2869,7 @@ function drawCrispComparisonLayer() {
     renderedTaskBars += 1;
   }
   compareBodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
+  compareBodyCrispCanvas.dataset.renderedLayerMarks = String(renderedLayerMarks);
 }
 
 function scheduleCrispTaskLayer() {
@@ -2794,11 +2878,12 @@ function scheduleCrispTaskLayer() {
     crispRenderFrame = 0;
     drawCrispTaskLayer();
     drawCrispComparisonLayer();
+    drawCrispAxisLayer();
   });
 }
 
 function drawBody() {
-  const w = bodyW(), h = bodyH(), scale = pxPerUs();
+  const w = bodyW(), h = bodyH();
   bctx.clearRect(0, 0, w, h);
   const fi = focusInfo();
 
@@ -2819,76 +2904,7 @@ function drawBody() {
 
   /* Mix 模式按单个 Wrap instance 框选 1C2V / 1C1V，不合并多个 Wrap。 */
   if (state.mixMode) drawWrapBands(fi);
-
-  /* 调用范围 barrier：任务区只保留虚线，不延伸局部时间刻度实线。 */
-  MODEL.layerMarks.forEach((m) => {
-    const x = Math.round(m.t * scale) + 0.5;
-    bctx.strokeStyle = 'rgba(255,255,255,0.15)'; bctx.setLineDash([4, 4]);
-    bctx.beginPath(); bctx.moveTo(x, 0); bctx.lineTo(x, h); bctx.stroke();
-    bctx.setLineDash([]);
-  });
-
-  /* section / wrap / group 分隔线 */
-  drawSeparators(bctx, w);
-
-  /* task bars */
-  const fontFamily = "'Inter', sans-serif";
-  for (const t of MODEL.tasks) {
-    const row = taskRow(t);
-    if (!Number.isFinite(row)) continue;
-    const visual = taskVisualState(t, fi);
-    visual.sourceSegments.forEach((segment) => {
-      const segmentRow = visual.expanded ? subRowOf[visual.core.idx]?.[segment.sublane] : row;
-      if (!Number.isFinite(segmentRow)) return;
-      const bar = barMetricsForRow(segmentRow);
-      const geometry = taskBarGeometry(t, segment.start, segment.end, scale);
-      const x = geometry.x;
-      const width = geometry.width;
-      const y = rowTop(segmentRow) + bar.pad;
-      const segmentSelected = segment.id
-        ? state.selSubtask?.id === segment.id
-        : Boolean(state.selTask?.id === t.id && !state.selSubtask);
-      const segmentHovered = segment.id
-        ? state.hoverSubtask?.id === segment.id
-        : Boolean(state.hoverTask?.id === t.id && !state.hoverSubtask);
-      bctx.globalAlpha = visual.alpha;
-      if (segment.kind === 'wait') {
-        if (width >= 1) {
-          drawWaitSegment(x, y, width, bar.height, fi.dependencyMode && !visual.related);
-          drawSubtaskFocus(x, y, width, bar.height, segmentSelected, segmentHovered);
-        }
-      } else if (segment.kind === 'set') {
-        const markerX = Math.round(x) + 0.5;
-        bctx.fillStyle = '#1FB6C9';
-        bctx.fillRect(markerX - 0.5, y - 1, 1, bar.height + 2);
-        bctx.beginPath();
-        bctx.arc(markerX, y - 1, 2.2, 0, Math.PI * 2);
-        bctx.fill();
-      } else if (segment.kind === 'wait-point') {
-        const markerX = Math.round(x) + 0.5;
-        bctx.fillStyle = '#FFAA3B';
-        bctx.fillRect(markerX - 0.5, y - 1, 1, bar.height + 2);
-        bctx.beginPath();
-        bctx.moveTo(markerX - 3, y - 2);
-        bctx.lineTo(markerX + 3, y - 2);
-        bctx.lineTo(markerX, y + 2.5);
-        bctx.closePath();
-        bctx.fill();
-      } else if (width >= 1) {
-        const renderTask = segment.id ? subtaskView(t, segment) : t;
-        window.PtoSwimlaneTaskPattern.drawTaskBar(bctx, {
-          x, y, width, height: bar.height, baseColor: visual.baseColor, fontFamily, task: renderTask,
-          isSelected: segmentSelected,
-          isRelated: fi.relTasks.has(t.id) && fi.focusTask && fi.focusTask.id !== t.id,
-          isEmphasized: segmentHovered,
-        });
-      }
-    });
-    bctx.globalAlpha = 1;
-  }
-
-  if (fi.showDependencyCurves) drawDependencyCurves(fi);
-  else if (state.mixMode) drawSyncCurves(fi);
+  else renderedWrapBandSpecs = [];
   copyCanvasPixels(bodyCanvas, compareBodyCanvas);
   scheduleCrispTaskLayer();
 }
@@ -2925,30 +2941,65 @@ function wrapBandSpecs() {
   return specs;
 }
 
+function wrapBandVisualState(spec, fi) {
+  const grp = MODEL.groups[spec.groupId];
+  const isFocus = fi.dimWrap === spec.wrapId;
+  const isHovered = state.hoverWrapBandKey === spec.key;
+  const groupFocus = fi.dimWrap == null && fi.dimGroup === spec.groupId;
+  const faded = !isHovered && ((fi.dimWrap != null && !isFocus)
+    || (fi.dimWrap == null && fi.dimGroup != null && !groupFocus));
+  return { grp, faded, bright: isHovered || isFocus };
+}
+
+function drawCrispWrapLabels(ctx, fi, specs, viewport) {
+  let rendered = 0;
+  ctx.save();
+  ctx.font = "600 8px 'JetBrains Mono', monospace";
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  for (const spec of specs) {
+    const { grp, faded, bright } = wrapBandVisualState(spec, fi);
+    const borderVisible = spec.x + spec.width >= viewport.left
+      && spec.x <= viewport.right
+      && spec.y + spec.height >= viewport.top
+      && spec.y <= viewport.bottom;
+    if (borderVisible) {
+      ctx.save();
+      ctx.strokeStyle = hexToRgba(grp.color, faded ? 0.12 : (bright ? 0.94 : 0.34));
+      ctx.lineWidth = bright ? 1.4 : 1;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.roundRect(
+        spec.x + 0.5,
+        spec.y + 1.5,
+        Math.max(0, spec.width - 1),
+        Math.max(0, spec.height - 3),
+        8,
+      );
+      ctx.stroke();
+      ctx.restore();
+    }
+    const label = `Wrap ${wrapInstanceDisplayId(spec.wrapId, spec.iteration)}`;
+    const x = spec.x + 1;
+    const y = Math.max(8, spec.y - 2);
+    const labelWidth = ctx.measureText(label).width;
+    if (x > viewport.right || x + labelWidth < viewport.left
+        || y < viewport.top || y - 10 > viewport.bottom) continue;
+    ctx.fillStyle = hexToRgba(grp.color, faded ? 0.2 : (bright ? 0.96 : 0.5));
+    ctx.fillText(label, x, y);
+    rendered += 1;
+  }
+  ctx.restore();
+  return rendered;
+}
+
 function drawWrapBands(fi) {
-  for (const spec of wrapBandSpecs()) {
-    const grp = MODEL.groups[spec.groupId];
-    const isFocus = fi.dimWrap === spec.wrapId;
-    const isHovered = state.hoverWrapBandKey === spec.key;
-    const groupFocus = fi.dimWrap == null && fi.dimGroup === spec.groupId;
-    const faded = !isHovered && ((fi.dimWrap != null && !isFocus)
-      || (fi.dimWrap == null && fi.dimGroup != null && !groupFocus));
-    const bright = isHovered || isFocus;
+  renderedWrapBandSpecs = wrapBandSpecs();
+  for (const spec of renderedWrapBandSpecs) {
+    const { grp, faded, bright } = wrapBandVisualState(spec, fi);
     bctx.save();
     bctx.fillStyle = hexToRgba(grp.color, faded ? 0.018 : (bright ? 0.11 : 0.04));
     bctx.fillRect(spec.x, spec.y, spec.width, spec.height);
-    bctx.strokeStyle = hexToRgba(grp.color, faded ? 0.12 : (bright ? 0.94 : 0.34));
-    bctx.lineWidth = bright ? 1.4 : 1;
-    bctx.setLineDash([5, 3]);
-    bctx.beginPath();
-    bctx.roundRect(spec.x + 0.5, spec.y + 1.5, spec.width - 1, spec.height - 3, 8);
-    bctx.stroke();
-    bctx.setLineDash([]);
-    bctx.font = "600 8px 'JetBrains Mono', monospace";
-    bctx.textAlign = 'left';
-    bctx.textBaseline = 'alphabetic';
-    bctx.fillStyle = hexToRgba(grp.color, faded ? 0.2 : (bright ? 0.96 : 0.5));
-    bctx.fillText(`Wrap ${wrapInstanceDisplayId(spec.wrapId, spec.iteration)}`, spec.x + 1, Math.max(8, spec.y - 2));
     bctx.restore();
   }
 }
@@ -2975,49 +3026,49 @@ function drawSeparators(ctx, w) {
   copyCanvasPixels(laneCanvas, compareLaneCanvas);
 }
 
-function drawWaitSegment(x, y, w, h, muted = false) {
+function drawWaitSegment(ctx, x, y, w, h, muted = false) {
   const waitColor = muted ? '#6F7480' : '#FFAA3B';
-  bctx.save();
-  bctx.beginPath(); bctx.roundRect(x, y, w, h, 2); bctx.clip();
-  bctx.fillStyle = hexToRgba(waitColor, muted ? 0.18 : 0.14);
-  bctx.fillRect(x, y, w, h);
-  bctx.strokeStyle = muted ? 'rgba(111,116,128,0.48)' : 'rgba(255,170,59,0.5)';
-  bctx.lineWidth = 1;
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 2); ctx.clip();
+  ctx.fillStyle = hexToRgba(waitColor, muted ? 0.18 : 0.14);
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = muted ? 'rgba(111,116,128,0.48)' : 'rgba(255,170,59,0.5)';
+  ctx.lineWidth = 1;
   for (let i = -h; i < w + h; i += 5) {
-    bctx.beginPath(); bctx.moveTo(x + i, y + h); bctx.lineTo(x + i + h, y); bctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + i, y + h); ctx.lineTo(x + i + h, y); ctx.stroke();
   }
-  bctx.restore();
-  bctx.strokeStyle = muted ? 'rgba(111,116,128,0.44)' : 'rgba(255,170,59,0.4)';
-  bctx.lineWidth = 1;
-  bctx.beginPath(); bctx.roundRect(x + 0.5, y + 0.5, Math.max(0, w - 1), h - 1, 2); bctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = muted ? 'rgba(111,116,128,0.44)' : 'rgba(255,170,59,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(x + 0.5, y + 0.5, Math.max(0, w - 1), h - 1, 2); ctx.stroke();
   if (w >= 6) {
-    bctx.fillStyle = waitColor;
-    bctx.beginPath();
-    bctx.moveTo(x, y - 1); bctx.lineTo(x + 5, y - 1); bctx.lineTo(x + 2.5, y + 3.5);
-    bctx.closePath(); bctx.fill();
+    ctx.fillStyle = waitColor;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 1); ctx.lineTo(x + 5, y - 1); ctx.lineTo(x + 2.5, y + 3.5);
+    ctx.closePath(); ctx.fill();
   }
 }
 
-function drawSubtaskFocus(x, y, w, h, selected, hovered) {
+function drawSubtaskFocus(ctx, x, y, w, h, selected, hovered) {
   if (!selected && !hovered) return;
-  bctx.save();
-  bctx.strokeStyle = selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.72)';
-  bctx.lineWidth = selected ? 1.5 : 1;
-  bctx.beginPath();
-  bctx.roundRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1), 2);
-  bctx.stroke();
-  bctx.restore();
+  ctx.save();
+  ctx.strokeStyle = selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.72)';
+  ctx.lineWidth = selected ? 1.5 : 1;
+  ctx.beginPath();
+  ctx.roundRect(x + 0.5, y + 0.5, Math.max(0, w - 1), Math.max(0, h - 1), 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /* 依赖贝塞尔曲线：渐进显示
    overview -> 不画; group -> 该子图弧线中等; wrap -> 该 wrap 弧线强;
    任务 -> 选中任务弧线最强, 同 Wrap 其余弱 */
-function drawDependencyCurves(fi) {
+function drawDependencyCurves(ctx, fi) {
   const edges = MODEL.edges.filter((e) => fi.relEdges.has(e.id) && edgeVisibleInCurrentMode(e));
-  edges.forEach((e) => drawDependencyCurve(e, true));
+  edges.forEach((e) => drawDependencyCurve(ctx, e, true));
 }
 
-function drawSyncCurves(fi) {
+function drawSyncCurves(ctx, fi) {
   let visible, strongPred;
   if (fi.focusTask) {
     visible = MODEL.edges.filter((e) => e.wrap === fi.focusTask.wrap);
@@ -3032,21 +3083,21 @@ function drawSyncCurves(fi) {
     return; /* overview: 保持干净, 不画弧线 */
   }
   /* 先弱后强, 保证强线在上层 */
-  visible.filter((e) => !strongPred(e)).forEach((e) => drawDependencyCurve(e, false));
-  visible.filter((e) => strongPred(e)).forEach((e) => drawDependencyCurve(e, true));
+  visible.filter((e) => !strongPred(e)).forEach((e) => drawDependencyCurve(ctx, e, false));
+  visible.filter((e) => strongPred(e)).forEach((e) => drawDependencyCurve(ctx, e, true));
   /* 选中 task 的同步点 barrier 竖线 */
   if (fi.focusTask) {
     fi.focusTask.syncIn.concat(fi.focusTask.syncOut).forEach((eid) => {
       const e = edgeById[eid];
       if (!e || e.relation !== 'sync') return;
       const color = MODEL.groups[e.group]?.color || KIND_ACCENT.aic;
-      drawBarrier(e.fromT, color);
-      drawBarrier(e.toT, color);
+      drawBarrier(ctx, e.fromT, color);
+      drawBarrier(ctx, e.toT, color);
     });
   }
 }
 
-function drawDependencyCurve(e, strong) {
+function drawDependencyCurve(ctx, e, strong) {
   const scale = pxPerUs();
   const fromRow = taskRow(taskById[e.fromTask]), toRow = taskRow(taskById[e.toTask]);
   if (!Number.isFinite(fromRow) || !Number.isFinite(toRow)) return;
@@ -3054,77 +3105,105 @@ function drawDependencyCurve(e, strong) {
   const x2 = e.toT * scale, y2 = rowMidY(toRow);
   const fromColor = taskBaseColor(taskById[e.fromTask]);
   const toColor = taskBaseColor(taskById[e.toTask]);
-  const grad = bctx.createLinearGradient(x1, y1, x2, y2);
+  const grad = ctx.createLinearGradient(x1, y1, x2, y2);
   grad.addColorStop(0, hexToRgba(fromColor, strong ? 0.98 : 0.32));
   grad.addColorStop(1, hexToRgba(toColor, strong ? 0.98 : 0.32));
   const midX = x1 + (x2 - x1) * 0.5;
-  bctx.save();
-  bctx.strokeStyle = grad;
-  bctx.lineWidth = strong ? 1.7 : 1;
+  ctx.save();
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = strong ? 1.7 : 1;
   /* 任务依赖为实线；AI Core 内部同步/等待为虚线。 */
-  bctx.setLineDash(e.relation === 'sync' ? (strong ? [6, 4] : [4, 4]) : []);
-  bctx.beginPath();
-  bctx.moveTo(x1, y1);
-  bctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
-  bctx.stroke();
-  bctx.setLineDash([]);
-  bctx.fillStyle = hexToRgba(fromColor, strong ? 1 : 0.5);
-  bctx.beginPath(); bctx.arc(x1, y1, strong ? 2.6 : 1.8, 0, Math.PI * 2); bctx.fill();
-  bctx.fillStyle = hexToRgba(toColor, strong ? 1 : 0.5);
+  ctx.setLineDash(e.relation === 'sync' ? (strong ? [6, 4] : [4, 4]) : []);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.bezierCurveTo(midX, y1, midX, y2, x2, y2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = hexToRgba(fromColor, strong ? 1 : 0.5);
+  ctx.beginPath(); ctx.arc(x1, y1, strong ? 2.6 : 1.8, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = hexToRgba(toColor, strong ? 1 : 0.5);
   const arrow = strong ? 5.2 : 4.2;
   const direction = Math.sign(x2 - x1) || 1;
-  bctx.beginPath();
-  bctx.moveTo(x2, y2);
-  bctx.lineTo(x2 - direction * arrow, y2 - arrow * 0.72);
-  bctx.lineTo(x2 - direction * arrow, y2 + arrow * 0.72);
-  bctx.closePath();
-  bctx.fill();
-  bctx.restore();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - direction * arrow, y2 - arrow * 0.72);
+  ctx.lineTo(x2 - direction * arrow, y2 + arrow * 0.72);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
-function drawBarrier(tUs, color) {
+function drawBarrier(ctx, tUs, color) {
   const x = Math.round(tUs * pxPerUs()) + 0.5;
-  bctx.save();
-  bctx.strokeStyle = hexToRgba(color, 0.45);
-  bctx.lineWidth = 1; bctx.setLineDash([2, 3]);
-  bctx.beginPath(); bctx.moveTo(x, 0); bctx.lineTo(x, bodyH()); bctx.stroke();
-  bctx.restore();
+  ctx.save();
+  ctx.strokeStyle = hexToRgba(color, 0.45);
+  ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, bodyH()); ctx.stroke();
+  ctx.restore();
 }
 
 /* ---- 时间轴 ---- */
-function drawAxis() {
+function drawCrispAxisLayer() {
+  if (!axisCrispCanvas || !axisWrap.clientWidth) return;
   const w = bodyW(), scale = pxPerUs();
-  actx.clearRect(0, 0, w, AXIS_H);
-  actx.fillStyle = 'rgba(255,255,255,0.40)';
-  actx.font = "500 10px 'JetBrains Mono', monospace";
-  actx.textBaseline = 'middle';
+  const viewportWidth = axisWrap.clientWidth;
+  const scrollLeft = axisWrap.scrollLeft;
+  const viewportRight = scrollLeft + viewportWidth;
+  const dpr = window.devicePixelRatio || 1;
+  const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
+  const pixelHeight = Math.max(1, Math.round(AXIS_H * dpr));
+  if (axisCrispCanvas.width !== pixelWidth) axisCrispCanvas.width = pixelWidth;
+  if (axisCrispCanvas.height !== pixelHeight) axisCrispCanvas.height = pixelHeight;
+  axisCrispCanvas.style.width = viewportWidth + 'px';
+  axisCrispCanvas.style.height = AXIS_H + 'px';
+  axisCrispCanvas.style.transform = `translate3d(${scrollLeft}px, 0, 0)`;
+  axisCrispCanvas.dataset.renderScale = dpr.toFixed(3);
+  const ctx = axisCrispCanvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, pixelWidth, pixelHeight);
+  ctx.setTransform(dpr, 0, 0, dpr, -scrollLeft * dpr, 0);
+  ctx.fillStyle = 'rgba(255,255,255,0.40)';
+  ctx.font = "500 10px 'JetBrains Mono', monospace";
+  ctx.textBaseline = 'middle';
   const { majorStep, minorStep } = adaptiveTimeSteps(MODEL.timelineEnd, w, 54);
+  let renderedTicks = 0;
   for (let t = 0; t <= MODEL.timelineEnd + minorStep * 0.25; t += minorStep) {
     const x = Math.round(t * scale) + 0.5;
+    if (x < scrollLeft - 48 || x > viewportRight + 1) continue;
     const major = Math.abs(t / majorStep - Math.round(t / majorStep)) < 1e-6;
-    actx.strokeStyle = major ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)';
-    actx.beginPath();
-    actx.moveTo(x, major ? AXIS_H - 11 : AXIS_H - 6); actx.lineTo(x, AXIS_H); actx.stroke();
-    if (major) { actx.textAlign = 'left'; actx.fillText(formatTimeTick(t) + 'μs', x + 3, 9); }
+    ctx.strokeStyle = major ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.10)';
+    ctx.beginPath();
+    ctx.moveTo(x, major ? AXIS_H - 11 : AXIS_H - 6); ctx.lineTo(x, AXIS_H); ctx.stroke();
+    if (major) { ctx.textAlign = 'left'; ctx.fillText(formatTimeTick(t) + 'μs', x + 3, 9); }
+    renderedTicks += 1;
   }
+  let renderedLayerLabels = 0;
   MODEL.layerMarks.forEach((m) => {
     const x = m.t * scale;
+    if (x + 62 < scrollLeft || x > viewportRight) return;
     const hovered = state.hoverLayer === m.layer;
     if (hovered) {
-      actx.fillStyle = 'rgba(255,255,255,0.10)';
-      actx.beginPath();
-      actx.roundRect(x + 1, 12, 52, 18, 4);
-      actx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      ctx.beginPath();
+      ctx.roundRect(x + 1, 12, 52, 18, 4);
+      ctx.fill();
     }
-    actx.fillStyle = hovered ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.62)';
-    actx.font = "600 10px 'Inter', sans-serif";
-    actx.textAlign = 'left';
-    actx.fillText('DevTask ' + m.label, x + 4, 22);
+    ctx.fillStyle = hovered ? 'rgba(255,255,255,0.94)' : 'rgba(255,255,255,0.62)';
+    ctx.font = "600 10px 'Inter', sans-serif";
+    ctx.textAlign = 'left';
+    ctx.fillText('DevTask ' + m.label, x + 4, 22);
     if (hovered) {
-      actx.fillStyle = 'rgba(255,255,255,0.78)';
-      actx.fillRect(x + 4, 29, 44, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillRect(x + 4, 29, 44, 1);
     }
+    renderedLayerLabels += 1;
   });
+  axisCrispCanvas.dataset.renderedTicks = String(renderedTicks);
+  axisCrispCanvas.dataset.renderedLayerLabels = String(renderedLayerLabels);
+}
+
+function drawAxis() {
+  drawCrispAxisLayer();
 }
 
 function adaptiveTimeSteps(total, pixelWidth, targetLabelPx = 58) {
@@ -3716,7 +3795,7 @@ function bindRunHistoryDismiss() {
 function layout({ reuseLaneCanvas = false } = {}) {
   const w = bodyW(), h = bodyH();
   bctx = setupCanvas(bodyCanvas, w, h);
-  actx = setupCanvas(axisCanvas, w, AXIS_H);
+  actx = setupCanvasSpacer(axisCanvas, w, AXIS_H);
   if (!reuseLaneCanvas || !lctx) lctx = setupCanvas(laneCanvas, LABEL_W, h);
   renderGlobalRuler();
   renderOverviewBand();
