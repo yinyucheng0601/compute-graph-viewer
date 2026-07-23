@@ -968,6 +968,7 @@ body {
 }
 
 .sl-timeline-right {
+  position: relative;
   min-width: 0;
 }
 
@@ -979,7 +980,7 @@ body {
 .sl-overview-wrap {
   position: relative;
   z-index: 30;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .sl-overview {
@@ -997,11 +998,11 @@ body {
   height: 100%;
 }
 
-.sl-overview-marker {
+.sl-task-time-projection {
   position: absolute;
-  top: 0;
+  top: 27px;
   bottom: 0;
-  z-index: 2;
+  z-index: 40;
   pointer-events: none;
   background: color-mix(in srgb, var(--warning) 14%, transparent);
   border-left: 1px solid color-mix(in srgb, var(--warning) 84%, transparent);
@@ -1020,7 +1021,7 @@ body {
 
 .sl-overview-tooltip {
   position: absolute;
-  top: 6px;
+  top: 67px;
   z-index: 60;
   min-width: 214px;
   pointer-events: none;
@@ -1491,6 +1492,8 @@ body {
                                       <canvas class="sl-axis-crisp-canvas" id="axisCrispCanvas" aria-hidden="true"></canvas>
                                     </div>
                                     <div class="sl-overview-wrap" id="overviewWrap"><div class="sl-overview" id="overviewBand"></div></div>
+                                    <div class="sl-task-time-projection" id="selectedTaskProjection" hidden aria-hidden="true"></div>
+                                    <div class="sl-overview-tooltip pto-swimlane-task-tooltip" id="overviewTooltip" hidden aria-hidden="true"></div>
                                   </div>
                                 </div>
                               </div>
@@ -2100,6 +2103,8 @@ const axisWrap = document.getElementById('axisWrap');
 const laneWrap = document.getElementById('laneWrap');
 const overviewWrap = document.getElementById('overviewWrap');
 const overviewBand = document.getElementById('overviewBand');
+const overviewTooltip = document.getElementById('overviewTooltip');
+const selectedTaskProjection = document.getElementById('selectedTaskProjection');
 const swimlaneScrollShell = document.querySelector('.sl-swimlane-scroll-shell');
 const timestampGuide = document.getElementById('timestampGuide');
 const globalRulerScale = document.getElementById('globalRulerScale');
@@ -2145,7 +2150,7 @@ let graphResizeObserver = null;
 let zoomRenderFrame = 0;
 let crispRenderFrame = 0;
 let renderedWrapBandSpecs = [];
-let pendingZoomAnchor = 0.5;
+let pendingZoomAnchorTime = 0;
 let panelActions = null;
 let responsivePaneMode = null;
 let autoCollapsedExplorer = false;
@@ -2173,7 +2178,31 @@ function visibleTrackW() {
 function bodyW() {
   return Math.ceil(visibleTrackW() * (state.zoomPct / 100));
 }
-function pxPerUs() { return Math.max(0.1, (bodyW() - 8) / MODEL.timelineEnd); }
+function timeTrackW() {
+  return Math.max(1, bodyW() - 8);
+}
+function pxPerUs() {
+  return Math.max(0.1, timeTrackW() / MODEL.timelineEnd);
+}
+function clampTimelineTime(time) {
+  return Math.max(0, Math.min(MODEL.timelineEnd, Number(time) || 0));
+}
+function timeToContentX(time) {
+  return clampTimelineTime(time) * pxPerUs();
+}
+function contentXToTime(x) {
+  return clampTimelineTime((Number(x) || 0) / pxPerUs());
+}
+function localTimeAtClientX(clientX) {
+  const rect = bodyWrap.getBoundingClientRect();
+  const viewportX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  return contentXToTime(bodyWrap.scrollLeft + viewportX);
+}
+function globalTimeAtClientX(clientX) {
+  const rect = globalRulerScale.getBoundingClientRect();
+  const f = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
+  return f * MODEL.timelineEnd;
+}
 function taskBarGeometry(task, start, end, scale) {
   let x = start * scale;
   let width = Math.max(0, end - start) * scale;
@@ -3241,6 +3270,7 @@ function fitLayer(layer) {
     axisWrap.scrollLeft = bodyWrap.scrollLeft;
     overviewWrap.scrollLeft = bodyWrap.scrollLeft;
     syncGlobalRulerBrush();
+    renderSelectedTaskProjection();
   });
 }
 
@@ -3505,37 +3535,58 @@ function buildOverviewMetrics() {
 
 function renderOverviewBand() {
   const w = bodyW();
+  const trackW = timeTrackW();
   const h = 62;
   const top = 7;
   const bottom = 9;
   overviewMetricSeries = buildOverviewMetrics();
   const grid = [0.25, 0.5, 0.75].map((p) => {
     const y = top + (h - top - bottom) * p;
-    return `<path d="M0 ${y.toFixed(2)} H${w}" stroke="rgba(255,255,255,0.055)" stroke-width="1"></path>`;
+    return `<path d="M0 ${y.toFixed(2)} H${trackW}" stroke="rgba(255,255,255,0.055)" stroke-width="1"></path>`;
   }).join('');
   const layerGuides = MODEL.layerMarks.map((mark) => {
-    const x = mark.t * pxPerUs();
+    const x = timeToContentX(mark.t);
     return `<path d="M${x.toFixed(2)} 0 V${h}" stroke="rgba(255,255,255,0.24)" stroke-width="1" stroke-dasharray="4 4"></path>`;
   }).join('');
   const paths = overviewMetricSeries.map((metric) => {
     const points = metric.values.map((value, i) => {
       const f = i / Math.max(1, metric.values.length - 1);
       const y = top + (1 - value / metric.max) * (h - top - bottom);
-      return { x: f * w, y };
+      return { x: f * trackW, y };
     });
     const line = smoothPath(points);
-    const area = `${line} L${w.toFixed(2)},${(h - bottom).toFixed(2)} L0,${(h - bottom).toFixed(2)} Z`;
+    const area = `${line} L${trackW.toFixed(2)},${(h - bottom).toFixed(2)} L0,${(h - bottom).toFixed(2)} Z`;
     return `<path d="${area}" fill="${metric.color}" opacity="0.10"></path><path d="${line}" fill="none" stroke="${metric.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.88"></path>`;
   }).join('');
-  let marker = '';
-  if (state.selTask) {
-    const selected = selectedTaskView();
-    const x = selected.start * pxPerUs();
-    const mw = Math.max(2, (selected.end - selected.start) * pxPerUs());
-    marker = `<div class="sl-overview-marker" style="left:${x}px;width:${mw}px"></div>`;
-  }
   overviewBand.style.width = w + 'px';
-  overviewBand.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">${grid}${layerGuides}${paths}</svg>${marker}<div class="sl-overview-tooltip pto-swimlane-task-tooltip" id="overviewTooltip" hidden aria-hidden="true"></div>`;
+  overviewBand.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">${grid}${layerGuides}${paths}</svg>`;
+  renderSelectedTaskProjection();
+}
+
+function renderSelectedTaskProjection() {
+  if (!selectedTaskProjection) return;
+  const selected = selectedTaskView();
+  if (!selected) {
+    selectedTaskProjection.hidden = true;
+    selectedTaskProjection.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  const viewportWidth = bodyWrap.clientWidth || visibleTrackW();
+  const startX = timeToContentX(selected.start) - bodyWrap.scrollLeft;
+  const endX = timeToContentX(selected.end) - bodyWrap.scrollLeft;
+  const visibleLeft = Math.max(0, startX);
+  const visibleRight = Math.min(viewportWidth, Math.max(startX + 2, endX));
+  if (visibleRight <= visibleLeft || startX > viewportWidth || endX < 0) {
+    selectedTaskProjection.hidden = true;
+    selectedTaskProjection.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  selectedTaskProjection.style.left = visibleLeft + 'px';
+  selectedTaskProjection.style.width = Math.max(2, visibleRight - visibleLeft) + 'px';
+  selectedTaskProjection.dataset.startTime = selected.start.toFixed(3);
+  selectedTaskProjection.dataset.endTime = selected.end.toFixed(3);
+  selectedTaskProjection.hidden = false;
+  selectedTaskProjection.setAttribute('aria-hidden', 'false');
 }
 
 function renderGlobalRuler() {
@@ -3554,7 +3605,7 @@ function renderGlobalRuler() {
 
 function syncGlobalRulerBrush() {
   if (!globalRulerBrush) return;
-  const w = bodyW();
+  const w = timeTrackW();
   const visible = Math.max(1, bodyWrap.clientWidth || visibleTrackW());
   const leftF = Math.max(0, Math.min(1, bodyWrap.scrollLeft / w));
   const widthF = Math.max(0.01, Math.min(1 - leftF, visible / w));
@@ -3571,19 +3622,32 @@ function formatMetricValue(metric, value) {
   return value.toFixed(1) + metric.unit;
 }
 
-function showTimestampGuideAt(clientX) {
+function showTimestampGuideAtTime(time) {
   if (!timestampGuide || !swimlaneScrollShell) return;
+  const clampedTime = clampTimelineTime(time);
   const shellRect = swimlaneScrollShell.getBoundingClientRect();
-  const left = Math.max(LABEL_W, Math.min(shellRect.width - 1, clientX - shellRect.left));
+  const bodyRect = bodyWrap.getBoundingClientRect();
+  const viewportX = timeToContentX(clampedTime) - bodyWrap.scrollLeft;
+  if (viewportX < 0 || viewportX > bodyRect.width) {
+    hideTimestampGuide();
+    return;
+  }
+  const left = bodyRect.left - shellRect.left + viewportX;
   timestampGuide.style.left = left + 'px';
   timestampGuide.hidden = false;
   timestampGuide.setAttribute('aria-hidden', 'false');
   if (state.secondaryViewMode === 'comparison' && compareTimestampGuide && compareGrid) {
     const compareRect = compareGrid.getBoundingClientRect();
-    const compareLeft = Math.max(LABEL_W, Math.min(compareRect.width - 1, clientX - compareRect.left));
-    compareTimestampGuide.style.left = compareLeft + 'px';
-    compareTimestampGuide.hidden = false;
-    compareTimestampGuide.setAttribute('aria-hidden', 'false');
+    const compareViewportX = timeToContentX(clampedTime) - compareBodyWrap.scrollLeft;
+    const compareTrackWidth = Math.max(0, compareRect.width - LABEL_W);
+    if (compareViewportX >= 0 && compareViewportX <= compareTrackWidth) {
+      compareTimestampGuide.style.left = LABEL_W + compareViewportX + 'px';
+      compareTimestampGuide.hidden = false;
+      compareTimestampGuide.setAttribute('aria-hidden', 'false');
+    } else {
+      compareTimestampGuide.hidden = true;
+      compareTimestampGuide.setAttribute('aria-hidden', 'true');
+    }
   }
 }
 
@@ -3598,37 +3662,42 @@ function hideTimestampGuide() {
   }
 }
 
-function showOverviewTooltip(e) {
+function showPerformanceTooltipAtTime(time, clientX) {
   if (!overviewMetricSeries.length) return;
-  const rect = overviewBand.getBoundingClientRect();
+  const rect = overviewWrap.getBoundingClientRect();
   if (!rect.width) return;
-  const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-  const f = x / rect.width;
-  const idx = Math.max(0, Math.min(overviewMetricSeries[0].values.length - 1, Math.round(f * (overviewMetricSeries[0].values.length - 1))));
-  const t = f * MODEL.timelineEnd;
-  const tip = document.getElementById('overviewTooltip');
-  if (!tip) return;
-  showTimestampGuideAt(e.clientX);
+  const t = clampTimelineTime(time);
+  const f = t / Math.max(Number.EPSILON, MODEL.timelineEnd);
+  const idx = Math.max(0, Math.min(
+    overviewMetricSeries[0].values.length - 1,
+    Math.round(f * (overviewMetricSeries[0].values.length - 1)),
+  ));
+  if (!overviewTooltip) return;
+  showTimestampGuideAtTime(t);
   const rows = overviewMetricSeries.map((metric) => (
     `<div class="pto-swimlane-task-tooltip__row"><span class="pto-swimlane-task-tooltip__key"><span class="sl-overview-tip-swatch" style="background:${metric.color}"></span>${metric.label}</span><span class="pto-swimlane-task-tooltip__value">${formatMetricValue(metric, metric.values[idx])}</span></div>`
   )).join('');
-  tip.innerHTML = `<div class="pto-swimlane-task-tooltip__title">时间戳 ${t.toFixed(1)}μs</div>${rows}`;
-  tip.hidden = false;
-  tip.classList.add('is-visible');
-  tip.setAttribute('aria-hidden', 'false');
-  const tw = tip.offsetWidth || 214;
-  const left = x + 12 + tw > rect.width ? x - tw - 12 : x + 12;
-  tip.style.left = Math.max(2, Math.min(rect.width - tw - 2, left)) + 'px';
-  tip.style.top = '6px';
+  overviewTooltip.innerHTML = `<div class="pto-swimlane-task-tooltip__title">时间戳 ${t.toFixed(1)}μs</div>${rows}`;
+  overviewTooltip.hidden = false;
+  overviewTooltip.classList.add('is-visible');
+  overviewTooltip.setAttribute('aria-hidden', 'false');
+  overviewTooltip.dataset.timestamp = t.toFixed(3);
+  const tw = overviewTooltip.offsetWidth || 214;
+  const anchorX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  const left = anchorX + 12 + tw > rect.width ? anchorX - tw - 12 : anchorX + 12;
+  overviewTooltip.style.left = Math.max(2, Math.min(rect.width - tw - 2, left)) + 'px';
+}
+
+function showOverviewTooltip(event) {
+  showPerformanceTooltipAtTime(localTimeAtClientX(event.clientX), event.clientX);
 }
 
 function hideOverviewTooltip() {
-  const tip = document.getElementById('overviewTooltip');
   hideTimestampGuide();
-  if (tip) {
-    tip.classList.remove('is-visible');
-    tip.setAttribute('aria-hidden', 'true');
-    tip.hidden = true;
+  if (overviewTooltip) {
+    overviewTooltip.classList.remove('is-visible');
+    overviewTooltip.setAttribute('aria-hidden', 'true');
+    overviewTooltip.hidden = true;
   }
 }
 
@@ -3855,7 +3924,8 @@ bodyWrap.addEventListener('scroll', () => {
     syncingComparisonScroll = false;
   }
   syncGlobalRulerBrush();
-  hideTimestampGuide();
+  renderSelectedTaskProjection();
+  hideOverviewTooltip();
   scheduleCrispTaskLayer();
 });
 function forwardLaneWheel(event, targetWrap) {
@@ -3880,8 +3950,9 @@ compareBodyWrap?.addEventListener('scroll', () => {
     overviewWrap.scrollLeft = compareBodyWrap.scrollLeft;
     syncingComparisonScroll = false;
     syncGlobalRulerBrush();
+    renderSelectedTaskProjection();
   }
-  hideTimestampGuide();
+  hideOverviewTooltip();
   scheduleCrispTaskLayer();
 });
 overviewBand.addEventListener('mousemove', showOverviewTooltip);
@@ -3895,13 +3966,13 @@ axisCanvas.addEventListener('mousemove', (e) => {
     drawAxis();
   }
   axisCanvas.style.cursor = mark ? 'pointer' : 'crosshair';
-  showTimestampGuideAt(e.clientX);
+  showPerformanceTooltipAtTime(localTimeAtClientX(e.clientX), e.clientX);
 });
 axisCanvas.addEventListener('mouseleave', () => {
   axisCanvas.style.cursor = 'default';
   state.hoverLayer = null;
   drawAxis();
-  hideTimestampGuide();
+  hideOverviewTooltip();
 });
 axisCanvas.addEventListener('click', (e) => {
   const rect = axisCanvas.getBoundingClientRect();
@@ -4094,17 +4165,19 @@ taskSearch.addEventListener('input', (e) => {
   drawBody();
 });
 if (globalRulerScale) {
+  globalRulerScale.addEventListener('pointermove', (e) => {
+    showPerformanceTooltipAtTime(globalTimeAtClientX(e.clientX), e.clientX);
+  });
+  globalRulerScale.addEventListener('pointerleave', hideOverviewTooltip);
   globalRulerScale.addEventListener('pointerdown', (e) => {
     const rect = (globalRulerTicks || globalRulerScale).getBoundingClientRect();
     const f = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    bodyWrap.scrollLeft = Math.max(0, bodyW() * f - bodyWrap.clientWidth / 2);
+    bodyWrap.scrollLeft = Math.max(0, timeTrackW() * f - bodyWrap.clientWidth / 2);
     syncGlobalRulerBrush();
   });
 }
 function setZoom(pct) {
-  const renderedWidth = parseFloat(bodyCanvas.style.width) || bodyW();
-  pendingZoomAnchor = Math.max(0, Math.min(1,
-    (bodyWrap.scrollLeft + bodyWrap.clientWidth / 2) / Math.max(1, renderedWidth)));
+  pendingZoomAnchorTime = contentXToTime(bodyWrap.scrollLeft + bodyWrap.clientWidth / 2);
   state.zoomPct = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(pct / 5) * 5));
   document.getElementById('zoomReadout').textContent = state.zoomPct + '%';
   zoomSlider.value = String(state.zoomPct);
@@ -4114,13 +4187,14 @@ function setZoom(pct) {
     zoomRenderFrame = 0;
     layout({ reuseLaneCanvas: true });
     bodyWrap.scrollLeft = Math.max(0,
-      bodyW() * pendingZoomAnchor - bodyWrap.clientWidth / 2);
+      timeToContentX(pendingZoomAnchorTime) - bodyWrap.clientWidth / 2);
     axisWrap.scrollLeft = bodyWrap.scrollLeft;
     overviewWrap.scrollLeft = bodyWrap.scrollLeft;
     if (state.secondaryViewMode === 'comparison' && compareBodyWrap) {
       compareBodyWrap.scrollLeft = bodyWrap.scrollLeft;
     }
     syncGlobalRulerBrush();
+    renderSelectedTaskProjection();
     canvasPane?.removeAttribute('aria-busy');
   });
 }
