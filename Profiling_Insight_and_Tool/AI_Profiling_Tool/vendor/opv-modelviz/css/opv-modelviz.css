@@ -1,0 +1,451 @@
+/* openPangu-2.0-Flash 整网图组件样式（从 openpangu_2_0_flash_modelviz.html 内联 <style> 抽出，
+   去掉全局 body/html 规则、embed 作用域收敛到 #opvHost、height 100vh→100% 以内嵌到训练大盘左侧整网图区）*/
+/* 迁入 index_v3.html 时：--model-graphviz-* 原为 :root 全局覆盖，会连带改掉「计算图」页签复用同名
+   token 的 Qwen2-7B 图；这里把覆盖收敛到 #opvHost 子树，仅影响整网图自己。 */
+#opvHost {
+      --opv-shell-bg: var(--background);
+      --opv-panel-bg: color-mix(in srgb, var(--panel-shell-bg) 96%, transparent);
+      --opv-panel-soft: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      --opv-border: var(--border-subtle);
+      --opv-border-strong: var(--border-strong);
+      --opv-text: var(--foreground);
+      --opv-muted: var(--foreground-secondary);
+      --opv-dim: var(--foreground-muted);
+      --opv-selected: #fff;
+      --opv-accent: var(--highlight-copy-blue-300);
+      --model-graphviz-bg: var(--opv-shell-bg);
+      --model-graphviz-surface: var(--opv-panel-bg);
+      --model-graphviz-surface-soft: var(--opv-panel-soft);
+      --model-graphviz-stage-bg: var(--opv-shell-bg);
+      --model-graphviz-line: color-mix(in srgb, var(--opv-muted) 88%, transparent);
+      --model-graphviz-line-soft: var(--opv-border-strong);
+      --model-graphviz-node-label: var(--opv-text);
+      --model-graphviz-node-type: var(--opv-muted);
+      --model-graphviz-cluster-label: var(--opv-muted);
+      --model-graphviz-toggle-bg: color-mix(in srgb, var(--opv-accent) 64%, var(--opv-panel-bg));
+      --model-graphviz-toggle-border: color-mix(in srgb, var(--opv-accent) 70%, var(--opv-border-strong));
+      --model-graphviz-toggle-icon: var(--opv-text);
+      --model-graphviz-tensor-fill: color-mix(in srgb, var(--opv-panel-soft) 70%, var(--opv-accent));
+      --model-graphviz-tensor-stroke: var(--opv-border-strong);
+      --model-graphviz-report-priority-on-dark: var(--foreground);
+      --model-graphviz-report-priority-on-light: var(--background);
+      --model-graphviz-node-shadow: none;
+      --model-graphviz-parent-shadow: none;
+      --model-graphviz-panel-shadow: none;
+    }
+    :root[data-theme='light'] #opvHost {
+      --opv-panel-bg: color-mix(in srgb, var(--panel-shell-bg) 96%, white);
+      --opv-panel-soft: color-mix(in srgb, var(--surface-1) 88%, white);
+      --opv-selected: #111;
+      --opv-accent: var(--primary);
+      --model-graphviz-line: rgba(37, 47, 63, 0.56);
+      --model-graphviz-line-soft: rgba(63, 76, 99, 0.24);
+      --model-graphviz-node-label: #1f2937;
+      --model-graphviz-node-type: rgba(69, 82, 104, 0.74);
+      --model-graphviz-cluster-label: rgba(69, 82, 104, 0.72);
+      --model-graphviz-tensor-fill: #D1D1D1;
+      --model-graphviz-tensor-stroke: rgba(63, 76, 99, 0.24);
+    }
+    .opv-app {
+      position: relative;
+      height: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 48px minmax(0, 1fr);
+      background: var(--opv-shell-bg);
+    }
+    #opvHost[data-embed='1'] {
+      grid-template-rows: minmax(0, 1fr);
+      min-height: 0;
+      height: 100%;
+    }
+    #opvHost[data-embed='1'] .opv-topbar,
+    #opvHost[data-embed='1'] .opv-status {
+      display: none;
+    }
+    .opv-topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: 0 var(--space-4);
+      border-bottom: 1px solid var(--opv-border);
+      background: color-mix(in srgb, var(--opv-panel-bg) 96%, transparent);
+    }
+    .opv-title { min-width: 0; display: flex; align-items: baseline; gap: var(--space-3); }
+    .opv-title h1 { margin: 0; font: var(--text-title-2); color: var(--opv-text); letter-spacing: 0; }
+    .opv-title span { color: var(--opv-muted); font: var(--text-mono); white-space: nowrap; }
+    .opv-actions { display: flex; align-items: center; gap: var(--space-2); }
+    .opv-file input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; }
+    .opv-floating-theme {
+      position: absolute;
+      z-index: 16;
+      top: 12px;
+      right: 12px;
+      display: none;
+      min-width: 64px;
+      min-height: 30px;
+      border: 1px solid var(--opv-border-strong);
+      background: color-mix(in srgb, var(--opv-panel-bg) 94%, transparent);
+      color: var(--opv-text);
+      backdrop-filter: blur(16px);
+    }
+    #opvHost[data-embed='1'] .opv-floating-theme {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .opv-color-panel {
+      position: absolute;
+      z-index: 20;
+      top: 56px;
+      right: 16px;
+      width: min(360px, calc(100% - 32px));
+      padding: 12px;
+      border: 1px solid var(--opv-border-strong);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--opv-panel-bg) 98%, transparent);
+      color: var(--opv-text);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(18px);
+    }
+    .opv-color-panel[hidden] { display: none; }
+    .opv-color-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: 10px;
+    }
+    .opv-color-title { font: var(--text-label); color: var(--opv-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .opv-color-row {
+      display: grid;
+      grid-template-columns: 84px minmax(0, 1fr) 48px;
+      align-items: center;
+      gap: 10px;
+      min-height: 34px;
+      font: var(--text-body-sm);
+    }
+    .opv-color-row output {
+      color: var(--opv-muted);
+      font: var(--text-mono);
+      text-align: right;
+    }
+    .opv-color-row input[type='range'] { width: 100%; accent-color: var(--primary); }
+    .opv-color-swatches {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .opv-color-swatch {
+      height: 22px;
+      border: 1px solid var(--opv-border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--swatch);
+    }
+    .opv-stage {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    .opv-stage.is-panning { cursor: grabbing; }
+    .opv-stage svg { display: block; transform-origin: 0 0; will-change: transform; }
+    .opv-stage .pto-model-graphviz-node { cursor: pointer; }
+    .opv-stage .pto-model-graphviz-cluster { cursor: default; }
+    .opv-stage [tabindex]:focus,
+    .opv-stage [tabindex]:focus-visible { outline: none; }
+    .opv-stage .pto-model-graphviz-node.is-selected rect { stroke: var(--opv-selected); stroke-width: 3px; }
+    .opv-stage .pto-model-graphviz-cluster.is-selected > rect:first-child { stroke: var(--opv-selected); stroke-width: 2.4px; }
+    .opv-stage .pto-model-graphviz-toggle,
+    .opv-stage .pto-model-graphviz-toggle-icon { display: none; }
+    .opv-stage .pto-model-graphviz-edge {
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    :root[data-theme='light'] .opv-stage .pto-model-graphviz-edge {
+      stroke: var(--model-graphviz-line);
+      stroke-width: 1.05px;
+    }
+    :root[data-theme='light'] .opv-stage .pto-model-graphviz-node rect {
+      fill-opacity: 1;
+      stroke: var(--model-graphviz-line-soft);
+      stroke-width: 0.9px;
+    }
+    :root[data-theme='light'] .opv-stage .pto-model-graphviz-node-label {
+      fill: var(--model-graphviz-node-label);
+      font-size: var(--font-size-title-sm);
+      font-weight: 650;
+    }
+    :root[data-theme='light'] .opv-stage .pto-model-graphviz-node-type {
+      fill: var(--model-graphviz-node-type);
+      font-size: calc(var(--font-size-label-xs) - 4px);
+      font-weight: 500;
+    }
+    .opv-overlay-toggle { cursor: pointer; pointer-events: all; }
+    .opv-overlay-toggle .opv-toggle-hit {
+      fill: transparent;
+      stroke: transparent;
+      pointer-events: all;
+    }
+    .opv-overlay-toggle circle {
+      fill: var(--model-graphviz-toggle-bg);
+      stroke: var(--model-graphviz-toggle-border);
+      stroke-width: 1.1px;
+    }
+    .opv-overlay-toggle text {
+      fill: var(--model-graphviz-toggle-icon);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: var(--font-weight-bold);
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+    .opv-repeat-tag text {
+      fill: var(--opv-text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: var(--font-weight-semibold);
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+    .opv-node-popover {
+      position: absolute;
+      z-index: 12;
+      width: min(520px, calc(100% - 24px));
+      max-height: min(680px, calc(100% - 24px));
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--opv-border-strong);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--opv-panel-bg) 97%, transparent);
+      color: var(--opv-text);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+      backdrop-filter: blur(18px);
+      user-select: text;
+    }
+    .opv-node-popover[hidden] { display: none; }
+    .opv-node-popover-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 10px;
+    }
+    .opv-node-popover-title {
+      margin: 0;
+      font: var(--text-title-2);
+      color: var(--opv-text);
+      overflow-wrap: anywhere;
+    }
+    .opv-node-popover-sub {
+      margin-top: 3px;
+      color: var(--opv-muted);
+      font: var(--text-label);
+    }
+    .opv-node-popover-close {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: var(--radius-sm);
+    }
+    .opv-node-popover-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font: var(--text-body-sm);
+      color: var(--opv-muted);
+    }
+    .opv-popover-kv {
+      display: grid;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: 4px 8px;
+      margin: 0;
+    }
+    .opv-popover-kv dt { color: var(--opv-dim); }
+    .opv-popover-kv dd {
+      margin: 0;
+      color: var(--opv-text);
+      overflow-wrap: anywhere;
+    }
+    .opv-popover-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .opv-status {
+      position: absolute;
+      left: var(--space-4);
+      bottom: var(--space-4);
+      max-width: min(620px, calc(100% - 32px));
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      color: var(--opv-muted);
+      background: color-mix(in srgb, var(--opv-panel-bg) 92%, transparent);
+      backdrop-filter: blur(16px);
+      font: var(--text-label);
+      pointer-events: none;
+    }
+    .opv-section { display: flex; flex-direction: column; gap: 8px; }
+    .opv-section-title {
+      color: var(--opv-dim);
+      font: var(--text-label);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .opv-code {
+      margin: 0;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-1) 86%, black);
+      color: var(--opv-muted);
+      font: var(--text-mono);
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .opv-edge-list { display: flex; flex-direction: column; gap: 6px; }
+    .opv-edge-row {
+      padding: 8px 9px;
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 78%, transparent);
+      color: var(--opv-muted);
+      font: var(--text-body-sm);
+    }
+    .opv-edge-row strong { color: var(--opv-text); font-weight: 600; }
+    @media (max-width: 980px) {
+      #opvHost.opv-app { height: auto; min-height: 100vh; grid-template-columns: 1fr; grid-template-rows: auto minmax(900px, calc(100vh - 48px)); }
+    }
+
+    /* ── 工具栏：算子染色 seg 控件 + 层级 hsel 下拉（从 training-run-twin-standalone/wzh_index.html
+       页面内联样式搬入，原来是页面级裸类名，这里收敛到 #opvHost 下避免和宿主页同名类冲突）── */
+    #opvHost .opv-actions #zoomOut,
+    #opvHost .opv-actions #zoomReset,
+    #opvHost .opv-actions #zoomIn {
+      height: 24px;
+      padding: 0 10px;
+      border: none;
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: 600 11px/1 var(--font-sans);
+      border-radius: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+    #opvHost .opv-actions #zoomOut:hover,
+    #opvHost .opv-actions #zoomReset:hover,
+    #opvHost .opv-actions #zoomIn:hover { color: var(--foreground); }
+    #opvHost .seg {
+      display: inline-flex;
+      background: color-mix(in srgb, var(--foreground) 6%, transparent);
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    #opvHost .segbtn {
+      height: 24px;
+      padding: 0 10px;
+      border: none;
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: 600 11px/1 var(--font-sans);
+      border-radius: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+    #opvHost .segbtn:hover { color: var(--foreground); }
+    #opvHost .segbtn.on {
+      background: var(--surface-1);
+      color: var(--foreground);
+      box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.28));
+    }
+    #opvHost .seg-lbl {
+      font: 600 11px/1.2 var(--font-sans);
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: var(--foreground-muted);
+    }
+    #opvHost .tsep {
+      display: inline-block;
+      width: 1px;
+      height: 18px;
+      background: var(--border-subtle);
+      flex: 0 0 auto;
+    }
+    #opvHost .hsel {
+      height: 24px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-default);
+      background: var(--surface-1);
+      color: var(--foreground);
+      font: 500 11px/1 var(--font-mono, monospace);
+      padding: 0 4px;
+      cursor: pointer;
+    }
+    #opvHost .hsel:focus { outline: none; border-color: var(--primary); }
+    #opvHost .hsel-dd { position: relative; display: inline-flex; }
+    #opvHost .hsel-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 24px;
+      padding: 0 6px 0 8px;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    #opvHost .hsel-chev {
+      width: 13px;
+      height: 13px;
+      flex: 0 0 auto;
+      opacity: 0.7;
+      transition: transform var(--duration-fast, 100ms) var(--easing-default, ease);
+    }
+    #opvHost .hsel-dd.open .hsel-chev { transform: rotate(180deg); }
+    #opvHost .hsel-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 80;
+      min-width: 186px;
+      padding: 6px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--surface-1);
+      box-shadow: 0 8px 24px rgba(0,0,0,.36);
+    }
+    #opvHost .hsel-menu[hidden] { display: none; }
+    #opvHost .hsel-item {
+      display: flex;
+      align-items: center;
+      height: 30px;
+      padding: 0 12px 0 26px;
+      position: relative;
+      border: 0;
+      background: transparent;
+      color: var(--foreground-secondary);
+      font: 500 12px/1 var(--font-sans);
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      width: 100%;
+      text-align: left;
+    }
+    #opvHost .hsel-item:hover { background: var(--state-hover, rgba(255,255,255,.06)); color: var(--foreground); }
+    #opvHost .hsel-item.is-sel { color: var(--foreground); }
+    #opvHost .hsel-item.is-sel::before {
+      content: "✓";
+      position: absolute;
+      left: 8px;
+      font-size: 12px;
+      color: var(--primary);
+    }

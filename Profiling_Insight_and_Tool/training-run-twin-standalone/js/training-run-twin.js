@@ -722,8 +722,14 @@
   var PP_STAGE_COUNT = 4;
   var PP_COLS_PER_STAGE = 16; // 64 cols / 4 PP stages = 16 cols per stage
 
+  // 本页是演示 demo,集群热力图不需要"实时"——着色只在外壳重建后(初始加载/切硬件)
+  // 算一次并冻结,之后 tick/时光机/renderAll 再调用 renderHeat() 都直接跳过,
+  // 不再逐帧重写 2048 个格子的 class/style/tip(此前每次重绘要花数百毫秒)。
+  var heatPainted = false;
+
   function renderHeatShell(heatEl) {
     const heat = heatEl || $("heat");
+    if (!heatEl) heatPainted = false; // 只有主热力图(#heat)外壳重建才需要重新着色
     const profile = hardwareProfiles[state.hardware];
     const cols = profile.cols; // 64
     const rows = profile.devices / cols; // 32
@@ -809,6 +815,7 @@
   }
 
   function renderHeat() {
+    if (heatPainted) return; // 已经着色过一次,固定着色,不再逐帧重绘 2048 个格子
     var cells = $("heat").querySelectorAll(".twin-heat-cell");
     var profile = hardwareProfiles[state.hardware];
     var cols = profile.cols;
@@ -817,16 +824,8 @@
     let lowUtil = 0;
     let total = 0;
     let totalUtil = 0;
-    // 回放态的 util/temp 已由 applyReplayDevices() 按绝对 step 确定性算好,
-    // 这里不能再叠随机游走,否则同一 step 每次重绘都不一样,失去"回放"的可复现性
-    const replayFrozen = isTimeMachineReplaying();
     state.devices.forEach((device, index) => {
       var col = index % cols;
-      if (!replayFrozen) {
-        const targetTemp = 54 + device.util * 23 + (device.bad ? 8 : 0);
-        device.temp = clamp(device.temp * 0.86 + (targetTemp + rand(-2.2, 2.2)) * 0.14, 50, 92);
-        device.util = clamp(device.util + (Math.random() - 0.5) * 0.025, 0.45, 1);
-      }
       peak = Math.max(peak, device.temp);
       total += device.temp;
       totalUtil += device.util;
@@ -873,6 +872,7 @@
           ? "查降频/散热"
           : "继续观察";
     }
+    heatPainted = true;
   }
 
   function renderArchitecture() {
@@ -1300,8 +1300,22 @@
     card.ctrl = renderMetricChart(card.wrap, card.cfg, w, h);
   }
 
+  // 先统一读完所有卡片的尺寸(一次 layout flush),再统一写(renderMetricChart 重建图表 DOM)。
+  // 逐卡"读尺寸→建 DOM→读下一张尺寸"交替着来的话,每张卡都会强制浏览器同步跑一次 layout——
+  // profiler 实测这是 tick() 单帧里最重的一块(N 张卡 N 次同步 layout,而不是 1 次)。
   function syncAccCards(force) {
-    accCards.forEach((c) => syncAccCard(c, force));
+    const pending = [];
+    accCards.forEach((card) => {
+      const w = Math.round(card.wrap.clientWidth || 0);
+      const h = Math.round(card.wrap.clientHeight || 0);
+      if (w < 2 || h < 2) return;
+      if (!force && card.ctrl && w === card.size.w && h === card.size.h) return;
+      pending.push({ card, w, h });
+    });
+    pending.forEach(({ card, w, h }) => {
+      card.size = { w, h };
+      card.ctrl = renderMetricChart(card.wrap, card.cfg, w, h);
+    });
   }
 
   function renderAccReadouts() {
@@ -1490,8 +1504,20 @@
     card.ctrl = renderMetricChart(card.wrap, card.cfg, w, h);
   }
 
+  // 同 syncAccCards:批量读完尺寸再批量写,避免逐卡读写交替触发多次同步 layout。
   function syncInfraCards(force) {
-    infraCards.forEach((c) => syncInfraCard(c, force));
+    const pending = [];
+    infraCards.forEach((card) => {
+      const w = Math.round(card.wrap.clientWidth || 0);
+      const h = Math.round(card.wrap.clientHeight || 0);
+      if (w < 2 || h < 2) return;
+      if (!force && card.ctrl && w === card.size.w && h === card.size.h) return;
+      pending.push({ card, w, h });
+    });
+    pending.forEach(({ card, w, h }) => {
+      card.size = { w, h };
+      card.ctrl = renderMetricChart(card.wrap, card.cfg, w, h);
+    });
   }
 
   function renderInfraReadouts() {
@@ -3420,12 +3446,17 @@
   // 通过 [data-locate-chart] 占位符挂载,避免重复实现一套图表渲染逻辑
   let locateMetricCards = []; // [{el, cfg, ctrl, size}]
 
+  // 同 syncAccCards:批量读完尺寸再批量写,避免逐卡读写交替触发多次同步 layout。
   function syncLocateMetricCharts(force) {
+    const pending = [];
     locateMetricCards.forEach((c) => {
       const w = Math.round(c.el.clientWidth || 0);
       const h = Math.round(c.el.clientHeight || 0);
       if (w < 2 || h < 2) return;
       if (!force && c.ctrl && w === c.size.w && h === c.size.h) return;
+      pending.push({ c, w, h });
+    });
+    pending.forEach(({ c, w, h }) => {
       c.size = { w, h };
       c.ctrl = renderMetricChart(c.el, c.cfg, w, h);
     });

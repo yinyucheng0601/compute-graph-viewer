@@ -30,6 +30,46 @@
   let chatStreaming = false;
   let chartsOverrideActive = false; // 「调整图表」演示是否已把精度栏换成新指标,关闭面板时据此还原
 
+  // ── 首屏欢迎语打字机效果:只要还停在欢迎屏(未开始对话),每次打开抽屉都重新播放一遍。
+  // 用一个自增 token 标记"当前是第几轮打字"——如果面板被快速关了又开、上一轮的 setTimeout
+  // 链还没跑完,旧的 step() 发现自己的 token 已经过期就直接放弃,不会跟新一轮抢着写同一个
+  // 已被清空重建的 cursor 节点(避免 insertAdjacentText 在已脱离文档的节点上报错)。 ──
+  const WELCOME_TEXT = '我可以帮你诊断问题、修改配置、定制面板。';
+  let typewriterToken = 0;
+
+  function typeWelcomeText(el, text) {
+    const token = ++typewriterToken;
+    el.textContent = '';
+    const cursor = document.createElement('span');
+    cursor.className = 'wzh-chat-typewriter-cursor';
+    el.appendChild(cursor);
+    let i = 0;
+    (function step() {
+      if (token !== typewriterToken) return;
+      if (i < text.length) {
+        cursor.insertAdjacentText('beforebegin', text[i]);
+        i += 1;
+        setTimeout(step, 32);
+      } else {
+        setTimeout(() => { if (token === typewriterToken) cursor.remove(); }, 1200);
+      }
+    })();
+  }
+
+  function playWelcomeTypewriter() {
+    const el = document.querySelector('#trainChatMessages .wzh-chat-welcome-text');
+    if (!el) return;
+    typeWelcomeText(el, WELCOME_TEXT);
+  }
+
+  // 每次打开抽屉,描边+阴影跑一圈双头光(见 .is-glow-sweep 相关 CSS);先移除类名强制回流,
+  // 再加回去,保证连续多次打开也能重新播放(而不是只在 class 第一次加上时触发一次)。
+  function triggerOpenGlow(panel) {
+    panel.classList.remove('is-glow-sweep');
+    void panel.offsetWidth;
+    panel.classList.add('is-glow-sweep');
+  }
+
   function getApiKey() { return (localStorage.getItem(KEY_STORE) || '').trim(); }
   function setApiKey(k) {
     if (k) localStorage.setItem(KEY_STORE, k.trim());
@@ -286,6 +326,25 @@ ${issuesText || '（暂无）'}
     document.querySelectorAll('.wzh-chat-suggestion').forEach((b) => { b.disabled = busy; });
     const sendBtn = $('trainChatSendBtn');
     if (sendBtn) sendBtn.disabled = busy;
+    const newBtn = $('trainChatNewBtn');
+    if (newBtn) newBtn.disabled = busy;
+  }
+
+  // 新建对话:按用户诉求只是"清空当前面板内容"——重置消息区回到欢迎屏 + 重放一次打字机效果,
+  // 不触碰「调整图表」演示的精度栏覆盖(那个由关闭面板时的 revertChartsOverrideIfActive 负责)。
+  function resetConversation() {
+    if (chatStreaming) return;
+    const msgEl = $('trainChatMessages');
+    if (!msgEl) return;
+    chatHistory = [];
+    msgEl.innerHTML =
+      '<div class="wzh-chat-welcome">' +
+        '<svg class="wzh-chat-welcome-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+          '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"></path>' +
+        '</svg>' +
+        '<div class="wzh-chat-welcome-text"></div>' +
+      '</div>';
+    playWelcomeTypewriter();
   }
 
   // ── 「消息设置」场景:固定的演示流程,不经 DeepSeek——用户已经把回答内容和消息预览卡片都
@@ -510,7 +569,10 @@ ${issuesText || '（暂无）'}
       toggle.setAttribute('aria-pressed', String(open));
       toggle.title = open ? '关闭智能对话' : '打开智能对话';
       toggle.setAttribute('aria-label', toggle.title);
-      if (!open) {
+      if (open) {
+        triggerOpenGlow(panel);
+        playWelcomeTypewriter();
+      } else {
         revertChartsOverrideIfActive(); // 关闭对话框即撤销「调整图表」演示对精度栏的改动
       }
     }
@@ -557,6 +619,7 @@ ${issuesText || '（暂无）'}
     initInput();
     initAnchorChip();
     $('trainChatKeyBtn')?.addEventListener('click', () => window.promptTrainChatApiKey());
+    $('trainChatNewBtn')?.addEventListener('click', resetConversation);
   }
 
   if (document.readyState === 'loading') {

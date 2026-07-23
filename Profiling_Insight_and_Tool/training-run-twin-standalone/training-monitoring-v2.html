@@ -1693,27 +1693,77 @@
     }
 
     /* ── 智能对话:训练场景 AI 助手,右侧滑出面板,默认收起(见 #trainChatToggle/js/training-chat-panel.js)。
-         沿用 wzh-locate-drawer 的滑出手法但不加暗背景遮罩 —— 对话过程中仍要能看到左侧整网图/指标。 ── */
+         沿用 wzh-locate-drawer 的滑出手法但不加暗背景遮罩 —— 对话过程中仍要能看到左侧整网图/指标。
+         悬浮卡片形态:上/右/下各留 8px 呼吸间距、16px 圆角(与 panel-shell/modal 同级 --radius-xl),
+         而非贴屏边的直角抽屉。收起时额外多平移一段(100% + 间距 + 阴影余量),避免圆角一角在
+         右侧留白里露出一小截。 ── */
+    @property --wzh-chat-glow-angle {
+      syntax: '<angle>';
+      inherits: false;
+      initial-value: 0deg;
+    }
     .wzh-chat-panel {
       position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 380px;
+      top: 8px;
+      right: 8px;
+      bottom: 8px;
+      width: 440px;
       max-width: 92vw;
       z-index: 1900;
       display: flex;
       flex-direction: column;
       background: var(--surface-1);
-      border-left: 1px solid var(--border-default);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-xl);
       box-shadow: var(--shadow-lg);
-      transform: translateX(100%);
+      transform: translateX(calc(100% + 40px));
       transition: transform var(--duration-base) var(--easing-default);
       pointer-events: none;
+      --wzh-chat-glow-angle: 0deg;
+      /* 光环/阴影颜色:在 accent 基础上多混一点 primary(蓝),让打开动效偏蓝一些,不是纯 accent 灰蓝 */
+      --wzh-chat-glow-color: color-mix(in srgb, var(--accent) 65%, var(--primary) 35%);
     }
     .wzh-chat-panel.is-open {
       transform: translateX(0);
       pointer-events: auto;
+    }
+    /* 打开时描边一圈"双头"跑马光:两段高亮弧线(相隔 180°)沿圆角边框对跑一圈后消失,
+       用 mask 只留边框宽度这一圈(content-box 与整体做 xor),角度用 @property 注册成
+       <angle> 才能被 @keyframes 平滑插值,而不是整块背景瞬间跳变。 */
+    .wzh-chat-panel::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      padding: 1.5px;
+      background: conic-gradient(from var(--wzh-chat-glow-angle),
+        transparent 0deg,
+        color-mix(in srgb, var(--wzh-chat-glow-color) 90%, transparent) 10deg,
+        transparent 30deg,
+        transparent 180deg,
+        color-mix(in srgb, var(--wzh-chat-glow-color) 90%, transparent) 190deg,
+        transparent 210deg,
+        transparent 360deg);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .wzh-chat-panel.is-glow-sweep::after {
+      animation: wzh-chat-glow-ring 2.4s ease-out;
+    }
+    .wzh-chat-panel.is-glow-sweep {
+      animation: wzh-chat-glow-shadow 2.4s ease-out;
+    }
+    @keyframes wzh-chat-glow-ring {
+      0% { opacity: 0; --wzh-chat-glow-angle: 0deg; }
+      12% { opacity: 1; }
+      100% { opacity: 0; --wzh-chat-glow-angle: 360deg; }
+    }
+    @keyframes wzh-chat-glow-shadow {
+      0%, 100% { box-shadow: var(--shadow-lg), 0 0 0 0 color-mix(in srgb, var(--wzh-chat-glow-color) 0%, transparent); }
+      35% { box-shadow: var(--shadow-lg), 0 0 28px 2px color-mix(in srgb, var(--wzh-chat-glow-color) 40%, transparent); }
     }
     /* 标题栏下不加分割线——右上角只留"设置 Key(齿轮) + 关闭"两个图标按钮,
        原来的上下文行/Key 状态行/额度行都收进了这一个齿轮按钮里(见 #trainChatKeyBtn)。 */
@@ -1729,6 +1779,7 @@
     /* 齿轮图标默认中性色;Key 已配置时略微提亮，作为"已配置"的唯一视觉线索(悬浮 title 给出完整文案) */
     .wzh-chat-key-icon { width: 16px; height: 16px; fill: none; stroke: var(--foreground-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke var(--duration-fast); }
     #trainChatKeyBtn.is-configured .wzh-chat-key-icon { stroke: var(--accent); }
+    .wzh-chat-new-icon { width: 16px; height: 16px; fill: none; stroke: var(--foreground-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     .wzh-chat-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 
@@ -1743,6 +1794,21 @@
     }
     .wzh-chat-welcome-icon { width: 26px; height: 26px; fill: none; stroke: var(--foreground-muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
     .wzh-chat-welcome-text { font-size: 12px; color: var(--foreground-muted); line-height: 1.6; }
+    /* 首屏欢迎语打字机效果的光标(见 js/training-chat-panel.js 的 typeWelcomeText):打字期间及
+       打完后短暂停留都保持闪烁,随后随文字节点一起被移除,不常驻。 */
+    .wzh-chat-typewriter-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      margin-left: 1px;
+      vertical-align: -0.15em;
+      background: var(--primary);
+      animation: wzh-chat-typewriter-blink .8s step-end infinite;
+    }
+    @keyframes wzh-chat-typewriter-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
 
     /* 用户气泡:靠右、有底色，右下角收成小直角当"尖角"，与 shadcn Bubble 的
        end-aligned + 内容自适应宽度(≤ 80%) 用法一致。 */
@@ -1877,7 +1943,7 @@
     #trainChatToggle.is-active .pto-ide-frame__window-icon { stroke: var(--accent); opacity: 1; }
 
     @media (max-width: 720px) {
-      .wzh-chat-panel { width: 100vw; max-width: 100vw; }
+      .wzh-chat-panel { left: 8px; width: auto; max-width: none; }
     }
 
     /* ── 日志:训练全量/任务/系统日志抽屉,右上角 #trainLogToggle 入口,默认收起(见 js/training-log-drawer.js)。
@@ -3025,6 +3091,11 @@ MoE：256+1（top-8 路由 · EP 切分）">?</span>
         <span class="wzh-chat-head-title">智能对话</span>
       </div>
       <div class="wzh-chat-head-actions">
+        <button class="btn btn-ghost btn-icon btn-sm" id="trainChatNewBtn" type="button" aria-label="新建对话" title="新建对话">
+          <svg class="wzh-chat-new-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+        </button>
         <button class="btn btn-ghost btn-icon btn-sm" id="trainChatKeyBtn" type="button" aria-label="设置 DeepSeek API Key（未配置）" title="设置 DeepSeek API Key（未配置）">
           <svg class="wzh-chat-key-icon" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="3"></circle>

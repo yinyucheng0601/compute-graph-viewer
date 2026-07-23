@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyPTO 泳道图性能分析工具</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../tokens/foundation.css">
+  <link rel="stylesheet" href="../tokens/semantic.css">
+  <link rel="stylesheet" href="../tokens/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ===== 顶部导航栏 ===== -->
+  <header class="header">
+    <div class="header-main">
+      <a class="home-link header-home" href="../launch.html" title="Back To Home" aria-label="Back To Home">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 6.2L7 2l5 4.2v5.1a.7.7 0 01-.7.7H8.6V8.9a.6.6 0 00-.6-.6H6a.6.6 0 00-.6.6V12H2.7a.7.7 0 01-.7-.7V6.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <div class="header-logo">
+        <div>
+          <div class="header-title">PyPTO 性能分析工具</div>
+          <div class="header-subtitle">Swimlane Perf Analyzer</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-spacer"></div>
+
+    <div class="header-file-info">
+      <div class="file-dropdown-wrap" id="fileDropdownWrap">
+        <button class="btn file-dropdown-btn" id="fileDropdownBtn">
+          <span id="fileName">内置样例</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="file-dropdown-menu" id="fileDropdownMenu">
+          <button class="file-dropdown-item" id="loadSampleBtn">内置样例</button>
+          <button class="file-dropdown-item" id="loadLocalBtn">打开本地 JSON</button>
+        </div>
+      </div>
+      <span id="eventCount" class="file-stats"></span>
+      <span id="coreCount" class="file-stats"></span>
+      <input type="file" id="fileInput" accept=".json" style="display:none">
+    </div>
+  </header>
+
+  <!-- ===== 主区域 ===== -->
+  <div class="main-area">
+
+    <!-- ===== 主内容区 ===== -->
+    <div id="mainContent" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+
+      <!-- 指标概览条 -->
+      <div class="metrics-strip">
+        <div class="metric-card metric-card-utilization" id="metricUtilization">
+          <div class="metric-card-top">
+            <div class="metric-card-heading">
+              <span class="metric-card-icon">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <rect x="2" y="10" width="3" height="6" rx="1" fill="currentColor" opacity="0.55"/>
+                  <rect x="7.5" y="6" width="3" height="10" rx="1" fill="currentColor" opacity="0.8"/>
+                  <rect x="13" y="2" width="3" height="14" rx="1" fill="currentColor"/>
+                </svg>
+              </span>
+              <div class="metric-card-title">平均核心利用率</div>
+            </div>
+          </div>
+          <div class="metric-value">--</div>
+          <div class="metric-footer">
+            <div class="metric-subtitle">--</div>
+            <canvas width="100" height="24"></canvas>
+          </div>
+        </div>
+        <div class="metric-card metric-card-bubble" id="metricBubble">
+          <div class="metric-card-top">
+            <div class="metric-card-heading">
+              <span class="metric-card-icon">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <circle cx="9" cy="10" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="9" cy="10" r="2.2" fill="currentColor" opacity="0.5"/>
+                  <circle cx="13.5" cy="5" r="1.8" stroke="currentColor" stroke-width="1.2"/>
+                  <circle cx="5.5" cy="4" r="1.2" fill="currentColor" opacity="0.4"/>
+                </svg>
+              </span>
+              <div class="metric-card-title">平均气泡率</div>
+            </div>
+          </div>
+          <div class="metric-value">--</div>
+          <div class="metric-footer">
+            <div class="metric-subtitle">--</div>
+            <canvas width="100" height="24"></canvas>
+          </div>
+        </div>
+        <div class="metric-card metric-card-balance" id="metricBalance">
+          <div class="metric-card-top">
+            <div class="metric-card-heading">
+              <span class="metric-card-icon">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M9 3v12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.4"/>
+                  <rect x="2.5" y="6.5" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.7"/>
+                  <rect x="10.5" y="6.5" width="5" height="5" rx="1.5" fill="currentColor"/>
+                </svg>
+              </span>
+              <div class="metric-card-title">负载均衡度</div>
+            </div>
+          </div>
+          <div class="metric-value">--</div>
+          <div class="metric-footer">
+            <div class="metric-subtitle">--</div>
+            <canvas width="100" height="24"></canvas>
+          </div>
+        </div>
+        <div class="metric-card metric-card-time" id="metricTime">
+          <div class="metric-card-top">
+            <div class="metric-card-heading">
+              <span class="metric-card-icon">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.4"/>
+                  <path d="M9 5.5V9.5l2.8 2.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <div class="metric-card-title">总执行时长</div>
+            </div>
+          </div>
+          <div class="metric-value">--</div>
+          <div class="metric-footer">
+            <div class="metric-subtitle">--</div>
+          </div>
+        </div>
+        <div class="metric-card metric-card-rating" id="metricRating">
+          <div class="metric-card-top">
+            <div class="metric-card-heading">
+              <span class="metric-card-icon">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                  <path d="M9 2.2L11.1 7.7H17L12.3 11l1.8 5.5L9 13.2 4.9 16.5l1.8-5.5L2 7.7h5.9L9 2.2z"/>
+                </svg>
+              </span>
+              <div class="metric-card-title">综合评级</div>
+            </div>
+          </div>
+          <div class="metric-stars">☆☆☆☆☆</div>
+          <div class="metric-label">--</div>
+          <div class="metric-footer">
+            <div class="metric-score">-- 分</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 内容分割 -->
+      <div class="content-split">
+
+        <!-- ===== 泳道图区域 ===== -->
+        <div class="swimlane-area">
+          <!-- 泳道工具栏 -->
+          <div class="toolbar">
+            <div class="toolbar-group">
+              <button class="btn btn-sm btn-icon" id="fitBtn" title="适应视图">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M1.5 5V2h3M9.5 2h3v3M12.5 9v3h-3M4.5 12h-3V9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button class="btn btn-sm btn-icon" id="zoomInBtn" title="放大">+</button>
+              <button class="btn btn-sm btn-icon" id="zoomOutBtn" title="缩小">−</button>
+              <button class="btn btn-sm" id="exportBtn">导出图片</button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="chip-group">
+              <label class="hw-chip hw-chip-aic">
+                <input type="checkbox" id="showAIC" checked>
+                <span>AIC</span>
+              </label>
+              <label class="hw-chip hw-chip-aiv">
+                <input type="checkbox" id="showAIV" checked>
+                <span>AIV</span>
+              </label>
+              <label class="hw-chip">
+                <input type="checkbox" id="showBubbles" checked>
+                <span>气泡</span>
+              </label>
+              <label class="hw-chip hw-chip-warn">
+                <input type="checkbox" id="highlightBottlenecks" checked>
+                <span>瓶颈</span>
+              </label>
+            </div>
+            <div class="toolbar-divider"></div>
+            <span class="toolbar-hint">滚轮缩放 · Shift+滚轮平移 · 拖拽平移 · 点击行查看详情</span>
+          </div>
+
+          <!-- 泳道主体: viewport + inplace 详情 -->
+          <div class="swimlane-body">
+            <!-- 左侧标签: 固定列，不参与横向滚动 -->
+            <div class="swimlane-labels" id="swimlaneLabel"></div>
+            <div class="swimlane-viewport" id="swimlaneViewport">
+              <div class="swimlane-inner">
+                <!-- 主泳道 canvas -->
+                <div id="swimlaneCanvas"></div>
+              </div>
+            </div>
+
+            <!-- 核心/任务 inplace 详情面板 -->
+            <div id="coreDetailPanel"></div>
+          </div>
+        </div>
+
+        <!-- ===== 侧边分析面板 ===== -->
+        <div class="sidebar">
+          <div class="tab-nav">
+            <button class="tab-btn active" data-tab="bottlenecks">
+              瓶颈分析
+              <span class="tab-badge" id="bottleneckCount">0</span>
+            </button>
+            <button class="tab-btn" data-tab="recommendations">
+              优化建议
+              <span class="tab-badge tab-badge-rec" id="recCount">0</span>
+            </button>
+            <button class="tab-btn" data-tab="charts">图表</button>
+            <button class="tab-btn" data-tab="cores">核心详情</button>
+          </div>
+
+          <!-- Tab: 瓶颈分析 -->
+          <div id="tab-bottlenecks" class="tab-panel active">
+            <div id="bottleneckList">
+              <div class="no-issues">
+                <span class="no-issues-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                <p>加载数据后自动分析</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: 优化建议 -->
+          <div id="tab-recommendations" class="tab-panel">
+            <div id="recommendationList">
+              <div class="no-issues">
+                <span class="no-issues-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2a7 7 0 017 7c0 2.5-1.3 4.7-3.3 6l-.7.5V17H9v-1.5l-.7-.5A7 7 0 0112 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <path d="M9 21h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <p>加载数据后生成建议</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: 图表 -->
+          <div id="tab-charts" class="tab-panel">
+            <div class="charts-section">
+              <div class="chart-block">
+                <div class="chart-title">AIC 核心利用率</div>
+                <div class="chart-container" id="chartUtilAIC"></div>
+              </div>
+              <div class="chart-block">
+                <div class="chart-title">AIV 核心利用率</div>
+                <div class="chart-container" id="chartUtilAIV"></div>
+              </div>
+              <div class="chart-block">
+                <div class="chart-title">核心气泡率 (越低越好)</div>
+                <div class="chart-container" id="chartBubble"></div>
+              </div>
+              <div class="chart-block">
+                <div class="chart-title">利用率热力图</div>
+                <div class="chart-container-sm" id="chartHeatmap"></div>
+              </div>
+              <div class="chart-block">
+                <div class="chart-title">操作类型耗时分布 Top 10</div>
+                <div class="chart-container-op" id="chartOps"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: 核心详情 -->
+          <div id="tab-cores" class="tab-panel">
+            <div class="table-filters">
+              <select class="table-filter-select" id="coreTypeFilter">
+                <option value="ALL">全部核心</option>
+                <option value="AIC">AIC 核心</option>
+                <option value="AIV">AIV 核心</option>
+              </select>
+              <input type="text" class="table-search" id="coreSearch" placeholder="搜索核心名称...">
+            </div>
+            <div class="core-table-wrap">
+              <table class="core-table">
+                <thead>
+                  <tr>
+                    <th>Core</th>
+                    <th>Tasks</th>
+                    <th>Active(μs)</th>
+                    <th>Util</th>
+                    <th>Bubble</th>
+                    <th>Avg(μs)</th>
+                    <th>Peak(μs)</th>
+                    <th>Idle(μs)</th>
+                  </tr>
+                </thead>
+                <tbody id="coreTableBody">
+                  <tr>
+                    <td colspan="8" class="table-empty-cell">加载数据后显示</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /sidebar -->
+      </div><!-- /content-split -->
+    </div><!-- /mainContent -->
+
+  </div><!-- /main-area -->
+</div><!-- /app-layout -->
+
+<!-- 加载覆盖层 -->
+<div id="loadingOverlay" style="display:none">
+  <div class="loading-spinner"></div>
+  <div class="loading-msg">正在加载...</div>
+</div>
+
+<!-- 错误提示 -->
+<div id="errorToast" style="display:none"></div>
+
+<!-- ===== 计算图面板 (从底部滑出) ===== -->
+<div id="computeGraphPanel" class="cg-panel">
+  <div class="cg-panel-resize" id="cgPanelResize"></div>
+  <div class="cg-panel-header">
+    <div class="cg-panel-title">
+      <span class="cg-panel-icon">⊞</span>
+      <span id="cgPanelTaskName">计算图</span>
+    </div>
+    <div class="cg-panel-header-right">
+      <div id="cgPanelSummary" class="cg-panel-summary-inline"></div>
+      <button class="cg-panel-close" id="cgPanelClose" title="关闭">✕</button>
+    </div>
+  </div>
+  <div class="cg-panel-body">
+    <div class="cg-panel-info" id="cgPanelInfo"></div>
+    <div class="cg-panel-graph" id="cgPanelGraph">
+      <div class="cg-empty">选择任务后显示计算图</div>
+    </div>
+  </div>
+</div>
+
+<!-- 脚本 (顺序重要) -->
+<script src="js/sample-data.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/analyzer.js"></script>
+<script src="../patterns/swimlane-task/pattern.js"></script>
+<script src="js/swimlane.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/compute-graph.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
