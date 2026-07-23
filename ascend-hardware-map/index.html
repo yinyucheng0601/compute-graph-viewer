@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aic-core-object/pattern.css">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/aiv-core-object/pattern.css">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-architecture/pattern.css">
+  <link rel="stylesheet" href="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.css">
   <link rel="stylesheet" href="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.css">
   <link rel="stylesheet" href="./app.css">
 </head>
@@ -83,21 +84,25 @@
             </aside>
 
             <section class="pto-ide-frame__pane preview-pane" data-ide-pane="editor-preview">
-              <div class="pto-ide-frame__tabstrip">
-                <div class="tab-control" role="tablist" aria-label="Preview tabs">
-                  <button class="tab-control-item is-selected" type="button" role="tab" aria-selected="true">hardware-impact.view</button>
+              <div class="pto-ide-frame__tabstrip" data-ide-slot="preview-tabs">
+                <div class="tab-control" role="tablist" aria-label="中栏视图">
+                  <button class="tab-control-item is-selected" id="hardwareViewTab" type="button" role="tab" data-preview-view="hardware" aria-selected="true" aria-controls="hardwareViewport">hardware-impact.view</button>
+                  <button class="tab-control-item" id="memoryViewTab" type="button" role="tab" data-preview-view="memory" aria-selected="false" aria-controls="memoryReuseView">memory-reuse.view</button>
                 </div>
               </div>
               <div class="pto-ide-frame__pane-body preview-body">
-                <section class="pto-hw-viewport hardware-shell" id="hardwareViewport">
+                <section class="pto-hw-viewport hardware-shell preview-view" id="hardwareViewport" data-view-panel="hardware" role="tabpanel" aria-labelledby="hardwareViewTab">
                   <header class="pto-hw-viewport__toolbar">
-                    <div class="pto-hw-viewport__title">硬件影响图 <small id="selectionCaption">尚未选择分析项</small></div>
-                    <div class="pto-hw-viewport__controls">
+                    <div class="pto-hw-viewport__title">
+                      <span>硬件架构图</span>
                       <div class="pto-hw-viewport__segmented" aria-label="架构切换">
                         <button class="btn btn-sm is-selected" type="button" data-arch-id="ascend910b" aria-pressed="true">910B</button>
-                        <button class="btn btn-sm" type="button" data-arch-id="ascend950b" aria-pressed="false">950B</button>
+                        <button class="btn btn-sm" type="button" data-arch-id="ascend950b" aria-pressed="false">950</button>
                       </div>
+                    </div>
+                    <div class="pto-hw-viewport__controls">
                       <div class="pto-hw-viewport__tools">
+                        <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" id="generationCompare" aria-pressed="false" hidden disabled title="切换到 950B 后查看代际对比">查看代际对比</button>
                         <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-detail aria-pressed="true">细节开</button>
                         <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-fit title="适合窗口">适合</button>
                         <button class="btn btn-sm btn-ghost pto-hw-viewport__tool" type="button" data-zoom-out aria-label="缩小">−</button>
@@ -107,15 +112,24 @@
                     </div>
                   </header>
                   <div class="pto-hw-viewport__stage hardware-stage" data-stage>
-                    <div class="empty-selection" id="emptySelection">
-                      <span class="empty-selection__index">01</span>
-                      <strong>从 Explorer 选择一个分析项</strong>
-                      <p>硬件图会聚焦相关单元与数据通路；未选择时保留完整架构基线。</p>
-                    </div>
+                    <aside class="generation-compare-card" id="generationCompareSummary" hidden aria-live="polite">
+                      <div class="generation-compare-card__head"><strong>950B 相对 910B</strong><span>新增路径高亮显示</span></div>
+                      <div class="generation-compare-card__columns">
+                        <div><b>950B 新增</b><span>SIMT、FP Buffer、UB↔L1、L0C→UB、NDDMA</span></div>
+                        <div><b>910B 假设移除</b><span>GM→L0A/L0B、L1→GM、int4 Cube、4:2 稀疏、SetLoadDataBoundary</span></div>
+                      </div>
+                    </aside>
                     <div class="pto-hw-viewport__scale hardware-scale" data-scale>
                       <div id="hardwareGraph"></div>
                     </div>
                   </div>
+                </section>
+                <section class="memory-reuse-view preview-view" id="memoryReuseView" data-view-panel="memory" role="tabpanel" aria-labelledby="memoryViewTab" hidden>
+                  <header class="memory-reuse-view__header">
+                    <div><strong id="memoryReuseTitle">UB 内存复用分析</strong><span id="memoryReuseSub">AIV · MatMulAddRelu_mix_aic__kernel0</span></div>
+                    <div class="memory-reuse-view__actions"><button class="btn btn-sm btn-ghost" type="button" id="memoryReuseClose">返回硬件图</button></div>
+                  </header>
+                  <div class="memory-reuse-host" id="memoryReuseHost"></div>
                 </section>
                 <div class="pto-ide-frame__floating-playback-mount" id="playbackMount" hidden></div>
               </div>
@@ -130,7 +144,7 @@
                 <div class="inspector-empty">
                   <span>CONTEXTUAL INSPECTOR</span>
                   <strong>选择迁移项或执行流</strong>
-                  <p>这里会显示判断信号、硬件影响、迁移动作、执行步骤和证据等级。</p>
+                  <p>这里会显示变化上下文、判断信号、硬件影响、迁移动作和执行步骤。</p>
                 </div>
               </div>
             </aside>
@@ -146,6 +160,7 @@
   <script src="../vendor/pto-design-system/patterns/aiv-core-object/pattern.js"></script>
   <script src="../vendor/pto-design-system/patterns/aic-core-object/pattern.js"></script>
   <script src="../vendor/pto-design-system/patterns/memory-architecture/pattern.js"></script>
+  <script src="../vendor/pto-design-system/patterns/memory-reuse-viewer/pattern.js"></script>
   <script src="../vendor/pto-design-system/patterns/hardware-architecture-viewport/pattern.js"></script>
   <script src="./app.js"></script>
 </body>

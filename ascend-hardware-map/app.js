@@ -31,6 +31,19 @@
     { id: 10, badge: '通信', title: 'HCCL 软件通信 → CCU 硬化通信', sub: '集合通信专用引擎', scenario: 'B', arch: 'ascend950b', essence: 'HCCL 仍提供上层语义，但 950 把部分集合通信执行下沉至 CCU，需要联合观察硬件资源与通算重叠。', signals: ['CCU', 'ReduceScatter', 'AllGatherMatMul', 'Dispatch / Combine', 'CCU profiling'], actions: ['区分 HCCL 接口语义与 CCU 执行落点', '用 CCU profiling 验证通信、片上内存和 AI Core 协同'], selectors: [N.l2, N.scalar, N.cube, N.l0c], routes: [], related: ['ccu-collective', 'gemm-ar'] },
   ];
 
+  const CATEGORY_CONTEXT = {
+    1: { actor: '算子开发者', goal: '让编译器选择正确 ISA，并让运行时挂载对应实现', impact: '在 CMake、Device 宏和 Host 注册中显式声明架构号', boundary: '架构声明只表达“想运行在哪一代”，不能单独证明 kernel 实际可编译、可运行或性能等价。' },
+    2: { actor: 'AIV 核硬件', goal: '让向量计算更细粒度可控并贴近裸 ISA', impact: '计算对象从 UB LocalTensor 延伸到 RegTensor，并新增谓词、地址寄存器和本地屏障', boundary: 'RegBase 不绕开 UB 直读 GM；迁移时必须把 GM → UB → Reg、UB 布局和寄存器压力一起评估。' },
+    3: { actor: 'Vector 核硬件', goal: '原生支持离散访存、线程级并发与原子操作', impact: '在 Vector 单元内新增 SIMT 子系统，并通过编译开关显式启用', boundary: 'SIMT 是对 SIMD 的补充而非替代；连续向量计算仍应保留 SIMD 路径并分别验证性能边界。' },
+    4: { actor: '芯片内互连', goal: '简化 Cube 数据流并减少中间结果绕路', impact: '删除旧直通通路，同时增加 UB→L1、L0C→UB、NDDMA、SSBuf 等路径', boundary: '这是物理通路变化，不是 API 重命名；旧搬运链必须按 950 实际连线重新组织。' },
+    5: { actor: 'Cube 硬件电路', goal: '为 MX 低比特计算路径重新分配电路资源', impact: '移除 int4、4:2 稀疏和边界绕回能力，并强化 MX 相关路径', boundary: '被移除的硬件能力不能通过修改编译参数恢复，必须替换指令、格式或算法路径。' },
+    6: { actor: 'Cube 取数接口', goal: '配合新数据通路提升矩阵喂数效率', impact: 'A 矩阵在 L0A 的分形由 ZZ 改为 NZ，L0B 的 ZN 与 L0C 的 NZ 保持不变', boundary: '变化只落在 L0A，但任何写死 L0A 切分和地址公式的实现都必须重新生成参数。' },
+    7: { actor: 'Cube / Matmul 硬件与 ISA', goal: '支持 LLM 低比特训练、推理和量化融合', impact: 'HiF8、FP8、MX 与 MicroScaling 进入搬运、计算和 Tiling 主路径', boundary: '低比特迁移不是替换 dtype；scale 布局、舍入、饱和、搬运和端到端精度必须一起验证。' },
+    8: { actor: 'UB 片上 SRAM', goal: '减少 bank 冲突并提高单 bank 容量', impact: 'bank group 16→8、每组 bank 3→2、单 bank 4KB→16KB、UB 192KB→256KB', boundary: '代码能编译不代表访问模式仍高效；旧代地址错位经验必须通过 profiling 重新验证。' },
+    9: { actor: '硬件与软件运行时', goal: '演进数值支持、同步原语与调试接口', impact: 'Subnormal 默认支持关闭、核间 Mutex 新增、CheckLocalMemoryIA 移除', boundary: '这类变化不一定改变结构图，却可能改变数值结果、同步行为与问题定位方式。' },
+    10: { actor: 'CCU 集合通信引擎', goal: '降低通信对内存带宽和 AI Core 的占用', impact: 'HCCL 保留上层语义，部分集合通信执行下沉到 CCU 硬化资源', boundary: '仅调用 HCCL API 不等于已使用好 950 通信能力；还要观察 CCU 资源、片上内存压力和通算重叠。' },
+  };
+
   const FLOWS = [
     { id: 'vector', title: 'AIV Vector 计算', short: 'GM/L2 → UB → Vector → UB → GM', confidence: 'verified', arch: 'ascend910b', summary: '单核 AIV 的标准 Vector 路径。数据经 MTE2 进入 UB，计算结果再由 MTE3 写回。', path: 'GM / L2 → MTE2 → UB → Vector → UB → MTE3 → GM / L2', selectors: [N.l2, N.ub, N.vector], routes: ['l2-to-aiv1', 'aiv1-to-l2'], meta: { 'PTO 语义': '普通 AIV tile 计算', 'payload 经过 UB': '是', '适用': 'elementwise / reduce / gather / cast' }, steps: [
       { label: '读 GM/L2', text: '源 tile 位于 GM，全局访问经 L2 层。', selectors: [N.gm, N.l2], routes: [] },
@@ -56,19 +69,19 @@
       { label: 'GM↔GM DMA', text: '外部 SDMA 搬运 payload。', selectors: [N.gm, N.l2], routes: [] },
       { label: 'wait/test', text: '稍后通过 AsyncEvent 收敛完成状态。', selectors: [N.scalar], routes: [] },
     ] },
-    { id: 'urma-async', title: '950 URMA 异步远程内存', short: 'GM → UnifiedBus / URMA → remote GM', confidence: 'claim', arch: 'ascend950b', summary: '950 可把异步接口映射到远程内存路径；公开资料能支持方向判断，但具体微结构仍需硬件手册确认。', path: 'AIV session → local GM → UnifiedBus / URMA → remote GM → wait/test', selectors: [N.scalar, N.l2, N.gm], routes: [], meta: { 'PTO API': 'TPUT_ASYNC / TGET_ASYNC', 'payload 经过 UB': '否', '证据边界': '互连方向可确认；端口细节待确认' }, steps: [
+    { id: 'urma-async', title: '950 URMA 异步远程内存', short: 'GM → UnifiedBus / URMA → remote GM', confidence: 'claim', arch: 'ascend950b', summary: 'AIV 提交远程访问后，payload 从本地 GM 进入 UnifiedBus / URMA 路径，并通过 wait/test 收敛完成状态。', path: 'AIV session → local GM → UnifiedBus / URMA → remote GM → wait/test', selectors: [N.scalar, N.l2, N.gm], routes: [], meta: { 'PTO API': 'TPUT_ASYNC / TGET_ASYNC', 'payload 经过 UB': '否' }, steps: [
       { label: 'AIV 建会话', text: '构建 session 并提交远程访问。', selectors: [N.scalar], routes: [] },
       { label: '进入互连面', text: 'payload 从 GM/L2 进入 950 IO 互连。', selectors: [N.gm, N.l2], routes: [] },
       { label: 'URMA 访问', text: '外部子系统承担远程内存语义。', selectors: [N.l2], routes: [] },
       { label: '完成语义', text: 'wait/test 或 Quiet 收敛可见性。', selectors: [N.scalar], routes: [] },
     ] },
-    { id: 'ccu-collective', title: '950 CCU 集合通信卸载', short: 'AIV launch；CCU 完成搬运归约', confidence: 'claim', arch: 'ascend950b', summary: 'AIV 负责握手与控制，CCU 路径承担集合通信的数据搬运与规约。外部 CCU 以证据说明呈现，不虚构进 AI Core 图。', path: 'AIC tile → AIV launch → CCU fetch/reduce → result GM → CCU_DONE', selectors: [N.cube, N.l0c, N.fp, N.scalar, N.l2], routes: [], meta: { 'PTO 语义': 'TGATHER / TSCATTER / TBROADCAST / TREDUCE', 'payload 经过 UB': '否', '适用': 'AllReduce / ReduceScatter / Broadcast' }, steps: [
+    { id: 'ccu-collective', title: '950 CCU 集合通信卸载', short: 'AIV launch；CCU 完成搬运归约', confidence: 'claim', arch: 'ascend950b', summary: 'AIV 负责握手与控制，CCU 路径承担集合通信的数据搬运与规约，结果写回 GM 后向 AIV 返回完成状态。', path: 'AIC tile → AIV launch → CCU fetch/reduce → result GM → CCU_DONE', selectors: [N.cube, N.l0c, N.fp, N.scalar, N.l2], routes: [], meta: { 'PTO 语义': 'TGATHER / TSCATTER / TBROADCAST / TREDUCE', 'payload 经过 UB': '否', '适用': 'AllReduce / ReduceScatter / Broadcast' }, steps: [
       { label: 'AIC 产 tile', text: 'Cube 结果变成 CCU 可访问的数据。', selectors: [N.cube, N.l0c, N.fp], routes: [] },
       { label: 'AIV launch', text: 'AIV 通知外部 CCU 启动任务。', selectors: [N.scalar], routes: [] },
       { label: 'CCU fetch + reduce', text: 'CCU 子系统完成缓冲、搬运与规约。', selectors: [N.l2], routes: [] },
       { label: '写回 + DONE', text: '结果回到 GM，完成信号返回 AIV。', selectors: [N.gm, N.scalar], routes: [] },
     ] },
-    { id: 'gemm-ar', title: 'GEMM + AllReduce 流水线', short: 'AIC 产 tile；AIV 通信；device barrier', confidence: 'inferred', arch: 'ascend950b', summary: 'AIC 不等整次 GEMM 结束；AIV 按 ready tile 发起通信，以 tile 粒度形成计算与通信重叠。', path: 'AIC tile → Ready Queue → AIV TTEST → TPUT AtomicAdd → barrier', selectors: [N.cube, N.l0c, N.scalar, N.ub, N.l2], routes: ['l2-to-aiv2', 'aiv2-to-l2'], meta: { 'PTO API': 'TTEST / TPUT AtomicAdd / TNOTIFY / TWAIT', '并行关系': 'AIC 生产，AIV 消费', '证据等级': '由示例流程推导' }, steps: [
+    { id: 'gemm-ar', title: 'GEMM + AllReduce 流水线', short: 'AIC 产 tile；AIV 通信；device barrier', confidence: 'inferred', arch: 'ascend950b', summary: 'AIC 不等整次 GEMM 结束；AIV 按 ready tile 发起通信，以 tile 粒度形成计算与通信重叠。', path: 'AIC tile → Ready Queue → AIV TTEST → TPUT AtomicAdd → barrier', selectors: [N.cube, N.l0c, N.scalar, N.ub, N.l2], routes: ['l2-to-aiv2', 'aiv2-to-l2'], meta: { 'PTO API': 'TTEST / TPUT AtomicAdd / TNOTIFY / TWAIT', '并行关系': 'AIC 生产，AIV 消费' }, steps: [
       { label: 'AIC 产 tile', text: 'Cube 完成一个可消费的 GEMM tile。', selectors: [N.cube, N.l0c], routes: [] },
       { label: 'Ready Queue', text: 'AIV 用 TTEST 非阻塞检查 tile。', selectors: [N.scalar], routes: [] },
       { label: 'TPUT AtomicAdd', text: 'AIV 把 tile 送向 owner rank。', selectors: [N.ub, N.l2], routes: ['l2-to-aiv2', 'aiv2-to-l2'] },
@@ -77,15 +90,74 @@
   ];
 
   const SCENARIOS = {
-    A: { title: 'A · 跨架构可兼容', body: '实现不依赖特定硬件路径，但仍需双架构编译、精度与性能验证。', actions: ['分别编译 dav-2201 与 dav-3510', '重点检查 Subnormal 与 UB bank 行为'] },
-    B: { title: 'B · 950 原生能力', body: '代码直接使用 950 新对象或新执行资源；若兼容 910B，需要独立实现分支。', actions: ['按代际拆分注册、tiling 与 workspace', '验证新能力对应的硬件和 profiling 证据'] },
-    C: { title: 'C · 写死旧硬件假设', body: '旧代码依赖 910B/A2/A3 的物理通路、分形或 SRAM 经验，不能只改编译参数。', actions: ['先逐项定位旧代硬件假设', '重写搬运、分形、tiling 与 bank 策略'] },
+    A: {
+      title: 'A · 简单 SIMD 样例', tagline: '改 CMake 试试，但要验',
+      features: ['CMake 中 CMAKE_ASC_ARCHITECTURES 可声明 dav-2201, dav-3510', 'kernel 主要是 GM ↔ UB 搬运、逐元素计算或简单 reduce', '不写死矩阵分形、L0A/L0B/L1 复杂路径', '不使用 BuiltIn API 或内部 impl 接口'],
+      actions: ['用 dav-2201 编译并在 2201 设备验证', '用 dav-3510 编译并在 3510 设备验证', '对照精度与性能，重点检查 Subnormal 和 UB bank 冲突'],
+    },
+    B: {
+      title: 'B · 950 原生能力', tagline: '它本来就是 950 的',
+      features: ['固定 --npu-arch=dav-3510，或启用 --enable-simt', 'README 仅声明支持 Ascend 950PR / 950DT', '出现 RegBase、RegTensor、MaskReg、AddrReg', '注册中出现 AddConfig("ascend950", regbaseCfg)', '使用 Histograms、HiF8、FP8、MXFP8、MXFP4 等低比特能力', '通信链路出现 CCU、ReduceScatter、AllGatherMatMul、Dispatch / Combine 或 CCU profiling'],
+      actions: ['默认按 3510 / 950 专用实现看待', '兼容 2201 时另写实现分支，并分别注册 ascend910b 与 ascend950', '按代际拆分 tiling、workspace、scale 布局和量化格式', '联合验证 HCCL 语义、CCU 硬化资源与 AI Core 计算重叠'],
+    },
+    C: {
+      title: 'C · 写死 A2/A3 硬件假设', tagline: '得重写硬件路径',
+      features: ['使用 L0A/L0B/L0C、LoadData、Mmad、Fixpipe', '使用 int4 Cube Matmul、4:2 结构化稀疏或 SetLoadDataBoundary', '假设 GM → L0 或 L1 → GM 通路存在', '写死 UB 大小、bank group、核数或分形布局'],
+      actions: ['不能只改 CMAKE_ASC_ARCHITECTURES', '先逐项检查数据通路和矩阵分形', '重写或拆分搬运路径，例如 GM → L1 → L0', 'int4 路径改为 Vector Cast 到 int8，或采用 950 的 MX / FP8 方案', '重新调优 tiling 与 bank 规避策略'],
+    },
   };
 
-  const state = { mode: 'migration', arch: 'ascend910b', selectedId: null, activeStep: -1, playing: false, timer: null, overlay: null, viewport: null, playback: null, playbackHover: null };
+  const DIFF_950_NEW = {
+    selectors: [N.simt, N.fp],
+    routes: ['aic-to-aiv1', 'aiv2-to-aic', 'l2-to-aiv2', 'l2-to-aiv2-dcache', 'aiv2-to-l2'],
+  };
+
+  const state = { mode: 'migration', arch: 'ascend910b', selectedId: null, activeStep: -1, playing: false, timer: null, overlay: null, viewport: null, playback: null, playbackHover: null, activation: null, hardwareResizeObserver: null, hardwareFitFrame: 0, diff: false, previewView: 'hardware', memoryReuseViewer: null, memoryReuseData: null };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+  function measureHardwareFrame() {
+    const host = $('#hardwareGraph');
+    const stage = host?.querySelector('[data-pto-mem-arch-stage]');
+    const layout = stage?.querySelector('.pto-mem950__layout');
+    const candidates = [host, stage, layout].filter(Boolean);
+    return {
+      width: Math.max(1, ...candidates.map((element) => Math.max(element.scrollWidth || 0, element.offsetWidth || 0))),
+      height: Math.max(1, ...candidates.map((element) => Math.max(element.scrollHeight || 0, element.offsetHeight || 0))),
+    };
+  }
+
+  function observeHardwareSize() {
+    state.hardwareResizeObserver?.disconnect?.();
+    if (typeof ResizeObserver !== 'function') return;
+    state.hardwareResizeObserver = new ResizeObserver(() => scheduleHardwareFit());
+    const stage = $('#hardwareGraph [data-pto-mem-arch-stage]');
+    if (stage) state.hardwareResizeObserver.observe(stage);
+    const viewport = $('#hardwareViewport');
+    if (viewport) state.hardwareResizeObserver.observe(viewport);
+  }
+
+  function scheduleHardwareFit() {
+    if (state.hardwareFitFrame) cancelAnimationFrame(state.hardwareFitFrame);
+    state.hardwareFitFrame = requestAnimationFrame(() => {
+      state.hardwareFitFrame = requestAnimationFrame(() => {
+        state.hardwareFitFrame = 0;
+        if (state.previewView !== 'hardware') return;
+        const size = measureHardwareFrame();
+        state.viewport?.setFrameSize?.(size.width, size.height);
+        state.viewport?.fit?.();
+        state.overlay?.update?.();
+      });
+    });
+  }
+
+  function scheduleMemoryFit() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (state.previewView !== 'memory') return;
+      state.memoryReuseViewer?.resize?.();
+    }));
+  }
 
   function renderLists() {
     $('#categoryList').innerHTML = CATEGORIES.map((item, index) => `
@@ -98,36 +170,54 @@
       <li><button class="entity-button" type="button" data-flow-id="${item.id}">
         <span class="entity-index">${String(index + 1).padStart(2, '0')}</span>
         <span class="entity-main"><span class="entity-title">${escape(item.title)}</span><span class="entity-sub">${escape(item.short)}</span></span>
-        <span class="evidence-badge">${escape(item.confidence)}</span>
       </button></li>`).join('');
+  }
+
+  function renderHardwareArchitecture(host) {
+    const rendered = window.PtoMemoryArchitecturePattern.renderArchitecture(host, state.arch);
+    rendered?.stage?.querySelector('.pto-mem950__notes')?.remove();
+    return rendered;
   }
 
   function renderHardware() {
     const host = $('#hardwareGraph');
-    window.PtoMemoryArchitecturePattern.renderArchitecture(host, state.arch);
+    state.activation?.destroy?.();
+    renderHardwareArchitecture(host);
     state.overlay?.destroy?.();
     state.overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay(host, state.arch);
     window.PtoMemoryArchitecturePattern.attachHoverInteractions(host, state.arch);
+    state.activation = window.PtoMemoryArchitecturePattern.attachNodeActivation(host, state.arch, {
+      selector: '[data-aiv-node="buffer:UB"]',
+      label: () => '打开 UB 内存可视化',
+      onActivate: (_target, detail) => openMemoryReuse(detail),
+    });
+    observeHardwareSize();
     requestAnimationFrame(() => {
       state.overlay?.update?.();
-      state.viewport?.fit?.();
       applyCurrentFocus();
+      scheduleHardwareFit();
     });
   }
 
   function setArch(arch) {
     if (!arch || state.arch === arch) return;
     state.arch = arch;
+    if (arch !== 'ascend950b') state.diff = false;
     $$('[data-arch-id]').forEach((button) => {
       const selected = button.dataset.archId === arch;
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
+    syncGenerationCompare();
     renderHardware();
   }
 
   function focusHardware(selectors = [], routes = []) {
     const host = $('#hardwareGraph');
+    if (state.arch === 'ascend950b' && state.diff) {
+      selectors = [...new Set([...selectors, ...DIFF_950_NEW.selectors])];
+      routes = [...new Set([...routes, ...DIFF_950_NEW.routes])];
+    }
     window.PtoMemoryArchitecturePattern.clearPathFocus(host);
     if (selectors.length || routes.length) {
       window.PtoMemoryArchitecturePattern.setPathFocus(host, state.arch, { selectors, routes });
@@ -153,6 +243,7 @@
   }
 
   function renderCategoryInspector(item) {
+    const context = CATEGORY_CONTEXT[item.id];
     const related = item.related.map((id) => {
       const flow = FLOWS.find((entry) => entry.id === id);
       return flow ? `<button class="btn btn-ghost related-flow" type="button" data-related-flow="${flow.id}">→ ${escape(flow.title)}</button>` : '';
@@ -160,20 +251,25 @@
     $('#inspectorMeta').textContent = `Category ${String(item.id).padStart(2, '0')}`;
     $('#inspectorBody').innerHTML = `<div class="inspector-content">
       ${section(item.badge, `<span class="inspector-kicker">${escape(item.scenario)} 类迁移判断</span><h2>${escape(item.title)}</h2><p>${escape(item.essence)}</p>`)}
+      ${section('变化上下文', `<dl class="meta-grid">
+        <div class="meta-row"><dt>变化来源</dt><dd>${escape(context.actor)}</dd></div>
+        <div class="meta-row"><dt>设计目标</dt><dd>${escape(context.goal)}</dd></div>
+        <div class="meta-row"><dt>直接影响</dt><dd>${escape(context.impact)}</dd></div>
+      </dl>`)}
       ${section('判断信号', `<div class="tag-row">${item.signals.map((signal) => `<span class="path-chip">${escape(signal)}</span>`).join('')}</div>`)}
+      ${section('关键边界', `<div class="inspector-card"><small>${escape(context.boundary)}</small></div>`)}
       ${section('建议动作', `<ul class="action-list">${item.actions.map((action) => `<li>${escape(action)}</li>`).join('')}</ul>`)}
       ${section('关联执行流', related)}
-      ${section('数据说明', '<div class="inspector-card"><strong>L2 · 解释性数据</strong><small>由两个原 demo 的事实与交互结构整合，用于产品原型；不声明为真实运行结果。</small></div>')}
     </div>`;
   }
 
   function renderFlowInspector(flow) {
-    $('#inspectorMeta').textContent = `${flow.confidence} · ${flow.steps.length} steps`;
+    const visibleMeta = Object.entries(flow.meta);
+    $('#inspectorMeta').textContent = `${flow.steps.length} steps`;
     $('#inspectorBody').innerHTML = `<div class="inspector-content">
-      ${section('Execution flow', `<span class="inspector-kicker">${escape(flow.confidence)}</span><h2>${escape(flow.title)}</h2><p>${escape(flow.summary)}</p><div class="inspector-card"><strong>路径</strong><small>${escape(flow.path)}</small></div>`)}
-      ${section('上下文', `<dl class="meta-grid">${Object.entries(flow.meta).map(([key, value]) => `<div class="meta-row"><dt>${escape(key)}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>`)}
+      ${section('Execution flow', `<span class="inspector-kicker">执行路径</span><h2>${escape(flow.title)}</h2><p>${escape(flow.summary)}</p><div class="inspector-card"><strong>路径</strong><small>${escape(flow.path)}</small></div>`)}
+      ${section('上下文', `<dl class="meta-grid">${visibleMeta.map(([key, value]) => `<div class="meta-row"><dt>${escape(key)}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>`)}
       ${section('执行步骤', `<ol class="step-list">${flow.steps.map((step, index) => `<li><button class="step-button${state.activeStep === index ? ' is-selected' : ''}" type="button" data-step="${index}"><span class="step-number">${String(index + 1).padStart(2, '0')}</span><span class="step-copy"><strong>${escape(step.label)}</strong><small>${escape(step.text)}</small></span></button></li>`).join('')}</ol>`)}
-      ${section('证据边界', `<div class="inspector-card"><strong>${escape(flow.confidence)}</strong><small>${flow.confidence === 'verified' ? '硬件路径与行为由原 demo 的已校验说明继承。' : flow.confidence === 'claim' ? '支持方向判断，但外部引擎端口与微结构不在本图中虚构。' : '由公开示例的协作时序推导，需以运行证据复核。'}</small></div>`)}
     </div>`;
     syncPlayback();
   }
@@ -186,10 +282,9 @@
     if (!item) return;
     $$('[data-category-id]').forEach((button) => button.classList.toggle('is-selected', Number(button.dataset.categoryId) === item.id));
     $$('[data-scenario]').forEach((button) => button.classList.toggle('is-selected', button.dataset.scenario === item.scenario));
-    $('#selectionCaption').textContent = item.title;
-    $('#emptySelection').hidden = true;
     renderCategoryInspector(item);
-    if (state.arch !== item.arch) setArch(item.arch); else applyCurrentFocus();
+    if (state.arch !== item.arch) setArch(item.arch);
+    else { applyCurrentFocus(); scheduleHardwareFit(); }
   }
 
   function selectFlow(id) {
@@ -199,10 +294,9 @@
     const item = FLOWS.find((entry) => entry.id === id);
     if (!item) return;
     $$('[data-flow-id]').forEach((button) => button.classList.toggle('is-selected', button.dataset.flowId === item.id));
-    $('#selectionCaption').textContent = item.title;
-    $('#emptySelection').hidden = true;
     renderFlowInspector(item);
-    if (state.arch !== item.arch) setArch(item.arch); else applyCurrentFocus();
+    if (state.arch !== item.arch) setArch(item.arch);
+    else { applyCurrentFocus(); scheduleHardwareFit(); }
   }
 
   function selectStep(index) {
@@ -211,6 +305,7 @@
     state.activeStep = Math.max(0, Math.min(flow.steps.length - 1, Number(index)));
     renderFlowInspector(flow);
     applyCurrentFocus();
+    scheduleHardwareFit();
   }
 
   function setMode(mode) {
@@ -226,15 +321,14 @@
     });
     $('#migrationExplorer').hidden = mode !== 'migration';
     $('#flowExplorer').hidden = mode !== 'flow';
-    $('#playbackMount').hidden = mode !== 'flow';
+    $('#playbackMount').hidden = mode !== 'flow' || state.previewView !== 'hardware';
     $('#explorerTitle').textContent = mode === 'migration' ? '迁移分类' : '执行流';
     $('#explorerCount').textContent = mode === 'migration' ? `${CATEGORIES.length} 项` : `${FLOWS.length} 条`;
-    $('#selectionCaption').textContent = '尚未选择分析项';
-    $('#emptySelection').hidden = false;
     $('#inspectorMeta').textContent = '等待选择';
-    $('#inspectorBody').innerHTML = '<div class="inspector-empty"><span>CONTEXTUAL INSPECTOR</span><strong>选择迁移项或执行流</strong><p>这里会显示判断信号、硬件影响、迁移动作、执行步骤和证据等级。</p></div>';
+    $('#inspectorBody').innerHTML = '<div class="inspector-empty"><span>CONTEXTUAL INSPECTOR</span><strong>选择迁移项或执行流</strong><p>这里会显示变化上下文、判断信号、硬件影响、迁移动作和执行步骤。</p></div>';
     $$('.entity-button, .scenario-chip').forEach((button) => button.classList.remove('is-selected'));
     focusHardware();
+    scheduleHardwareFit();
     syncPlayback();
   }
 
@@ -242,13 +336,72 @@
     const scenario = SCENARIOS[key];
     if (!scenario) return;
     state.selectedId = null;
-    $('#emptySelection').hidden = false;
-    $('#selectionCaption').textContent = scenario.title;
     $$('[data-scenario]').forEach((button) => button.classList.toggle('is-selected', button.dataset.scenario === key));
     $$('[data-category-id]').forEach((button) => button.classList.remove('is-selected'));
     $('#inspectorMeta').textContent = `Scenario ${key}`;
-    $('#inspectorBody').innerHTML = `<div class="inspector-content">${section('快速判断', `<span class="inspector-kicker">Migration scenario</span><h2>${escape(scenario.title)}</h2><p>${escape(scenario.body)}</p>`)}${section('下一步', `<ul class="action-list">${scenario.actions.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>`)}</div>`;
+    $('#inspectorBody').innerHTML = `<div class="inspector-content">
+      ${section('快速判断', `<span class="inspector-kicker">Migration scenario ${escape(key)}</span><h2>${escape(scenario.title)}</h2><p>${escape(scenario.tagline)}</p>`)}
+      ${section('识别特征（典型）', `<ul class="signal-list">${scenario.features.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>`)}
+      ${section('处理方式', `<ul class="action-list">${scenario.actions.map((item) => `<li>${escape(item)}</li>`).join('')}</ul>`)}
+    </div>`;
     focusHardware();
+    scheduleHardwareFit();
+  }
+
+  function syncPreviewView() {
+    $$('[data-preview-view]').forEach((tab) => {
+      const selected = tab.dataset.previewView === state.previewView;
+      tab.classList.toggle('is-selected', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    $$('[data-view-panel]').forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== state.previewView; });
+    $('#playbackMount').hidden = state.previewView !== 'hardware' || state.mode !== 'flow';
+    if (state.previewView === 'hardware') scheduleHardwareFit();
+    else scheduleMemoryFit();
+  }
+
+  function openMemoryReuse(detail = {}) {
+    if (detail.node && detail.node !== 'buffer:UB') return;
+    const helper = window.PtoMemoryReuseViewer;
+    const host = $('#memoryReuseHost');
+    if (!helper || !host) return;
+    state.memoryReuseViewer?.destroy?.();
+    const coreLabel = detail.coreTitle || detail.coreId || 'AIV';
+    const data = helper.createDemoData({ coreId: detail.coreId, coreTitle: coreLabel });
+    state.memoryReuseData = data;
+    $('#memoryReuseTitle').textContent = 'UB 内存复用分析';
+    $('#memoryReuseSub').textContent = data.kernel || `${coreLabel} · MatMulAddRelu_mix_aic__kernel0`;
+    state.previewView = 'memory';
+    syncPreviewView();
+    state.memoryReuseViewer = helper.render(host, data, { initialBuffer: 'UB' });
+    scheduleMemoryFit();
+  }
+
+  function closeMemoryReuse() {
+    state.previewView = 'hardware';
+    state.memoryReuseViewer?.destroy?.();
+    state.memoryReuseViewer = null;
+    syncPreviewView();
+  }
+
+  function syncGenerationCompare() {
+    const enabled = state.arch === 'ascend950b';
+    const button = $('#generationCompare');
+    button.disabled = !enabled;
+    button.hidden = !enabled;
+    button.classList.toggle('is-selected', enabled && state.diff);
+    button.setAttribute('aria-pressed', String(enabled && state.diff));
+    button.title = enabled ? '突出 950B 新增资源与通路，并查看移除项摘要' : '切换到 950B 后查看代际对比';
+    $('#generationCompareSummary').hidden = !(enabled && state.diff);
+  }
+
+  function toggleGenerationCompare() {
+    if (state.arch !== 'ascend950b') return;
+    state.diff = !state.diff;
+    syncGenerationCompare();
+    applyCurrentFocus();
+    scheduleHardwareFit();
   }
 
   function syncPlayback() {
@@ -309,7 +462,7 @@
   }
 
   function initHardware() {
-    window.PtoMemoryArchitecturePattern.renderArchitecture($('#hardwareGraph'), state.arch);
+    renderHardwareArchitecture($('#hardwareGraph'));
     state.overlay = window.PtoMemoryArchitecturePattern.createRouteOverlay($('#hardwareGraph'), state.arch);
     window.PtoMemoryArchitecturePattern.attachHoverInteractions($('#hardwareGraph'), state.arch);
     state.viewport = window.PtoHardwareArchitectureViewport.mount($('#hardwareViewport'), {
@@ -322,14 +475,17 @@
       zoomIn: '[data-zoom-in]',
       fit: '[data-fit]',
       readout: '[data-readout]',
+      zoomLevels: [0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2],
       defaultScale: 0.6,
       fitOnMount: true,
       pan: true,
       wheelZoom: true,
+      onDetailChange: () => scheduleHardwareFit(),
       onScaleChange: () => requestAnimationFrame(() => state.overlay?.update?.()),
       onPanChange: () => requestAnimationFrame(() => state.overlay?.update?.()),
     });
-    requestAnimationFrame(() => { state.overlay?.update?.(); state.viewport?.fit?.(); });
+    observeHardwareSize();
+    scheduleHardwareFit();
   }
 
   function initEvents() {
@@ -345,16 +501,31 @@
       const related = event.target.closest('[data-related-flow]');
       if (related) { setMode('flow'); selectFlow(related.dataset.relatedFlow); return; }
       const step = event.target.closest('[data-step]');
-      if (step) { stopPlayback(); selectStep(step.dataset.step); }
+      if (step) { stopPlayback(); selectStep(step.dataset.step); return; }
+      const preview = event.target.closest('[data-preview-view]');
+      if (preview?.dataset.previewView === 'memory') return openMemoryReuse();
+      if (preview?.dataset.previewView === 'hardware') return closeMemoryReuse();
     });
     $$('[data-arch-id]').forEach((button) => button.addEventListener('click', () => setArch(button.dataset.archId)));
+    $$('[data-preview-view]').forEach((tab) => tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = $$('[data-preview-view]');
+      const current = tabs.indexOf(tab);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      if (tabs[next].dataset.previewView === 'memory') openMemoryReuse();
+      else closeMemoryReuse();
+    }));
     $('#inspectorToggle').addEventListener('click', () => {
       const hidden = !$('#inspectorPane').hidden;
       $('#inspectorPane').hidden = hidden;
       $('#inspectorToggle').classList.toggle('is-selected', !hidden);
       $('#inspectorToggle').setAttribute('aria-pressed', String(!hidden));
-      requestAnimationFrame(() => state.viewport?.fit?.());
+      scheduleHardwareFit();
     });
+    $('#memoryReuseClose').addEventListener('click', closeMemoryReuse);
+    $('#generationCompare').addEventListener('click', toggleGenerationCompare);
     const frame = $('[data-ide-frame]');
     frame.addEventListener('pointermove', (event) => {
       const rect = frame.getBoundingClientRect();
@@ -369,5 +540,15 @@
   initHardware();
   initPlayback();
   initEvents();
+  syncGenerationCompare();
+  syncPreviewView();
   setMode('migration');
+  window.addEventListener('load', () => {
+    if (state.previewView === 'hardware') scheduleHardwareFit();
+    else scheduleMemoryFit();
+  }, { once: true });
+  document.fonts?.ready?.then(() => {
+    if (state.previewView === 'hardware') scheduleHardwareFit();
+    else scheduleMemoryFit();
+  });
 })();
