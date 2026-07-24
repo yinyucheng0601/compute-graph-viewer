@@ -365,10 +365,10 @@
    都没有，下面那条 :has(.cro-bar.is-selected) 去色规则整条不生效，五个典型层
    之间就只剩 0.5 的透明度差 —— 点一个 MoE 层，Dense / Emb / Norm / Head 照旧
    满色，读不出「这次与它们无关」。按列补一条，与算子粒度那条同一套观感。 */
-.cro-board.is-focused .cro-structure__col:not(.is-related) .cro-bar {
+.cro-board.is-focused .cro-structure__col:not(.is-related):not(.is-selected) .cro-bar {
   filter: grayscale(1) brightness(0.92);
 }
-.cro-board.is-focused .cro-structure__col:not(.is-related) .cro-bar:hover {
+.cro-board.is-focused .cro-structure__col:not(.is-related):not(.is-selected) .cro-bar:hover {
   filter: brightness(1.04);
   opacity: 1;
 }
@@ -622,17 +622,36 @@
   gap: var(--space-2);
   min-width: 0;
   min-height: 0;
+  /* 整列（名字 + 底板）都是选中该典型层的热区，与 .cro-moe-group 同写法 */
+  cursor: pointer;
 }
+
+.cro-structure__col:hover .cro-structure__stack { background: var(--state-hover); }
 
 .cro-structure__name {
   /* 不设 flex:0 0 auto 的话，它在 min-height:0 的列里会被压成 0 高，
      被下面的卡片盖住（Dense / MoE 的列标题「被层盖住」） */
   flex: 0 0 auto;
+  font: inherit;
   font-size: var(--font-size-label-xs);
   color: var(--foreground-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 由 div 换成 button（键盘可达，click 冒泡给 .cro-structure__col 同一条选中路径） */
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cro-structure__name:hover { color: var(--foreground); }
+
+.cro-structure__name:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }
 
 .cro-structure__stack {
@@ -645,6 +664,26 @@
   flex: 1 1 auto;
   min-height: 60px;
   overflow-y: auto;
+  transition: background-color 120ms ease;
+}
+
+/* 并行分支：deck 里并排的两条支路（注意力 Q∥KV、MoE 路由∥共享）在典型层里
+   也左右分栏，而不是一律竖排 —— 成员见 config-relation-observer.js 的
+   PARALLEL_GROUPS。两栏等分半宽、栏内仍竖排；gap 与 .cro-structure__stack 的
+   1px 一致，使并行段与其上下的串行段读成同一条栈。flex-start 让较短的一栏
+   （如只有一个 shared_expert 的右栏）自然顶排，不被另一栏拉伸。 */
+.cro-structure__lanes {
+  display: flex;
+  gap: 1px;
+  align-items: flex-start;
+}
+
+.cro-structure__lane {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 /* 结构条的每一段。色值与填充方式和整网 deck 的节点**逐位一致**：
@@ -727,6 +766,16 @@
 /* 选中某层时，对应的 Dense / MoE 结构列整体点亮 */
 .cro-structure__col.is-related .cro-structure__stack { background: var(--surface-3); }
 .cro-structure__col.is-related .cro-structure__name { color: var(--foreground); }
+
+/* 整列点击（点名字/底板）：整块底板一圈高亮描边 + 提亮，表示「这一整个典型层」在
+   向外连线。与 .cro-bar / .cro-moe-group 的选中态同一套白描边语言，只是套在整列上。 */
+.cro-structure__col.is-selected .cro-structure__stack {
+  background: var(--surface-3);
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.cro-structure__col.is-selected .cro-structure__name { color: var(--foreground); font-weight: var(--font-weight-medium); }
+/* 选中列内的算子条保持满色/不去色（聚焦降噪只压其它列） */
+.cro-board.is-focused .cro-structure__col.is-selected .cro-bar { opacity: 1; filter: none; }
 
 /* ── 右：MoE ────────────────────────────────────────────────────────────── */
 /* MoE 列吃满整行高度：区块本身由 grid 拉伸，内部逐层把高度传下去，

@@ -7,8 +7,8 @@ v 20260720 · 型号：**openPangu-2.0-Flash**（华为 ascend-tribe 开源）
 > 与校验报告 `model_architecture_validation.md`（extract 自官方 `config.json` + `openPangu-2.0-Infer` 源码，commit `1676856`）。
 >
 >
-> ⚠️ **未从本地取到的量（标记为「待补」）**：总参数量 / 激活参数量 / 训练数据量 / rope_theta 数值 / 训练精度 / routed_scaling_factor。
-> 本地 checkout 的 safetensors 是 Git LFS 指针文件，未下载全权重，故这些量本文不臆造。
+> ⚠️ **未从本地取到的量（标记为「待补」）**：rope_theta 数值 / routed_scaling_factor / micro_batch_size。
+> 本地 checkout 的 safetensors 是 Git LFS 指针文件，未下载全权重；总参数量 / 激活参数量取自官方 README 模型卡，训练精度取自训练监控页与定位链文档。
 
 ## 1. 骨架
 
@@ -65,7 +65,7 @@ openPangu-2.0-Flash
 │   │   ├─ post_mlp_norm   — Post MLP RMSNorm（+ 残差）
 │   │   └─ block_post_norm — Block Post RMSNorm（可选）
 │   │
-│   · 每层专家并行运行时：expert_parallel_state（EP 切分 256 专家）
+│   · 每层专家并行运行时：expert_parallel_state（EP 切分 256 专家，详见 §6）
 │
 ├─ final_norm — Final RMSNorm
 ├─ lm_head    — LM Head [2560 → vocab 151552] → logits
@@ -382,18 +382,105 @@ graph TD
 | K_index / N_index | DSA indexer | 候选 **2048** → 选 **24** | 同上 |
 | S_max | 最大上下文 | **524288**（512K） | config |
 | N_mtp | MTP 层数 | **3**（层 46/47/48） | 同上 |
-| — | 总参数 / 激活参数 | **待补**（本地未下载全权重） | — |
-| — | 训练数据 / 精度 / rope_theta | **待补** | — |
+| — | 总参数 / 激活参数 | **~92B** / **~6B**（per token） | README / model card |
+| — | 训练精度 | **FP8 E4M3**（HiF8：forward FP8, backward BF16, master FP32） | 定位链 · training-monitoring |
+| — | 训练数据量 | **24T tokens** | training-monitoring |
+| — | rope_theta | **待补** | — |
+| — | routed_scaling_factor | **待补** | — |
+| — | 并行策略 / rank 数 / batch / 超参 | → 详见 **§6 并行与部署规格** | CHANGELOG · 定位链 · monitoring · ansible template |
 
 ## 5. 独特设计要点
 
 1. **MLA + Causal Conv1D**：在 Q/KV/O 低秩路径上加入因果短卷积（`q/kv/o_causal_conv`）与残差+LayerNorm，配合 `MoME State`。区别于 DeepSeek 纯低秩 MLA。
 2. **DSA/SWA 混合注意力**：1/3 层用 DSA indexer（2048 候选选 24）做稀疏长程注意力，2/3 层用滑动窗口，服务 512K 超长上下文。
-3. **256 专家标准 MoE + 1 共享**：`top-8/256`，专家并行（EP）切分；**无 MoGE 分组均衡约束**（那是 Pro MoE 的特性，本模型没有）。
+3. **256 专家标准 MoE + 1 共享**：`top-8/256`，专家并行（EP=64）切分，每 rank 4 专家；**无 MoGE 分组均衡约束**（那是 Pro MoE 的特性，本模型没有）。完整并行策略见 §6。
 4. **Param Sink Token ×128**：可学习 sink token 抑制极大激活值。
 5. **3 层 MTP**：多 token 预测，额外预测后续 3 个 token（Pro MoE 仅 1 层）。
 6. **多重 RMSNorm**：input / post-attention / pre-mlp / post-mlp / block-post / final 多处 RMSNorm。
 
+## 6. 并行与部署规格（集中规格表）
+
+> 本节数据来源于 `CHANGELOG.md`（并行策略公式）、`定位链-openPangu-2.0-Flash.md`（训练超参）、`training-monitoring.html`（训练监控页）、`config-relation-observer.html` 的 `CroTopology` 推导逻辑，以及源仓库 `configuration_openpangu_v2.py`（TP/PP plan）与 `omni_infer_server_template_performance1P1D_92B_bf16_open.yml`（推理部署模板）。
+
+### 6.1 训练并行策略（主配置 · 2048 Ascend 910B NPU）
+
+| 符号 | 参数 | 值 | 说明 |
+|---|---|---|---|
+| DP | Data Parallel | **8** | 数据并行副本数 |
+| PP | Pipeline Parallel | **4** | 流水线段数 |
+| TP | Tensor Parallel | **1**（未启用） | 张量并行 |
+| CP | Context Parallel | **1**（未启用） | 上下文并行 |
+| EP | Expert Parallel | **64** | 专家并行（256 专家 / 64 = 每 rank 4 专家） |
+| — | **Total Rank** | **2048** | `DP × PP × TP × CP × EP = 8×4×1×1×64` |
+| — | 硬件 | 256 节点 × 8 = 2048 × **Ascend 910B** | — |
+| — | ZeRO | **ZeRO-1** | 优化器状态分片 |
+| — | 精度 | **FP8 E4M3**（HiF8 混合精度：forward FP8, backward BF16, master weights FP32） | — |
+
+### 6.2 PP Stage 层分配
+
+> 按「尽量均分、前 (L mod PP) 段各多 1 层」的公式分配：`floor(46/4)=11, remainder=2` → 前 2 段 12 层、后 2 段 11 层。`lm_head` + loss 追加在 PP3 末尾，不计入 decoder 层数。
+
+| Stage | 层范围 | 层数 | 包含 |
+|---|---|---|---|
+| PP0 | L0 ~ L11 | 12 | Embedding + Dense (L0-1) + MoE (L2-11) |
+| PP1 | L12 ~ L23 | 12 | MoE |
+| PP2 | L24 ~ L34 | 11 | MoE |
+| PP3 | L35 ~ L45 | 11 | MoE + `lm_head` + loss |
+
+### 6.3 EP 专家分配与层间分布
+
+- **256 路由专家** ÷ **64 EP rank** = 每 rank 持有 **4 个**路由专家
+- **1 个共享专家**在所有 EP rank 上**复制**（不参与 EP 切分）
+- Expert Parallel State（`expert_parallel_state`）在每层 MoE FFN 中管理 EP 通信
+
+**层间分布**：每个 MoE 层（L2~L45，共 44 层）都有**自己独立的 256 个路由专家**，层间权重互不相干。专家编号（0~255）和「编号 → EP rank」分片公式在全局一致，但同一个编号 e 在不同 layer 中是权重完全不同的实例。总计 **44 层 × 256 = 11264 个专家实例**（不含每层复制的 1 个共享专家）。
+
+### 6.4 训练超参
+
+| 参数 | 值 | 来源 |
+|---|---|---|
+| Global Batch Size | **12288** | `training-monitoring.html:1329` |
+| Sequence Length（预训练） | **4096** | `定位链:105` |
+| 每步 Token 数 | **50.3M**（12288 × 4096） | `training-monitoring.html:1337` |
+| 总训练 Token | **24T** | `training-monitoring.html:1329` |
+| 总训练步数 | ~480K | `training-monitoring.html:1339` |
+| Optimizer | **AdamW**（β₁=0.9, β₂=0.95, weight_decay=0.1） | `training-monitoring.html:1332` |
+| Learning Rate | **3e-4** → cosine → **3e-5**（2K warmup） | `training-monitoring.html:1333` |
+| Grad Clip | **1.0** | `training-monitoring.html:1334` |
+
+### 6.5 推理部署规格
+
+| 参数 | 值 | 来源 |
+|---|---|---|
+| 部署模板 | **1P1D**（1 Pipeline × 1 Data Parallel） | ansible template 文件名 |
+| 精度 | **BF16** | 同上 |
+| 总参数量 | **~92B** | README / model card |
+| 每 token 激活参数 | **~6B** | README / model card |
+| 最大上下文 | **524288（512K）** | config.json |
+
+### 6.6 并行拓扑示意
+
+```
+Total Rank = DP × PP × EP = 8 × 4 × 64 = 2048
+（TP=1, CP=1 不参与乘法）
+
+Cluster 网格: 行 = DP×PP = 32 行, 列 = EP = 64 列
+每 4 行一组对应一个 DP 副本, 组内 4 行对应 PP0~PP3
+
+  EP rank →
+D  ┌──────────────────────────────────┐
+P  │ PP0  L0~L11  (12层)              │  ← DP copy 0
+×  │ PP1  L12~L23 (12层)              │
+P  │ PP2  L24~L34 (11层)              │
+P  │ PP3  L35~L45+head (11层+输出)    │
+   ├──────────────────────────────────┤
+   │ PP0  ...                          │  ← DP copy 1
+   │ ...                               │
+   └──────────────────────────────────┘
+
+EP 轴: 256 专家 ÷ 64 = 每 rank 4 专家
+共享专家在所有 rank 上复制
+```
 
 ### 附：数据溯源
 - canonical schema：`model-architecture/openpangu-2.0-flash/outputs/model_architecture.json`（`schema_version: model_architecture.v1`）
