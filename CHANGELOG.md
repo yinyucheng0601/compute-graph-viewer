@@ -5,6 +5,15 @@
 
 ---
 
+## 2026-07-24 — config-relation-observer：点专家/EP 组全展开连线（连上所有相关 layer 与各 stage 的 rank）
+
+- `js/config-relation-observer.js` — 明确「路由槽位」的分布语义并全展开连线。一个专家编号 e 在**每个 MoE 层**都有一份实例（各层权重独立、互不相干，只共享编号与「编号→EP rank」分片公式），其 EP 组在**每个 PP stage** 内各占一块 rank。`resolveRelation` 的 `case "expert"/"epRank"` 连上全部 MoE 层 + 各 stage 的该 EP 组 rank（× DP 副本），`sharedExpert` 连上全部 MoE 层 + 各 stage 全部 rank。`drawRelationLinks` 新增 `clusterStageAnchors()`：集群侧不再把 4 段并成一个横跨整幅热力图的巨框，而是**按 PP stage 拆成多条线**（每段一条 + 一圈虚线框，总「Node… · N 卡」标签只挂离 hub 最近那条），直观表达「这个编号的 rank 散布在每个 stage」。`relationLabels` 主标签改为「`E37 · L2~L45 各一份`」，点明分布范围又不误导成「同一个专家横跨各层」。
+  - 同时移除上一轮为「单层收敛」方案加的 MoE 代表层步进器（`#croMoeRepLayer` / `moeRepLayer` / `.cro-replayer*` / `NAV_PREV·NAV_NEXT`）与其 `emitSelect` scopeLayer 注入——全展开语义下与之矛盾，故回退。
+
+## 2026-07-24 — config-relation-observer：典型 Layer 并行分支改左右分栏
+
+- `js/config-relation-observer.js` / `css/config-relation-observer.css` — 典型 Layer 面板原先把每列算子一律竖排（`renderStructure` 直接把 bars 顺次塞进 `.cro-structure__stack`），把整网 deck 里本是并行的支路读成了串行。新增 `PARALLEL_GROUPS` 声明（按 deck 的 SIDE_ROWS 配对）：注意力 Q 路径 ∥ KV 路径、MoE 路由专家支路（Router→Dispatch→Expert Pool→Combine）∥ 共享专家支路；`renderStructure` 据此把连续同组的 bar 收进 `.cro-structure__lanes` 左右两条 `.cro-structure__lane` 子栈渲染，汇合节点（`attention_core` / `moe_branch_add`）本身不属任何分栏、自然收束回整条竖排。bar 的 `data-*`/点击/关系高亮全部不变（子栈仅作视觉容器，选择器都是后代匹配）。
+
 ## 2026-07-22 — TaskCompare：图表对比底部新增「Media 对比」栏
 
 - `Profiling_Insight_and_Tool/training-run-twin-standalone/TaskCompare.html` — 图表对比页底部增加多模态产出对比分区：左侧勾选几个任务就渲染几张卡片，卡片自上而下为任务名（含状态点/基线标签）、圆角视频封面（取自 `pic/`，16:10 定比裁切 + 综合评分/分辨率·帧率/时长角标）、生成 prompt、产出质量指标（CLIP-T / 时序一致性 / 美学评分 / FVD）、来源 checkpoint 与单条生成耗时；沿用 `.cmp-group` 外壳支持折叠，「标记最优」开关下逐指标高亮最优任务。

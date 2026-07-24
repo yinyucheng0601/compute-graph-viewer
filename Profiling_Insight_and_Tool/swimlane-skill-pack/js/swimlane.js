@@ -42,7 +42,7 @@ const SWIMLANE_THEMES = {
     TICK_COLOR: '#8D8D8D',
     GRID_COLOR: 'rgba(255, 255, 255, 0.06)',
     BUBBLE_COLOR: 'rgba(239, 68, 68, 0.15)',
-    SELECTED_ROW_BG: 'rgba(255, 255, 255, 0.05)',
+    SELECTED_ROW_BG: 'rgba(255, 255, 255, 0.10)',
     BOTTLENECK_ROW_BG: 'rgba(255, 255, 255, 0.04)',
     HOVER_ROW_BG: 'rgba(255, 255, 255, 0.025)',
     SELECTED_ROW_BORDER: 'rgba(255, 255, 255, 0.22)',
@@ -56,7 +56,7 @@ const SWIMLANE_THEMES = {
     GROUP_ROW_SELECTED_BG: 'rgba(255, 255, 255, 0.09)',
     // 选中聚焦下不含选中泳道的分组头暗化背景
     GROUP_ROW_BG_DIM: 'rgba(255, 255, 255, 0.012)',
-    LABEL_SELECTED_BG: 'rgba(255, 255, 255, 0.06)',
+    LABEL_SELECTED_BG: 'rgba(255, 255, 255, 0.11)',
     LABEL_BOTTLENECK_BG: 'rgba(255, 255, 255, 0.04)',
     LABEL_HOVER_BG: 'rgba(255, 255, 255, 0.03)',
     RELATION_LINE: 'rgba(255, 255, 255, 0.8)',
@@ -794,9 +794,15 @@ class SwimlaneRenderer {
     activeBorderKeys.forEach((key) => {
       const idx = layoutCores.indexOf(key);
       if (idx >= 0) {
+        // 仅画左右侧边线，不画上下白边
         ctx.strokeStyle = this.pal.SELECTED_ROW_BORDER;
         ctx.lineWidth = 1;
-        ctx.strokeRect(0, layoutTops[idx], canvasW, SWIMLANE_CONFIG.ROW_HEIGHT);
+        ctx.beginPath();
+        ctx.moveTo(0, layoutTops[idx]);
+        ctx.lineTo(0, layoutTops[idx] + SWIMLANE_CONFIG.ROW_HEIGHT);
+        ctx.moveTo(canvasW, layoutTops[idx]);
+        ctx.lineTo(canvasW, layoutTops[idx] + SWIMLANE_CONFIG.ROW_HEIGHT);
+        ctx.stroke();
       }
     });
 
@@ -1274,7 +1280,7 @@ class SwimlaneRenderer {
         ctx.font = `${isSelected ? 600 : 400} 11px ${sans}`;
         ctx.textAlign = 'left';
         const nameMaxW = Math.max(20, W - rightZone - indent - 4);
-        ctx.fillText(this._ellipsize(ctx, meta.label, nameMaxW), indent, cy + 0.5);
+        ctx.fillText(this._ellipsize(ctx, meta.label, nameMaxW), indent, cy + 1.5);
 
         if (hasUtil) {
           // 泳道利用率 meter：蓝色，纯利用率指示（占比详情见悬浮气泡）

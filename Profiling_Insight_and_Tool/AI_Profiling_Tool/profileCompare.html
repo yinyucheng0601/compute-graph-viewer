@@ -62,6 +62,9 @@ body {
 .sl-pane-inspector { flex: 0 0 332px; }
 .sl-pane-head { flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-3);
   padding: 10px 14px; min-height: 50px; }
+/* 对比面板标题行：确保 pane-header 不下沉压缩高度，标题有足够行高显示完整 */
+.pto-ide-frame__pane-header { min-height: 36px; }
+.pto-ide-frame__pane-title { line-height: 1.4; padding: 3px 0; }
 .sl-pane-title { font: var(--text-title-2); }
 .sl-pane-kicker { font: 500 11px / 1.2 var(--font-sans); color: var(--foreground-muted);
   text-transform: uppercase; letter-spacing: var(--letter-spacing-label); }
@@ -81,7 +84,8 @@ body {
   font: 500 11px / 1.2 var(--font-sans); color: var(--foreground-muted);
   text-transform: uppercase; letter-spacing: var(--letter-spacing-label);
 }
-.sl-axis-wrap { overflow: hidden; border-bottom: 1px solid var(--border-default); }
+.sl-axis-wrap { overflow: hidden; border-bottom: 1px solid var(--border-default); background: var(--surface-2); }
+.sl-timeline-right { background: var(--surface-2); }
 .sl-lane-wrap { overflow: hidden; border-right: 1px solid var(--border-subtle); }
 .sl-body-wrap { position: relative; overflow: auto; }
 .sl-axis-wrap canvas, .sl-lane-wrap canvas, .sl-body-wrap canvas { display: block; }
@@ -291,6 +295,7 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding-bottom: 8px;
 }
 
 .sl-swimlane-workbench {
@@ -446,6 +451,39 @@ body {
   border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 80%, transparent);
 }
 
+/* 差异看板内「按任务 | 按泳道」页签：复用 .sl-report-tabs 骨架，间距收紧适配卡片区 */
+.sl-diff-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding-top: var(--space-2);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+.sl-diff-tabs .sl-report-tab {
+  min-height: 30px;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--foreground-muted);
+  font: 500 11px / 1.2 var(--font-sans);
+}
+
+.sl-diff-tabs .sl-report-tab:hover {
+  background: transparent;
+  color: var(--foreground-secondary);
+}
+
+.sl-diff-tabs .sl-report-tab.is-selected,
+.sl-diff-tabs .sl-report-tab.is-selected:hover {
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--foreground);
+}
+
 .sl-pmu-groups {
   display: flex;
   flex-wrap: wrap;
@@ -586,19 +624,30 @@ body {
 .sl-diff-stat-card__num { color: var(--foreground); font: 600 14px / 1.3 var(--font-mono); }
 .sl-diff-card-list { display: flex; flex-direction: column; gap: 8px; }
 .sl-diff-card {
-  padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer;
+  padding: 7px 10px; border-radius: var(--radius-lg); cursor: pointer;
   background: color-mix(in srgb, var(--surface-3) 68%, transparent);
   border: 1px solid transparent;
   transition: background var(--duration-fast) var(--easing-default), border-color var(--duration-fast) var(--easing-default);
 }
+.sl-diff-card.is-top {
+  background: linear-gradient(150deg,
+    color-mix(in srgb, var(--danger) 15%, var(--surface-1)),
+    var(--surface-1) 72%);
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+}
 .sl-diff-card:hover { background: var(--state-hover); }
+.sl-diff-card.is-top:hover { background: linear-gradient(150deg,
+  color-mix(in srgb, var(--danger) 22%, var(--surface-1)),
+  var(--surface-1) 72%); }
 .sl-diff-card.is-active { background: var(--state-selected); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .sl-diff-card__path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-body-sm); color: var(--foreground); }
 .sl-diff-card__path small { color: var(--foreground-muted); font-weight: 400; }
 .sl-diff-card__meter-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .sl-diff-card__pct { flex: 0 0 auto; font: 600 12px / 1.3 var(--font-mono); color: var(--foreground); min-width: 50px; }
 .sl-diff-card__meter-row .sl-meter { flex: 1 1 auto; margin: 0; }
-.sl-diff-card__vals { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font: 500 11px / 1.3 var(--font-mono); color: var(--foreground-muted); }
+.sl-diff-card__vals { margin-top: 4px; font: 500 11px / 1.3 var(--font-sans); color: var(--foreground-muted); }
+.sl-diff-card__val { color: var(--foreground); font-family: var(--font-mono); font-weight: 600; }
+.sl-diff-card__val.is-warn { color: #d23b3b; }
 
 /* ── 对比双方左右卡片 ── */
 .sl-compare-cards {
@@ -621,16 +670,17 @@ body {
 .sl-compare-card__name {
   flex: 1 1 auto; min-width: 0;
   padding: 2px 0;
-  font: 500 12px / 1.35 var(--font-mono); color: var(--foreground);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 500 11px / 1.35 var(--font-mono); color: var(--foreground);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; word-break: break-all;
 }
 .sl-compare-card__badge {
   position: absolute; top: 0; right: 0; z-index: 2;
-  font-size: 7px; font-family: var(--font-mono); font-weight: 600;
-  padding: 1px 5px 2px 6px;
+  font: 500 10px / 1.3 var(--font-sans);
+  padding: 1px 7px 2px 7px;
   border-radius: 0 var(--radius-lg) 0 var(--radius-lg);
-  background: color-mix(in srgb, var(--accent) 85%, var(--foreground));
-  color: var(--background);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--foreground-secondary);
   pointer-events: none;
 }
 /* 缩小版仪表盘 */
@@ -1097,119 +1147,6 @@ body {
   display: none;
 }
 
-.sl-block-graph-view {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.sl-block-graph-view[hidden] {
-  display: none;
-}
-
-.sl-block-graph-tools {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.sl-block-graph-tools {
-  margin-left: auto;
-}
-
-.sl-block-graph-tools .btn svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sl-block-graph-body {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-  background-color: var(--surface-1);
-  background-image: radial-gradient(circle, var(--pass-ir-pattern-stage-dot) 1px, transparent 1.2px);
-  background-size: 24px 24px;
-  cursor: grab;
-  touch-action: none;
-}
-
-.sl-block-graph-canvas-tools {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-3);
-  z-index: 3;
-  height: 28px;
-  min-height: 28px;
-  gap: 6px;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--surface-3);
-  box-shadow: none;
-}
-
-.sl-block-graph-canvas-tools .btn {
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
-  min-height: 22px;
-  border-radius: var(--radius-md);
-}
-
-.sl-block-graph-canvas-tools .btn svg {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sl-block-graph-body.is-panning {
-  cursor: grabbing;
-}
-
-.sl-block-graph-stage {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-  will-change: transform;
-}
-
-.sl-compare-swimlane-view {
-  min-width: 0;
-  min-height: 0;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.sl-compare-swimlane-view[hidden] {
-  display: none;
-}
-
-.sl-compare-grid {
-  position: relative;
-  background: var(--surface-1);
-}
-
-.sl-compare-timestamp-guide {
-  top: 0;
-  bottom: 0;
-}
-
 /* ── 训练级 Timeline 泳道（对比模式上下两栏统一用这套结构：Host ▸ Rank ▸
    Ascend Hardware / Communication / Overlap Analysis；结构对齐 index_v3.html
    Timeline 页签的 .tl-viewport/.tl-inner，内容由 buildTrainingSwimlaneData 自由构造）── */
@@ -1226,6 +1163,8 @@ body {
   display: none;
 }
 
+/* 泳道图的滚动容器就是这个带边框的视口本身：overflow:auto 内部纵向/横向滚动，
+   细滚动条，泳道图始终裁在圆角边框内，不外溢到 pane-body（对齐 old.html）。 */
 .sl-train-tl-viewport {
   flex: 1 1 auto;
   min-height: 0;
@@ -1282,47 +1221,21 @@ body {
   border-right: 1px solid var(--border-subtle);
 }
 
-/* 对比框上下两栏（analysisColumn）固定等高、禁止拖拽：分隔条保留做视觉分界，
-   但去掉指针交互；实际锁定 50/50 的逻辑见 init() 里对 analysisGutter 的处理 + 上面
-   swimlane-analysis 分栏的 data-sizes="50,50"（storage key 也一并换新，甩掉旧的拖拽记忆）。 */
+/* 对比框上下两栏固定等高：分隔条隐藏，pv 内部留滚动条空间 */
 [data-ide-split="swimlane-analysis"] > .pto-workbench-shell__split-gutter {
-  pointer-events: none;
-  cursor: default;
+  display: none;
 }
-
-.sl-block-graph-flow {
-  min-width: 1px;
-  min-height: 1px;
-  padding: 0;
-  display: block;
-}
-
-.sl-block-graph-node {
-  position: absolute;
-  z-index: 2;
-}
-
-.sl-block-graph-edge-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.sl-block-graph-edge-line {
-  fill: none;
-  stroke: var(--foreground-muted);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  marker-end: url(#sl-block-graph-arrow);
-}
+/* 面板之间 8px 间距 */
+#canvasPane { margin-bottom: 8px; }
+#canvasPane .sl-train-tl-viewport { margin-bottom: 0; }
+#blockGraphView .sl-train-tl-viewport { margin-top: 0; }
 
 .sl-timeline-head {
   flex: 0 0 auto;
   z-index: 5;
+  background: var(--surface-2);
   box-shadow: 0 1px 0 var(--border-default);
+  overflow: hidden;
 }
 
 .sl-timeline-band {
@@ -1983,46 +1896,20 @@ body {
                         </div>
                       </section>
 
-                      <section class="pto-ide-frame__pane sl-block-graph-view" id="blockGraphView" data-ide-pane="block-graph" hidden aria-hidden="true">
+                      <section class="pto-ide-frame__pane" id="blockGraphView" data-ide-pane="block-graph" style="min-width:0;min-height:0;height:100%;display:flex;flex-direction:column" hidden aria-hidden="true">
                         <div class="pto-ide-frame__pane-header sl-cmp-header-pad">
-                          <h2 class="pto-ide-frame__pane-title" id="blockGraphTitle">attention_score_block_06</h2>
+                          <h2 class="pto-ide-frame__pane-title" id="blockGraphTitle"></h2>
                           <span class="sl-searchbox sl-header-searchbox" id="cmpBottomSearchbox" hidden>
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m21 21-4-4"></path></svg>
                             <input type="search" placeholder="搜索对比任务" />
                           </span>
                         </div>
-                        <div class="sl-block-graph-body" id="blockGraphViewport" tabindex="0" aria-label="任务对应的 block graph，可拖拽和缩放">
-                          <div class="segmented-control sl-block-graph-canvas-tools" aria-label="计算图画布工具">
-                            <button class="btn btn-icon btn-ghost" type="button" id="blockGraphZoomOut" aria-label="缩小计算图" title="缩小">
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M8 11h6"></path><path d="m20 20-4-4"></path></svg>
-                            </button>
-                            <button class="btn btn-icon btn-ghost" type="button" id="blockGraphFit" aria-label="适应计算图画布" title="适应画布">
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M16 21h5v-5"></path></svg>
-                            </button>
-                            <button class="btn btn-icon btn-ghost" type="button" id="blockGraphZoomIn" aria-label="放大计算图" title="放大">
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M8 11h6"></path><path d="M11 8v6"></path><path d="m20 20-4-4"></path></svg>
-                            </button>
-                          </div>
-                          <div class="sl-block-graph-stage" id="blockGraphStage">
-                            <div class="pto-pass-ir-graph-node-pattern-surface sl-block-graph-flow" id="blockGraphMount"></div>
-                          </div>
-                        </div>
-                        <div class="sl-compare-swimlane-view" id="compareSwimlaneView" hidden aria-hidden="true">
-                          <div class="sl-grid sl-compare-grid" id="compareGrid" hidden>
-                            <div class="sl-lane-wrap" id="compareLaneWrap"><canvas id="compareLaneCanvas"></canvas></div>
-                            <div class="sl-body-wrap" id="compareBodyWrap">
-                              <canvas id="compareBodyCanvas"></canvas>
-                              <canvas class="sl-body-crisp-canvas" id="compareBodyCrispCanvas" aria-hidden="true"></canvas>
-                            </div>
-                            <div class="sl-timestamp-guide sl-compare-timestamp-guide" id="compareTimestampGuide" aria-hidden="true" hidden></div>
-                          </div>
-                          <div class="sl-train-tl-layout" id="trainTimelineBottom">
-                            <div class="sl-train-tl-viewport" id="trainTimelineBottomViewport">
-                              <div class="sl-train-tl-corner"></div>
-                              <div class="sl-train-tl-inner">
-                                <div class="sl-train-tl-label" id="trainTimelineBottomLabel"></div>
-                                <div class="sl-train-tl-canvas" id="trainTimelineBottomCanvas"></div>
-                              </div>
+                        <div class="sl-train-tl-layout" id="trainTimelineBottom">
+                          <div class="sl-train-tl-viewport" id="trainTimelineBottomViewport">
+                            <div class="sl-train-tl-corner"></div>
+                            <div class="sl-train-tl-inner">
+                              <div class="sl-train-tl-label" id="trainTimelineBottomLabel"></div>
+                              <div class="sl-train-tl-canvas" id="trainTimelineBottomCanvas"></div>
                             </div>
                           </div>
                         </div>
@@ -2235,6 +2122,7 @@ const state = {
   diffSelectedLane: null,
   inspectorView: 'dashboard', // dashboard | detail
   detailTaskKey: null,        // { coreName, subGraphId, label, ordinal } — 点击泳道任务条时置入，驱动详情下钻
+  diffTab: 'task',            // task | lane —— 差异看板「按任务 / 按泳道」页签
   swimlaneViewMode: 'grouped', // grouped | aggregated —— 对比模式下「分组视图/聚合视图」页签
   collapsedLaneGroups: new Set(['host', 'ai_core_worker_phases']),
   expandedLaneCores: new Set(),
@@ -2430,29 +2318,14 @@ const topInspectorToggle = document.getElementById('topInspectorToggle');
 const railTerminalToggle = document.getElementById('railTerminalToggle');
 const blockGraphView = document.getElementById('blockGraphView');
 const blockGraphTitle = document.getElementById('blockGraphTitle');
-const blockGraphMount = document.getElementById('blockGraphMount');
-const blockGraphViewport = document.getElementById('blockGraphViewport');
-const blockGraphStage = document.getElementById('blockGraphStage');
-const compareSwimlaneView = document.getElementById('compareSwimlaneView');
-const compareGrid = document.getElementById('compareGrid');
-const compareLaneWrap = document.getElementById('compareLaneWrap');
-const compareBodyWrap = document.getElementById('compareBodyWrap');
-const compareLaneCanvas = document.getElementById('compareLaneCanvas');
-const compareBodyCanvas = document.getElementById('compareBodyCanvas');
-const compareBodyCrispCanvas = document.getElementById('compareBodyCrispCanvas');
-const compareTimestampGuide = document.getElementById('compareTimestampGuide');
 const swimlaneWorkbenchEl = document.querySelector('.sl-swimlane-workbench');
 const trainTimelineTop = document.getElementById('trainTimelineTop');
 const trainTimelineBottom = document.getElementById('trainTimelineBottom');
-const blockGraphZoomOut = document.getElementById('blockGraphZoomOut');
-const blockGraphZoomIn = document.getElementById('blockGraphZoomIn');
-const blockGraphFit = document.getElementById('blockGraphFit');
 let bctx, actx, lctx, crispCtx;
 let frameController = null;
 let canvasTooltipController = null;
 let canvasResizeObserver = null;
 let frameResizeObserver = null;
-let graphResizeObserver = null;
 let zoomRenderFrame = 0;
 let crispRenderFrame = 0;
 let pendingZoomAnchor = 0.5;
@@ -2462,18 +2335,6 @@ let autoCollapsedExplorer = false;
 let autoCollapsedInspector = false;
 let overviewMetricSeries = [];
 const overviewMetricCache = new Map();
-let syncingComparisonScroll = false;
-const blockGraphViewState = {
-  x: 0,
-  y: 0,
-  scale: 1,
-  dragging: false,
-  pointerId: null,
-  startClientX: 0,
-  startClientY: 0,
-  startX: 0,
-  startY: 0,
-};
 
 const LABEL_W = 184;
 function visibleTrackW() {
@@ -2735,67 +2596,6 @@ function setupCanvas(canvas, wCss, hCss) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
   return ctx;
-}
-
-function copyCanvasPixels(source, target) {
-  if (!source || !target || state.secondaryViewMode !== 'comparison' || isAggregatedSwimlane()) return;
-  if (target === compareBodyCanvas) {
-    renderComparisonBody();
-    return;
-  }
-  if (target.width !== source.width) target.width = source.width;
-  if (target.height !== source.height) target.height = source.height;
-  target.style.width = source.style.width;
-  target.style.height = source.style.height;
-  const ctx = target.getContext('2d');
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, target.width, target.height);
-  ctx.drawImage(source, 0, 0);
-}
-
-function renderComparisonBody() {
-  const run = RUN_BY_ID[state.comparisonRunId];
-  if (!run || !compareBodyCanvas) return;
-  const model = run.model;
-  const scale = pxPerUs();
-  const width = Math.max(bodyW(), Math.ceil(model.timelineEnd * scale + 8));
-  const height = bodyH();
-  const ctx = setupCanvas(compareBodyCanvas, width, height);
-  ctx.clearRect(0, 0, width, height);
-  rowItems.forEach((item, row) => {
-    if (item.type !== 'section') return;
-    ctx.fillStyle = 'rgba(255,255,255,0.026)';
-    ctx.fillRect(0, rowTop(row), width, rowHeight(row));
-  });
-  model.layerMarks.forEach((mark) => {
-    const x = Math.round(mark.t * scale) + 0.5;
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-    ctx.setLineDash([]);
-  });
-  for (const task of model.tasks) {
-    const row = rowOf[task.coreIdx];
-    if (!Number.isFinite(row)) continue;
-    const bar = barMetricsForRow(row);
-    const geometry = taskBarGeometry(task, task.start, task.end, scale);
-    const x = geometry.x;
-    const y = rowTop(row) + bar.pad;
-    const taskWidth = geometry.width;
-    if (taskWidth < 1) continue;
-    const group = task.group != null ? model.groups[task.group] : null;
-    window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
-      x, y, width: taskWidth, height: bar.height,
-      baseColor: group?.color || KIND_ACCENT[task.kind],
-      fontFamily: "'Inter', sans-serif", task,
-    });
-  }
-  scheduleCrispTaskLayer();
-}
-
-function syncComparisonCanvases() {
-  copyCanvasPixels(laneCanvas, compareLaneCanvas);
-  copyCanvasPixels(bodyCanvas, compareBodyCanvas);
 }
 
 /* ============================================================
@@ -3120,60 +2920,11 @@ function drawCrispTaskLayer() {
   bodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
 }
 
-function drawCrispComparisonLayer() {
-  if (isAggregatedSwimlane()) return;
-  if (state.secondaryViewMode !== 'comparison' || !compareBodyCrispCanvas
-      || !compareBodyWrap?.clientWidth || !compareBodyWrap.clientHeight) return;
-  const run = RUN_BY_ID[state.comparisonRunId];
-  if (!run) return;
-  const model = run.model;
-  const viewportWidth = compareBodyWrap.clientWidth;
-  const viewportHeight = compareBodyWrap.clientHeight;
-  const scrollLeft = compareBodyWrap.scrollLeft;
-  const scrollTop = compareBodyWrap.scrollTop;
-  const dpr = window.devicePixelRatio || 1;
-  const pixelWidth = Math.max(1, Math.round(viewportWidth * dpr));
-  const pixelHeight = Math.max(1, Math.round(viewportHeight * dpr));
-  if (compareBodyCrispCanvas.width !== pixelWidth) compareBodyCrispCanvas.width = pixelWidth;
-  if (compareBodyCrispCanvas.height !== pixelHeight) compareBodyCrispCanvas.height = pixelHeight;
-  compareBodyCrispCanvas.style.width = viewportWidth + 'px';
-  compareBodyCrispCanvas.style.height = viewportHeight + 'px';
-  compareBodyCrispCanvas.style.transform = `translate3d(${scrollLeft}px, ${scrollTop}px, 0)`;
-  compareBodyCrispCanvas.dataset.renderScale = dpr.toFixed(3);
-  const ctx = compareBodyCrispCanvas.getContext('2d');
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, pixelWidth, pixelHeight);
-  ctx.setTransform(dpr, 0, 0, dpr, -scrollLeft * dpr, -scrollTop * dpr);
-  const scale = pxPerUs();
-  const viewportRight = scrollLeft + viewportWidth;
-  const viewportBottom = scrollTop + viewportHeight;
-  let renderedTaskBars = 0;
-  for (const task of model.tasks) {
-    const row = rowOf[task.coreIdx];
-    if (!Number.isFinite(row)) continue;
-    const bar = barMetricsForRow(row);
-    const geometry = taskBarGeometry(task, task.start, task.end, scale);
-    const x = geometry.x;
-    const y = rowTop(row) + bar.pad;
-    if (geometry.width < 1 || x + geometry.width < scrollLeft || x > viewportRight
-        || y + bar.height < scrollTop || y > viewportBottom) continue;
-    const group = task.group != null ? model.groups[task.group] : null;
-    window.PtoSwimlaneTaskPattern.drawTaskBar(ctx, {
-      x, y, width: geometry.width, height: bar.height,
-      baseColor: group?.color || KIND_ACCENT[task.kind],
-      fontFamily: "'Inter', sans-serif", task,
-    });
-    renderedTaskBars += 1;
-  }
-  compareBodyCrispCanvas.dataset.renderedTaskBars = String(renderedTaskBars);
-}
-
 function scheduleCrispTaskLayer() {
   if (crispRenderFrame) return;
   crispRenderFrame = window.requestAnimationFrame(() => {
     crispRenderFrame = 0;
     drawCrispTaskLayer();
-    drawCrispComparisonLayer();
   });
 }
 
@@ -3270,7 +3021,6 @@ function drawBody() {
   if (fi.showDependencyCurves) drawDependencyCurves(fi);
   else if (state.mixMode) drawSyncCurves(fi);
   drawAggregatedComparePass(bctx);
-  copyCanvasPixels(bodyCanvas, compareBodyCanvas);
   scheduleCrispTaskLayer();
 }
 
@@ -3353,7 +3103,6 @@ function drawSeparators(ctx, w) {
   rowItems.forEach((item, row) => {
     if (item.type === 'section') line(row, 'rgba(255,255,255,0.16)', 1);
   });
-  copyCanvasPixels(laneCanvas, compareLaneCanvas);
 }
 
 function drawWaitSegment(x, y, w, h, muted = false) {
@@ -3476,8 +3225,10 @@ function drawBarrier(tUs, color) {
 function drawAxis() {
   const w = bodyW(), scale = pxPerUs();
   actx.clearRect(0, 0, w, AXIS_H);
+  actx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface-2').trim() || '#1a1a2e';
+  actx.fillRect(0, 0, w, AXIS_H);
   actx.fillStyle = 'rgba(255,255,255,0.40)';
-  actx.font = "500 10px 'JetBrains Mono', monospace";
+  actx.font = "500 10px 'Inter', sans-serif";
   actx.textBaseline = 'middle';
   const { majorStep, minorStep } = adaptiveTimeSteps(MODEL.timelineEnd, w, 54);
   for (let t = 0; t <= MODEL.timelineEnd + minorStep * 0.25; t += minorStep) {
@@ -3893,23 +3644,12 @@ function showTimestampGuideAt(clientX) {
   timestampGuide.style.left = left + 'px';
   timestampGuide.hidden = false;
   timestampGuide.setAttribute('aria-hidden', 'false');
-  if (state.secondaryViewMode === 'comparison' && compareTimestampGuide && compareGrid) {
-    const compareRect = compareGrid.getBoundingClientRect();
-    const compareLeft = Math.max(LABEL_W, Math.min(compareRect.width - 1, clientX - compareRect.left));
-    compareTimestampGuide.style.left = compareLeft + 'px';
-    compareTimestampGuide.hidden = false;
-    compareTimestampGuide.setAttribute('aria-hidden', 'false');
-  }
 }
 
 function hideTimestampGuide() {
   if (timestampGuide) {
     timestampGuide.hidden = true;
     timestampGuide.setAttribute('aria-hidden', 'true');
-  }
-  if (compareTimestampGuide) {
-    compareTimestampGuide.hidden = true;
-    compareTimestampGuide.setAttribute('aria-hidden', 'true');
   }
 }
 
@@ -3993,13 +3733,14 @@ function runCheckItemHtml(r, idx) {
   const isCompared = r.id === state.comparisonRunId;
   const checked = isBase || isCompared;
   const dotClass = runDotClass(r.id);
+  const cbDisabled = isBase ? 'disabled' : '';
   const cbTitle = isBase
     ? '基线固定参与对比（对比框上栏）；如需换掉，请点另一条记录的"基线"标签'
     : isCompared
-      ? '当前对比对象（对比框下栏）；勾选另一条记录即可替换'
+      ? '取消勾选以退出对比模式'
       : '勾选后作为对比对象（对比框下栏）';
   return `<div class="cmp-task-item ${checked ? 'is-selected' : ''}" data-id="${escapeHtml(r.id)}">
-    <input type="checkbox" class="cmp-cb" data-id="${escapeHtml(r.id)}" ${checked ? 'checked' : ''} ${checked ? 'disabled' : ''} title="${escapeHtml(cbTitle)}">
+    <input type="checkbox" class="cmp-cb" data-id="${escapeHtml(r.id)}" ${checked ? 'checked' : ''} ${cbDisabled} title="${escapeHtml(cbTitle)}">
     <span class="dot ${dotClass}"></span>
     ${runNameMiddleEllipsisHtml(r.id)}
     <span class="cmp-base-tag ${isBase ? 'is-selected' : ''}" data-base="${escapeHtml(r.id)}" title="设为基线（对比框上栏）">基线</span>
@@ -4023,11 +3764,13 @@ function extraRunItemHtml(r) {
   </div>`;
 }
 
-// 勾选一条未勾中的记录 = 把它设为新的对比对象（替换旧的），本工具固定两两对比，
-// 不支持勾出第三路；已勾中的两行 checkbox 是 disabled 的，点了也不会走到这里。
+// 勾选一条未勾中的记录 = 把它设为新的对比对象（替换旧的），本工具固定两两对比。
+// 取消勾选已勾中的对比对象 = 退出对比模式，恢复只有基线的状态。
 function toggleCompareCheck(runId) {
   if (runId !== state.selectedRunId && runId !== state.comparisonRunId) {
     openRunComparison(runId);
+  } else if (runId === state.comparisonRunId) {
+    closeRunComparison();
   }
   renderRunHistory();
 }
@@ -4105,7 +3848,11 @@ function loadRun(runId) {
   });
   state.expandedLaneCores.clear();
   state.collapsedLaneGroups = new Set(['host', 'ai_core_worker_phases']);
-  setBlockGraphOpen(false);
+  state.secondaryViewMode = null;
+  state.comparisonRunId = null;
+  state.diffSelectedLane = null;
+  state.detailTaskKey = null;
+  state.inspectorView = 'dashboard';
   setSwimlaneViewMode('grouped');
   buildOrder();
   layout();
@@ -4183,11 +3930,6 @@ bodyWrap.addEventListener('scroll', () => {
   axisWrap.scrollLeft = bodyWrap.scrollLeft;
   overviewWrap.scrollLeft = bodyWrap.scrollLeft;
   laneWrap.scrollTop = bodyWrap.scrollTop;
-  if (!syncingComparisonScroll && state.secondaryViewMode === 'comparison' && compareBodyWrap) {
-    syncingComparisonScroll = true;
-    compareBodyWrap.scrollLeft = bodyWrap.scrollLeft;
-    syncingComparisonScroll = false;
-  }
   syncGlobalRulerBrush();
   hideTimestampGuide();
   scheduleCrispTaskLayer();
@@ -4204,20 +3946,6 @@ function forwardLaneWheel(event, targetWrap) {
   if (targetWrap.scrollLeft !== beforeLeft || targetWrap.scrollTop !== beforeTop) event.preventDefault();
 }
 laneWrap.addEventListener('wheel', (event) => forwardLaneWheel(event, bodyWrap), { passive: false });
-compareLaneWrap?.addEventListener('wheel', (event) => forwardLaneWheel(event, compareBodyWrap), { passive: false });
-compareBodyWrap?.addEventListener('scroll', () => {
-  if (compareLaneWrap) compareLaneWrap.scrollTop = compareBodyWrap.scrollTop;
-  if (!syncingComparisonScroll && bodyWrap.scrollLeft !== compareBodyWrap.scrollLeft) {
-    syncingComparisonScroll = true;
-    bodyWrap.scrollLeft = compareBodyWrap.scrollLeft;
-    axisWrap.scrollLeft = compareBodyWrap.scrollLeft;
-    overviewWrap.scrollLeft = compareBodyWrap.scrollLeft;
-    syncingComparisonScroll = false;
-    syncGlobalRulerBrush();
-  }
-  hideTimestampGuide();
-  scheduleCrispTaskLayer();
-});
 overviewBand.addEventListener('mousemove', showOverviewTooltip);
 overviewBand.addEventListener('mouseleave', hideOverviewTooltip);
 axisCanvas.addEventListener('mousemove', (e) => {
@@ -4434,9 +4162,6 @@ function setZoom(pct) {
       bodyW() * pendingZoomAnchor - bodyWrap.clientWidth / 2);
     axisWrap.scrollLeft = bodyWrap.scrollLeft;
     overviewWrap.scrollLeft = bodyWrap.scrollLeft;
-    if (state.secondaryViewMode === 'comparison' && compareBodyWrap) {
-      compareBodyWrap.scrollLeft = bodyWrap.scrollLeft;
-    }
     syncGlobalRulerBrush();
     canvasPane?.removeAttribute('aria-busy');
   });
@@ -4547,77 +4272,6 @@ function renderInspector() {
   if (topRun) renderCompareGauge(document.getElementById('compareGaugeTop'), computeRunPhs(topRun));
   if (bottomRun) renderCompareGauge(document.getElementById('compareGaugeBottom'), computeRunPhs(bottomRun));
   bindInspector();
-}
-
-function blockGraphSpec(t) {
-  const graph = CURRENT_RUN.blockGraph;
-  if (!graph) return null;
-  return { ...graph, selectedTaskId: t?.id || null };
-}
-
-function blockGraphEdgePath(source, target) {
-  const x1 = source.x + Number(source.frame?.width || 190);
-  const y1 = source.y + Number(source.frame?.height || source.frame?.minHeight || 72) / 2;
-  const x2 = target.x;
-  const y2 = target.y + Number(target.frame?.height || target.frame?.minHeight || 72) / 2;
-  const bend = Math.max(36, Math.abs(x2 - x1) * 0.42);
-  return `M${x1},${y1} C${x1 + bend},${y1} ${x2 - bend},${y2} ${x2},${y2}`;
-}
-
-function renderBlockGraph(t) {
-  const helper = window.PtoPassIrGraphNodePattern;
-  if (!helper || !blockGraphMount || !blockGraphTitle) return;
-  const graph = blockGraphSpec(t);
-  if (!graph) return;
-  blockGraphTitle.textContent = graph.name;
-  blockGraphTitle.title = `${graph.graphType} · leafHash ${graph.leafHash}`;
-  blockGraphMount.innerHTML = '';
-  blockGraphMount.style.width = `${graph.canvas.width}px`;
-  blockGraphMount.style.height = `${graph.canvas.height}px`;
-  blockGraphMount.dataset.leafHash = graph.leafHash;
-  blockGraphMount.dataset.provenance = graph.provenance;
-
-  const nodeById = Object.fromEntries(graph.nodes.map((node) => [node.id, node]));
-  const edgeLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  edgeLayer.setAttribute('class', 'sl-block-graph-edge-layer');
-  edgeLayer.setAttribute('viewBox', `0 0 ${graph.canvas.width} ${graph.canvas.height}`);
-  edgeLayer.setAttribute('width', String(graph.canvas.width));
-  edgeLayer.setAttribute('height', String(graph.canvas.height));
-  edgeLayer.setAttribute('aria-hidden', 'true');
-  edgeLayer.innerHTML = `<defs><marker id="sl-block-graph-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8 z" fill="var(--foreground-muted)"></path></marker></defs>`;
-  graph.edges.forEach((edge) => {
-    const source = nodeById[edge.from];
-    const target = nodeById[edge.to];
-    if (!source || !target) return;
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('class', 'sl-block-graph-edge-line');
-    path.setAttribute('d', blockGraphEdgePath(source, target));
-    path.dataset.edgeId = edge.id;
-    edgeLayer.appendChild(path);
-  });
-  blockGraphMount.appendChild(edgeLayer);
-
-  graph.nodes.forEach((node) => {
-    const slot = document.createElement('div');
-    slot.className = 'sl-block-graph-node';
-    slot.style.left = `${node.x}px`;
-    slot.style.top = `${node.y}px`;
-    const card = helper.buildNodeCardElement(node, {
-      compact: true,
-      selected: false,
-    });
-    card.addEventListener('click', (event) => {
-      event.stopPropagation();
-      blockGraphMount.querySelectorAll('.node-card.selected').forEach((item) => item.classList.remove('selected'));
-      card.classList.add('selected');
-    });
-    slot.appendChild(card);
-    blockGraphMount.appendChild(slot);
-  });
-}
-
-function blockGraphIsOpen() {
-  return Boolean(blockGraphView && !blockGraphView.hidden);
 }
 
 /* ============================================================
@@ -4883,6 +4537,46 @@ function computeLaneDiffCards() {
   return cards;
 }
 
+/* ── 按泳道聚合：把同一泳道类型（AI Core / AIV / Comm …）跨 Host/Rank 汇总 ── */
+function computeLaneAggregatedDiffCards() {
+  var topRun = RUN_BY_ID[state.selectedRunId];
+  var bottomRun = RUN_BY_ID[state.comparisonRunId];
+  if (!topRun || !bottomRun) return [];
+  var topStats = laneBusyStats(topRun);
+  var bottomStats = laneBusyStats(bottomRun);
+  var agg = new Map();
+  function ingest(stats, side) {
+    stats.forEach(function (info, leafKey) {
+      var path = laneKeyPath(leafKey);
+      var segs = path.split(' › ');
+      var groupLabel = segs[1] || '其他';
+      var leafLabel = segs[2] || leafKey;
+      var key = groupLabel + ' › ' + leafLabel;
+      var entry = agg.get(key);
+      if (!entry) { entry = { laneType: key, groupLabel: groupLabel, leafLabel: leafLabel, topUs: 0, bottomUs: 0, topCount: 0, bottomCount: 0, leafKeys: [] }; agg.set(key, entry); }
+      if (side === 'top') { entry.topUs += info.busyUs; entry.topCount += info.count; }
+      else { entry.bottomUs += info.busyUs; entry.bottomCount += info.count; }
+      if (entry.leafKeys.indexOf(leafKey) < 0) entry.leafKeys.push(leafKey);
+    });
+  }
+  ingest(topStats, 'top');
+  ingest(bottomStats, 'bottom');
+  var cards = [];
+  agg.forEach(function (entry) {
+    var base = Math.max(entry.topUs, entry.bottomUs, 1e-6);
+    var diffPct = (Math.abs(entry.topUs - entry.bottomUs) / base) * 100;
+    cards.push({
+      leafKey: entry.leafKeys[0] || '',
+      path: entry.laneType,
+      topUs: entry.topUs, bottomUs: entry.bottomUs, diffPct: diffPct,
+      itemCount: entry.topCount + entry.bottomCount,
+      direction: entry.bottomUs > entry.topUs ? 'up' : (entry.bottomUs < entry.topUs ? 'down' : 'flat'),
+    });
+  });
+  cards.sort(function (a, b) { return b.diffPct - a.diffPct; });
+  return cards;
+}
+
 /* ── PHS 仪表盘（缩小版，复用 index_v3.html app.js 的 renderPhsGauge / gradeColorAt / gradeToColor / hexA）── */
 function compareGradeColorAt(v) {
   const stops = [
@@ -4946,8 +4640,8 @@ function renderCompareGauge(box, phs) {
   var curColor = compareGradeToColor(grade);
   var estColor = compareGradeToColor(estGrade);
 
-  var W = 220, H = 140, cx = 110, cy = 112;
-  var rOut = 96, rIn = 78;
+  var W = 180, H = 100, cx = 90, cy = 78;
+  var rOut = 74, rIn = 58;
   var N = 52;
   var A0 = 180, A1 = 0;
   var polar = function (r, aDeg) {
@@ -4975,7 +4669,7 @@ function renderCompareGauge(box, phs) {
   var gainArrow = '';
   if (est > cur + 1) {
     var aEst = angOf(est);
-    var r2 = rOut + 13;
+    var r2 = rOut + 10;
     var sx = polar(r2, aCur), ex = polar(r2, aEst);
     gainArrow += '<path d="M ' + sx[0].toFixed(1) + ' ' + sx[1].toFixed(1) + ' A ' + r2 + ' ' + r2 + ' 0 0 1 ' + ex[0].toFixed(1) + ' ' + ex[1].toFixed(1) + '" fill="none" stroke="' + estColor + '" stroke-width="1.6" stroke-linecap="round"/>';
     var bx = polar(r2, aEst + 4);
@@ -5072,9 +4766,9 @@ function diffDetailHtml(taskKey) {
   html += '<div class="sl-report-card">';
   html += '<div class="sl-report-card__title">选中任务</div>';
   html += '<div class="sl-detail-meta">';
+  html += '<div class="sl-detail-meta__row"><span class="sl-detail-meta__key">语义标签</span><span class="sl-detail-meta__val"><span class="sl-detail-label-pill" style="background:' + (labelColorForTag(label)) + '">' + escapeHtml(label) + '</span></span></div>';
   html += '<div class="sl-detail-meta__row"><span class="sl-detail-meta__key">任务名称</span><span class="sl-detail-meta__val monospace" title="' + escapeHtml(taskName) + '">' + escapeHtml(taskName) + '</span></div>';
   html += '<div class="sl-detail-meta__row"><span class="sl-detail-meta__key">归属泳道</span><span class="sl-detail-meta__val">' + escapeHtml(laneName) + '</span></div>';
-  html += '<div class="sl-detail-meta__row"><span class="sl-detail-meta__key">语义标签</span><span class="sl-detail-meta__val"><span class="sl-detail-label-pill" style="background:' + (labelColorForTag(label)) + '">' + escapeHtml(label) + '</span></span></div>';
   html += '<div class="sl-detail-meta__row"><span class="sl-detail-meta__key">' + escapeHtml(stepId ? '所属 Step' : 'Wrap') + '</span><span class="sl-detail-meta__val monospace">' + escapeHtml(stepId || '—') + '</span></div>';
   html += '</div></div>';
 
@@ -5145,23 +4839,38 @@ function formatCompareVal(val, unit) {
   return num.toFixed(2) + ' ' + (unit || '');
 }
 
-function diffCardHtml(card) {
+function diffCardHtml(card, index) {
   const active = state.diffSelectedLane === card.leafKey;
   const barPct = Math.min(100, Math.max(2, card.diffPct));
-  return '<div class="sl-diff-card ' + (active ? 'is-active' : '') + '" data-diff-lane="' + escapeHtml(card.leafKey) + '" role="button" tabindex="0">' +
-    '<div class="sl-diff-card__path">' + escapeHtml(card.path) + ' <small>泳道</small></div>' +
+  const topMs = (card.topUs / 1000).toFixed(2);
+  const bottomMs = (card.bottomUs / 1000).toFixed(2);
+  const topBigger = card.topUs >= card.bottomUs;
+  const bottomBigger = card.bottomUs >= card.topUs;
+  const topClass = index < 3 ? ' is-top' : '';
+  return '<div class="sl-diff-card' + (active ? ' is-active' : '') + topClass + '" data-diff-lane="' + escapeHtml(card.leafKey) + '" role="button" tabindex="0">' +
+    '<div class="sl-diff-card__path">' + escapeHtml(card.path) + '</div>' +
     '<div class="sl-diff-card__meter-row">' +
       '<span class="sl-diff-card__pct">' + card.diffPct.toFixed(1) + '%</span>' +
       '<div class="sl-meter"><div class="sl-meter-fill" style="width:' + barPct + '%"></div></div>' +
     '</div>' +
-    '<div class="sl-diff-card__vals"><span>' + (card.topUs / 1000).toFixed(2) + 'ms</span><span>' + (card.bottomUs / 1000).toFixed(2) + 'ms</span></div>' +
+    '<div class="sl-diff-card__vals">基线任务 <span class="sl-diff-card__val' + (topBigger ? ' is-warn' : '') + '">' + topMs + 'ms</span> &nbsp;|&nbsp; 对比任务 <span class="sl-diff-card__val' + (bottomBigger ? ' is-warn' : '') + '">' + bottomMs + 'ms</span></div>' +
   '</div>';
 }
 
 function diffDashboardHtml() {
   var topRun = RUN_BY_ID[state.selectedRunId];
   var bottomRun = RUN_BY_ID[state.comparisonRunId];
-  if (!topRun || !bottomRun) return '<div class="sl-empty-state">未找到可对比的运行。</div>';
+  if (!topRun) return '<div class="sl-empty-state">未找到基线运行数据。</div>';
+  if (!bottomRun) return '<div class="sl-empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px var(--space-4);gap:var(--space-3)">' +
+    '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.4" aria-hidden="true">' +
+      '<rect x="3" y="3" width="8" height="8" rx="1.5"></rect>' +
+      '<rect x="13" y="3" width="8" height="8" rx="1.5"></rect>' +
+      '<rect x="3" y="13" width="8" height="8" rx="1.5"></rect>' +
+      '<rect x="13" y="13" width="8" height="8" rx="1.5"></rect>' +
+      '<path d="M11 3v18"></path>' +
+    '</svg>' +
+    '<span>请勾选对比数据</span>' +
+  '</div>';
   var topPhs = computeRunPhs(topRun);
   var bottomPhs = computeRunPhs(bottomRun);
   var topDotClass = runDotClass(topRun.id);
@@ -5184,21 +4893,26 @@ function diffDashboardHtml() {
     '</div>' +
   '</div>' +
   (function () {
-    var cards = computeLaneDiffCards();
-    if (!cards.length) return '';
-    var lanesTotal = cards.length;
-    var differingCards = cards.filter(function (c) { return c.diffPct >= DIFF_WARN_THRESHOLD; });
-    var lanesDiffering = differingCards.length;
-    var itemsDiffering = differingCards.reduce(function (sum, c) { return sum + c.itemCount; }, 0);
+    var isTaskTab = state.diffTab === 'task';
+    var taskCards = computeLaneDiffCards();
+    var laneCards = computeLaneAggregatedDiffCards();
+    var cards = isTaskTab ? taskCards : laneCards;
+    if (!taskCards.length && !laneCards.length) return '';
+    // 统计数字始终基于任务级数据，不随页签切换变化
+    var differingTaskCards = taskCards.filter(function (c) { return c.diffPct >= DIFF_WARN_THRESHOLD; });
+    var taskItemsDiffering = differingTaskCards.reduce(function (sum, c) { return sum + c.itemCount; }, 0);
     return '' +
       '<div class="sl-diff-stat-card">' +
-        '<div class="sl-diff-stat-card__row"><span class="sl-diff-stat-card__label">差异泳道</span><span class="sl-diff-stat-card__num">' + lanesDiffering + ' / ' + lanesTotal + '</span></div>' +
-        '<div class="sl-diff-stat-card__row"><span class="sl-diff-stat-card__label">差异项</span><span class="sl-diff-stat-card__num">' + itemsDiffering + '</span></div>' +
+        '<div class="sl-diff-stat-card__row"><span class="sl-diff-stat-card__label">差异任务</span><span class="sl-diff-stat-card__num">' + taskCards.length + '</span></div>' +
+        '<div class="sl-diff-stat-card__row"><span class="sl-diff-stat-card__label">差异泳道</span><span class="sl-diff-stat-card__num">' + laneCards.length + '</span></div>' +
+      '</div>' +
+      '<div class="sl-diff-tabs" role="tablist" aria-label="差异粒度">' +
+        '<button class="btn sl-report-tab' + (isTaskTab ? ' is-selected' : '') + '" type="button" role="tab" data-diff-tab="task" aria-selected="' + isTaskTab + '">按任务 <small>' + taskCards.length + '</small></button>' +
+        '<button class="btn sl-report-tab' + (!isTaskTab ? ' is-selected' : '') + '" type="button" role="tab" data-diff-tab="lane" aria-selected="' + !isTaskTab + '">按泳道 <small>' + laneCards.length + '</small></button>' +
       '</div>' +
       '<div class="sl-insp-section">' +
-        '<div class="sl-insp-section-label">泳道差异 · 按差异幅度排序（' + cards.length + '）</div>' +
-        '<div class="sl-diff-card-list">' + cards.map(function (c) { return diffCardHtml(c); }).join('') + '</div>' +
-        '<div class="sl-insp-hint">差异幅度 = |基线 − 对比对象| 的 busy 时长占两者较大值的比例；差异泳道 / 差异项按差异幅度 ≥ ' + DIFF_WARN_THRESHOLD + '% 统计。点击卡片可在上下两栏泳道中定位并高亮对应行。</div>' +
+        '<div class="sl-diff-card-list">' + cards.map(function (c, i) { return diffCardHtml(c, i); }).join('') + '</div>' +
+        '<div class="sl-insp-hint">差异幅度 = |基线 − 对比对象| 的 busy 时长占两者较大值的比例；差异泳道 / 差异任务按差异幅度 ≥ ' + DIFF_WARN_THRESHOLD + '% 统计。点击卡片可在上下两栏泳道中定位并高亮对应行。</div>' +
       '</div>';
   })();
 }
@@ -5217,13 +4931,25 @@ function selectDiffLane(leafKey) {
   if (isAggregatedSwimlane()) {
     // 聚合视图下同一个叶子泳道被拆成 §base/§compare 两行紧邻显示，rowMeta 里没有
     // 裸 leafKey 这一行了——直接 scrollToCore(leafKey) 会因为找不到行而定位失败。
-    // 定位到 base 行本身，再把 compare 行塞进 extraActiveLaneKeys 一起高亮，
-    // 跟点击任务条时"两条相邻泳道一起亮"的行为保持一致。
     const renderer = trainRenderers.top;
     if (renderer?.parsedData) {
       expandLaneGroupOn(renderer, groupId);
       const baseKey = `${leafKey}§base`, compareKey = `${leafKey}§compare`;
-      renderer.extraActiveLaneKeys = [compareKey];
+      const baseEvents = renderer.parsedData.coreEvents?.get(baseKey) || [];
+      const compareEvents = renderer.parsedData.coreEvents?.get(compareKey) || [];
+      if (baseEvents.length > 0) {
+        // 首条事件临时归零时长 → 不可见但仍驱动暗化；其余事件全进 relatedEvents 保持明亮
+        var selEvent = baseEvents[0];
+        var savedEnd = selEvent.execEnd;
+        selEvent.execEnd = selEvent.execStart;
+        renderer.selectedEvent = selEvent;
+        renderer.relatedEvents = baseEvents.slice(1).concat(compareEvents);
+        renderer.selectedCore = baseKey;
+        renderer.extraActiveLaneKeys = [compareKey];
+        renderer._render();
+        renderer._renderLabels();
+        selEvent.execEnd = savedEnd;
+      }
       renderer.scrollToCore(baseKey);
     }
   } else {
@@ -5231,10 +4957,66 @@ function selectDiffLane(leafKey) {
       const renderer = trainRenderers[key];
       if (!renderer?.parsedData) return;
       expandLaneGroupOn(renderer, groupId);
+      const events = renderer.parsedData.coreEvents?.get(leafKey) || [];
+      if (events.length > 0) {
+        // 首条事件临时归零时长 → 不可见但驱动暗化；其余全进 relatedEvents 不暗
+        var selEvent = events[0];
+        var savedEnd = selEvent.execEnd;
+        selEvent.execEnd = selEvent.execStart;
+        renderer.selectedEvent = selEvent;
+        renderer.relatedEvents = events.slice(1);
+        renderer.selectedCore = leafKey;
+        renderer.extraActiveLaneKeys = [];
+        renderer._render();
+        renderer._renderLabels();
+        selEvent.execEnd = savedEnd;
+      }
       renderer.scrollToCore(leafKey);
     });
   }
+  hideCrossLaneConnectors();
   renderInspector();
+}
+
+/* ── "按任务"页签卡片点击 → 下钻到对应任务的差异详情 ── */
+function drillToTaskDetail(leafKey) {
+  if (!leafKey) return;
+  var groupId = laneGroupIdOf(leafKey);
+  if (isAggregatedSwimlane()) {
+    var renderer = trainRenderers.top;
+    if (!renderer?.parsedData) return;
+    expandLaneGroupOn(renderer, groupId);
+    var baseKey = leafKey + '§base';
+    var events = renderer.parsedData.coreEvents?.get(baseKey) || [];
+    if (events.length > 0) {
+      selectAggregatedTrainEvent(renderer, events[0]);
+      requestAnimationFrame(function () { renderer.scrollToCore(baseKey); });
+    }
+  } else {
+    ['top', 'bottom'].forEach(function (key) {
+      var r = trainRenderers[key];
+      if (r) expandLaneGroupOn(r, groupId);
+    });
+    var renderer = trainRenderers.top;
+    if (!renderer?.parsedData) return;
+    var events = renderer.parsedData.coreEvents?.get(leafKey) || [];
+    if (events.length > 0) {
+      var key = renderer.positionalKeyOfEvent(events[0]);
+      if (key) {
+        selectGroupedTrainEvent(key);
+        requestAnimationFrame(function () {
+          trainRenderers.top?.scrollToCore(leafKey);
+          trainRenderers.bottom?.scrollToCore(leafKey);
+          // scrollToCore 改的是 viewport.scrollTop，各自的 yScrollTop 与上下两栏镜像同步
+          // 都在随后的 scroll 事件里异步落定；连线在滚动前已画过一次，这里等两帧同步做完
+          // 再按最终 scrollTop 重画，否则下端会停在滚动前的旧位置、对不上下面的任务条。
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { updateCrossLaneConnectors(); });
+          });
+        });
+      }
+    }
+  }
 }
 
 // 返回差异看板：只重置 inspector 面板状态是不够的——画布上被选中的任务条（含聚合视图下
@@ -5308,26 +5090,40 @@ function mountAggregatedTrainSwimlane(topRun, bottomRun) {
   renderer.loadData(parsed, analysis, built.laneTree);
 }
 
-function renderTrainingComparison() {
+function renderTrainingComparison(onComplete) {
   const topRun = RUN_BY_ID[state.selectedRunId];
   const bottomRun = RUN_BY_ID[state.comparisonRunId];
   if (state.swimlaneViewMode === 'aggregated') {
+    if (!bottomRun) {
+      setSwimlaneViewMode('grouped');
+      showBottomPlaceholder();
+      if (onComplete) onComplete();
+      return;
+    }
     mountAggregatedTrainSwimlane(topRun, bottomRun);
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
       try { trainRenderers.top?.fitToView?.(); } catch (e) {}
+      if (onComplete) onComplete();
     }));
     return;
   }
   if (topRun) mountTrainSwimlane('top', topRun);
-  if (bottomRun) mountTrainSwimlane('bottom', bottomRun);
-  bindTrainSwimlaneSync();
-  // 双 rAF：等面板按新尺寸真正完成一次布局后再各自 fitToView + 对齐缩放，
-  // 避免用隐藏态下的 0 宽度算出初始 xScale。
-  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-    try { trainRenderers.top?.fitToView?.(); } catch (e) {}
-    try { trainRenderers.bottom?.fitToView?.(); } catch (e) {}
-    alignTrainSwimlaneZoom();
-  }));
+  if (bottomRun) {
+    mountTrainSwimlane('bottom', bottomRun);
+    bindTrainSwimlaneSync();
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      try { trainRenderers.top?.fitToView?.(); } catch (e) {}
+      try { trainRenderers.bottom?.fitToView?.(); } catch (e) {}
+      alignTrainSwimlaneZoom();
+      if (onComplete) onComplete();
+    }));
+  } else {
+    showBottomPlaceholder();
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      try { trainRenderers.top?.fitToView?.(); } catch (e) {}
+      if (onComplete) onComplete();
+    }));
+  }
 }
 
 // 上下两栏对齐到同一 xScale（取两者各自 fitToView 后较小的一个，再额外放大一档），
@@ -5380,9 +5176,8 @@ function bindTrainSwimlaneSync() {
           tv.scrollTop = sv.scrollTop;
           window.requestAnimationFrame(() => window.requestAnimationFrame(() => { trainSwimlaneScrollSyncing = false; }));
         }
-        // 滚动时同步更新连线位置——聚合视图下没有 target（bottom 未挂载），
-        // 上面两行会短路跳过，但连线仍然要跟着滚，所以这句不能放在 target 存在的分支里。
-        if (trainRenderers.top?.selectedEvent) updateCrossLaneConnectors();
+        // 仅差异详情模式下才同步连线位置；泳道高亮模式不画连线
+        if (trainRenderers.top?.selectedEvent && state.inspectorView === 'detail') updateCrossLaneConnectors();
       }, { passive: true });
     }
     const canvasHost = document.getElementById(key === 'top' ? 'trainTimelineTopCanvas' : 'trainTimelineBottomCanvas');
@@ -5397,9 +5192,7 @@ function bindTrainSwimlaneSync() {
           const ratio = sourceRect.width ? (e.clientX - sourceRect.left) / sourceRect.width : 0.5;
           target._zoom(factor, ratio * targetRect.width);
         }
-        // 缩放后更新连线位置——聚合视图下没有 target 可转发缩放，但本侧（source）自己的
-        // 原生滚轮缩放仍会触发，连线跟着重算，所以这句同样不能挂在 target 存在的分支里。
-        requestAnimationFrame(function () { updateCrossLaneConnectors(); });
+        if (state.inspectorView === 'detail') requestAnimationFrame(function () { updateCrossLaneConnectors(); });
       }, { passive: true });
     }
   });
@@ -5437,7 +5230,10 @@ function captureTrainSelection() {
 // 而不只是"不被压暗"）——这样 base/compare 两条相邻泳道会一起亮起来。
 // 连线复用 updateCrossLaneConnectors。
 function selectAggregatedTrainEvent(renderer, event) {
+  // 真·任务选中 → 退出「按泳道」高亮态（同 selectGroupedTrainEvent）
+  if (event) state.diffSelectedLane = null;
   renderer.selectedEvent = event || null;
+  renderer.selectedCore = null;
   const key = event ? renderer.positionalKeyOfEvent(event) : null;
   const siblingKey = key ? trainSiblingPositionalKey(key) : null;
   const siblingEvent = siblingKey ? renderer.findEventByPositionalKey(siblingKey) : null;
@@ -5456,13 +5252,21 @@ function selectAggregatedTrainEvent(renderer, event) {
 function selectGroupedTrainEvent(baseKey) {
   const topR = trainRenderers.top, bottomR = trainRenderers.bottom;
   const event = baseKey && topR ? topR.findEventByPositionalKey(baseKey) : null;
+  // 真·任务选中 → 退出「按泳道」高亮态，避免 diffSelectedLane 残留导致切视图时被误判为泳道模式
+  if (event) state.diffSelectedLane = null;
   if (topR) {
     topR.selectedEvent = event || null;
+    topR.selectedCore = null;
     topR.relatedEvents = [];
+    topR.extraActiveLaneKeys = [];
     topR._render();
     topR._renderLabels();
   }
-  bottomR?.setSelectedEventByKey(event ? baseKey : null);
+  if (bottomR) {
+    bottomR.selectedCore = null;
+    bottomR.extraActiveLaneKeys = [];
+    bottomR.setSelectedEventByKey(event ? baseKey : null);
+  }
   state.detailTaskKey = event ? baseKey : null;
   state.inspectorView = event ? 'detail' : 'dashboard';
   renderInspector();
@@ -5476,11 +5280,67 @@ function selectGroupedTrainEvent(baseKey) {
 function bindTrainSwimlaneCoreSelectSync(key, renderer) {
   const other = key === 'top' ? 'bottom' : 'top';
   renderer.onCoreClick = (coreName) => {
+    // 再次点击同一行 = 取消选中 → 清空两侧
+    if (!renderer.selectedCore) {
+      renderer.selectedEvent = null;
+      renderer.relatedEvents = [];
+      renderer.extraActiveLaneKeys = [];
+      renderer._render();
+      renderer._renderLabels();
+      if (!isAggregatedSwimlane()) {
+        const target = trainRenderers[other];
+        if (target) {
+          target.selectedEvent = null;
+          target.selectedCore = null;
+          target.relatedEvents = [];
+          target.extraActiveLaneKeys = [];
+          target._render();
+          target._renderLabels();
+        }
+      }
+      hideCrossLaneConnectors();
+      renderInspector();
+      return;
+    }
+
+    if (isAggregatedSwimlane()) {
+      // 聚合视图：只有 top 一个实例。coreName 带 §base/§compare 后缀，
+      // 找出对侧 sibling 一起高亮，其余行暗化。
+      const stripped = trainStripRunSuffix(coreName);
+      const baseKey = `${stripped.coreName}§base`;
+      const compareKey = `${stripped.coreName}§compare`;
+      const baseEvents = renderer.parsedData?.coreEvents?.get(baseKey) || [];
+      const compareEvents = renderer.parsedData?.coreEvents?.get(compareKey) || [];
+      renderer.selectedEvent = baseEvents.length > 0 ? baseEvents[0] : null;
+      renderer.selectedCore = baseKey;
+      renderer.relatedEvents = compareEvents.length > 0 ? [compareEvents[0]] : [];
+      renderer.extraActiveLaneKeys = [compareKey];
+      renderer._render();
+      renderer._renderLabels();
+      hideCrossLaneConnectors();
+      renderInspector();
+      return;
+    }
+
+    // 分组视图：两侧同步，选中行高亮 + 其余行暗化
     const target = trainRenderers[other];
-    if (!target || !target.rowMeta?.has(coreName) || target.selectedCore === coreName) return;
+    if (!target || !target.rowMeta?.has(coreName)) return;
+    const srcEvents = renderer.parsedData?.coreEvents?.get(coreName) || [];
+    const tgtEvents = target.parsedData?.coreEvents?.get(coreName) || [];
+    renderer.selectedEvent = srcEvents.length > 0 ? srcEvents[0] : null;
+    renderer.selectedCore = coreName;
+    renderer.relatedEvents = [];
+    renderer.extraActiveLaneKeys = [];
+    renderer._render();
+    renderer._renderLabels();
+    target.selectedEvent = tgtEvents.length > 0 ? tgtEvents[0] : null;
     target.selectedCore = coreName;
+    target.relatedEvents = [];
+    target.extraActiveLaneKeys = [];
     target._render();
     target._renderLabels();
+    hideCrossLaneConnectors();
+    renderInspector();
   };
   renderer.onEventClick = () => {
     // swimlane.js 的原生 click 处理器已经把 renderer.selectedEvent 切好了（再点一下同一条会切回 null）。
@@ -5500,24 +5360,22 @@ function bindTrainSwimlaneCoreSelectSync(key, renderer) {
 }
 
 function renderSecondaryViewMode() {
-  const graphMode = state.secondaryViewMode === 'graph';
-  const comparisonMode = state.secondaryViewMode === 'comparison';
-  if (blockGraphViewport) blockGraphViewport.hidden = !graphMode;
-  if (compareSwimlaneView) {
-    compareSwimlaneView.hidden = !comparisonMode;
-    compareSwimlaneView.setAttribute('aria-hidden', String(!comparisonMode));
-  }
+  var comparisonMode = state.secondaryViewMode === 'comparison';
   if (swimlaneWorkbenchEl) swimlaneWorkbenchEl.hidden = comparisonMode;
   if (trainTimelineTop) trainTimelineTop.hidden = !comparisonMode;
+  if (blockGraphView && !comparisonMode) {
+    // 清除占位
+    var placeholder = blockGraphView.querySelector('.sl-comparison-placeholder');
+    if (placeholder) placeholder.remove();
+    blockGraphView.hidden = true;
+    blockGraphView.setAttribute('aria-hidden', 'true');
+  }
   updateCompareHeaderSearch();
 }
 
-// 对比模式下标题行的搜索框（纯样式占位，不接任何过滤逻辑）：
-// 聚合视图只剩上栏可见，标题让位给搜索框；分组视图上下两栏标题都保留，
-// 搜索框分别贴在各自标题行最右侧。
 function updateCompareHeaderSearch() {
-  const comparisonMode = state.secondaryViewMode === 'comparison';
-  const aggregated = comparisonMode && state.swimlaneViewMode === 'aggregated';
+  var comparisonMode = state.secondaryViewMode === 'comparison';
+  var aggregated = comparisonMode && state.swimlaneViewMode === 'aggregated';
   if (swimlanePaneTitle) swimlanePaneTitle.hidden = aggregated;
   if (cmpTopSearchbox) cmpTopSearchbox.hidden = !comparisonMode;
   if (cmpBottomSearchbox) cmpBottomSearchbox.hidden = !comparisonMode;
@@ -5923,22 +5781,11 @@ function initCodeTabSwitch() {
   }
 }
 
-function blockGraphGutter() {
-  const previous = blockGraphView?.previousElementSibling;
-  return previous?.classList.contains('pto-workbench-shell__split-gutter') ? previous : null;
-}
-
-/* ── 分组视图 | 聚合视图 页签（顶部导航，替代原 projectName 占位）──
-   聚合视图＝把上下两个对比面板合并成一个：隐藏下半屏（blockGraphView 本身），
-   把训练泳道数据按叶子泳道拼接后整份装进 top 渲染实例。跟 setBlockGraphOpen(false)
-   不同的是这里不清空 comparisonRunId/secondaryViewMode——聚合视图仍然是对比模式，
-   只是换一种排布，不是退出对比。 */
+/* ── 分组视图 | 聚合视图 页签 ── */
 function setMergedTrainPanelHidden(hidden) {
   if (!blockGraphView) return;
   blockGraphView.hidden = hidden;
   blockGraphView.setAttribute('aria-hidden', String(hidden));
-  const gutter = blockGraphGutter();
-  if (gutter) gutter.hidden = hidden;
   window.requestAnimationFrame(() => {
     frameController?.refresh?.();
     layout();
@@ -5956,30 +5803,90 @@ function setSwimlaneViewMode(mode) {
     });
   }
   if (state.swimlaneViewMode === mode) return;
-  // 切换前先把当前选中的任务记下来（跟视图模式无关的裸 key + 原来选的是哪一侧），
-  // 挂载新数据后再换算回对应模式的 key 找回同一个任务——分组⇄聚合切换要保持选中，
-  // 连线跟着 selectedEvent 走，自然也就保留了。
+  // 切换前先记下当前选中的任务和泳道差异高亮，挂载新数据后再恢复
   const pendingSelection = captureTrainSelection();
+  const pendingDiffLane = state.diffSelectedLane;
   state.swimlaneViewMode = mode;
+  state.diffSelectedLane = null; // 暂时清空，等 renderTrainingComparison 完成后再恢复
   if (state.secondaryViewMode === 'comparison') {
     hideCrossLaneConnectors();
     setMergedTrainPanelHidden(mode === 'aggregated');
-    renderTrainingComparison();
-    restoreTrainSelection(pendingSelection, mode);
+    window.requestAnimationFrame(function () {
+      frameController?.refresh?.();
+      layout();
+      window.requestAnimationFrame(function () {
+        renderTrainingComparison(function () {
+          if (pendingDiffLane) {
+            // 「按泳道」高亮模式：selectedEvent 只是驱动暗化的零时长占位，不是真正的任务选中，
+            // 切视图后应继续按泳道高亮、不画连线，绝不能走 restoreTrainSelection 把它当任务选中恢复
+            //（那会变成"选中泳道行里的第一个任务"）。额外一层 rAF 等 fitToView 的滚动定位完成后再恢复。
+            window.requestAnimationFrame(function () {
+              selectDiffLane(pendingDiffLane);
+            });
+          } else {
+            restoreTrainSelection(pendingSelection, mode);
+          }
+        });
+      });
+    });
     updateCompareHeaderSearch();
   }
+}
+
+// 把某个 viewport 横向滚到让选中任务条居中：scrollToCore 只管纵向，而挂载新数据后
+// fitToView 会把 scrollLeft 归零、时间轴又被 alignTrainSwimlaneZoom 放大 2.2×，
+// 选中任务条若在时间轴后段就会横向溢出可视区。content 布局为 [label|canvas]，label 用
+// translateX 抵消 scrollLeft 视觉钉在左侧，故 canvas 可视区宽 = clientWidth − labelWidth。
+function centerTrainViewportOnEventX(renderer, viewportId, event) {
+  const vp = document.getElementById(viewportId);
+  if (!vp || !renderer?.parsedData || !event) return;
+  const range = renderer.parsedData.timeRange;
+  const taskCenterX = (event.ts + (event.dur || 0) / 2 - range.start) * renderer.xScale;
+  const labelW = renderer.labelWidth || 200;
+  vp.scrollLeft = Math.max(0, taskCenterX - (vp.clientWidth - labelW) / 2);
 }
 
 function restoreTrainSelection(pending, mode) {
   const topR = trainRenderers.top;
   if (!pending || !topR) return;
+  // 挂载新数据后 fitToView 会把滚动归零，恢复选中的任务条大概率落在可视区外。
+  // 选中后自动滚动到它所在行（纵向）并横向居中，等滚动落定后按最终位置重画跨栏连线，
+  // 否则看起来像"选中的任务条切完视图就消失了"。
+  const revealAndRedraw = (scroll) => {
+    window.requestAnimationFrame(function () {
+      scroll();
+      window.requestAnimationFrame(function () {
+        window.requestAnimationFrame(function () { updateCrossLaneConnectors(); });
+      });
+    });
+  };
+  // 切视图后是全新挂载的数据，泳道分组回到默认（可能折叠）。恢复选中前必须先展开该任务
+  // 所在分组，否则那一行根本不在可见行里：任务条画不出来，连线 _getEventPos 落空退化到
+  // viewport 正中——就成了"只剩连线、任务条消失对不上"。与 drillToTaskDetail 的处理一致。
+  const groupId = laneGroupIdOf(pending.baseKey.coreName);
   if (mode === 'aggregated') {
+    expandLaneGroupOn(topR, groupId);
     const suffix = pending.side || 'base';
     const mergedKey = Object.assign({}, pending.baseKey, { coreName: `${pending.baseKey.coreName}§${suffix}` });
     const event = topR.findEventByPositionalKey(mergedKey);
-    if (event) selectAggregatedTrainEvent(topR, event);
+    if (event) {
+      selectAggregatedTrainEvent(topR, event);
+      revealAndRedraw(function () {
+        topR.scrollToCore(mergedKey.coreName);
+        centerTrainViewportOnEventX(topR, 'trainTimelineTopViewport', event);
+      });
+    }
   } else {
+    if (trainRenderers.top) expandLaneGroupOn(trainRenderers.top, groupId);
+    if (trainRenderers.bottom) expandLaneGroupOn(trainRenderers.bottom, groupId);
     selectGroupedTrainEvent(pending.baseKey);
+    revealAndRedraw(function () {
+      const t = trainRenderers.top, b = trainRenderers.bottom;
+      t?.scrollToCore(pending.baseKey.coreName);
+      b?.scrollToCore(pending.baseKey.coreName);
+      centerTrainViewportOnEventX(t, 'trainTimelineTopViewport', t?.selectedEvent);
+      centerTrainViewportOnEventX(b, 'trainTimelineBottomViewport', b?.selectedEvent);
+    });
   }
 }
 
@@ -6000,182 +5907,84 @@ function bindSwimlaneViewTabs() {
   });
 }
 
-function applyBlockGraphTransform() {
-  if (!blockGraphStage) return;
-  blockGraphStage.style.transform = `translate(${blockGraphViewState.x}px, ${blockGraphViewState.y}px) scale(${blockGraphViewState.scale})`;
-}
-
-function blockGraphContentSize() {
-  return {
-    width: Math.max(1, blockGraphMount?.offsetWidth || blockGraphMount?.scrollWidth || 1),
-    height: Math.max(1, blockGraphMount?.offsetHeight || blockGraphMount?.scrollHeight || 1),
-  };
-}
-
-function centerBlockGraph(scale = 1) {
-  if (!blockGraphViewport || !blockGraphMount || !blockGraphIsOpen() || state.secondaryViewMode !== 'graph') return;
-  const content = blockGraphContentSize();
-  blockGraphViewState.scale = Math.max(0.12, Math.min(1.8, scale));
-  blockGraphViewState.x = (blockGraphViewport.clientWidth - content.width * blockGraphViewState.scale) / 2;
-  blockGraphViewState.y = (blockGraphViewport.clientHeight - content.height * blockGraphViewState.scale) / 2;
-  applyBlockGraphTransform();
-}
-
-function fitBlockGraph() {
-  if (!blockGraphViewport || !blockGraphMount || !blockGraphIsOpen() || state.secondaryViewMode !== 'graph') return;
-  const content = blockGraphContentSize();
-  const inset = 24;
-  const availableWidth = Math.max(1, blockGraphViewport.clientWidth - inset * 2);
-  const availableHeight = Math.max(1, blockGraphViewport.clientHeight - inset * 2);
-  const scale = Math.max(0.12, Math.min(1.25, Math.min(
-    availableWidth / content.width,
-    availableHeight / content.height,
-  )));
-  centerBlockGraph(scale);
-}
-
-function zoomBlockGraph(nextScale, anchorX = null, anchorY = null) {
-  if (!blockGraphViewport || !blockGraphIsOpen() || state.secondaryViewMode !== 'graph') return;
-  const previousScale = blockGraphViewState.scale;
-  const scale = Math.max(0.12, Math.min(1.8, nextScale));
-  const x = Number.isFinite(anchorX) ? anchorX : blockGraphViewport.clientWidth / 2;
-  const y = Number.isFinite(anchorY) ? anchorY : blockGraphViewport.clientHeight / 2;
-  const worldX = (x - blockGraphViewState.x) / previousScale;
-  const worldY = (y - blockGraphViewState.y) / previousScale;
-  blockGraphViewState.scale = scale;
-  blockGraphViewState.x = x - worldX * scale;
-  blockGraphViewState.y = y - worldY * scale;
-  applyBlockGraphTransform();
-}
-
-function setBlockGraphOpen(open) {
-  if (!blockGraphView) return;
-  if (!open) {
-    state.secondaryViewMode = null;
-    state.comparisonRunId = null;
-    state.diffSelectedLane = null;
-    state.detailTaskKey = null;
-    state.inspectorView = 'dashboard';
-    setSwimlaneViewMode('grouped');
-    hideCrossLaneConnectors();
-    hideTimestampGuide();
-  }
-  renderSecondaryViewMode();
-  renderInspector();
-  blockGraphView.hidden = !open;
-  blockGraphView.setAttribute('aria-hidden', String(!open));
-  const gutter = blockGraphGutter();
-  if (gutter) gutter.hidden = !open;
-  window.requestAnimationFrame(() => {
-    frameController?.refresh?.();
-    layout();
-    if (open && state.secondaryViewMode === 'graph') window.requestAnimationFrame(fitBlockGraph);
-    if (open && state.secondaryViewMode === 'comparison') {
-      window.requestAnimationFrame(() => renderTrainingComparison());
-    }
-  });
-}
-
-function openBlockGraph(t) {
-  if (!t || !blockGraphView) return;
-  state.secondaryViewMode = 'graph';
-  state.comparisonRunId = null;
-  renderBlockGraph(t);
-  setBlockGraphOpen(true);
-}
-
 function openRunComparison(runId) {
   if (!runId || runId === state.selectedRunId || !blockGraphView) return;
-  const comparedRun = RUN_BY_ID[runId];
+  var comparedRun = RUN_BY_ID[runId];
   if (!comparedRun) return;
   state.secondaryViewMode = 'comparison';
   state.comparisonRunId = runId;
   state.diffSelectedLane = null;
   blockGraphTitle.textContent = comparedRun.id;
-  setBlockGraphOpen(true);
+  blockGraphView.hidden = false;
+  blockGraphView.setAttribute('aria-hidden', 'false');
+  // 确保 trainTimelineTop / trainTimelineBottom 的 hidden 属性被清除
+  if (trainTimelineTop) trainTimelineTop.removeAttribute('hidden');
+  if (trainTimelineBottom) trainTimelineBottom.removeAttribute('hidden');
+  // 清除占位提示
+  var placeholder = blockGraphView.querySelector('.sl-comparison-placeholder');
+  if (placeholder) placeholder.remove();
+  renderSecondaryViewMode();
+  renderInspector();
+  window.requestAnimationFrame(function () {
+    frameController?.refresh?.();
+    layout();
+    window.requestAnimationFrame(function () { renderTrainingComparison(); });
+  });
+}
+
+function closeRunComparison() {
+  // 保持对比模式布局（上下两栏），只清空对比数据源。
+  // 顶部继续渲染基线训练泳道，底部和右侧显示"请勾选对比数据"占位。
+  state.comparisonRunId = null;
+  state.diffSelectedLane = null;
+  state.detailTaskKey = null;
+  state.inspectorView = 'dashboard';
+  hideCrossLaneConnectors();
+  if (trainRenderers.bottom) {
+    trainRenderers.bottom.selectedEvent = null;
+    trainRenderers.bottom.selectedCore = null;
+    trainRenderers.bottom.relatedEvents = [];
+    trainRenderers.bottom.extraActiveLaneKeys = [];
+  }
+  renderInspector();
+  window.requestAnimationFrame(function () {
+    frameController?.refresh?.();
+    layout();
+    window.requestAnimationFrame(function () { renderTrainingComparison(); });
+  });
+}
+
+/** 底部面板无对比数据时显示"请勾选对比数据"占位 */
+function showBottomPlaceholder() {
+  if (!blockGraphView) return;
+  // 清除旧的占位
+  var existing = blockGraphView.querySelector('.sl-comparison-placeholder');
+  if (!existing) {
+    var div = document.createElement('div');
+    div.className = 'sl-comparison-placeholder';
+    div.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:140px;gap:var(--space-3);color:var(--foreground-muted);font:var(--text-body-sm)">' +
+      '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.35" aria-hidden="true">' +
+        '<rect x="3" y="3" width="8" height="8" rx="1.5"></rect>' +
+        '<rect x="13" y="3" width="8" height="8" rx="1.5"></rect>' +
+        '<rect x="3" y="13" width="8" height="8" rx="1.5"></rect>' +
+        '<rect x="13" y="13" width="8" height="8" rx="1.5"></rect>' +
+        '<path d="M11 3v18"></path>' +
+      '</svg>' +
+      '<span>请勾选对比数据</span>' +
+    '</div>';
+    blockGraphView.appendChild(div);
+  }
+  // 隐藏旧的 train timeline bottom 内容
+  if (trainTimelineBottom) trainTimelineBottom.setAttribute('hidden', '');
 }
 
 function applyDefaultCompareMode() {
-  // 对比模式是本页默认入口（不再需要 ?mode=compare 才触发）：直接打开本文件也一样默认进入对比。
-  const params = new URLSearchParams(window.location.search);
-  const requestedRunId = params.get('runId');
-  const defaultRunId = (requestedRunId && RUN_BY_ID[requestedRunId] && requestedRunId !== state.selectedRunId)
+  var params = new URLSearchParams(window.location.search);
+  var requestedRunId = params.get('runId');
+  var defaultRunId = (requestedRunId && RUN_BY_ID[requestedRunId] && requestedRunId !== state.selectedRunId)
     ? requestedRunId
     : pickDefaultComparisonRunId();
   if (defaultRunId) { openRunComparison(defaultRunId); renderRunHistory(); }
-}
-
-function bindBlockGraphPanel() {
-  setBlockGraphOpen(false);
-  blockGraphFit?.addEventListener('click', fitBlockGraph);
-  blockGraphZoomOut?.addEventListener('click', () => zoomBlockGraph(blockGraphViewState.scale / 1.15));
-  blockGraphZoomIn?.addEventListener('click', () => zoomBlockGraph(blockGraphViewState.scale * 1.15));
-
-  if (blockGraphViewport) {
-    blockGraphViewport.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
-      if (event.target.closest('button, .node-card, .sl-block-graph-canvas-tools')) return;
-      blockGraphViewState.dragging = true;
-      blockGraphViewState.pointerId = event.pointerId;
-      blockGraphViewState.startClientX = event.clientX;
-      blockGraphViewState.startClientY = event.clientY;
-      blockGraphViewState.startX = blockGraphViewState.x;
-      blockGraphViewState.startY = blockGraphViewState.y;
-      blockGraphViewport.classList.add('is-panning');
-      blockGraphViewport.setPointerCapture?.(event.pointerId);
-    });
-    blockGraphViewport.addEventListener('pointermove', (event) => {
-      if (!blockGraphViewState.dragging || event.pointerId !== blockGraphViewState.pointerId) return;
-      blockGraphViewState.x = blockGraphViewState.startX + event.clientX - blockGraphViewState.startClientX;
-      blockGraphViewState.y = blockGraphViewState.startY + event.clientY - blockGraphViewState.startClientY;
-      applyBlockGraphTransform();
-    });
-    const stopPanning = (event) => {
-      if (!blockGraphViewState.dragging || event.pointerId !== blockGraphViewState.pointerId) return;
-      blockGraphViewState.dragging = false;
-      blockGraphViewState.pointerId = null;
-      blockGraphViewport.classList.remove('is-panning');
-      blockGraphViewport.releasePointerCapture?.(event.pointerId);
-    };
-    blockGraphViewport.addEventListener('pointerup', stopPanning);
-    blockGraphViewport.addEventListener('pointercancel', stopPanning);
-    blockGraphViewport.addEventListener('click', (event) => {
-      if (event.target.closest('button, .node-card, .sl-block-graph-canvas-tools')) return;
-      blockGraphMount.querySelectorAll('.node-card.selected').forEach((item) => item.classList.remove('selected'));
-    });
-    blockGraphViewport.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const rect = blockGraphViewport.getBoundingClientRect();
-      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
-      zoomBlockGraph(
-        blockGraphViewState.scale * factor,
-        event.clientX - rect.left,
-        event.clientY - rect.top,
-      );
-    }, { passive: false });
-    blockGraphViewport.addEventListener('dblclick', fitBlockGraph);
-    blockGraphViewport.addEventListener('keydown', (event) => {
-      if (event.key === '+' || event.key === '=') zoomBlockGraph(blockGraphViewState.scale * 1.15);
-      else if (event.key === '-') zoomBlockGraph(blockGraphViewState.scale / 1.15);
-      else if (event.key.toLowerCase() === 'f') fitBlockGraph();
-      else return;
-      event.preventDefault();
-    });
-  }
-
-  if ('ResizeObserver' in window && blockGraphViewport) {
-    graphResizeObserver = new ResizeObserver(() => {
-      if (blockGraphIsOpen() && state.secondaryViewMode === 'graph') window.requestAnimationFrame(fitBlockGraph);
-    });
-    graphResizeObserver.observe(blockGraphViewport);
-  }
-  frameEl.addEventListener('pto-ide-bottom-panel-change', () => {
-    window.requestAnimationFrame(() => {
-      layout();
-      if (blockGraphIsOpen() && state.secondaryViewMode === 'graph') window.requestAnimationFrame(fitBlockGraph);
-      if (blockGraphIsOpen() && state.secondaryViewMode === 'comparison') window.requestAnimationFrame(syncComparisonCanvases);
-    });
-  });
 }
 
 function bindInspector() {
@@ -6185,13 +5994,29 @@ function bindInspector() {
   if (backBtn) {
     backBtn.addEventListener('click', goBackToDashboard);
   }
-  // 差异看板视图：泳道卡片点击
+  // 差异粒度页签（按任务 | 按泳道）
+  body.querySelectorAll('[data-diff-tab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tab = btn.dataset.diffTab;
+      if (tab !== state.diffTab) {
+        state.diffTab = tab;
+        state.diffSelectedLane = null;
+        hideCrossLaneConnectors();
+        renderInspector();
+      }
+    });
+  });
+  // 差异看板视图：泳道卡片点击 —— "按任务"页签下钻到差异详情，"按泳道"仅高亮泳道行
   body.querySelectorAll('[data-diff-lane]').forEach((el) => {
-    el.addEventListener('click', () => selectDiffLane(el.dataset.diffLane));
+    el.addEventListener('click', () => {
+      if (state.diffTab === 'task') drillToTaskDetail(el.dataset.diffLane);
+      else selectDiffLane(el.dataset.diffLane);
+    });
     el.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        selectDiffLane(el.dataset.diffLane);
+        if (state.diffTab === 'task') drillToTaskDetail(el.dataset.diffLane);
+        else selectDiffLane(el.dataset.diffLane);
       }
     });
   });
@@ -6354,7 +6179,6 @@ function init() {
   layout();
   renderInspector();
   panelActions = bindTopPanelActions();
-  bindBlockGraphPanel();
   applyDefaultCompareMode();
   initSharedCanvasTooltip();
   initCodeTabSwitch();

@@ -820,6 +820,37 @@
     });
   }
 
+  /* ══ 典型层里的并行分支 ══════════════════════════════════════════════════
+     deck（model-architecture-3d-deck）把两组算子真的画成并排的两条竖直支路：
+       · 注意力的 Q 路径 ∥ KV 路径（deck 里 x=98 vs x=446，同一 y）；
+       · MoE 的路由专家支路（Router→Dispatch→Expert Pool→Combine）∥ 共享专家
+         支路（shared_expert 在 x=508）。
+     投影成典型层时若一律竖排，就把「并行」读成了「串行」。下表按 deck 的
+     SIDE_ROWS 配对声明每组并行支路的左/右分栏成员（lanes[0]=左、lanes[1]=右，
+     与 deck 的 x 顺序一致），renderStructure 据此把这一段渲染成左右两条子栈；
+     在 deck 里两支汇合的节点（attention_core / moe_branch_add）本身不属于任何
+     分栏，会自然收束回整条竖排。deck 换布局时改这里即可，其余逻辑不动。 */
+  const PARALLEL_GROUPS = [
+    { id: "attn_qkv", lanes: [
+      ["q_a_proj", "q_causal_conv", "q_residual_add", "q_a_norm", "q_b_proj", "query_tensor"],
+      ["kv_a_proj", "kv_causal_conv", "kv_residual_add", "kv_a_norm", "kv_b_proj", "key_tensor"],
+    ] },
+    { id: "moe_branch", lanes: [
+      ["gate", "a2a_dispatch", "expert_pool", "a2a_combine"],
+      ["shared_expert"],
+    ] },
+  ];
+  /* deckNode id → { group, lane, laneCount }：同一 id 只属于一组一栏。 */
+  const PARALLEL_LOOKUP = (() => {
+    const map = new Map();
+    PARALLEL_GROUPS.forEach((group) => {
+      group.lanes.forEach((ids, lane) => {
+        ids.forEach((id) => map.set(id, { group: group.id, lane, laneCount: group.lanes.length }));
+      });
+    });
+    return map;
+  })();
+
   /* ══ 渲染：五段结构条 ════════════════════════════════════════════════════ */
   function renderStructure(container, topology, emit) {
     if (!container) return;
@@ -828,39 +859,78 @@
     // 与 Layer 导航同一套列宽，两块对齐成一个整体
     container.style.gridTemplateColumns = columnTemplate(columns);
 
+    const makeBar = (bar, col) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "cro-bar";
+      el.dataset.segment = col.id;
+      el.dataset.bar = bar.id;
+      if (bar.deckNode) el.dataset.deckNode = bar.deckNode;
+      if (bar.experts) el.dataset.experts = bar.experts;
+      el.dataset.op = bar.op;   // 与 deck 节点同名 op → 取到同一个 --pto-model-deck-* 色
+      el.textContent = bar.label;
+      el.addEventListener("click", () => emit({
+        kind: "segment",
+        segment: col.id,
+        bar: bar.id,
+        deckNode: bar.deckNode,
+        experts: bar.experts || null,
+        layers: col.layers,
+      }));
+      return el;
+    };
+
     columns.forEach((col) => {
       const wrap = document.createElement("div");
       wrap.className = "cro-structure__col";
       wrap.dataset.segment = col.id;
+      /* 整列（名字 + 底板）都是「选中这一整个典型层」的热区：命中列内某根 .cro-bar
+         时直接放行（那颗算子条自己的 click 走单算子通路），否则发一个 wholeColumn
+         选择 —— 锚点是整列底板（.cro-structure__stack）、整网侧是整张层卡，而不是
+         列里的第一个算子。resolveRelation 据 wholeColumn 覆盖整段的层/专家/rank。 */
+      wrap.addEventListener("click", (event) => {
+        if (event.target.closest(".cro-bar")) return;
+        emit({ kind: "segment", segment: col.id, wholeColumn: true, layers: col.layers });
+      });
 
-      const name = document.createElement("div");
+      const name = document.createElement("button");
+      name.type = "button";
       name.className = "cro-structure__name";
       name.textContent = col.name;
       name.title = col.name;
+      name.setAttribute("aria-label", col.name);
 
       const stack = document.createElement("div");
       stack.className = "cro-structure__stack";
 
+      /* 把 bars 切成「整条竖排段」与「并行分支段」交替的块：连续且属于同一
+         并行组的 bar 收进一块，用左右分栏子栈渲染；其余 bar 直接整条竖排。
+         bar 在 col.bars 里本就按 deck 的 y 顺序排列，故各栏内竖排顺序天然正确。 */
+      let pending = null;   // { group, lanes: bar[][] }
+      const flush = () => {
+        if (!pending) return;
+        const lanes = document.createElement("div");
+        lanes.className = "cro-structure__lanes";
+        pending.lanes.forEach((barsInLane) => {
+          const lane = document.createElement("div");
+          lane.className = "cro-structure__lane";
+          barsInLane.forEach((bar) => lane.appendChild(makeBar(bar, col)));
+          lanes.appendChild(lane);
+        });
+        stack.appendChild(lanes);
+        pending = null;
+      };
+
       col.bars.forEach((bar) => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "cro-bar";
-        el.dataset.segment = col.id;
-        el.dataset.bar = bar.id;
-        if (bar.deckNode) el.dataset.deckNode = bar.deckNode;
-        if (bar.experts) el.dataset.experts = bar.experts;
-        el.dataset.op = bar.op;   // 与 deck 节点同名 op → 取到同一个 --pto-model-deck-* 色
-        el.textContent = bar.label;
-        el.addEventListener("click", () => emit({
-          kind: "segment",
-          segment: col.id,
-          bar: bar.id,
-          deckNode: bar.deckNode,
-          experts: bar.experts || null,
-          layers: col.layers,
-        }));
-        stack.appendChild(el);
+        const info = bar.deckNode ? PARALLEL_LOOKUP.get(bar.deckNode) : null;
+        if (!info) { flush(); stack.appendChild(makeBar(bar, col)); return; }
+        if (!pending || pending.group !== info.group) {
+          flush();
+          pending = { group: info.group, lanes: Array.from({ length: info.laneCount }, () => []) };
+        }
+        pending.lanes[info.lane].push(bar);
       });
+      flush();
 
       wrap.append(name, stack);
       container.appendChild(wrap);
@@ -1141,6 +1211,9 @@
       primary: payload,
       layers: new Set(), stages: new Set(),
       segment: null, bar: null, unit: null, deckNode: payload.deckNode || null, deckLayer: null,
+      // wholeColumn：点了典型层的名字/底板 = 选中整列。锚点是整块底板、整网侧是整张
+      // 层卡，而不是列里某个算子；关系集覆盖整段的层/专家/rank。
+      wholeColumn: Boolean(payload.wholeColumn),
       // deckStatic：目标算子在 deck 的 input / output 静态段里（Emb / Final Norm /
       // LM Head / MTP…），不属于任何一张层卡片。selectNode(id, layer) 会把查找
       // 限死在那张层卡内，静态节点永远找不到 —— 于是既选不中也连不出线。
@@ -1190,7 +1263,9 @@
       case "segment": {
         const col = columns.find((c) => c.id === payload.segment);
         rel.segment = payload.segment;
-        rel.bar = { segment: payload.segment, bar: payload.bar };
+        // 整列点击不落到单个算子条：rel.bar 留空，arch 锚点走整块底板；deckNode 也
+        // 留空，net 锚点退回整张层卡（见 collectAnchors）。单算子点击才设 rel.bar。
+        if (!payload.wholeColumn) rel.bar = { segment: payload.segment, bar: payload.bar };
         if (col && col.layers.length) {
           // 已经选中某一层时，点算子条只收敛到那一层（select.png 的
           //「EP Combine in Layer 3」），否则覆盖整列
@@ -1213,9 +1288,15 @@
           // deckLayer 只用来把 deck 转到流水线对应的一端，不能拿去限定查找范围
           rel.deckStatic = true;
           if (entry) rel.deckLayer = col.stageAnchor === "first" ? entry.lo : entry.hi;
+          // 端点列（Emb/Norm/Head）就一个概念块，整列点击时用它的代表算子做 deck 静态
+          // 节点，让 net 侧仍能连到 deck 里的 embedding / final_norm / lm_head。
+          if (payload.wholeColumn && col.bars[0]) rel.deckNode = col.bars[0].deckNode;
           addRanks(topology.ranksOfStage(stage));
         }
-        if (payload.experts === "routed") { allRoutedExperts(); allEpRanks(); }
+        if (payload.wholeColumn && col && col.id === "moe") {
+          // 整列点 MoE：这一整段 MoE 典型层横跨全部路由专家 + 共享专家 + 全部 EP rank
+          allRoutedExperts(); allEpRanks(); allShared();
+        } else if (payload.experts === "routed") { allRoutedExperts(); allEpRanks(); }
         else if (payload.experts === "shared") allShared();
         else if (col && col.id === "moe") {
           // MoE 列里其余算子（Attn / 各 Norm / 残差 Add）不落在某几个专家身上，
@@ -1233,11 +1314,13 @@
         rel.epRanks.add(payload.epRank);
         rel.segment = "moe";
         rel.bar = { segment: "moe", bar: "expert_pool" };
+        // 【全展开】一个路由槽位（专家编号 e）在**每个 MoE 层**都有一份实例（各层权重
+        // 独立、互不相干，只共享编号与「编号→EP rank」的分片公式）；它的 EP 组在**每个
+        // PP stage** 内都占一块 rank。点专家就把这个编号涉及的全部 MoE 层 + 全部 stage 的
+        // 该 EP 组 rank（× DP 副本）一并连上，让「这个编号散布在哪里」一眼看全。连线侧
+        // 会按 stage 拆成多条（见 drawRelationLinks），而非缩成一个巨框。
         addLayers(moeLayers);
-        // 专家在每个 MoE 层都有一份，deck 挑中间那层做代表；不给 deckLayer
-        // 的话 selectNode 拿不到层号，整网侧就没有锚点可连。
         rel.deckLayer = moeLayers[Math.floor(moeLayers.length / 2)];
-        // 专家驻留在每个 PP stage × 每个 DP 副本上的同一个 EP rank
         rel.stages.forEach((s) => addRanks(topology.ranksOfEpRankInStage(s, payload.epRank)));
         break;
       }
@@ -1245,6 +1328,8 @@
         rel.shared.add(payload.shared);
         rel.segment = "moe";
         rel.bar = { segment: "moe", bar: "shared_expert" };
+        // 共享专家同样每个 MoE 层各一份，每个 token 都过 → 连上全部 MoE 层 + 每个 stage
+        // 的全部 rank。
         addLayers(moeLayers);
         rel.deckLayer = moeLayers[Math.floor(moeLayers.length / 2)];
         rel.stages.forEach((s) => addRanks(topology.ranksOfStage(s)));
@@ -1288,6 +1373,9 @@
       col.bars.forEach((bar) => { if (bar.deckNode) rel.staticNodes.add(bar.deckNode); });
     });
     if (rel.bar && rel.segment) rel.segments.add(rel.segment);
+    // 整列点击没有 rel.bar，但被点的这一列本身当然在关系集里（端点列 col.layers 为空，
+    // 上面按层号那轮不会加进来，这里补上，否则整列高亮/去色都读不到自己）。
+    if (rel.wholeColumn && rel.segment) rel.segments.add(rel.segment);
     if (rel.unit) rel.units.add(rel.unit);
 
     rel.nodes = topology.nodesOfRanks(Array.from(rel.ranks));
@@ -1319,13 +1407,23 @@
     const labels = {};
     const c = topology.counts;
 
-    // 整网 / 结构：算子 + 层
-    if (rel.bar) {
+    // 整列点击：主标签直接报这一整个典型层的名字（如「Dense x2（L0~L1）」/「MoE
+    // x44（L2~L45）」/「Emb」），表示连的是整块而非某个算子。
+    if (rel.wholeColumn) {
+      const col = columns.find((x) => x.id === rel.segment);
+      if (col) {
+        labels.arch = col.layers.length || rel.stages.size !== 1
+          ? col.name
+          : `${col.name} · PP${Array.from(rel.stages)[0]}`;
+      }
+    } else if (rel.bar) {
       const col = columns.find((x) => x.id === rel.bar.segment);
       const barDef = col && col.bars.find((b) => b.id === rel.bar.bar);
       const name = barDef ? barDef.label : rel.bar.bar;
       if (rel.layers.size === 1) {
-        labels.arch = `${name} in Layer ${Array.from(rel.layers)[0]}`;
+        const only = Array.from(rel.layers)[0];
+        // 单层定位一律带上 PP 段，把「这个算子/专家究竟落在哪一段流水线」写死在标签上
+        labels.arch = `${name} in Layer ${only} · PP${topology.stageOfLayer(only)}`;
       } else if (rel.layers.size) {
         labels.arch = `${name} · ${formatRuns(rel.layers, "L", 1)}`;
       } else {
@@ -1338,6 +1436,16 @@
       labels.arch = `Layer ${l} · PP${layer.stage} · ${layer.ffn === "dense" ? "Dense" : "MoE"} · ${layer.attention.toUpperCase()}`;
     } else if (rel.stages.size === 1) {
       labels.arch = `PP${Array.from(rel.stages)[0]} · ${formatRuns(rel.layers, "L", 1)}`;
+    }
+
+    // 专家 / EP 组 / 共享专家：主标签点明「该编号在全部相关 MoE 层各有一份」，既表达
+    // 全展开的分布范围，又不误导成「同一个专家横跨各层」（各层是独立权重实例）。
+    const pk = rel.primary && rel.primary.kind;
+    if ((pk === "expert" || pk === "epRank" || pk === "sharedExpert") && rel.layers.size) {
+      const who = pk === "expert" ? `E${rel.primary.expert}`
+        : pk === "sharedExpert" ? `SE${rel.primary.shared}`
+        : `EP${rel.primary.epRank}`;
+      labels.arch = `${who} · ${formatRuns(rel.layers, "L", 1)} 各一份`;
     }
 
     // MoE：EP 组 + 组内专家区间，专家全量时改用摘要，避免拼出 64 段
@@ -1446,7 +1554,13 @@
         "#croDeckHost",
       ),
       nav: pick(".cro-tick.is-selected", ".cro-tick.is-related", "#croLayerNav"),
-      arch: pick(".cro-bar.is-selected", ".cro-structure__col.is-related .cro-structure__stack", "#croStructure"),
+      // 整列点击时没有单个 .cro-bar.is-selected，锚点取整块底板（.cro-structure__col
+      // .is-selected .cro-structure__stack）；单算子点击则仍锚在那根算子条上。
+      arch: pick(
+        ".cro-bar.is-selected, .cro-structure__col.is-selected .cro-structure__stack",
+        ".cro-structure__col.is-related .cro-structure__stack",
+        "#croStructure",
+      ),
       // 选中整个 EP 组时，连线要接到组卡片本身（与白描边同一个框），
       // 而不是退化成组内专家的并集包围盒再补一圈虚线。
       moe: pick(
@@ -1456,6 +1570,30 @@
       ),
       cluster: pick("#croHeat .twin-heat-cell.is-selected", "#croHeat .twin-heat-cell.is-related", "#croHeat"),
     };
+  }
+
+  /* 集群里被牵连的格子按 PP stage 拆成多个锚点。点专家/EP 组/共享专家时，该编号的
+     EP 组在**每个 stage** 内都占一块 rank —— 集群图正好横向分成 pp 个 stage 块，把
+     每块的并集包围盒各作一个锚点，drawRelationLinks 就能对每个 stage 各拉一条线，
+     而不是把 4 段并成一个横跨整幅热力图的巨框。 */
+  function clusterStageAnchors() {
+    const host = document.querySelector("#croHeat");
+    const board = document.getElementById("croBoard");
+    if (!host) return [];
+    const fit = (rect) => clampRectTo(clampRectTo(rect, host), board);
+    const byStage = new Map();
+    host.querySelectorAll(".twin-heat-cell.is-related, .twin-heat-cell.is-selected").forEach((cell) => {
+      const s = Number(cell.dataset.stage);
+      if (!Number.isFinite(s)) return;
+      if (!byStage.has(s)) byStage.set(s, []);
+      byStage.get(s).push(cell);
+    });
+    const out = [];
+    byStage.forEach((cells, stage) => {
+      const rect = unionRect(cells);
+      if (rect) out.push({ stage, rect: fit(rect), group: cells.length > 1 });
+    });
+    return out.sort((a, b) => a.stage - b.stage);
   }
 
   const centerOf = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 });
@@ -1503,26 +1641,47 @@
       moe: rel.labels.moe, cluster: rel.labels.cluster,
     };
 
-    if (hub.group) appendGroupOutline(layer, hub.rect);
-
-    order.forEach((key) => {
-      const target = anchors[key];
-      if (key === hubKey || !target) return;
-      const toCenter = centerOf(target.rect);
+    // 一条 hub→target 的曲线 + 可选中点标签 + 可选整组虚线框
+    const drawLink = (targetRect, isGroup, labelText) => {
+      const toCenter = centerOf(targetRect);
       const from = edgePoint(hub.rect, toCenter);
-      const to = edgePoint(target.rect, hubCenter);
+      const to = edgePoint(targetRect, hubCenter);
       if (!Number.isFinite(to.x) || !Number.isFinite(from.x)) return;
-
-      if (target.group) appendGroupOutline(layer, target.rect);
-
+      if (isGroup) appendGroupOutline(layer, targetRect);
       const bend = Math.max(48, Math.abs(to.x - from.x) * 0.45);
       const path = document.createElementNS(SVG_NS, "path");
       path.setAttribute("d", `M${from.x} ${from.y}C${from.x + (to.x > from.x ? bend : -bend)} ${from.y},${to.x + (to.x > from.x ? -bend : bend)} ${to.y},${to.x} ${to.y}`);
       path.setAttribute("class", "cro-link");
       layer.appendChild(path);
+      if (labelText) appendLinkLabel(layer, labelText, (from.x + to.x) / 2, (from.y + to.y) / 2);
+    };
 
-      const text = labelFor[key];
-      if (text) appendLinkLabel(layer, text, (from.x + to.x) / 2, (from.y + to.y) / 2);
+    if (hub.group) appendGroupOutline(layer, hub.rect);
+
+    // 点专家/EP 组/共享专家时，该编号的 rank 分布在每个 PP stage 里 —— 集群侧按 stage
+    // 拆成多条线（每段一条 + 一圈虚线框），整段的「Node… · N 卡」标签只挂在离 hub 最近
+    // 的那条上，其余段只留虚线框，避免 4 个标签堆叠。
+    const fanCluster = rel.primary
+      && (rel.primary.kind === "expert" || rel.primary.kind === "epRank" || rel.primary.kind === "sharedExpert");
+
+    order.forEach((key) => {
+      if (key === hubKey) return;
+      if (key === "cluster" && fanCluster) {
+        const stageAnchors = clusterStageAnchors();
+        if (stageAnchors.length) {
+          // 离 hub（MoE 列，在右侧）最近的一段挂总标签
+          let nearest = 0; let best = Infinity;
+          stageAnchors.forEach((a, i) => {
+            const d = Math.abs(centerOf(a.rect).x - hubCenter.x) + Math.abs(centerOf(a.rect).y - hubCenter.y);
+            if (d < best) { best = d; nearest = i; }
+          });
+          stageAnchors.forEach((a, i) => drawLink(a.rect, a.group, i === nearest ? rel.labels.cluster : null));
+          return;
+        }
+      }
+      const target = anchors[key];
+      if (!target) return;
+      drawLink(target.rect, target.group, labelFor[key]);
     });
   }
 
@@ -1657,8 +1816,7 @@
 
     function emitSelect(payload) {
       const topology = controller.topology;
-      // 「先选层、再点算子条」时把范围收敛到那一层，得到 select.png 里
-      // 「EP Combine in Layer 3」这种单层定位
+      // 「先选层、再点算子条」时把结构条收敛到那一层（select.png 的 EP Combine in Layer 3）
       if (payload && payload.kind === "segment" && !Number.isFinite(payload.scopeLayer)) {
         const prev = relation && relation.primary;
         if (prev && prev.kind === "layer" && (payload.layers || []).includes(prev.layer)) {
@@ -1720,7 +1878,11 @@
         bar.classList.toggle("is-selected", selected);
       });
       structure?.querySelectorAll(".cro-structure__col").forEach((col) => {
-        col.classList.toggle("is-related", Boolean(rel) && rel.segments.has(col.dataset.segment));
+        // 整列点击：被点的那一列进 is-selected（整块底板高亮描边，作连线锚点），
+        // 其余被牵连的列仍是 is-related。单算子点击时没有 wholeColumn，全走 is-related。
+        const selected = Boolean(rel && rel.wholeColumn) && col.dataset.segment === rel.segment;
+        col.classList.toggle("is-selected", selected);
+        col.classList.toggle("is-related", !selected && Boolean(rel) && rel.segments.has(col.dataset.segment));
       });
 
       // ── 层刻度取选中算子的语义色 ──
@@ -1824,7 +1986,7 @@
       let pending = 0;
       new ResizeObserver(() => {
         cancelAnimationFrame(pending);
-        pending = requestAnimationFrame(() => layoutLayerNav(layerNav, controller.topology));
+        pending = requestAnimationFrame(() => layoutLayerNav(layerNav));
       }).observe(layerNav);
     }
     // 主题切换会重算 deck 调色板，重新搬一次
@@ -1848,6 +2010,7 @@
        board 之外的地方也要能清空。命中任一可选对象则不清。 */
     const SELECTABLE = [
       ".cro-tick", ".cro-pp-span", ".cro-bar", ".cro-expert", ".cro-moe-group",
+      ".cro-structure__col",
       ".twin-heat-cell", ".pto-model-deck__node", ".pto-model-deck__experts",
       ".pto-model-deck__side-rule", ".cro-stepper", ".pto-ide-frame__topbar",
     ].join(", ");
