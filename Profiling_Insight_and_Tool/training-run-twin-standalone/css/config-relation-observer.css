@@ -545,6 +545,35 @@
   flex: 0 0 auto;
 }
 
+/* 20px 的档距是给「范围切换」那种独立控件留的；标题后紧跟一枚问号时太散，
+   读起来像两件事。问号答的正是这个标题，贴着它才对。 */
+.cro-section__heading--tight {
+  gap: var(--space-2);
+  /* 绑定说明要另起一行（flex:1 0 100%），所以这一行得能换行 */
+  flex-wrap: wrap;
+}
+
+/* 「编号口径：Layer 38 · PP3 · DP 副本 0」——宫格上那些 global rank 是按哪一层、
+   哪个副本算出来的。它跟着编号一起出现、一起消失（未绑定时 hidden）。
+   自己独占一行：跟标题挤在一行会把标题压成省略号，而这句话正是标题的限定。 */
+.cro-moe-bind {
+  flex: 1 0 100%;
+  font-size: var(--font-size-label-xs);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground-muted);
+  line-height: 1.5;
+}
+
+.cro-moe-bind[hidden] { display: none; }
+
+/* 全局的 .cro-section__title 是 flex:0 0 auto（arch 列里那几节不能被压）。
+   MoE 列窄，这条标题又长，不放开收缩就会把问号顶出容器 —— 这一节允许标题换行。 */
+.cro-section__heading--tight > .cro-section__title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .cro-section__subtitle {
   font-size: var(--font-size-label-xs);
   color: var(--foreground-muted);
@@ -1792,13 +1821,18 @@
   padding: 2px var(--space-1) 2px 2px;
 }
 
-/* 组名一行、专家一行。padding 要留够，否则专家选中的 1.5px 白描边会被
+/* 「整个列表才是一套完整的 EP group、每张卡只是一个 EP rank」这条口径原先是
+   列表首格的一块实底摘要（.cro-moe-group-summary，占满一整行网格）。它是读法的
+   前提而不是一条数据，已改挂到本节标题右侧的问号气泡（见 renderMoe），
+   摘要块与它的样式一并下线。 */
+
+/* rank 名一行、专家一行。padding 要留够，否则专家选中的 1.5px 白描边会被
    卡片边缘裁掉。 */
-/* EP 组卡片是**空心**的：不铺底色，只有一圈细描边，与 Layer 导航里代表单个
+/* EP rank 卡片是**空心**的：不铺底色，只有一圈细描边，与 Layer 导航里代表单个
    layer 的 .cro-tick 同一套语言（空心细胶囊 + --border-default 描边）。
-   铺 surface-2 会让每个组都成为一块实底，MoE 列一屏十几个组连成一片灰板，
+   铺 surface-2 会让每个 rank 都成为一块实底，MoE 列一屏十几个 rank 连成一片灰板，
    而组内的专家胶囊本身就是实心的（.cro-expert 的 surface-3）—— 实心装在实心
-   里，"组"这一层边界反而看不出来。空心描边把卡片降回一个纯粹的框，实心的
+   里，rank 这一层边界反而看不出来。空心描边把卡片降回一个纯粹的框，实心的
    只剩专家。
    四种状态全部只改描边，不碰填充，所以统一收在 --cro-group-ring 一个变量上，
    由同一条 box-shadow 渲染（与集群格子的 --cro-cell-ring 同写法）：
@@ -1813,37 +1847,37 @@
   border-radius: var(--radius-sm);
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--cro-group-ring);
-  /* 整卡都是选中该 EP 组的热区（专家胶囊除外，见 renderMoe 的 click 处理） */
+  /* 整卡都是选中该 EP rank 的热区（专家胶囊除外，见 renderMoe 的 click 处理） */
   cursor: pointer;
   transition: box-shadow 120ms ease;
 }
 
 .cro-moe-group:hover { --cro-group-ring: var(--foreground-secondary); }
 
-/* 被牵连的组：描边提一档。原先这里要专门写一句"不铺蓝底"，现在没有底可铺了。 */
+/* 被牵连的 rank：描边提一档。原先这里要专门写一句"不铺蓝底"，现在没有底可铺了。 */
 .cro-moe-group.is-related { --cro-group-ring: var(--border-strong); }
 
-/* 关系只点到个别 EP 组时（点一张 rank 卡 = 它所在的那一个），提到与
+/* 关系只点到个别 EP rank 时，提到与
    .cro-expert--shared.is-related 同一档的白 1.5px —— 同一次点击里共享专家亮
-   的就是这一档，EP 组停在灰边上会读成"没被点上"。is-pinpoint 由 JS 按
+   的就是这一档，EP rank 停在灰边上会读成"没被点上"。is-pinpoint 由 JS 按
    「关系集里的 EP 数 < 全部 EP」加（见 applyRelation），点整网/典型层那种
-   全 EP 命中仍走上面那条灰档：几十个组一起白框等于什么都没突出。
+   全 EP 命中仍走上面那条灰档：几十个 rank 一起白框等于什么都没突出。
    卡片保持空心不铺底 —— 亮的是边框，与它「纯粹一个框」的定位不冲突。 */
 .cro-moe-group.is-related.is-pinpoint {
   --cro-group-ring: #fff;
   box-shadow: inset 0 0 0 1.5px var(--cro-group-ring);
 }
 
-/* 整个 EP 组被选中：整组一圈白描边，与 .cro-expert.is-selected 的单体白描边
+/* 整个 EP rank 被选中：整卡一圈白描边，与 .cro-expert.is-selected 的单体白描边
    同一套语言。描边改到 inset，卡片外缘不再外扩，滚动容器也就不必替它让位。 */
 .cro-moe-group.is-selected {
   --cro-group-ring: #fff;
   box-shadow: inset 0 0 0 1.5px var(--cro-group-ring);
 }
 
-/* 整组被点亮（直接选中 or 被牵连）时，组内专家保留 is-related 供聚焦降噪
-   判断"未涉及"，但底色压回中性 —— 粒度是「组」，就由组卡片自己表达；
-   每张专家卡再各填一层蓝，整组会连人带框一起变蓝，组级的白描边／蓝底
+/* 整个 rank 被点亮（直接选中 or 被牵连）时，本地专家保留 is-related 供聚焦降噪
+   判断"未涉及"，但底色压回中性 —— 粒度是「rank」，就由 rank 卡片自己表达；
+   每张专家卡再各填一层蓝，整卡会连人带框一起变蓝，rank 级的白描边／蓝底
    反而读不出来。单独选中的专家（is-selected）不受影响。 */
 .cro-moe-group.is-selected .cro-expert.is-related,
 .cro-moe-group.is-related .cro-expert.is-related {
@@ -1873,9 +1907,28 @@
 .cro-moe-group.is-related .cro-moe-group__name,
 .cro-moe-group.is-selected .cro-moe-group__name { color: var(--foreground); }
 
+/* 不可下钻态（.is-anon）：还没指定是哪一个 MoE layer，点一个格子无法确定问的是
+   哪一层的那份专家实例，于是点击不发连线（见 js 的 moeBindingOf / moeBoundOf）。
+   光标给 not-allowed：这里**确实点不动**，用 pointer 是撒谎、用 help 又只说了
+   「有话要讲」没说「按不动」—— 禁用光标是唯一如实的一个。
+   名字压一档灰，与可下钻态一眼可分。 */
+.cro-moe-group.is-anon,
+.cro-moe-group.is-anon .cro-moe-group__name,
+.cro-moe-group.is-anon .cro-expert { cursor: not-allowed; }
+
+.cro-moe-group.is-anon .cro-moe-group__name { color: var(--foreground-muted); }
+
+/* 专家胶囊铺成**每行最多 4 个**的网格：原先是 nowrap 的一行，靠 .cro-expert 的
+   flex:1 1 0 挤等宽 —— 每个 rank 4 个（256/64）时正好，可 EP 拨小到 32 就是 8 个、
+   16 就是 16 个，一行挤下去每枚只剩几像素，"E12" 被压成一道竖条，读不出是谁。
+   现在满 4 换行，卡片高度跟着长（.cro-moe-group 是 flex 列，内容撑高；同一行的
+   rank 卡由 grid 拉伸对齐，反正每个 rank 的专家数一样多）。
+   列数走 --cro-expert-cols（renderMoe 按 min(4, 实际个数) 写进内联样式）：
+   不足 4 个时列数收到实际个数，胶囊仍铺满整行宽，与改动前的观感一致 ——
+   写死 4 列会让"1 个共享专家"缩成四分之一宽，右边空着三格。 */
 .cro-moe-group__experts {
-  display: flex;
-  flex-wrap: nowrap;   /* 一行排完 */
+  display: grid;
+  grid-template-columns: repeat(var(--cro-expert-cols, 4), minmax(0, 1fr));
   gap: 3px;
   min-width: 0;
 }
@@ -1886,8 +1939,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* flex:1 1 0 让同一行里的专家严格等宽，文字由 justify-content 居中；
-     min-width:0 允许它们一起收缩而不是溢出。 */
+  /* 等宽由外层网格的 minmax(0, 1fr) 保证，文字由 justify-content 居中；
+     min-width:0 允许它们一起收缩而不是溢出。flex:1 1 0 留着是给别处仍以 flex 排
+     的胶囊用（网格项上这条属性不生效，无副作用）。 */
   flex: 1 1 0;
   min-width: 0;
   height: 15px;
@@ -2284,7 +2338,237 @@
 
 .cro-incident-view[hidden] { display: none; }
 
-/* ── 中区 · 编排画布 ─────────────────────────────────────────────────────
+/* ══ 中区 · 机制舞台 + 传播地图 ═══════════════════════════════════════════
+   中区有两块内容，靠 .cro-incident-center 的两个 data 状态决定谁占主位：
+     data-mech="off" → 只有传播图，满铺（改造前的老样子，没写 mechanism 的事件走这条）
+     data-mech="on"  → 机制舞台满铺，传播图缩到右下角当地图
+       └ data-map="dock" 停靠 / "open" 点开后铺满中区，盖在机制舞台上
+   停靠态里传播图不接手势（pointer-events:none），整块交给覆盖其上的 __head 按钮，
+   所以「点地图任意处放大」和「地图里还能拖拽」不会互相抢事件。 */
+.cro-incident-center {
+  position: relative;
+  min-height: 0;
+  display: grid;
+}
+
+/* 机制舞台。上=相位轴（auto）/ 中=画布（1fr 吃满）/ 下=相位说明（auto）。 */
+.cro-mech {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.cro-mech[hidden] { display: none; }
+
+.cro-mech__axis {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* 相位轴用现成的 tab-control：相位就是「看哪一相」的分段选择，不另立控件。 */
+.cro-mech__phases {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cro-mech__phases::-webkit-scrollbar { display: none; }
+
+.cro-mech__phases .tab-control-item {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 相位读数（时刻 / 计时）：跟着相位走的一个数，用等宽体，免得换相时左右跳。 */
+.cro-mech__clock {
+  flex: 0 0 auto;
+  font: var(--text-mono, var(--text-body-sm));
+  font-family: var(--font-mono);
+  font-size: var(--font-size-label-xs);
+  color: var(--foreground-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 画布只负责给 SVG 一个可量的框；图本身按 viewBox 等比缩进来。 */
+.cro-mech__canvas {
+  position: relative;
+  min-height: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.cro-mech__canvas > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 当前相位说明。它是把原来堆在一起的 root / path / impact 拆到各相位后的落点：
+   一次只讲这一相发生了什么。右下角留出地图的宽度，免得长句子跑到地图底下。 */
+.cro-mech__caption {
+  margin: 0;
+  font: var(--text-body-sm);
+  line-height: 1.65;
+  color: var(--foreground-secondary);
+}
+
+/* 地图停靠时右侧留出一整列：地图坐在这一列的底部，所以它在「右下角」，但不压住
+   机制图的任何内容 —— router 图的 softmax 带、barrier 图的读数都落在右下部，
+   直接把地图浮在上面会盖掉正文。相位轴仍横跨两列（它是整块的控制条）。 */
+.cro-incident-center[data-mech="on"] .cro-mech {
+  grid-template-columns: minmax(0, 1fr) 288px;
+  column-gap: var(--space-4);
+}
+
+.cro-incident-center[data-mech="on"] .cro-mech__axis { grid-column: 1 / -1; }
+.cro-incident-center[data-mech="on"] .cro-mech__canvas,
+.cro-incident-center[data-mech="on"] .cro-mech__caption { grid-column: 1; }
+
+/* ── 机制图内部图元 ───────────────────────────────────────────────────── */
+.cro-mech__title { font-size: 11px; fill: var(--foreground-muted); }
+.cro-mech__label { font-size: 10.5px; fill: var(--foreground-secondary); }
+.cro-mech__value {
+  font-size: 11px;
+  fill: var(--foreground);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.cro-mech__value.is-danger { fill: var(--danger); }
+.cro-mech__frame { fill: none; stroke: var(--border-subtle); }
+.cro-mech__rule { stroke: var(--border-default); stroke-dasharray: 4 4; }
+.cro-mech__block {
+  fill: color-mix(in srgb, var(--primary) 12%, transparent);
+  stroke: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+.cro-mech__cell { stroke: none; }
+.cro-mech__cell.is-dead { fill: color-mix(in srgb, var(--foreground) 12%, transparent); }
+.cro-mech__cell.is-hot { fill: var(--danger); }
+.cro-mech__beam { fill: none; stroke: color-mix(in srgb, var(--primary) 45%, transparent); stroke-width: 1.2; }
+.cro-mech__beam.is-hot { stroke: color-mix(in srgb, var(--danger) 70%, transparent); stroke-width: 2; }
+.cro-mech__beam.is-dead { stroke: color-mix(in srgb, var(--foreground) 14%, transparent); stroke-dasharray: 2 5; }
+/* 沿既有连线跑的彗星 —— 「动」不是让图元乱动，是让流量在图上跑起来。 */
+.cro-mech__comet { fill: none; stroke: var(--primary); stroke-width: 1.8; stroke-linecap: round; }
+.cro-mech__comet.is-hot { stroke: var(--danger); stroke-width: 2.4; }
+
+/* ── 右下角地图 ──────────────────────────────────────────────────────── */
+/* 两种形态下画布都要吃满地图框：grid 一行 minmax(0,1fr)，比给
+   .cro-incident-flow 写 height:100% 稳（它在停靠态里是绝对定位框的子项）。 */
+.cro-mech-map {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.cro-incident-center[data-mech="off"] .cro-mech-map__head { display: none; }
+
+.cro-incident-center[data-mech="on"] .cro-mech-map {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 288px;
+  height: min(216px, 46%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+  z-index: 3;
+  transition: inset var(--duration-fast) var(--easing-default),
+              width var(--duration-fast) var(--easing-default),
+              height var(--duration-fast) var(--easing-default);
+}
+
+.cro-incident-center[data-mech="on"][data-map="open"] .cro-mech-map {
+  inset: 0;
+  width: auto;
+  height: auto;
+  background: var(--surface-1);
+}
+
+/* 停靠态：地图整块不接手势，__head 铺满成一个「点开」按钮，标题压在顶栏上。 */
+.cro-incident-center[data-mech="on"][data-map="dock"] .cro-incident-flow { pointer-events: none; }
+.cro-incident-center[data-mech="on"][data-map="dock"] .cro-stage-zoom { display: none; }
+.cro-incident-center[data-mech="on"][data-map="dock"] .cro-incident-arrow { display: none; }
+
+.cro-mech-map__head {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0 var(--space-3);
+  border: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--surface-2) 92%, transparent) 0,
+    color-mix(in srgb, var(--surface-2) 78%, transparent) 22px,
+    transparent 30px
+  );
+  color: var(--foreground-secondary);
+  font: var(--text-label);
+  font-size: var(--font-size-label-xs);
+  cursor: zoom-in;
+}
+
+.cro-mech-map__head:hover { color: var(--foreground); }
+.cro-mech-map__head:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* 点开后 __head 收成右上角一枚关闭键，画布重新可拖拽。 */
+.cro-incident-center[data-map="open"] .cro-mech-map__head {
+  inset: var(--space-2) var(--space-2) auto auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  cursor: zoom-out;
+}
+
+.cro-incident-center[data-map="open"] .cro-mech-map__title { display: none; }
+
+.cro-mech-map__icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cro-mech-map__icon-close { display: none; }
+.cro-incident-center[data-map="open"] .cro-mech-map__icon-expand { display: none; }
+.cro-incident-center[data-map="open"] .cro-mech-map__icon-close { display: inline; }
+
+/* 窄栏下 288px 的预留列会把机制图挤扁，这时收回预留、地图改成小一号的浮层。
+   浮层确实会压住一角，但比机制图被挤到读不出来强。 */
+@media (max-width: 1180px) {
+  .cro-incident-center[data-mech="on"] .cro-mech {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cro-incident-center[data-mech="on"] .cro-mech__axis,
+  .cro-incident-center[data-mech="on"] .cro-mech__canvas,
+  .cro-incident-center[data-mech="on"] .cro-mech__caption { grid-column: 1; }
+  .cro-incident-center[data-mech="on"][data-map="dock"] .cro-mech-map {
+    width: 212px;
+    height: min(152px, 40%);
+  }
+}
+
+/* 中区 · 编排画布 ─────────────────────────────────────────────────────
    视口只负责裁剪与承接手势；舞台在里面按内容排到自然尺寸，整体一起平移缩放。
    传播源 / 连接线 / 受影响没有各自的滚动条，也没有各自的边界。 */
 .cro-incident-flow {

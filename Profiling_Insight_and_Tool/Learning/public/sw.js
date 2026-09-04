@@ -1,5 +1,18 @@
-const CACHE = 'transformer-pocket-v8';
-const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/cards-data.js', '/manifest.webmanifest', '/icon.svg', '/cards.json'];
+const CACHE = 'transformer-pocket-v9';
+const KATEX_FONTS = [
+  'KaTeX_AMS-Regular', 'KaTeX_Caligraphic-Bold', 'KaTeX_Caligraphic-Regular',
+  'KaTeX_Fraktur-Bold', 'KaTeX_Fraktur-Regular', 'KaTeX_Main-Bold',
+  'KaTeX_Main-BoldItalic', 'KaTeX_Main-Italic', 'KaTeX_Main-Regular',
+  'KaTeX_Math-BoldItalic', 'KaTeX_Math-Italic', 'KaTeX_SansSerif-Bold',
+  'KaTeX_SansSerif-Italic', 'KaTeX_SansSerif-Regular', 'KaTeX_Script-Regular',
+  'KaTeX_Size1-Regular', 'KaTeX_Size2-Regular', 'KaTeX_Size3-Regular',
+  'KaTeX_Size4-Regular', 'KaTeX_Typewriter-Regular'
+].map(name => `/katex/fonts/${name}.woff2`);
+const SHELL = [
+  '/', '/index.html', '/styles.css', '/app.js', '/cards-data.js',
+  '/manifest.webmanifest', '/icon.svg', '/cards.json', '/katex/katex.min.css',
+  '/katex/katex.min.js', '/katex/contrib/auto-render.min.js', ...KATEX_FONTS
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

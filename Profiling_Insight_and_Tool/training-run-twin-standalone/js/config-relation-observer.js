@@ -360,10 +360,57 @@
         + "显存上怎么调都便宜。\n\n"
         + "常见取值 8 / 16 / 32 / 64；lora_alpha 一般取 2r（不占显存，本页只在 yaml 里写出来）。",
     },
-    routedExpert: { label: "Routed",         group: "moe",      min: 1,  max: 1024, pow2: true },
+    /* 「Routed = 256」最容易被读成「这个模型一共 256 个专家」。实际它是**每个 MoE
+       layer 各自**的专家数，有多少个 MoE 层就有多少套。标签本身塞不下这个限定
+       —— MoE 那一行是 nowrap 四等分、约 300px 一列，标签早已挂着省略号（见 css
+       .cro-region--moe .cro-stepper-row），写成「Routed (per MoE Layer)」只会被截
+       成一截读不通的碎片，还会把 Top-K / Shared / EP 一起压窄。所以限定词走问号
+       气泡，可见的那一半交给下面那条 section 标题（「单个 MoE Layer 的…」）。
+       title 写成函数：乘出来那个总数才是让人一下反应过来的地方，得报当前的层数。 */
+    routedExpert: {
+      label: "Routed", group: "moe", min: 1, max: 1024, pow2: true,
+      title: ({ counts }) => {
+        const head = "Routed = 每个 MoE layer 各自持有的路由专家数，不是全模型的总数。\n\n";
+        if (!counts.moeLayers) {
+          return `${head}当前配置没有 MoE 层，这一枚不参与建模。`;
+        }
+        return head
+          + `当前 ${counts.totalLayer} 层里有 ${counts.moeLayers} 层是 MoE，每层各有一整套 `
+          + `${counts.routedExpert} 个路由专家 —— 全模型共 ${counts.moeLayers} × ${counts.routedExpert} = `
+          + `${counts.moeLayers * counts.routedExpert} 个专家实例。\n\n`
+          + "各层的专家是彼此独立的参数，不共享权重；Top-K 路由也在每一层各自独立进行。\n\n"
+          + `下面「单个 MoE Layer 的路由专家在 EP ranks 上的分布」铺开的就是其中一层的那一套：`
+          + `${counts.routedExpert} 个专家按 EP=${counts.ep} 切开`
+          + (counts.expertsPerEpRank ? `，每个 EP rank 持有 ${counts.expertsPerEpRank} 个。` : "。");
+      },
+    },
     topK:         { label: "Top-K",          group: "moe",      min: 1,  max: 64,   step: 1 },
     sharedExpert: { label: "Shared",         group: "moe",      min: 0,  max: 8,    step: 1 },
-    ep:           { label: "EP",             group: "moe",      min: 1,  max: 1024, pow2: true },
+    /* 「EP = 64」有三种误读：一共 64 个专家 / 一共 64 个专家并行组 / 每张卡 64 个
+       专家。它是**一套专家摊在多少个 rank 上**，而每个 rank 手上只有 Routed ÷ EP
+       个专家。这句话里的两个数都得报当前值，所以 title 与 Routed 一样写成函数
+       （建 stepper 时拓扑还没派生出来，正文由 emit() 那一趟填，见 fieldTitle）。 */
+    ep: {
+      label: "EP", group: "moe", min: 1, max: 1024, pow2: true,
+      title: ({ counts }) => {
+        const head = "EP = **一套路由专家分布在多少个 rank 上**（expert parallel size），"
+          + "既不是专家的个数，也不是专家并行组的个数。\n\n";
+        if (!counts.moeLayers) {
+          return `${head}当前配置没有 MoE 层，这一枚不参与建模。`;
+        }
+        return head
+          + `每个 rank 上的专家人头数 = Routed ÷ EP = ${counts.routedExpert} ÷ ${counts.ep} = `
+          + (counts.expertsPerEpRank
+            ? `**${counts.expertsPerEpRank} 个**。\n\n`
+            : "除不尽 —— 当前这一档切不平，专家没法均摊到 EP rank 上。\n\n")
+          + `凑齐这 ${counts.ep} 个 rank 才是**一整套专家**；`
+          + `当前有 ${counts.edp} 组这样的 EP 域并排跑（集群矩阵的纵轴就是它）。\n\n`
+          + "── 拨大拨小各付什么代价 ──\n"
+          + "EP 越大，一套专家摊得越碎、每张卡背的专家参数与优化器状态越少；"
+          + "代价是每层两次 all-to-all 要横跨更多 rank，跨机时尤其贵。"
+          + "EP 越小则相反：通信便宜，但每张卡要装下更多专家。";
+      },
+    },
     totalRank:    { label: "Total Rank",     group: "cluster",  min: 1,  max: 65536, pow2: true },
     /* node 仍留在 FIELD_SPECS（label 供只读读数与建议修法的改动清单使用，量程供
        nodeLayout 夹取），但已不在 FIELD_ORDER 里 —— 它是派生量，不是输入。
@@ -1249,15 +1296,27 @@
     const dp = Math.max(1, config.dp || 1);
     const num = Math.max(1, config.microBatchNum || 1);
     const total = mbs * dp * num;
+    /* 单位一定要写出来：格子里只有一个光秃秃的 12288，不说清楚就会被读成 token 数
+       （相差一个 Seq Length，量级差了三个数量级）。所以浮层里既给「条」这个单位，
+       也给换算到 token 的那一步 —— 后者才是大家嘴里的「一步过多少 token」。 */
+    const seq = Math.max(1, config.seqLen || 1);
+    const tokens = total * seq;
     return {
       text: String(total),
-      title: "Global Batch · global batch size（一次参数更新吃掉多少样本）\n\n"
-        + "= Micro Batch " + mbs + " × DP " + dp + " × micro_batch_num " + num + " = " + total + "\n"
+      title: "Global Batch · global batch size（一次参数更新吃掉多少**条**样本）\n\n"
+        + "= Micro Batch " + mbs + " × DP " + dp + " × micro_batch_num " + num + " = " + total + " 条\n"
         + "三个因子分散在三处：Micro Batch 就在右边，DP 在 Model Architecture 那一行，"
         + "micro_batch_num 收在这一行末尾的「高级选项」里。"
         + "它是**派生量**，没有加减键：要改就动那三个数之一。\n\n"
+        + "── 单位是「条」，不是 token ──\n"
+        + "一条样本 = 一条长 Seq Length 的序列，也就是 [B, S, H] 里 B 数的那个东西。"
+        + "所以 " + total + " 读作 **" + total + " 条序列**，不是 " + total + " 个 token、"
+        + "也不是 " + total + " 个 step。换算到 token：\n"
+        + total + " 条 × Seq Length " + seq + " = **" + tokens.toLocaleString("en-US") + " token**"
+        + "（一次参数更新真正过的 token 量；训练日志里的「多少 B token」按这个数累计）。\n\n"
         + "── 表单上那枚 Micro Batch 不是它 ──\n"
-        + "MBS 是每卡每次前反向真正喂进去的样本数；这个数是全集群一步的总量。"
+        + "MBS 是每卡每次前反向真正喂进去的条数；这个数是全集群一步的总量（同一个单位，"
+        + "差在「每卡每次」与「全集群一步」）。"
         + "YAML 的 runner_config.batch_size 填的是**这个**（full_batch: True 的口径 —— "
         + "每张卡都取全局 batch 的数据量，再在图内按 dp 切）。\n\n"
         + "── 它几乎不进显存 ──\n"
@@ -2204,6 +2263,15 @@
     }
   }
 
+  /* 大多数字段的说明是写死的一段话；个别字段（Routed / EP）要把当前拓扑的数报出来才
+     讲得清，于是 title 也允许写成 (topology) => string。建 stepper 时拓扑还没派生
+     出来，先给空串把问号建出来，正文由 emit() 那一趟按当前拓扑填 —— emit 在
+     mount 之后必定跑一次（init 末尾的 controller.refresh()），不会留下空气泡。 */
+  function fieldTitle(spec, topology) {
+    if (typeof spec.title !== "function") return spec.title;
+    return topology ? spec.title(topology) : "";
+  }
+
   function buildStepper(field, value, onStep, onType) {
     const spec = FIELD_SPECS[field];
     const wrap = document.createElement("div");
@@ -2215,7 +2283,8 @@
     /* 问号建在标签后面：整枚外壳当触发面积（原先 wrap.title 的做法）在这一行里
        太糊 —— 表单挨得紧，扫过去会一路弹。带 disabledReason 的字段即使 title
        为空也先把问号建出来（传空串而不是 undefined），置灰时它才有地方说话。 */
-    fillLabel(label, spec.label, spec.title != null ? spec.title : (spec.disabledReason != null ? "" : null));
+    const initialTitle = fieldTitle(spec, null);   // 函数型 title 此刻只拿得到空串，正文等 emit() 填
+    fillLabel(label, spec.label, initialTitle != null ? initialTitle : (spec.disabledReason != null ? "" : null));
 
     const control = document.createElement("div");
     control.className = "zoom-control-group cro-stepper__control";
@@ -2867,8 +2936,9 @@
              `spec.disabledReason` 是「此刻为什么不可用」，后者排在正文之前 ——
              与那几枚开关（buildFlagSwitch / buildFlagChoice 那两处）同一种写法。
              ⚠️ 别写成「不可用时只留理由」：那会把 buildStepper 挂上的说明抹掉，
-             VPP 的悬浮曾经就是这么丢的。 */
-          setHint(wrap.querySelector(".cro-hint"), spec.title, usable ? "" : spec.disabledReason);
+             VPP 的悬浮曾经就是这么丢的。
+             title 写成函数的字段（Routed / EP）也在这里拿到当前拓扑落成文字。 */
+          setHint(wrap.querySelector(".cro-hint"), fieldTitle(spec, topology), usable ? "" : spec.disabledReason);
         }
         const readout = readouts.get(field);
         if (readout) readout.disabled = !usable;
@@ -3783,10 +3853,95 @@
     });
   }
 
+  /* ══ MoE 宫格的「绑定」═══════════════════════════════════════════════════
+     宫格里的卡片画的是**一个 EP group 内部**的 EP rank（0…EP-1），不是集群里的
+     global rank。EP=64 时它写着 Rank 0~63，而集群有 2048 张卡 —— 这个编号被读成
+     global rank 几乎是必然的，而且读错之后整条关系都跟着错。
+
+     根子在于：EP rank → global rank 的换算需要 rankOf(stage, dpIdx, epIdx, inner)，
+     而 stage 与 dpIdx 不在 MoE 区里 —— 它们由「你在看哪一个 MoE layer / 哪一张卡」
+     决定。没有这个上下文时，宫格只是一张**示意图**，压根没有确定的编号可标。
+
+     「能标编号」与「能点」是**两件事**，条件不同，所以分开判：
+
+       · 能标编号（binding）—— 需要 stage + dpIdx。点一个 MoE layer、一段 PP、或
+         集群里某张卡都能定住 stage，此时每张卡标上对应的 global rank。
+       · 能点（drill）—— 还需要**具体是哪一个 MoE layer**。专家实例是按层分的：
+         同一个编号在每层各有一份、权重互不相干，只定到 stage（一段 PP 里往往有
+         十几个 MoE 层）仍然回答不了「你问的是哪一层的那份」。所以点 Cluster 的
+         rank 格只标号、不放开点击；只有点了某个 MoE Layer 才放开。
+
+     binding 判据「rel.stages.size === 1 && rel.epRanks.size > 0」：前半是数学上的
+     充要条件（rankOf 少了 stage 就算不出来），后半排掉「点了一个 Dense 层」这类
+     虽然只压一个 stage、却与专家无关的选择。 */
+
+  /* 禁点说明。两种禁点态共用同一段正文（都是同一个道理：没指定层就问不出实例），
+     只有末尾一句按「编号是否也一并隐去」分岔 —— 正文里不能写死「编号已隐去」，
+     按 Cluster rank 进来时编号是标着的。 */
+  const MOE_NO_DRILL_HINT =
+    "每个 MoE layer 有相互独立的一套专家，且所在的 Rank 可能不同；编号相同的 Expert，在不同层里权重一定不同。\n\n"
+    + "所以在指定是**哪一个 MoE layer** 之前，点一个格子无法确定问的是哪一层的那份实例 —— 这张宫格此刻只是一个 EP group 的示意，点击不发出连线，免得把一条根本没确定下来的对应关系画成确定的。\n\n"
+    + "请点 Layer 布局刻度带上的一个 MoE Layer，再回到这里下钻。";
+  const MOE_UNBOUND_TAIL =
+    "\n\n（卡片上的编号也因此先隐去：那是「EP 组内的第几个」，不是集群里的 global rank。"
+    + "点一个 MoE Layer 或 Cluster 里的一张 Rank 卡，就能定出 PP stage，编号随之标出。）";
+
+  /* 当前选择能不能把宫格实例化。返回 { stage, dpIdx, layer, exactDp } 或 null。
+     dpIdx 只有点集群里某张卡时才是确定的；从层/PP 段进来时整段横跨全部 EDP 副本，
+     取副本 0 并在标题上写明 —— 不写明就等于又造了一个「看着确定、其实是我挑的」
+     的编号，与这次要治的毛病同源。
+     layer 认两种来源：直接点层（kind:"layer"），以及在已绑定的宫格里继续下钻
+     （kind:"expert"/"epRank" 带着 scopeLayer）—— 后者必须认，否则一点专家层号
+     就丢了，口径会从「Layer 38」退回「PP3 整段」，而下钻本来就发生在那一层里。 */
+  function moeBindingOf(rel, topology) {
+    if (!rel || rel.stages.size !== 1 || rel.epRanks.size === 0) return null;
+    const stage = Array.from(rel.stages)[0];
+    if (!Number.isFinite(stage) || !topology.stages[stage]) return null;
+    const p = rel.primary || {};
+    const exactDp = Number.isFinite(p.dpIdx);
+    const dpIdx = exactDp ? p.dpIdx : 0;
+    const claimed = p.kind === "layer" ? p.layer : p.scopeLayer;
+    const layer = Number.isFinite(claimed)
+      && topology.layers[claimed]?.ffn === "moe"
+      && topology.stageOfLayer(claimed) === stage
+      ? claimed
+      : null;
+    return { stage, dpIdx, layer, exactDp };
+  }
+
+  /* 宫格能不能点、点了带什么上下文 —— 点击回调是建 DOM 时的闭包，拿不到此刻的
+     relation，所以把绑定写在 dataset 上，点的时候现读。
+     没有 moeBindLayer 就返回 null：标了编号不等于能点（见上面那段）。 */
+  function moeBoundOf(host) {
+    if (!host || host.dataset.moeBound !== "1") return null;
+    const num = (key) => (host.dataset[key] === "" || host.dataset[key] == null
+      ? null
+      : Number(host.dataset[key]));
+    const stage = num("moeBindStage");
+    const layer = num("moeBindLayer");
+    if (!Number.isFinite(stage) || !Number.isFinite(layer)) return null;
+    return {
+      stage,
+      dpIdx: Number.isFinite(num("moeBindDp")) ? num("moeBindDp") : 0,
+      layer,
+    };
+  }
+
   /* ══ 渲染：MoE 专家面板（第 5 项）════════════════════════════════════════
      共享专家 SE0…（始终激活，不参与路由）+ 路由专家按 EP rank 分组，
      每组 routedExpert / ep 个专家。分组与成员全部由 topology.epRanks 派生，
      改 Routed Expert / EP 立即重建。 */
+  /* 专家胶囊那一格铺几列。上限 4：EP 拨小时一个 rank 会拿到 8 / 16 个专家，
+     挤在一行里每枚只剩几像素，"E12" 被压成一道竖条；满 4 换行，卡片跟着长高
+     （css 的 .cro-moe-group__experts 是 grid，列数读这个变量）。
+     不足 4 个时列数收到实际个数，胶囊仍铺满整行宽 —— 否则「1 个共享专家」会
+     缩成四分之一宽、右边空着三格。0 个（无共享专家的空态）也得给 1，
+     repeat(0, …) 是非法值。 */
+  function setExpertCols(host, count) {
+    if (!host) return;
+    host.style.setProperty("--cro-expert-cols", String(Math.max(1, Math.min(4, count))));
+  }
+
   function renderMoe(sharedHost, routedHost, topology, emit) {
     const { counts, epRanks, hasMoe } = topology;
     if (sharedHost) sharedHost.innerHTML = "";
@@ -3796,6 +3951,7 @@
     if (!hasMoe) return;
 
     if (sharedHost) {
+      setExpertCols(sharedHost, counts.sharedExpert);
       if (counts.sharedExpert > 0) {
         for (let i = 0; i < counts.sharedExpert; i += 1) {
           const chip = document.createElement("button");
@@ -3820,6 +3976,25 @@
     }
 
     if (!routedHost) return;
+    /* 这里展示的是一个完整 EP group 内部的专家放置：外层才是 group，下面每张
+       卡片对应一个 EP rank（也就是该 rank 持有的本地专家分片）。这个层级必须交代
+       清楚，否则单张「Rank n」卡会被误读成一个只有 E/EP 个专家的 EP group。
+       但它是「怎么读下面这些卡片」的前提、不是一条数据，所以不占列表里的一格，
+       改挂到本节标题右侧的问号气泡上（与页面其余 data-hint 同一套触发）。
+       角色卡里那几份 MoE 图没有这个 section 标题，跳过即可 —— 它们是只读证据，
+       本来也不该长出新的触发点。 */
+    const routedHeading = routedHost.id === "croRoutedExperts"
+      ? document.getElementById("croRoutedHeading")
+      : null;
+    if (routedHeading) {
+      routedHeading.querySelector(".cro-hint")?.remove();
+      /* 气泡正文是纯文本（renderHint 用 textContent + pre-wrap），别写 markdown */
+      const hint = buildHint(counts.expertsPerEpRank
+        ? `下面铺开的是一个 EP group 的内部：EP size ${counts.ep}，${counts.routedExpert} 个路由专家均分到组内 ${counts.ep} 个 EP rank、每个 rank 持有 ${counts.expertsPerEpRank} 个 —— 所以每张卡片是一个 EP rank 手上的本地专家分片，不是一个 EP group。`
+        : `下面铺开的是一个 EP group 的内部：EP size ${counts.ep}，共 ${counts.routedExpert} 个路由专家 —— 每张卡片是一个 EP rank 手上的本地专家分片，不是一个 EP group。`);
+      if (hint) routedHeading.appendChild(hint);
+    }
+
     if (!epRanks.length || !counts.expertsPerEpRank) {
       const empty = document.createElement("span");
       empty.className = "cro-empty";
@@ -3828,29 +4003,41 @@
       return;
     }
 
+    /* 建出来的一律是**未绑定**态（编号抹掉、挂 MOE_UNBOUND_HINT、点击不连线）；
+       有选择时紧随其后的 applyRelation → syncMoeBinding 会把它翻成已绑定态。
+       次序上靠得住：配置一变走 controller.onChange，renderMoe 之后就是
+       reapplySelection（见那条回调），没有选择时本来也该是未绑定态。 */
+    routedHost.dataset.moeBound = "0";
+
     epRanks.forEach((entry) => {
       const group = document.createElement("div");
       group.className = "cro-moe-group";
       group.dataset.epRank = String(entry.epRank);
+      group.dataset.expertRange = `E${entry.lo}~E${entry.hi}（${entry.experts.length} 个）`;
 
-      /* 整张卡片都是「选中这个 EP 组」的热区 —— 组名那几个字太小，点不中。
+      /* 整张卡片都是「选中这个 EP rank」的热区 —— rank 名那几个字太小，点不中。
          专家胶囊有自己的 kind:"expert"，让它们的 click 冒到这里就会被这一组
          盖掉，所以命中 .cro-expert 时直接放行。组名按钮不再单独挂 listener，
-         它的 click 冒上来走同一条路径，键盘可达性照旧由它承担。 */
-      group.dataset.tip = `EP rank ${entry.epRank} · 持有专家 E${entry.lo}~E${entry.hi}（${entry.experts.length} 个）`;
+         它的 click 冒上来走同一条路径，键盘可达性照旧由它承担。
+         未绑定时这一击不产生选择，只把说明弹出来（悬浮已经会弹，这一条是给
+         触屏用的：那里没有 hover）。 */
       group.addEventListener("click", (event) => {
         if (event.target.closest(".cro-expert")) return;
-        emit({ kind: "epRank", epRank: entry.epRank, experts: entry.experts, deckNode: "expert_pool" });
+        const bound = moeBoundOf(routedHost);
+        if (!bound) { showHint(group); return; }
+        emit({
+          kind: "epRank", epRank: entry.epRank, experts: entry.experts, deckNode: "expert_pool",
+          scopeStage: bound.stage, scopeLayer: bound.layer, dpIdx: bound.dpIdx,
+        });
       });
 
       const name = document.createElement("button");
       name.type = "button";
       name.className = "cro-moe-group__name";
-      name.textContent = `EP${entry.epRank}`;
-      name.setAttribute("aria-label", group.title);
 
       const experts = document.createElement("div");
       experts.className = "cro-moe-group__experts";
+      setExpertCols(experts, entry.experts.length);
       entry.experts.forEach((e) => {
         const dot = document.createElement("button");
         dot.type = "button";
@@ -3859,16 +4046,127 @@
         dot.dataset.epRank = String(entry.epRank);
         dot.dataset.op = "moe";            // 与结构条 expert_pool bar 同色
         dot.textContent = `E${e}`;
-        dot.dataset.tip = `路由专家 E${e} · 驻留 EP rank ${entry.epRank}`;
-        dot.setAttribute("aria-label", dot.title);
-        dot.addEventListener("click", () => emit({
-          kind: "expert", expert: e, epRank: entry.epRank, deckNode: "expert_pool",
-        }));
+        dot.addEventListener("click", (event) => {
+          const bound = moeBoundOf(routedHost);
+          if (!bound) { event.stopPropagation(); showHint(dot); return; }
+          emit({
+            kind: "expert", expert: e, epRank: entry.epRank, deckNode: "expert_pool",
+            scopeStage: bound.stage, scopeLayer: bound.layer, dpIdx: bound.dpIdx,
+          });
+        });
         experts.appendChild(dot);
       });
 
       group.append(name, experts);
       routedHost.appendChild(group);
+    });
+    // 建完就把两态里的一态写上去（此刻必然是未绑定）
+    paintMoeBinding(routedHost, null, topology);
+  }
+
+  /* 把宫格翻到「未绑定 / 已绑定」中的一态。两态的差别集中在三处：卡片上写不写
+     global rank、悬浮弹的是说明还是读数、点击连不连线（后者由 dataset 上的绑定
+     决定，见 moeBoundOf）。
+     ⚠️ 未绑定态用 data-hint（富气泡）而**不是** data-tip：两套提示都挂在
+     pointerover 上，同一个元素上各挂一条会同时弹出来两个框。 */
+  function paintMoeBinding(routedHost, binding, topology) {
+    if (!routedHost) return;
+    /* 事件详情的角色卡里也重建了一整套宫格，那是只读证据、不参与静态查询：
+       保持它原来的「Rank N + 读数悬浮」，不翻两态、也不挂说明气泡 —— 对一个
+       点不动的东西弹「请先去点别处」只是噪声。 */
+    if (routedHost.id !== "croRoutedExperts") {
+      routedHost.querySelectorAll(".cro-moe-group").forEach((group) => {
+        const epRank = Number(group.dataset.epRank);
+        const range = group.dataset.expertRange || "";
+        group.dataset.tip = `EP rank ${epRank} · 持有专家 ${range}`;
+        const name = group.querySelector(".cro-moe-group__name");
+        if (name) {
+          name.textContent = `Rank ${epRank}`;
+          name.setAttribute("aria-label", `EP rank ${epRank}`);
+        }
+        group.querySelectorAll(".cro-expert").forEach((dot) => {
+          dot.dataset.tip = `路由专家 E${dot.dataset.expert} · 驻留 EP rank ${epRank}`;
+          dot.setAttribute("aria-label", dot.dataset.tip);
+        });
+      });
+      return;
+    }
+    /* 两个开关，条件不同（见 moeBindingOf 上面那段）：
+         numbered —— 定住了 PP stage，卡上能标 global rank；
+         drillable —— 还定住了具体哪一个 MoE layer，格子才放开点击。
+       点 Cluster 的 rank 格落在两者之间：标号，但不放开点。 */
+    const numbered = Boolean(binding);
+    const drillable = numbered && binding.layer != null;
+    routedHost.dataset.moeBound = numbered ? "1" : "0";
+    routedHost.dataset.moeBindStage = numbered ? String(binding.stage) : "";
+    routedHost.dataset.moeBindDp = numbered ? String(binding.dpIdx) : "";
+    // moeBoundOf 认它作「能不能点」的开关：没有层号就返回 null
+    routedHost.dataset.moeBindLayer = drillable ? String(binding.layer) : "";
+
+    /* 标题旁的口径说明：编号是按哪一层 / 哪个副本算出来的，必须跟编号一起出现。
+       从层或 PP 段进来时 DP 副本是页面替用户挑的 0（整段横跨全部 EDP 副本），
+       写成「副本 0 / 共 N」把这件事说破；点集群里某张卡进来时副本是确定的。
+       只定到 stage 时把「还没指定层、格子不可点」一并写出来 —— 否则用户看见
+       编号出来了却点不动，只能靠猜。 */
+    const bindChip = document.getElementById("croMoeBind");
+    if (bindChip) {
+      if (!numbered) {
+        bindChip.textContent = "";
+        bindChip.hidden = true;
+      } else {
+        const dpPart = binding.exactDp
+          ? `DP 副本 ${binding.dpIdx}`
+          : `DP 副本 ${binding.dpIdx}（共 ${topology.counts.edp} 个，默认取第 0 个）`;
+        bindChip.textContent = drillable
+          ? `编号口径：Layer ${binding.layer} · PP${binding.stage} · ${dpPart} —— 下面的格子是这一层内的下钻`
+          : `编号口径：PP${binding.stage} 整段 · ${dpPart} —— 未指定 MoE layer，格子暂不可点`;
+        bindChip.hidden = false;
+      }
+    }
+
+    const ranksPerEp = topology.counts.ranksPerEp || 1;
+    const hint = MOE_NO_DRILL_HINT + (numbered ? "" : MOE_UNBOUND_TAIL);
+    const layerNote = drillable ? `Layer ${binding.layer} 的` : "";
+    routedHost.querySelectorAll(".cro-moe-group").forEach((group) => {
+      const epRank = Number(group.dataset.epRank);
+      const name = group.querySelector(".cro-moe-group__name");
+      const range = group.dataset.expertRange || "";
+
+      // ① 编号：定住 stage 就标；EP rank p 在这个 (stage, dp 副本) 里对应一段连续
+      //    的 global rank，段长 = ranksPerEp（TP×CP）。TP=CP=1 时就是一张卡。
+      let label = null;
+      if (numbered) {
+        const first = topology.rankOf(binding.stage, binding.dpIdx, epRank, 0);
+        label = ranksPerEp > 1 ? `${first}~${first + ranksPerEp - 1}` : String(first);
+      }
+      if (name) {
+        name.textContent = label == null ? "Rank" : `Rank ${label}`;
+        name.setAttribute("aria-label", label == null
+          ? `EP 组内第 ${epRank} 个 rank；未定住 PP stage，暂不标 global rank`
+          : `global rank ${label}，EP rank ${epRank}`);
+      }
+
+      // ② 可点性：只有定到具体 MoE layer 才放开。不可点时挂说明气泡、不挂
+      //    data-tip（两套提示都在 pointerover 上，同挂会一起弹出来）。
+      group.classList.toggle("is-anon", !drillable);
+      if (!drillable) {
+        delete group.dataset.tip;
+        group.dataset.hint = hint;
+        group.querySelectorAll(".cro-expert").forEach((dot) => {
+          delete dot.dataset.tip;
+          dot.dataset.hint = hint;
+          dot.setAttribute("aria-label",
+            `路由专家 E${dot.dataset.expert}（未指定 MoE layer，不可下钻）`);
+        });
+        return;
+      }
+      delete group.dataset.hint;
+      group.dataset.tip = `global rank ${label} · Layer ${binding.layer} · PP${binding.stage} · DP 副本 ${binding.dpIdx} · EP rank ${epRank}\n持有专家 ${range}`;
+      group.querySelectorAll(".cro-expert").forEach((dot) => {
+        delete dot.dataset.hint;
+        dot.dataset.tip = `${layerNote}路由专家 E${dot.dataset.expert} · 驻留 global rank ${label} · EP rank ${epRank}`;
+        dot.setAttribute("aria-label", dot.dataset.tip);
+      });
     });
   }
 
@@ -4557,14 +4855,40 @@
         rel.epRanks.add(payload.epRank);
         rel.segment = "moe";
         rel.bar = { segment: "moe", bar: "expert_pool" };
-        // 【全展开】一个路由槽位（专家编号 e）在**每个 MoE 层**都有一份实例（各层权重
-        // 独立、互不相干，只共享编号与「编号→EP rank」的分片公式）；它的 EP 组在**每个
-        // PP stage** 内都占一块 rank。点专家就把这个编号涉及的全部 MoE 层 + 全部 stage 的
-        // 该 EP 组 rank（× DP 副本）一并连上，让「这个编号散布在哪里」一眼看全。连线侧
-        // 会按 stage 拆成多条（见 drawRelationLinks），而非缩成一个巨框。
-        addLayers(moeLayers);
-        rel.deckLayer = moeLayers[Math.floor(moeLayers.length / 2)];
-        rel.stages.forEach((s) => addRanks(topology.ranksOfEpRankInStage(s, payload.epRank)));
+        /* 一个路由槽位（专家编号 e）在**每个 MoE 层**都有一份实例（各层权重独立、
+           互不相干，只共享编号与「编号→EP rank」的分片公式）；它的 EP 组在**每个
+           PP stage** 内都占一块 rank。所以有两种口径：
+
+           【收敛】payload 带 scopeStage —— 这一击来自已绑定的 MoE 宫格（用户先点了
+             某个 MoE layer / 某张卡，宫格上已经标出 global rank）。此刻问的是「**这一层
+             的**这个专家在哪」，答案必须与卡片上写着的那个编号一致，于是收敛到该
+             stage 的 MoE 层、并只取 dpIdx 指定的那个 DP 副本。
+           【全展开】没有 scopeStage（外部 API / 老快照）—— 退回原来的口径：全部 MoE
+             层 + 全部 stage × 全部 DP 副本，让「这个编号散布在哪里」一眼看全。
+             连线侧会按 stage 拆成多条（见 drawRelationLinks），而非缩成一个巨框。 */
+        const scopeStage = Number.isFinite(payload.scopeStage) ? payload.scopeStage : null;
+        const scopedLayers = scopeStage == null
+          ? moeLayers
+          : moeLayers.filter((l) => topology.stageOfLayer(l) === scopeStage);
+        /* 【定层】scopeLayer 落在这段 stage 的 MoE 层里 —— 用户是先点了那一层、
+           再在宫格上继续下钻，这一击问的是「**这一层里**的这个专家」，关系集必须
+           收到这一层。只按 stage 收敛不够：一段 PP 里通常有十几层 MoE，层导航
+           会把整段全亮，与标题上写着的 Layer N 打架（口径说一层、布局亮一片）。 */
+        const pinnedLayer = Number.isFinite(payload.scopeLayer) && scopedLayers.includes(payload.scopeLayer)
+          ? payload.scopeLayer
+          : null;
+        const useLayers = pinnedLayer != null
+          ? [pinnedLayer]
+          : (scopedLayers.length ? scopedLayers : moeLayers);
+        addLayers(useLayers);
+        rel.deckLayer = Number.isFinite(payload.scopeLayer) && useLayers.includes(payload.scopeLayer)
+          ? payload.scopeLayer
+          : useLayers[Math.floor(useLayers.length / 2)];
+        const pinDp = scopeStage != null && Number.isFinite(payload.dpIdx) ? payload.dpIdx : null;
+        rel.stages.forEach((s) => {
+          const all = topology.ranksOfEpRankInStage(s, payload.epRank);
+          addRanks(pinDp == null ? all : all.filter((r) => topology.coordsOfRank(r).dpIdx === pinDp));
+        });
         break;
       }
       case "sharedExpert": {
@@ -4681,26 +5005,34 @@
       labels.arch = `PP${Array.from(rel.stages)[0]} · ${formatRuns(rel.layers, "L", 1)}`;
     }
 
-    // 专家 / EP 组 / 共享专家：主标签点明「该编号在全部相关 MoE 层各有一份」，既表达
-    // 全展开的分布范围，又不误导成「同一个专家横跨各层」（各层是独立权重实例）。
+    /* 专家 / EP rank / 共享专家两种口径，跟着关系集走：
+       - 收敛到一层（先点了某个 MoE layer、再在宫格里下钻）：写「在 Layer N 里」，
+         把"这一击发生在哪一层"说死，与层导航只亮那一层对上；
+       - 全展开（没有定层）：写「各一份」，表达该编号在每个相关 MoE 层都有一份
+         独立实例，而不是同一个专家横跨各层。 */
     const pk = rel.primary && rel.primary.kind;
     if ((pk === "expert" || pk === "epRank" || pk === "sharedExpert") && rel.layers.size) {
       const who = pk === "expert" ? `E${rel.primary.expert}`
         : pk === "sharedExpert" ? `SE${rel.primary.shared}`
-        : `EP${rel.primary.epRank}`;
-      labels.arch = `${who} · ${formatRuns(rel.layers, "L", 1)} 各一份`;
+        : `EP rank ${rel.primary.epRank}`;
+      if (rel.layers.size === 1) {
+        const only = Array.from(rel.layers)[0];
+        labels.arch = `${who} in Layer ${only} · PP${topology.stageOfLayer(only)}`;
+      } else {
+        labels.arch = `${who} · ${formatRuns(rel.layers, "L", 1)} 各一份`;
+      }
     }
 
-    // MoE：EP 组 + 组内专家区间，专家全量时改用摘要，避免拼出 64 段
+    // MoE：EP rank + 本地专家区间，专家全量时改用摘要，避免拼出 64 段
     const epParts = [];
     if (rel.epRanks.size && rel.epRanks.size < c.ep) {
       Array.from(rel.epRanks).sort((a, b) => a - b).slice(0, 3).forEach((p) => {
         const own = topology.expertsOfEpRank(p).filter((e) => rel.experts.has(e));
-        epParts.push(own.length ? `EP${p}(${formatRuns(own, "E", 1)})` : `EP${p}`);
+        epParts.push(own.length ? `Rank ${p}(${formatRuns(own, "E", 1)})` : `Rank ${p}`);
       });
       if (rel.epRanks.size > 3) epParts.push(`等 ${rel.epRanks.size} 个 EP rank`);
     } else if (rel.epRanks.size) {
-      // 只牵连到 EP 分组、没点到具体专家时（MoE 列里的 Attn / Norm / Add），
+      // 只牵连到 EP ranks、没点到具体专家时（MoE 列里的 Attn / Norm / Add），
       // 不能报「N 专家」，那是没被点亮的
       epParts.push(rel.experts.size
         ? `全部 ${c.ep} 个 EP rank · ${c.routedExpert} 专家`
@@ -5868,6 +6200,826 @@
     };
   }
 
+  /* ══ 事件机制图 ══════════════════════════════════════════════════════════
+     「传播源 → 受影响」是范围图：它回答「打到了谁」，回答不了「为什么会打过去、
+     怎么传的」，而且 11 个事件共用同一张图，机制差异被拉平。机制图补的就是这一段：
+     一个事件一张图，按 event.mechanism.phases 的相位推进，相位说明写在事件数据里。
+
+     动效遵循两条：
+       · 动的是「沿既有连线跑的东西」（stroke-dashoffset 彗星），不是让图元乱动；
+       · 相位切换是重画一张静态图，不是逐帧补间 —— 讲得清、开销低、可随时定格。
+     两者都是纯 SVG + SMIL，不引库、不占 rAF。 */
+
+  const MECH_VIEW = { w: 940, h: 430 };
+
+  /* 沿一条路径跑的彗星：底线常显，虚线段无限位移。tone 决定颜色（正常蓝 / 异常红）。 */
+  function mechComet(d, tone, dur = "1.1s", delay = "0s") {
+    const comet = svgNode("path", {
+      class: `cro-mech__comet${tone === "hot" ? " is-hot" : ""}`,
+      d, "stroke-dasharray": "7 27",
+    });
+    comet.appendChild(svgNode("animate", {
+      attributeName: "stroke-dashoffset", from: 34, to: 0,
+      dur, begin: delay, repeatCount: "indefinite",
+    }));
+    return comet;
+  }
+
+  /* 震中高亮：两个相位错开的圆角矩形向外扩散并淡出（层级图 ripple 的 SVG 版）。 */
+  function mechRipple(x, y, w, h, color) {
+    const g = svgNode("g", { "pointer-events": "none" });
+    const gx = Math.max(4, w * 0.45), gy = Math.max(4, h * 0.9);
+    [0, 0.6].forEach((delay) => {
+      const rect = svgNode("rect", {
+        x, y, width: w, height: h, rx: Math.min(4, h / 2),
+        fill: "none", stroke: color, "stroke-width": 1.6, "stroke-opacity": 0.5,
+      });
+      const anim = (name, from, to) => rect.appendChild(svgNode("animate", {
+        attributeName: name, values: `${from};${to}`,
+        dur: "1.2s", begin: `${delay}s`, repeatCount: "indefinite",
+      }));
+      anim("x", x, x - gx); anim("y", y, y - gy);
+      anim("width", w, w + gx * 2); anim("height", h, h + gy * 2);
+      anim("stroke-opacity", 0.5, 0);
+      g.appendChild(rect);
+    });
+    return g;
+  }
+
+  /* 相位之间要可比，抖动就不能是 Math.random()：同一个下标每次得到同一个值。 */
+  function mechJitter(i, salt = 0) {
+    const v = Math.sin((i + 1) * 12.9898 + salt * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  }
+
+  /* 各机制图的自然高度不一样（64 条泳道比 16×16 网格高一截），所以 height 可覆盖；
+     宽度统一，两张图在同一块画布里切换时横向比例才不跳。 */
+  function mechRoot(label, height = MECH_VIEW.h) {
+    return svgNode("svg", {
+      class: "cro-mech__svg", viewBox: `0 0 ${MECH_VIEW.w} ${height}`,
+      preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": label,
+    });
+  }
+
+  /* ── 机制 A · Router FP8 溢出导致路由塌缩（p1-root）────────────────────
+     左 Router → 中 dispatch 扇出 → 右 256 专家网格；下方两条 256 根的数值带
+     （logits / softmax p）把「为什么扇出会变」摊开。相位 ①② 是健康态，正好当
+     ③④ 的对照：同一张图两态，比并排画两张更能读出「变的是哪一步」。 */
+  const MECH_ROUTER = {
+    cols: 16, cellW: 25, cellH: 13, gap: 2, gridX: 486, gridY: 16,
+    gate: { x: 26, y: 78, w: 142, h: 100 },
+    hot: 193,
+    healthy: [12, 45, 71, 103, 137, 168, 193, 221, 246],
+    logitsStrip: { x: 26, y: 300, w: 436, h: 100 },
+    softmaxStrip: { x: 500, y: 300, w: 416, h: 100 },
+  };
+
+  function mechExpertBox(index) {
+    const M = MECH_ROUTER;
+    return {
+      x: M.gridX + (index % M.cols) * (M.cellW + M.gap),
+      y: M.gridY + Math.floor(index / M.cols) * (M.cellH + M.gap),
+      w: M.cellW, h: M.cellH,
+    };
+  }
+
+  function renderMechRouterCollapse(phase) {
+    const M = MECH_ROUTER;
+    const svg = mechRoot("Router 打分 → Top-2 路由 → 专家接收");
+    const collapsed = phase >= 2;   // ③ 起 softmax 已塌成 one-hot
+    const overflow = phase >= 1;    // ② 起 logits 已越界
+    const g = M.gate;
+
+    // ── 左：Router 块 ──
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: g.x, y: g.y - 30 }, "Layer 38 · MoE Router"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: g.x, y: g.y - 14 }, "token batch 4096 → gate"));
+    svg.appendChild(svgNode("rect", {
+      class: "cro-mech__block", x: g.x, y: g.y, width: g.w, height: g.h, rx: 8, "stroke-width": 1.2,
+    }));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: g.x + g.w / 2, y: g.y + 38, "text-anchor": "middle" }, "Linear(h → 256)"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: g.x + g.w / 2, y: g.y + 56, "text-anchor": "middle" }, "softmax · Top-2"));
+    svg.appendChild(svgNode("text", {
+      class: `cro-mech__value${overflow ? " is-danger" : ""}`,
+      x: g.x + g.w / 2, y: g.y + 82, "text-anchor": "middle",
+    }, overflow ? "FP8 E4M3 溢出" : "FP8 E4M3 正常"));
+
+    // ── 右：256 专家网格。份额决定填充浓度；塌缩后只有 E193 亮，其余转 dead ──
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: M.gridX, y: M.gridY - 8 }, "256 routed experts（16 × 16）"));
+    for (let i = 0; i < 256; i += 1) {
+      const box = mechExpertBox(i);
+      const isHot = i === M.hot;
+      const dead = collapsed && !isHot;
+      const cell = svgNode("rect", {
+        class: `cro-mech__cell${dead ? " is-dead" : collapsed ? " is-hot" : ""}`,
+        x: box.x, y: box.y, width: box.w, height: box.h, rx: 2,
+      });
+      if (!collapsed) {
+        // 健康态：份额在 0.3%~0.6% 之间小幅起伏，用填充浓度表达
+        cell.setAttribute("fill", "var(--primary)");
+        cell.setAttribute("fill-opacity", (0.16 + mechJitter(i) * 0.34).toFixed(3));
+      }
+      svg.appendChild(cell);
+    }
+    const hotBox = mechExpertBox(M.hot);
+    svg.appendChild(svgNode("rect", {
+      x: hotBox.x - 1.5, y: hotBox.y - 1.5, width: hotBox.w + 3, height: hotBox.h + 3, rx: 3,
+      fill: "none", stroke: "var(--danger)",
+      "stroke-width": collapsed ? 1.8 : 1.2, "stroke-opacity": collapsed ? 1 : 0.5,
+    }));
+    /* E193 的标注挂在网格**左侧**：挂右侧会横压过同一行后面十几个专家格子，
+       那些格子正是「其余专家断没断流」的读点，不能被字盖住。左侧是扇出区，
+       标注底下垫一块同色板，压在光束上也读得清。 */
+    {
+      const text = collapsed ? "E193 · 98% token" : "E193";
+      const w = text.length * 6.2 + 12;
+      const x = M.gridX - 14, y = hotBox.y + hotBox.h / 2;
+      svg.appendChild(svgNode("rect", {
+        x: x - w, y: y - 9, width: w, height: 18, rx: 4,
+        fill: "var(--surface-1)", stroke: "var(--danger)",
+        "stroke-opacity": collapsed ? 0.7 : 0.3, "stroke-width": 1,
+      }));
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${collapsed ? " is-danger" : ""}`,
+        x: x - 6, y: y + 4, "text-anchor": "end",
+      }, text));
+      svg.appendChild(svgNode("line", {
+        x1: x, x2: hotBox.x, y1: y, y2: y,
+        stroke: "var(--danger)", "stroke-opacity": collapsed ? 0.7 : 0.3, "stroke-width": 1,
+      }));
+    }
+    if (collapsed) svg.appendChild(mechRipple(hotBox.x - 2, hotBox.y - 2, hotBox.w + 4, hotBox.h + 4, "var(--danger)"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: M.gridX, y: 272 },
+      collapsed
+        ? "247 个 dead expert：本 step 起再没收到过 token"
+        : "扇出发散：每个专家 0.3%~0.6%，dispatch 流量均摊在 EP 组 64 张卡上"));
+
+    // ── 中：dispatch 扇出。塌缩后旧路径转虚灰、新流量全部汇到 E193 ──
+    const srcX = g.x + g.w, srcY = g.y + g.h / 2;
+    const beam = (target) => {
+      const box = mechExpertBox(target);
+      const tx = box.x, ty = box.y + box.h / 2;
+      return `M${srcX},${srcY}C${srcX + 130},${srcY} ${tx - 130},${ty} ${tx},${ty}`;
+    };
+    M.healthy.forEach((target, k) => {
+      const dead = collapsed && target !== M.hot;
+      svg.appendChild(svgNode("path", { class: `cro-mech__beam${dead ? " is-dead" : ""}`, d: beam(target) }));
+      if (!dead) {
+        svg.appendChild(mechComet(beam(target), collapsed ? "hot" : "cool",
+          collapsed ? "0.75s" : "1.2s", `${(k * 0.13).toFixed(2)}s`));
+      }
+    });
+    if (collapsed) {
+      svg.appendChild(svgNode("path", { class: "cro-mech__beam is-hot", d: beam(M.hot) }));
+      [0.15, 0.45, 0.75].forEach((delay) => svg.appendChild(mechComet(beam(M.hot), "hot", "0.75s", `${delay}s`)));
+    }
+
+    // ── 下：两条 256 根的数值带 ──
+    const strip = (box, title, valueOf, scale, note, markHot) => {
+      svg.appendChild(svgNode("text", { class: "cro-mech__title", x: box.x, y: box.y - 10 }, title));
+      svg.appendChild(svgNode("line", {
+        x1: box.x, x2: box.x + box.w, y1: box.y + box.h, y2: box.y + box.h, stroke: "var(--border-default)",
+      }));
+      const step = box.w / 256;
+      for (let i = 0; i < 256; i += 1) {
+        const h = Math.max(0.6, Math.min(1, scale(valueOf(i))) * box.h);
+        const isHot = i === M.hot && markHot;
+        svg.appendChild(svgNode("rect", {
+          x: box.x + i * step, y: box.y + box.h - h, width: Math.max(0.9, step - 0.55), height: h,
+          fill: isHot ? "var(--danger)" : "var(--primary)", "fill-opacity": isHot ? 1 : 0.42,
+        }));
+      }
+      svg.appendChild(svgNode("text", { class: "cro-mech__label", x: box.x, y: box.y + box.h + 18 }, note));
+    };
+    // logits：对数刻度，才装得下 12.4 与 1846 同框；FP8 上限 448 画一条虚线
+    const logScale = (v) => Math.log10(v + 1) / Math.log10(2001);
+    strip(M.logitsStrip, "router logits（256）",
+      (i) => (overflow && i === M.hot ? 1846 : 3.5 + mechJitter(i, 3) * 8.9), logScale,
+      overflow ? "max = 1846，已越过 FP8 E4M3 上限 448" : "max = 12.4，全部落在 FP8 可表示区间内",
+      overflow);
+    {
+      const box = M.logitsStrip;
+      const ly = box.y + box.h - logScale(448) * box.h;
+      svg.appendChild(svgNode("line", { class: "cro-mech__rule", x1: box.x, x2: box.x + box.w, y1: ly, y2: ly }));
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: box.x + box.w, y: ly - 5, "text-anchor": "end",
+      }, "FP8 E4M3 上限 448"));
+    }
+    // softmax p：开方刻度，否则健康态的 0.4% 在轴上是一条看不见的线
+    strip(M.softmaxStrip, "softmax p（256）",
+      (i) => (collapsed ? (i === M.hot ? 1 : 0) : 0.0028 + mechJitter(i, 7) * 0.0026), Math.sqrt,
+      collapsed
+        ? "分布退化成 one-hot：p(E193) = 1.0，其余 255 个为 0"
+        : "分布平坦：负载均衡损失把 token 摊到全部专家上",
+      collapsed);
+    return svg;
+  }
+
+  /* ── 机制 B · all-to-all barrier 空等（p1-a2a）─────────────────────────
+     64 条泳道 = EP 通信组 64 张卡，横轴是时间/进度，中间一条 barrier 竖线。
+     「空等」画成越过 barrier 后持续生长的行军蚁虚线 —— 等待是有长度的，这正是
+     静态范围图表达不出来的那一维。 */
+  /* 高度按「64 条泳道 + 底部 barrier 刻度 + 一行读数」倒推：
+     lanes 从 top=56 起，步距 5.2 → 末条底边 56 + 63×5.2 + 4 = 387.6，
+     刻度标在 +26 = 413.6，读数落 445 / 463，正好收在 470 内。改任一项都要重算。 */
+  const MECH_BARRIER = {
+    height: 470,
+    lanes: 64, laneH: 4, laneGap: 1.2, top: 56,
+    trackX0: 96, trackX1: 900, barrier: 520, timeout: 878,
+    stalled: 23, stalledRank: 1559,
+    progress: [0.42, 0.86, 1, 1],   // 健康卡向 barrier 的推进度
+    stall: 0.30,                    // 卡住那张停在哪
+    waitSeconds: [0, 0, 2, 30],
+    readoutY: [445, 463],           // 标签行 / 读数行
+  };
+
+  function renderMechBarrierWait(phase) {
+    const M = MECH_BARRIER;
+    const svg = mechRoot("EP 通信组 64 张卡的 all-to-all barrier 泳道", M.height);
+    const step = M.laneH + M.laneGap;
+    const laneY = (i) => M.top + i * step;
+    const bottom = laneY(M.lanes - 1) + M.laneH;
+    const waited = M.waitSeconds[phase];
+    const waitW = (waited / 30) * (M.timeout - M.barrier);
+
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 26, y: 24 }, "EP 通信组 · 64 rank（global 1536–1599）"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: M.trackX1, y: 24, "text-anchor": "end" }, "→ 时间"));
+
+    const marker = (x, label, danger) => {
+      svg.appendChild(svgNode("line", {
+        x1: x, x2: x, y1: M.top - 12, y2: bottom + 10,
+        stroke: danger ? "var(--danger)" : "var(--border-strong)", "stroke-width": 1.4,
+        "stroke-dasharray": danger ? "5 4" : "none",
+      }));
+      svg.appendChild(svgNode("text", {
+        class: danger ? "cro-mech__value is-danger" : "cro-mech__label",
+        x, y: bottom + 26, "text-anchor": "middle",
+      }, label));
+    };
+    marker(M.barrier, "all-to-all barrier", false);
+    if (phase >= 3) marker(M.timeout, "HCCL timeout 30 s", true);
+
+    for (let i = 0; i < M.lanes; i += 1) {
+      const y = laneY(i);
+      const isStalled = i === M.stalled;
+      // 轨道底：这条卡本可以走到哪
+      svg.appendChild(svgNode("rect", {
+        x: M.trackX0, y, width: M.trackX1 - M.trackX0, height: M.laneH, rx: 2,
+        fill: "var(--foreground)", "fill-opacity": 0.06,
+      }));
+      // 进度条。健康卡带微小抖动，读起来才像 64 张真卡而不是一把等长的条
+      const p = isStalled ? M.stall : Math.min(1, M.progress[phase] * (0.94 + mechJitter(i, 11) * 0.12));
+      const w = (M.barrier - M.trackX0) * p;
+      svg.appendChild(svgNode("rect", {
+        x: M.trackX0, y, width: w, height: M.laneH, rx: 2,
+        fill: isStalled ? "var(--danger)" : "var(--primary)", "fill-opacity": isStalled ? 1 : 0.7,
+      }));
+      // 推进中的彗星：只在还没到 barrier 的卡上跑
+      if (!isStalled && p < 1) {
+        svg.appendChild(mechComet(`M${M.trackX0},${y + M.laneH / 2}H${M.trackX0 + w}`,
+          "cool", "1.1s", `${(mechJitter(i, 5) * 0.8).toFixed(2)}s`));
+      }
+      // 空等段：越过 barrier 之后的行军蚁，长度就是这张卡白烧掉的时间
+      if (!isStalled && waitW > 0) {
+        const wy = y + M.laneH / 2;
+        svg.appendChild(svgNode("line", {
+          x1: M.barrier, x2: M.barrier + waitW, y1: wy, y2: wy,
+          stroke: "var(--warning)", "stroke-width": M.laneH, "stroke-opacity": 0.18,
+        }));
+        const ants = svgNode("line", {
+          x1: M.barrier, x2: M.barrier + waitW, y1: wy, y2: wy,
+          stroke: "var(--warning)", "stroke-width": 1.6, "stroke-dasharray": "3 7",
+        });
+        ants.appendChild(svgNode("animate", {
+          attributeName: "stroke-dashoffset", from: 10, to: 0,
+          dur: "0.9s", begin: `${(mechJitter(i, 9) * 0.9).toFixed(2)}s`, repeatCount: "indefinite",
+        }));
+        svg.appendChild(ants);
+      }
+    }
+
+    // 卡住的那条单独描出来：它是这张图上唯一的「因」
+    {
+      const y = laneY(M.stalled);
+      const w = (M.barrier - M.trackX0) * M.stall;
+      if (phase >= 1) svg.appendChild(mechRipple(M.trackX0 + w - 6, y - 1, 12, M.laneH + 2, "var(--danger)"));
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__value is-danger", x: 90, y: y + M.laneH, "text-anchor": "end",
+      }, `r23 · ${M.stalledRank}`));
+      if (phase >= 1) {
+        svg.appendChild(svgNode("text", {
+          class: "cro-mech__value is-danger", x: M.trackX0 + w + 10, y: y + M.laneH,
+        }, "send=0 / recv=9832 → 卡在收侧"));
+      }
+    }
+    // 其余泳道每 8 条标一次刻度，认得出「这是 64 张卡」就够
+    for (let i = 0; i < M.lanes; i += 8) {
+      if (i === M.stalled) continue;
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: 90, y: laneY(i) + M.laneH, "text-anchor": "end",
+      }, `r${i}`));
+    }
+
+    // 读数：「63 张是结果、1 张是原因」的量化落点
+    const readout = (x, label, value, danger) => {
+      svg.appendChild(svgNode("text", { class: "cro-mech__label", x, y: M.readoutY[0] }, label));
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${danger ? " is-danger" : ""}`, x, y: M.readoutY[1],
+      }, value));
+    };
+    readout(26, "空等卡数", phase >= 2 ? "63 / 64" : "0 / 64", phase >= 2);
+    readout(150, "已空等", `${waited} s`, phase >= 3);
+    readout(268, "累计空转", `${63 * waited} 卡·秒`, phase >= 3);
+    readout(430, "timeout 报错", phase >= 3 ? "64 张（其中 63 张是结果）" : "0 张", phase >= 3);
+    return svg;
+  }
+
+  /* ── 机制 C · PP 依赖链的逐级回压（p1-spread）─────────────────────────
+     这个事件最容易被读成「2048 张卡各自出了问题」。机制图要说的恰恰相反：出问题
+     的只有 1 张，其余 2047 张是被**依赖**拖住的，而拖住它们的链条是可数的 ——
+     上排画依赖拓扑（前向送激活、反向回梯度，首尾相接成闭环），中间四条泳道画各
+     stage 何时从「在算」翻成「在等」（自震中起逐级向上游回压），下排把 1 → 64 →
+     512 → 2048 拆成一条乘法链：×EP 组 → ×EDP 副本 → ×PP 段。三段读下来就是
+     「一张卡怎么变成整网」。 */
+  const MECH_PP = {
+    height: 470,
+    stages: 4,
+    boxY: 52, boxH: 42, boxW: 128, boxX0: 132, boxGap: 200,
+    laneX0: 126, laneX1: 900, laneY0: 186, laneH: 22, laneGap: 14,
+    /* 每相里各 stage 从哪个位置翻成「在等」（null = 仍在算）。stage3 先停，
+       上游 2→1→0 依次被回压 —— 顺序不能反，那正是这张图要讲的因果方向。 */
+    stop: [
+      [null, null, null, null],
+      [null, null, null, 0.32],
+      [null, null, 0.48, 0.32],
+      [0.72, 0.60, 0.48, 0.32],
+    ],
+    /* 乘法链：一张卡 → EP 组 → PP 段 → 全网。倍数写在箭头上，读者能自己验算。 */
+    chain: [
+      { n: 1, label: "震中", note: "rank 1559" },
+      { n: 64, label: "EP 组", note: "× EP 64", mul: "× 64" },
+      { n: 512, label: "PP stage", note: "× EDP 8", mul: "× 8" },
+      { n: 2048, label: "全网", note: "× PP 4", mul: "× 4" },
+    ],
+  };
+
+  function renderMechPpCascade(phase) {
+    const M = MECH_PP;
+    const svg = mechRoot("PP 依赖链上的逐级回压", M.height);
+    const boxCx = (s) => M.boxX0 + s * M.boxGap + M.boxW / 2;
+    const stopped = M.stop[phase];
+    // 第 ② 相：震中所在的 EP 组已经停了，但 stage 级别还没整段断
+    const epStalled = phase >= 1;
+
+    // ── 上：依赖拓扑（前向送激活 → / ← 反向回梯度）──
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: 26 }, "PP 依赖链（4 个 stage 首尾相接）"));
+    for (let s = 0; s < M.stages; s += 1) {
+      const x = M.boxX0 + s * M.boxGap;
+      const dead = stopped[s] != null;
+      svg.appendChild(svgNode("rect", {
+        class: "cro-mech__block", x, y: M.boxY, width: M.boxW, height: M.boxH, rx: 8,
+        "stroke-width": 1.2,
+        fill: dead ? "color-mix(in srgb, var(--danger) 16%, transparent)" : undefined,
+        stroke: dead ? "var(--danger)" : undefined,
+      }));
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${dead ? " is-danger" : ""}`,
+        x: x + M.boxW / 2, y: M.boxY + 20, "text-anchor": "middle",
+      }, `PP stage ${s}`));
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: x + M.boxW / 2, y: M.boxY + 34, "text-anchor": "middle",
+      }, dead ? "已停" : "在算"));
+      // 前向：s → s+1 送激活
+      if (s < M.stages - 1) {
+        const x1 = x + M.boxW + 6, x2 = x + M.boxGap - 6, y = M.boxY + 14;
+        const broken = stopped[s + 1] != null;
+        svg.appendChild(svgNode("path", {
+          class: `cro-mech__beam${broken ? " is-dead" : ""}`,
+          d: `M${x1},${y}H${x2}`,
+        }));
+        svg.appendChild(svgNode("path", {
+          d: `M${x2 - 6},${y - 4}L${x2},${y}L${x2 - 6},${y + 4}`, fill: "none",
+          stroke: broken ? "color-mix(in srgb, var(--foreground) 20%, transparent)" : "var(--primary)",
+          "stroke-width": 1.4,
+        }));
+        if (!broken) svg.appendChild(mechComet(`M${x1},${y}H${x2}`, "cool", "1.2s", `${(s * 0.2).toFixed(1)}s`));
+      }
+      // 反向：s+1 → s 回梯度
+      if (s < M.stages - 1) {
+        const x1 = x + M.boxGap - 6, x2 = x + M.boxW + 6, y = M.boxY + 30;
+        const broken = stopped[s + 1] != null || stopped[s] != null;
+        svg.appendChild(svgNode("path", {
+          class: `cro-mech__beam${broken ? " is-dead" : ""}`,
+          d: `M${x1},${y}H${x2}`,
+        }));
+        svg.appendChild(svgNode("path", {
+          d: `M${x2 + 6},${y - 4}L${x2},${y}L${x2 + 6},${y + 4}`, fill: "none",
+          stroke: broken ? "color-mix(in srgb, var(--foreground) 20%, transparent)" : "var(--primary)",
+          "stroke-width": 1.4,
+        }));
+      }
+    }
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: M.boxX0, y: M.boxY + 62 },
+      "上行箭头 = 前向送激活，下行箭头 = 反向回梯度；stage 0 的下一个 micro-batch 要等 stage 3 的梯度回来 —— 这是一条闭环，断一处就整条停。"));
+
+    // ── 中：四条 stage 泳道（横轴 = 时间）──
+    const laneY = (s) => M.laneY0 + s * (M.laneH + M.laneGap);
+    const laneBottom = laneY(M.stages - 1) + M.laneH;
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: M.laneY0 - 14 }, "各 stage 在算 / 在等"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: M.laneX1, y: M.laneY0 - 14, "text-anchor": "end" }, "→ 时间"));
+    for (let s = 0; s < M.stages; s += 1) {
+      const y = laneY(s);
+      const span = M.laneX1 - M.laneX0;
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: M.laneX0 - 10, y: y + M.laneH - 6, "text-anchor": "end",
+      }, `PP${s}`));
+      svg.appendChild(svgNode("rect", {
+        x: M.laneX0, y, width: span, height: M.laneH, rx: 3,
+        fill: "var(--foreground)", "fill-opacity": 0.06,
+      }));
+      const cut = stopped[s];
+      const runW = cut == null ? span : span * cut;
+      // 在算段
+      svg.appendChild(svgNode("rect", {
+        x: M.laneX0, y, width: runW, height: M.laneH, rx: 3,
+        fill: "var(--primary)", "fill-opacity": 0.62,
+      }));
+      if (cut == null) {
+        svg.appendChild(mechComet(`M${M.laneX0},${y + M.laneH / 2}H${M.laneX1}`, "cool", "1.3s", `${(s * 0.22).toFixed(2)}s`));
+      } else {
+        // 在等段：行军蚁，长度就是这一段流水线白停的时间
+        const wy = y + M.laneH / 2, x1 = M.laneX0 + runW;
+        svg.appendChild(svgNode("rect", {
+          x: x1, y, width: M.laneX1 - x1, height: M.laneH, rx: 3,
+          fill: "var(--warning)", "fill-opacity": 0.16,
+        }));
+        const ants = svgNode("line", {
+          x1, x2: M.laneX1, y1: wy, y2: wy,
+          stroke: "var(--warning)", "stroke-width": 2, "stroke-dasharray": "4 8",
+        });
+        ants.appendChild(svgNode("animate", {
+          attributeName: "stroke-dashoffset", from: 12, to: 0,
+          dur: "0.9s", begin: `${(s * 0.15).toFixed(2)}s`, repeatCount: "indefinite",
+        }));
+        svg.appendChild(ants);
+        svg.appendChild(svgNode("text", {
+          class: "cro-mech__value is-danger", x: x1 + 8, y: y + M.laneH - 6,
+        }, s === 3 ? "卡在 all-to-all" : "上游/下游没人接，回压停下"));
+      }
+      // 震中：第 ① 相时 stage3 整段还在跑，只有一张卡停了，单独标出来
+      if (s === 3) {
+        const mx = M.laneX0 + (M.laneX1 - M.laneX0) * 0.32;
+        svg.appendChild(svgNode("line", {
+          x1: mx, x2: mx, y1: y - 5, y2: y + M.laneH + 5,
+          stroke: "var(--danger)", "stroke-width": 1.6,
+        }));
+        svg.appendChild(mechRipple(mx - 4, y - 2, 8, M.laneH + 4, "var(--danger)"));
+        if (!epStalled) {
+          svg.appendChild(svgNode("text", {
+            class: "cro-mech__value is-danger", x: mx + 10, y: y + M.laneH - 6,
+          }, "rank 1559 停在这里（整段仍在跑）"));
+        }
+      }
+    }
+
+    // ── 下：1 → 64 → 512 → 2048 的乘法链 ──
+    const chainY = laneBottom + 52;
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: chainY - 16 },
+      "受影响卡数怎么涨起来的（每一步都是一个可数的倍数，不是「故障扩散」）"));
+    const nodeW = 150, nodeH = 46, gap = 62;
+    const totalW = M.chain.length * nodeW + (M.chain.length - 1) * gap;
+    const x0 = (MECH_VIEW.w - totalW) / 2;
+    M.chain.forEach((node, i) => {
+      const x = x0 + i * (nodeW + gap);
+      const on = i <= phase;
+      svg.appendChild(svgNode("rect", {
+        x, y: chainY, width: nodeW, height: nodeH, rx: 8,
+        fill: on ? "color-mix(in srgb, var(--danger) 14%, transparent)" : "transparent",
+        stroke: on ? "var(--danger)" : "var(--border-default)",
+        "stroke-width": on ? 1.6 : 1,
+        "stroke-opacity": on ? 1 : 0.6,
+      }));
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${on ? " is-danger" : ""}`,
+        x: x + nodeW / 2, y: chainY + 21, "text-anchor": "middle",
+      }, `${node.n.toLocaleString("en-US")} 卡`));
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: x + nodeW / 2, y: chainY + 37, "text-anchor": "middle",
+      }, `${node.label} · ${node.note}`));
+      if (i > 0) {
+        const ax1 = x - gap + 8, ax2 = x - 8, ay = chainY + nodeH / 2;
+        svg.appendChild(svgNode("path", {
+          class: `cro-mech__beam${on ? " is-hot" : " is-dead"}`, d: `M${ax1},${ay}H${ax2}`,
+        }));
+        if (on) svg.appendChild(mechComet(`M${ax1},${ay}H${ax2}`, "hot", "0.8s", `${(i * 0.18).toFixed(2)}s`));
+        svg.appendChild(svgNode("text", {
+          class: `cro-mech__value${on ? " is-danger" : ""}`,
+          x: (ax1 + ax2) / 2, y: ay - 8, "text-anchor": "middle",
+        }, node.mul));
+      }
+    });
+    return svg;
+  }
+
+  /* ── 机制 D · 激活的存活区间叠出显存峰值（p2-peak）────────────────────
+     「激活值占 36.2 GB」这句话本身不解释任何东西。真正的机制是**生命周期**：
+     一层的激活在前向产生、要等到反向用到它时才能释放，于是 12 层的存活区间在
+     前向末尾**全部重叠**，峰值就是这些区间的叠加和。所以上半画区间条、下半画
+     由它们逐槽位加出来的占用曲线 —— 下面那条线不是另画的，它就是上面那些条的
+     竖向计数，两者必须逐格对齐。 */
+  const MECH_MEM = {
+    height: 470,
+    lo: 34, hi: 45,                 // PP stage 3 的 12 层
+    slotX0: 126, slotX1: 900,
+    barY0: 58, barH: 12, barGap: 3,
+    plotY0: 300, plotY1: 438, cap: 64,
+    base: { weight: 14.1, optim: 9.8, frag: 3.9 },
+    layerGB: 0.71, spikeLayer: 38, spikeGB: 1.2, headGB: 27.2,
+    cursor: [3, 11, 12, 12],        // 各相的时间游标（槽位）
+  };
+
+  function memLayers() {
+    const M = MECH_MEM;
+    const out = [];
+    for (let l = M.lo; l <= M.hi; l += 1) {
+      const i = l - M.lo;
+      out.push({
+        key: `L${l}`, gb: l === M.spikeLayer ? M.spikeGB : M.layerGB,
+        born: i, dies: 25 - i, spike: l === M.spikeLayer,
+      });
+    }
+    // LM Head 的 logits：存活极短（前向算完紧接着反向就用掉），但体量最大
+    out.push({ key: "LM Head logits", gb: M.headGB, born: 12, dies: 13, head: true });
+    return out;
+  }
+
+  function renderMechActivationLifetime(phase) {
+    const M = MECH_MEM;
+    const svg = mechRoot("激活的存活区间与显存峰值", M.height);
+    const rows = memLayers();
+    const slots = 26;
+    const slotW = (M.slotX1 - M.slotX0) / slots;
+    const sx = (t) => M.slotX0 + t * slotW;
+    const cur = M.cursor[phase];
+    const aliveAt = (t) => rows.reduce((sum, r) => (t >= r.born && t < r.dies ? sum + r.gb : sum), 0);
+    const baseGB = M.base.weight + M.base.optim + M.base.frag;
+
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: 26 },
+      "PP stage 3 的一个 step：前向 L34→L45→LM Head，再反向回来"));
+    // 前向 / 反向分界
+    const midX = sx(13);
+    svg.appendChild(svgNode("line", { class: "cro-mech__rule", x1: midX, x2: midX, y1: 40, y2: M.plotY1 }));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: midX - 8, y: 40, "text-anchor": "end" }, "前向 →"));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: midX + 8, y: 40 }, "← 反向"));
+
+    // ── 上：存活区间条 ──
+    rows.forEach((r, i) => {
+      const y = M.barY0 + i * (M.barH + M.barGap);
+      const x1 = sx(r.born), x2 = sx(r.dies);
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: M.slotX0 - 10, y: y + M.barH - 2, "text-anchor": "end",
+      }, r.key));
+      // 轨道
+      svg.appendChild(svgNode("rect", {
+        x: M.slotX0, y, width: M.slotX1 - M.slotX0, height: M.barH, rx: 2,
+        fill: "var(--foreground)", "fill-opacity": 0.05,
+      }));
+      const alive = cur >= r.born && cur < r.dies;
+      const tone = r.head ? "var(--danger)" : r.spike ? "var(--warning)" : "var(--primary)";
+      svg.appendChild(svgNode("rect", {
+        x: x1, y, width: Math.max(3, x2 - x1), height: M.barH, rx: 2,
+        fill: tone, "fill-opacity": alive ? 0.85 : 0.22,
+      }));
+      // 还没走到的那一段（存活但尚未度过）在第 ④ 相高亮：释放要等到反向
+      if (phase === 3 && alive && x2 > sx(cur)) {
+        const ants = svgNode("line", {
+          x1: sx(cur), x2, y1: y + M.barH / 2, y2: y + M.barH / 2,
+          stroke: "var(--warning)", "stroke-width": 1.6, "stroke-dasharray": "3 6",
+        });
+        ants.appendChild(svgNode("animate", {
+          attributeName: "stroke-dashoffset", from: 9, to: 0,
+          dur: "0.8s", begin: `${(i * 0.06).toFixed(2)}s`, repeatCount: "indefinite",
+        }));
+        svg.appendChild(ants);
+      }
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${r.head || r.spike ? " is-danger" : ""}`,
+        x: x2 + 8, y: y + M.barH - 2,
+      }, `${r.gb.toFixed(2)} GB`));
+    });
+
+    // ── 下：由区间叠出来的占用曲线 ──
+    const gy = (gb) => M.plotY1 - (gb / M.cap) * (M.plotY1 - M.plotY0);
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: M.plotY0 - 12 },
+      "单卡显存占用 = 常驻段 + 此刻仍存活的激活之和"));
+    svg.appendChild(svgNode("line", {
+      x1: M.slotX0, x2: M.slotX1, y1: M.plotY1, y2: M.plotY1, stroke: "var(--border-default)",
+    }));
+    // 常驻段（权重 + 优化器 + 碎片）
+    svg.appendChild(svgNode("rect", {
+      x: M.slotX0, y: gy(baseGB), width: M.slotX1 - M.slotX0, height: M.plotY1 - gy(baseGB),
+      fill: "var(--primary)", "fill-opacity": 0.2,
+    }));
+    svg.appendChild(svgNode("text", { class: "cro-mech__label", x: M.slotX0 + 6, y: gy(baseGB) - 5 },
+      `常驻 ${baseGB.toFixed(1)} GB（权重 ${M.base.weight} + 优化器 ${M.base.optim} + 碎片 ${M.base.frag}）`));
+    // 激活面积
+    const pts = [];
+    for (let t = 0; t <= slots; t += 1) pts.push(`${sx(t).toFixed(1)},${gy(baseGB + aliveAt(Math.min(t, slots - 1))).toFixed(1)}`);
+    svg.appendChild(svgNode("path", {
+      d: `M${sx(0).toFixed(1)},${gy(baseGB).toFixed(1)}L${pts.join("L")}L${sx(slots).toFixed(1)},${gy(baseGB).toFixed(1)}Z`,
+      fill: "var(--warning)", "fill-opacity": 0.3,
+    }));
+    svg.appendChild(svgNode("path", {
+      d: `M${pts.join("L")}`, fill: "none", stroke: "var(--warning)", "stroke-width": 1.8,
+    }));
+    // 容量上限
+    svg.appendChild(svgNode("line", {
+      x1: M.slotX0, x2: M.slotX1, y1: gy(M.cap), y2: gy(M.cap),
+      stroke: "var(--danger)", "stroke-width": 1.4, "stroke-dasharray": "5 4",
+    }));
+    svg.appendChild(svgNode("text", {
+      class: "cro-mech__value is-danger", x: M.slotX1, y: gy(M.cap) - 6, "text-anchor": "end",
+    }, `单卡容量 ${M.cap} GB`));
+    // 时间游标
+    const cx = sx(cur + 0.5);
+    const now = baseGB + aliveAt(cur);
+    svg.appendChild(svgNode("line", {
+      x1: cx, x2: cx, y1: M.barY0 - 8, y2: M.plotY1,
+      stroke: "var(--danger)", "stroke-width": 1.4,
+    }));
+    svg.appendChild(svgNode("circle", { cx, cy: gy(now), r: 4, fill: "var(--danger)" }));
+    if (now >= M.cap - 0.05) svg.appendChild(mechRipple(cx - 5, gy(now) - 5, 10, 10, "var(--danger)"));
+    const anchor = cx > MECH_VIEW.w * 0.62 ? "end" : "start";
+    svg.appendChild(svgNode("text", {
+      class: "cro-mech__value is-danger", x: cx + (anchor === "end" ? -10 : 10), y: gy(now) - 12,
+      "text-anchor": anchor,
+    }, `${now.toFixed(1)} / ${M.cap} GB · 激活 ${aliveAt(cur).toFixed(1)} GB · 余量 ${Math.max(0, M.cap - now).toFixed(1)} GB`));
+    return svg;
+  }
+
+  /* ── 机制 E · 碎片让「空闲够」也申请不到（p2-oom）──────────────────────
+     这条最容易被读反：空闲还有 3.9 GB，申请只要 0.5 GB，凭什么失败？决定成败的
+     从来不是空闲**总量**，而是**最大连续块**。所以图上必须把 64 GB 摊成一条真实
+     的地址空间：已分配的块与空洞交替排列，再把那 0.5 GB 的申请块拿去逐个洞试放
+     —— 试到最后一个（也是最大的一个 0.32 GB）仍然放不下，这就是 OOM。 */
+  const MECH_OOM = {
+    height: 470,
+    cap: 64, rows: 8, gbPerRow: 8,
+    x0: 78, x1: 908, rowY0: 74, rowH: 26, rowGap: 10,
+    allocGB: 60.1, freeGB: 3.9, biggestHole: 0.32, requestGB: 0.5,
+    holes: 22,
+  };
+
+  /* 洞的尺寸与位置：确定性生成，且必须满足三条事实 —— 洞的总量 = 3.9 GB、
+     最大的一个 = 0.32 GB、其余都严格小于它。数字对不上，整张图就在骗人。 */
+  function oomLayout() {
+    const M = MECH_OOM;
+    const n = M.holes - 1;
+    const raw = Array.from({ length: n }, (_, i) => 0.06 + mechJitter(i, 17) * 0.2);
+    const scale = (M.freeGB - M.biggestHole) / raw.reduce((a, b) => a + b, 0);
+    const sizes = raw.map((v) => v * scale);
+    // 最大的那个插在中间偏后，读者扫到它时正好是「连最大的也放不下」那一击
+    sizes.splice(Math.floor(n * 0.72), 0, M.biggestHole);
+    // 洞之间的已分配段：同样确定性分配，总量 60.1
+    const gapsRaw = Array.from({ length: sizes.length + 1 }, (_, i) => 0.4 + mechJitter(i, 29));
+    const gScale = M.allocGB / gapsRaw.reduce((a, b) => a + b, 0);
+    const gaps = gapsRaw.map((v) => v * gScale);
+    const spans = [];
+    let at = 0;
+    gaps.forEach((g, i) => {
+      spans.push({ kind: "alloc", from: at, to: at + g }); at += g;
+      if (i < sizes.length) { spans.push({ kind: "hole", from: at, to: at + sizes[i], gb: sizes[i] }); at += sizes[i]; }
+    });
+    return spans;
+  }
+
+  function renderMechFragmentedOom(phase) {
+    const M = MECH_OOM;
+    const svg = mechRoot("64 GB 地址空间里的碎片与一次失败的申请", M.height);
+    const spans = oomLayout();
+    const pxPerGB = (M.x1 - M.x0) / M.gbPerRow;
+    const rowY = (r) => M.rowY0 + r * (M.rowH + M.rowGap);
+    const showHoles = phase >= 1;
+    const showRequest = phase >= 2;
+
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: 26 },
+      `rank 1553 的 64 GB 地址空间（每行 ${M.gbPerRow} GB，共 ${M.rows} 行）`));
+
+    /* 一段 [from, to) GB 可能跨行，按行切开画。地址空间是连续的，跨行只是排版。 */
+    const drawSpan = (from, to, make) => {
+      let a = from;
+      while (a < to - 1e-9) {
+        const r = Math.floor(a / M.gbPerRow);
+        const rowEnd = (r + 1) * M.gbPerRow;
+        const b = Math.min(to, rowEnd);
+        make(M.x0 + (a - r * M.gbPerRow) * pxPerGB, rowY(r), (b - a) * pxPerGB, r);
+        a = b;
+      }
+    };
+
+    for (let r = 0; r < M.rows; r += 1) {
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: M.x0 - 10, y: rowY(r) + M.rowH - 8, "text-anchor": "end",
+      }, `${r * M.gbPerRow}`));
+      svg.appendChild(svgNode("rect", {
+        x: M.x0, y: rowY(r), width: M.x1 - M.x0, height: M.rowH, rx: 3,
+        fill: "var(--foreground)", "fill-opacity": 0.05,
+      }));
+    }
+
+    const holeAnchors = [];
+    spans.forEach((span) => {
+      if (span.kind === "alloc") {
+        drawSpan(span.from, span.to, (x, y, w) => svg.appendChild(svgNode("rect", {
+          x, y: y + 2, width: Math.max(1, w - 0.6), height: M.rowH - 4, rx: 2,
+          fill: "var(--primary)", "fill-opacity": 0.55,
+        })));
+        return;
+      }
+      const biggest = Math.abs(span.gb - M.biggestHole) < 1e-9;
+      drawSpan(span.from, span.to, (x, y, w, r) => {
+        svg.appendChild(svgNode("rect", {
+          x, y: y + 2, width: Math.max(1.5, w - 0.6), height: M.rowH - 4, rx: 2,
+          fill: showHoles ? (biggest ? "var(--warning)" : "var(--danger)") : "var(--foreground)",
+          "fill-opacity": showHoles ? (biggest ? 0.55 : 0.3) : 0.12,
+        }));
+        holeAnchors.push({ x, y, gb: span.gb, biggest, row: r });
+      });
+      if (biggest && showHoles) {
+        drawSpan(span.from, span.to, (x, y, w) => {
+          svg.appendChild(mechRipple(x - 1, y + 1, w + 2, M.rowH - 2, "var(--warning)"));
+          svg.appendChild(svgNode("text", {
+            class: "cro-mech__value is-danger", x: x + w / 2, y: y - 4, "text-anchor": "middle",
+          }, `最大连续块 ${M.biggestHole} GB`));
+        });
+      }
+    });
+
+    /* 0.5 GB 的申请块逐个洞试放：x / y 用 calcMode="discrete" 同步跳，
+       跳完一圈就是「每个洞都试过了，都放不下」。只挑最大的 10 个洞，
+       22 个跳下来一圈要 7 秒多，久到看不出是在做同一件事。 */
+    if (showRequest && holeAnchors.length) {
+      const reqW = M.requestGB * pxPerGB;
+      const tour = holeAnchors.slice().sort((a, b) => b.gb - a.gb).slice(0, 10)
+        .sort((a, b) => (a.row - b.row) || (a.x - b.x));
+      const xs = tour.map((h) => h.x.toFixed(1)).join(";");
+      const ys = tour.map((h) => (h.y + 1).toFixed(1)).join(";");
+      const req = svgNode("rect", {
+        x: tour[0].x, y: tour[0].y + 1, width: reqW, height: M.rowH - 2, rx: 3,
+        fill: "color-mix(in srgb, var(--danger) 18%, transparent)",
+        stroke: "var(--danger)", "stroke-width": 1.8, "stroke-dasharray": "6 4",
+      });
+      [["x", xs], ["y", ys]].forEach(([attr, values]) => req.appendChild(svgNode("animate", {
+        attributeName: attr, values, calcMode: "discrete",
+        dur: `${(tour.length * 0.34).toFixed(2)}s`, repeatCount: "indefinite",
+      })));
+      const dash = svgNode("animate", {
+        attributeName: "stroke-dashoffset", from: 10, to: 0, dur: "0.7s", repeatCount: "indefinite",
+      });
+      req.appendChild(dash);
+      svg.appendChild(req);
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__value is-danger", x: M.x0, y: rowY(M.rows - 1) + M.rowH + 22,
+      }, `申请中的 0.5 GB 临时 buffer（宽度按同一比例尺画）—— 正在逐个空洞试放`));
+    }
+
+    // ── 下：总量 vs 最大连续块 的对照，这条是整个事件的题眼 ──
+    const cmpY = 400;
+    svg.appendChild(svgNode("text", { class: "cro-mech__title", x: 30, y: cmpY - 12 },
+      "决定成败的不是空闲总量，是最大连续块"));
+    const bars = [
+      { label: "空闲总量", gb: M.freeGB, tone: "var(--success)", ok: true },
+      { label: "申请量", gb: M.requestGB, tone: "var(--primary)" },
+      { label: "最大连续块", gb: M.biggestHole, tone: "var(--danger)" },
+    ];
+    const scale = 640 / M.freeGB;
+    bars.forEach((b, i) => {
+      const y = cmpY + i * 22;
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__label", x: 138, y: y + 11, "text-anchor": "end",
+      }, b.label));
+      svg.appendChild(svgNode("rect", {
+        x: 148, y: y + 1, width: Math.max(2, b.gb * scale), height: 12, rx: 3,
+        fill: b.tone, "fill-opacity": 0.75,
+      }));
+      svg.appendChild(svgNode("text", {
+        class: `cro-mech__value${i === 2 ? " is-danger" : ""}`, x: 148 + Math.max(2, b.gb * scale) + 10, y: y + 11,
+      }, `${b.gb} GB`));
+    });
+    if (phase >= 3) {
+      svg.appendChild(svgNode("text", {
+        class: "cro-mech__value is-danger", x: 500, y: cmpY + 33,
+      }, "0.32 GB < 0.5 GB → 申请失败，OOM（碎片率 83%）"));
+    }
+    return svg;
+  }
+  const MECHANISM_RENDERERS = {
+    "router-collapse": renderMechRouterCollapse,
+    "barrier-wait": renderMechBarrierWait,
+    "pp-cascade": renderMechPpCascade,
+    "activation-lifetime": renderMechActivationLifetime,
+    "fragmented-oom": renderMechFragmentedOom,
+  };
+
   /* 运行态事件与 training-monitoring-v2 的问题一/问题二同源。事件保留自己的
      性能语义；scope 描述“本次运行实际涉及谁”，不覆盖静态配置映射公式。
      evidence 是本事件的「内涵」：一张证据图 + 几个关键读数，落在详情下区。 */
@@ -5967,6 +7119,22 @@
           conclusion: "EP rank 23 是首个阻塞者，其余 63 个 EP rank 是 barrier 受害者，不应被判为 64 个独立根因。",
           root: "recv 过载，迟迟进不了 all-to-all barrier", path: "Rank 1559 → All-to-all barrier → 63 rank 空等",
           impact: "同组其余成员在 barrier 上空等 30 s，整个 EP 通信组停止前进",
+          /* 机制：集合通信的 barrier 语义。「空等 30 s」这件事只有让时间跑起来才
+             成立 —— 静态图画得出「63 张卡受影响」，画不出「它们在等，而且等了多久」。
+             四相各自是同一条泳道图在不同时刻的截面，evidence 的 64 卡构成图是第 ④ 相。*/
+          mechanism: {
+            kind: "barrier-wait",
+            phases: [
+              { tag: "① 进入 dispatch", clock: "t = 0 ms",
+                caption: "EP 通信组 64 张卡同时进入 Layer 38 的 all-to-all dispatch。每张卡先把本地 token 按目标专家分箱，再向 barrier 推进 —— 这一步各卡是并行的，互不等待。" },
+              { tag: "② rank 1559 卡住", clock: "t = +8 ms",
+                caption: "rank 1559（EP r23）的 recv 量对不上：send=0 而 recv=9832，收侧被 E193 的 token 灌爆，迟迟凑不齐自己那一份，进度条停在半路。其余 63 张卡毫无察觉，继续推进。" },
+              { tag: "③ 63 卡到达 barrier", clock: "t = +2 s",
+                caption: "all-to-all 是同步集合操作：任何一张卡没到齐，barrier 就不放行。63 张卡先后抵达后全部转入空等 —— 它们的算力从这一刻起是零产出，但日志上什么都不会报。" },
+              { tag: "④ HCCL 30 s 超时", clock: "t = +30 s",
+                caption: "等满 HCCL 超时阈值，64 张卡同时抛 timeout。此刻 63 张是结果、1 张是原因，而报错数完全反过来——按报错数排根因会把结论整个搞反。累计空转 63 × 30 s ≈ 1890 卡·秒。" },
+            ],
+          },
           evidence: {
             chart: {
               kind: "stack", title: "EP 通信组 64 张卡的角色构成", unit: " 卡",
@@ -5993,6 +7161,23 @@
           conclusion: "这是问题2的根因事件：FP8 softmax 溢出导致路由塌缩，而不是 HCCL 自身故障。",
           root: "Router 的 max(logits)=1846，FP8 下 exp() 直接溢出成 Inf", path: "Router → Expert 193（98% token）→ EP rank 23",
           impact: "路由塌缩，98% token 全压到 E193，其余 247 个再没收到过 token",
+          /* 机制：MoE 路由的分布塌缩。四相把「打分 → 越界 → softmax 塌成 one-hot →
+             流量全汇到一个专家」拆开演一遍；前两相是同一张扇出图的健康态，正好当
+             第三、四相的对照（同图两态，比并排画两张更能读出「变了什么」）。
+             evidence 的 token 路由份额柱状图是第 ④ 相的静态截面。 */
+          mechanism: {
+            kind: "router-collapse",
+            phases: [
+              { tag: "① 正常路由", clock: "max(logits) = 12.4",
+                caption: "Top-2 gate 给 256 个专家打分，负载均衡损失把分布压平：每个专家拿到 0.3%~0.6% 的 token，扇出是发散的，dispatch 流量均摊在 EP 组的 64 张卡上。" },
+              { tag: "② logits 越界", clock: "max(logits) = 1846 › FP8 448",
+                caption: "上游数值漂移把 Router 线性层的输出整体推高，最大 logit 冲到 1846 —— 已经越过 FP8 E4M3 能表示的 448。此刻路由结果还没变，图上扇出仍是发散的，异常只存在于数值里。" },
+              { tag: "③ softmax 塌成 one-hot", clock: "exp(1846) = Inf",
+                caption: "softmax 先算 exp()：Inf 同时进了分子和分母，归一化结果退化成 one-hot —— E193 的概率变成 1.0，其余 255 个专家全是 0。这一步是纯数值事故，不是路由策略做出的决定。" },
+              { tag: "④ 路由塌缩", clock: "E193 98% · dead 247",
+                caption: "此后每个 step 的 token 都被送往同一个专家。E193 的 dispatch buffer 被撑爆，247 个专家再没收到过 token —— 下游 rank 1559 那句 send=0 / recv=9832 的收发失配，源头就在这里。" },
+            ],
+          },
           evidence: {
             chart: {
               kind: "bars", title: "Layer 38 本 step 的 token 路由份额", unit: "%",
@@ -6020,6 +7205,23 @@
           conclusion: "报错点是通信 timeout，异常震中却在 Layer 38 Router；单点经 EP barrier 和 PP 依赖扩散至整网。",
           root: "all-to-all 就阻塞在这里，它是整网停摆的起点", path: "Expert 193 过载 → Rank 1559 阻塞 → EP barrier → PP3 断裂 → 全网等待",
           impact: "沿 EP barrier 与 PP 依赖逐级传导，4 个 stage 全部停在等待上",
+          /* 机制：依赖链的逐级回压。这个事件最容易被读成「2048 张卡各自出了问题」，
+             而 evidence 那张 1/63/448/1536 的构成图只给出结果、没给出「凭什么是这几个
+             数」。四相把它拆成一条可验算的乘法链：1 →×EP64→ 64 →×EDP8→ 512 →×PP4→
+             2048，每一步都是一个已知的并行度，而不是一句「故障扩散」。 */
+          mechanism: {
+            kind: "pp-cascade",
+            phases: [
+              { tag: "① 震中", clock: "1 / 2048 卡",
+                caption: "rank 1559 停在 all-to-all 上。此刻 PP3 整段仍在正常推进 —— 停的只有这一张卡，泳道上那道红线就是它。这也是全网唯一一个「自己出了问题」的对象。" },
+              { tag: "② EP 组停摆", clock: "64 / 2048 卡",
+                caption: "all-to-all 是同步集合操作，同组另外 63 张卡在 barrier 上空等。第一个倍数是 EP=64：它不是扩散出来的，是这张卡所在通信组的大小。" },
+              { tag: "③ PP3 整段断裂", clock: "512 / 2048 卡",
+                caption: "EP 组停住，这一段流水线就交不出激活。同 stage 的其余 7 个 EDP 副本随后也停在依赖上 —— 第二个倍数是 EDP=8，512 = 64 × 8 正是一个 PP stage 的卡数。" },
+              { tag: "④ 依赖环闭合", clock: "2048 / 2048 卡",
+                caption: "上游 PP2 送不出激活、PP1 与 PP0 依次回压；而 PP0 的下一个 micro-batch 又在等 PP3 的梯度回来 —— 这是一条闭环，断一处就整条停。第三个倍数是 PP=4。99.95% 的卡只是被链条拖住的，它们的 timeout 日志与根因无关。" },
+            ],
+          },
           evidence: {
             chart: {
               kind: "stack", title: "2048 张卡按「离震中多远」的构成", unit: " 卡",
@@ -6112,6 +7314,23 @@
           conclusion: "激活值占峰值的 56.6%，是唯一可大幅缩减的组成。",
           root: "激活在反向用到之前一直留在显存里，逐层累加不释放", path: "逐层激活累积 → Stage 3 叠加 LM Head logits",
           impact: "两段合计 36.2 GB 激活，占满 64 GB 峰值的 56.6%，容量再无余量",
+          /* 机制：存活区间的叠加。「激活值占 36.2 GB」本身不解释任何东西 —— 真正
+             的原因是生命周期：一层的激活在前向产生、要等反向用到它时才能释放，
+             于是 12 层的存活区间在前向末尾**全部重叠**。图上半是区间条、下半是由
+             它们逐槽位加出来的占用曲线，那条曲线就是这些条的竖向计数。 */
+          mechanism: {
+            kind: "activation-lifetime",
+            phases: [
+              { tag: "① 前向起步", clock: "L34 → L37",
+                caption: "常驻段（权重 14.1 + 优化器 9.8 + 碎片 3.9 = 27.8 GB）一开始就在。前向每算完一层，就往显存里压进一份激活 —— 它不能释放，因为反向算梯度时还要用。" },
+              { tag: "② 12 层累完", clock: "激活 9.0 GB",
+                caption: "L34~L45 每层约 0.71 GB，只有 L38 是 1.2 GB（expert dispatch buffer 让它比同段普通层高 1.7 倍）。12 条存活区间此刻全部在线，叠出 9.0 GB。" },
+              { tag: "③ LM Head 叠上", clock: "激活 36.2 GB · 64/64",
+                caption: "LM Head 的 logits 存活极短（前向算完紧接着反向就用掉），体量却是 27.2 GB —— 它落在 12 层激活全都还没释放的那一刻，两段合计 36.2 GB，把 64 GB 顶满。峰值就出现在这一个槽位上。" },
+              { tag: "④ 释放要等到反向", clock: "安全余量 0 GB",
+                caption: "此刻余量为零，而这 12 层的激活各自还要活到反向用到它的那一步才被释放（区间条上闪动的那一截就是剩余存活）。能靠重计算换回来的正是这 36.2 GB —— 权重与优化器状态由并行切分固定，改不动。" },
+            ],
+          },
           evidence: {
             /* 用等距容器而不是构成条：这张图的分母是**一张卡的 64 GB**，不是各段
                之和。装满了就是 OOM，平面色条表达不了「框满了」这件事。
@@ -6172,6 +7391,23 @@
           conclusion: "64/64 GB 容量不足是主因，83% 碎片率让 0.5 GB 临时 buffer 更早申请失败。",
           root: "64 GB 占满，0.5 GB 的临时 buffer 申请失败", path: "Rank 1553 OOM → PP3 中断 → 全网等待",
           impact: "它一崩 PP3 就断，全网跟着停在等待上",
+          /* 机制：碎片。这条最容易被读反 —— 空闲还有 3.9 GB、申请只要 0.5 GB，
+             凭什么失败？evidence 的容器图给了三个数，但「为什么放不下」得把 64 GB
+             摊成真实的地址空间才看得见：已分配块与空洞交替排列，0.5 GB 的申请块
+             逐个洞试放，连最大的那个 0.32 GB 也装不下。 */
+          mechanism: {
+            kind: "fragmented-oom",
+            phases: [
+              { tag: "① 看总量还有余", clock: "已分配 60.1 / 空闲 3.9 GB",
+                caption: "64 GB 里已分配 60.1 GB，空闲 3.9 GB。只看这两个数，一次 0.5 GB 的临时 buffer 申请没有任何理由失败 —— 这正是把 OOM 归因成「容量刚好不够」的由来。" },
+              { tag: "② 空闲不是一整块", clock: "碎片率 83%",
+                caption: "把 3.9 GB 空闲摊回地址空间：它散成二十多个洞，夹在已分配块之间。反复的分配 / 释放（还有换页与碎片整理，见问题1.2）把连续空间切碎了，碎片率 83%。" },
+              { tag: "③ 逐个洞试放", clock: "申请 0.5 GB",
+                caption: "分配器要的是一段**连续**地址。0.5 GB 的申请块沿着这些洞一个个试过去 —— 图上那个红框就是它，每停一个洞都装不下。" },
+              { tag: "④ 连最大的洞也放不下", clock: "0.32 GB < 0.5 GB",
+                caption: "最大连续块只有 0.32 GB，小于申请量 0.5 GB，申请失败。决定成败的从来不是空闲总量，而是最大连续块 —— 所以「再省 0.5 GB 就好了」这个结论是错的，真正要治的是碎片本身（或把峰值降下来让洞变大）。" },
+            ],
+          },
           evidence: {
             /* 与上一张同款等距容器（同一个 builder），两张图并排看就是「装满了」
                和「装满之后长什么样」。
@@ -6475,6 +7711,14 @@
       }
 
       // ── MoE ──
+      /* 先翻绑定态：关系收敛到唯一一个 PP stage 且触及 MoE 时，宫格才有确定的
+         global rank 可标、点击才发得出连线（见 moeBindingOf 上面那段）。清空选择
+         时 rel 为 null → 回到未绑定，编号随之消失。 */
+      paintMoeBinding(
+        document.getElementById("croRoutedExperts"),
+        moeBindingOf(rel, controller.topology),
+        controller.topology,
+      );
       // 只扫 board：事件详情的角色卡里也有一整套 .cro-expert / .cro-moe-group，
       // 那是只读证据，不该被静态查询的选中态涂到。
       board?.querySelectorAll(".cro-expert[data-expert]").forEach((dot) => {
@@ -6650,6 +7894,7 @@
     function setIncidentLayout(on) {
       const view = document.getElementById("croIncidentView");
       if (view && view.hidden !== !on) view.hidden = !on;
+      if (!on) mech.stop();   // 回配置态：别让机制图的相位定时器在隐藏页面里空转
       if (board && board.hidden !== on) {
         board.hidden = on;
         if (!on) {
@@ -6728,7 +7973,9 @@
       const experts = expandIncidentValues(spec, "experts", topology);
       if (experts.length) add("experts", experts.length > 8 ? `${experts.length} 个专家` : formatRuns(experts, "E"));
       const epRanks = expandIncidentValues(spec, "epRanks", topology);
-      if (epRanks.length) add("epRanks", epRanks.length > 8 ? `${epRanks.length} 个 EP 组` : formatRuns(epRanks, "EP"));
+      if (epRanks.length) add("epRanks", epRanks.length > 8
+        ? `${epRanks.length} 个 EP ranks`
+        : formatRuns(epRanks, "EP rank "));
       const ranks = expandIncidentValues(spec, "ranks", topology);
       if (ranks.length) add("ranks", ranks.length > 4 ? `${ranks.length} 张卡` : formatRuns(ranks, "rank "));
       return chips;
@@ -7058,6 +8305,122 @@
 
     /* 箭头列：path 拆成链路步骤，再挂上传导中途扫到的范围（propagation）。
        propagation 与 origin/victim 同构，直接复用同一套 chip。 */
+    /* ── 中区 · 机制舞台 ───────────────────────────────────────────────────
+       事件写了 mechanism 就由机制图占主位，传播图退成右下角地图；没写就整块回到
+       原来的满铺传播图（data-mech="off"）—— 所以机制图可以一个事件一个事件地铺，
+       不必一次改完 11 个。
+       相位是「看哪一相」的分段选择，播放只是替用户按顺序点一遍；演到末相自动停在
+       那里（不循环），因为末相才是这个事件最终的样子，定格比转圈更有用。 */
+    const mech = (() => {
+      const center = document.getElementById("croIncidentCenter");
+      const root = document.getElementById("croMech");
+      const axis = document.getElementById("croMechPhases");
+      const canvas = document.getElementById("croMechCanvas");
+      const caption = document.getElementById("croMechCaption");
+      const clock = document.getElementById("croMechClock");
+      const playButton = document.getElementById("croMechPlay");
+      const mapToggle = document.getElementById("croMechMapToggle");
+      const PHASE_MS = 2800;
+      const ICON = {
+        play: "M7 4v16l13-8z",
+        pause: "M8 5h3v14H8zM13 5h3v14h-3z",
+        replay: "M4 12a8 8 0 1 0 2.6-5.9M4 3v4h4",
+      };
+      if (!center) return { render() { return false; }, stop() {} };
+
+      let spec = null, phases = [], phase = 0, timer = 0;
+
+      function setIcon(name, label) {
+        const path = playButton?.querySelector("path");
+        if (path) path.setAttribute("d", ICON[name]);
+        // 播放键的填充/描边画法不同：replay 是描边箭头，另两个是实心图形
+        const svg = playButton?.querySelector("svg");
+        if (svg) {
+          svg.setAttribute("fill", name === "replay" ? "none" : "currentColor");
+          svg.setAttribute("stroke", name === "replay" ? "currentColor" : "none");
+          svg.setAttribute("stroke-width", "2");
+          svg.setAttribute("stroke-linecap", "round");
+        }
+        playButton?.setAttribute("aria-label", label);
+        playButton?.setAttribute("title", label);
+      }
+
+      function stop() {
+        if (timer) { clearInterval(timer); timer = 0; }
+        setIcon(phases.length && phase >= phases.length - 1 ? "replay" : "play",
+          phases.length && phase >= phases.length - 1 ? "从头播一遍" : "播放机制演进");
+      }
+
+      function select(index) {
+        if (!spec || !phases.length) return;
+        phase = Math.max(0, Math.min(phases.length - 1, index));
+        const entry = phases[phase];
+        const draw = MECHANISM_RENDERERS[spec.kind];
+        canvas.replaceChildren(draw(phase));
+        canvas.setAttribute("aria-label", `${entry.tag} · ${entry.caption}`);
+        caption.textContent = entry.caption;
+        clock.textContent = entry.clock || "";
+        Array.from(axis.children).forEach((tab, i) => {
+          const on = i === phase;
+          tab.classList.toggle("is-selected", on);
+          tab.setAttribute("aria-selected", String(on));
+        });
+      }
+
+      function start() {
+        stop();
+        if (phase >= phases.length - 1) select(0);
+        timer = setInterval(() => {
+          if (phase >= phases.length - 1) { stop(); return; }
+          select(phase + 1);
+        }, PHASE_MS);
+        setIcon("pause", "暂停");
+      }
+
+      playButton?.addEventListener("click", () => { if (timer) stop(); else start(); });
+
+      /* 地图开合：停靠态整块是一枚放大键，点开后铺满中区、画布重新可拖拽。
+         点开时停掉自动播放 —— 相位说明被地图盖住了，让它在背后自己翻页没有意义。 */
+      mapToggle?.addEventListener("click", () => {
+        if (center.dataset.mech !== "on") return;
+        const open = center.dataset.map !== "open";
+        center.dataset.map = open ? "open" : "dock";
+        mapToggle.setAttribute("aria-expanded", String(open));
+        if (open) stop();
+        requestAnimationFrame(() => stage.fit());
+      });
+
+      function render(event) {
+        stop();
+        spec = event?.mechanism && MECHANISM_RENDERERS[event.mechanism.kind] ? event.mechanism : null;
+        phases = spec?.phases || [];
+        center.dataset.map = "dock";
+        mapToggle?.setAttribute("aria-expanded", "false");
+        if (!spec || !phases.length) {
+          center.dataset.mech = "off";
+          if (root) root.hidden = true;
+          canvas?.replaceChildren();
+          return false;
+        }
+        center.dataset.mech = "on";
+        if (root) root.hidden = false;
+        axis.replaceChildren(...phases.map((entry, i) => {
+          const tab = document.createElement("button");
+          tab.type = "button";
+          tab.className = "tab-control-item";
+          tab.setAttribute("role", "tab");
+          tab.textContent = entry.tag;
+          tab.addEventListener("click", () => { stop(); select(i); });
+          return tab;
+        }));
+        phase = 0;
+        select(0);
+        return true;
+      }
+
+      return { render, stop };
+    })();
+
     function renderIncidentArrow(event, topology) {
       const chain = document.getElementById("croIncidentArrowChain");
       if (chain) {
@@ -7466,6 +8829,8 @@
     /* 中区两张角色卡 + 下区事件内涵。第 6–8 项接入下区图表。 */
     function renderIncidentView(event) {
       const topology = controller.topology;
+      // 机制图先渲：它决定中区是「机制图 + 右下角地图」还是老样子的满铺传播图
+      mech.render(event);
       renderIncidentArrow(event, topology);
       // 事件 focus 指向具体算子时（如 p1-root 的 Router gate），把那根算子条也
       // 点亮——四域里这件事原来由整网 deck 承担，现在结构条是唯一的层内算子视图。
@@ -7828,7 +9193,8 @@
       // .cro-capacity 子树里，得单独列一条，否则点它选中文字会清掉当前选择。
       ".cro-capacity", ".cro-capacity__basis",
       // 说明气泡同理：它也挂在 body 上，不在任何一个白名单子树里 —— 在里面
-      // 拖选文案不该顺手把当前选择清掉（问号本身落在 .cro-stepper 里，已覆盖）
+      // 拖选文案不该顺手把当前选择清掉（问号本身由下面那条前置守卫统一挡掉，
+      // 它可能挂在 stepper 上，也可能挂在某个小节标题上）
       ".cro-hint-bubble",
       // YAML 视图的代码框：在里面拖选文本、点复制键都不是「点空白」
       ".cro-region--yaml",
@@ -7838,8 +9204,9 @@
     document.addEventListener("click", (event) => {
       if (!relation) return;
       /* 说明问号与气泡不参与选择：它们只是「这是什么」的开合，点一下不该把当前
-         选择或正在调查的事件关掉。放在最前面单独挡掉 —— 问号虽然落在 .cro-stepper
-         这个白名单里，但下面事件态那一支是按「点到任意 button 就算离开」判的。 */
+         选择或正在调查的事件关掉。放在最前面单独挡掉，位置就无所谓了 —— 问号既可能
+         挂在 stepper 上（落在白名单里），也可能挂在某个小节标题上（不落在里面）；
+         而下面事件态那一支又是按「点到任意 button 就算离开」判的。 */
       if (event.target.closest?.(".cro-hint, .cro-hint-bubble")) return;
       // 运行事件是一次显式调查上下文：点击画布空白不应误退出。只有横幅关闭键
       // 或其他可响应对象触发新的选择时，才结束当前事件关系。

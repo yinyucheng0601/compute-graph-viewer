@@ -23,11 +23,20 @@ function escapeHtml(text) {
 }
 
 function inline(text) {
-  return escapeHtml(text)
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+  const protectedParts = [];
+  const protect = (value) => {
+    const index = protectedParts.push(value) - 1;
+    return `\uE000${index}\uE001`;
+  };
+  const protectedText = text
+    .replace(/`([^`]+)`/g, (_, code) => protect(`<code>${escapeHtml(code)}</code>`))
+    .replace(/\\\(.+?\\\)|\\\[.+?\\\]|\$\$.+?\$\$|\$(?!\s)(?:\\.|[^$])+?\$/g, formula => protect(escapeHtml(formula)));
+
+  return escapeHtml(protectedText)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+    .replace(/\uE000(\d+)\uE001/g, (_, index) => protectedParts[Number(index)]);
 }
 
 function renderMarkdown(markdown) {
@@ -38,6 +47,7 @@ function renderMarkdown(markdown) {
   let code = [];
   let inCode = false;
   let table = [];
+  let mathBlock = null;
 
   const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
   const closeQuote = () => { if (quote.length) { out.push(`<blockquote>${quote.map(x => `<p>${inline(x)}</p>`).join('')}</blockquote>`); quote = []; } };
@@ -57,6 +67,16 @@ function renderMarkdown(markdown) {
 
   for (const raw of lines) {
     const line = raw.trimEnd();
+    if (mathBlock) {
+      if (line.trim() === mathBlock.close) {
+        const formula = `${mathBlock.open}\n${mathBlock.lines.join('\n')}\n${mathBlock.close}`;
+        out.push(`<div class="math-block">${escapeHtml(formula)}</div>`);
+        mathBlock = null;
+      } else {
+        mathBlock.lines.push(raw);
+      }
+      continue;
+    }
     if (line.trim().startsWith('```')) {
       flush();
       if (inCode) { out.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`); code = []; }
@@ -64,6 +84,11 @@ function renderMarkdown(markdown) {
       continue;
     }
     if (inCode) { code.push(raw); continue; }
+    if (line.trim() === '$$' || line.trim() === '\\[') {
+      flush();
+      mathBlock = { open: line.trim(), close: line.trim() === '$$' ? '$$' : '\\]', lines: [] };
+      continue;
+    }
     if (/^\s*\|.+\|\s*$/.test(line)) { closeList(); closeQuote(); table.push(line.trim()); continue; }
     closeTable();
     if (/^>/.test(line)) { closeList(); quote.push(line.replace(/^>\s?/, '')); continue; }
@@ -81,7 +106,23 @@ function renderMarkdown(markdown) {
   }
   flush();
   if (code.length) out.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+  if (mathBlock) out.push(`<p>${escapeHtml([mathBlock.open, ...mathBlock.lines].join('\n'))}</p>`);
   return out.join('');
+}
+
+function renderMath(container) {
+  if (typeof renderMathInElement !== 'function') return;
+  renderMathInElement(container, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false },
+      { left: '$', right: '$', display: false }
+    ],
+    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+    throwOnError: false,
+    strict: 'ignore'
+  });
 }
 
 function shuffle(items) {
@@ -123,8 +164,10 @@ function showCard(direction = 'next') {
   $('#cardIndex').textContent = `CARD ${String(state.index + 1).padStart(3, '0')}`;
   $('#breadcrumb').textContent = `${card.chapter}  /  ${card.section}`;
   $('#cardTitle').textContent = card.title;
-  $('#cardContent').innerHTML = renderMarkdown(card.body);
-  $('#cardContent').scrollTop = 0;
+  const cardContent = $('#cardContent');
+  cardContent.innerHTML = renderMarkdown(card.body);
+  renderMath(cardContent);
+  cardContent.scrollTop = 0;
   $('#readTime').textContent = `约 ${Math.max(1, Math.ceil(card.body.length / 420))} 分钟`;
   $('#progressText').textContent = `${state.index + 1} / ${state.deck.length}`;
   $('#progressBar').style.width = `${((state.index + 1) / state.deck.length) * 100}%`;

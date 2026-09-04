@@ -7937,8 +7937,9 @@ body.chat-shell-page {
     if (!msgEl) return;
     const rest = msgEl.scrollHeight - msgEl.clientHeight;
     const canScroll = rest > FADE_EPSILON;
-    // 滑回底部即恢复跟随:不用再点「回到底部」也能重新贴着最新内容
-    if (isNearBottom(msgEl)) stickToBottom = true;
+    // 这里只刷新视觉状态，不根据 scroll 事件恢复自动跟随。内容重排（例如正式回答开始时
+    // 自动收起思考块）和程序化 scrollTo 同样会触发 scroll；在这里恢复会误把用户刚刚
+    // 取消的跟随重新打开。恢复跟随只由下方明确的用户向下滚动操作或「回到底部」触发。
     // 置顶的问题卡片就贴在滚动口顶沿,再叠一层顶端渐隐会把卡片上半截压暗;
     // 改由卡片自己的下沿遮罩(.is-stuck::after)承担"内容淡出"这件事。
     // 判定要同时满足两条:卡片已经压到内容区顶沿、且确实滚动过——
@@ -9639,7 +9640,7 @@ ${issuesText || '（暂无）'}
           chatStreaming = false;
           setChatBusy(false);
         }
-        scrollChatToBottom(msgEl);
+        scrollChatToBottom(msgEl, { onlyIfNearBottom: true });
       }
     }
   }
@@ -9942,7 +9943,7 @@ ${issuesText || '（暂无）'}
     return { refresh, close, onKeyDown, isOpen };
   }
 
-  // 录屏快捷演示：按 Ctrl + Shift + Enter，留出 1.5 秒开录窗口，再用真实输入事件逐字写入问题；
+  // 录屏快捷演示：按 Ctrl + Shift + Enter，留出 0.5 秒开录窗口，再用真实输入事件逐字写入问题；
   // 敲到 # 时让真实上下文浮窗打开，
   // 停一拍后用 Enter 选中首项 profile_dir，再继续输入并点击真实发送按钮。
   // 不直接灌最终字符串，这样录到的高亮标签、浮窗、输入框增高和发送状态都是产品本身的行为。
@@ -10019,9 +10020,9 @@ ${issuesText || '（暂无）'}
       dispatchRecordingInput(input);
       focusChatInput();
 
-      // 从快捷键按下的时刻算满 1.5 秒，而不是页面复位结束后再额外等待。
-      // 这样无论触发前在欢迎页还是已有对话，第一字都会在约第 1.5 秒出现。
-      const countdownLeft = Math.max(0, 1500 - (performance.now() - triggeredAt));
+      // 从快捷键按下的时刻算满 0.5 秒，而不是页面复位结束后再额外等待。
+      // 这样无论触发前在欢迎页还是已有对话，第一字都会在约第 0.5 秒出现。
+      const countdownLeft = Math.max(0, 500 - (performance.now() - triggeredAt));
       await recordingWait(countdownLeft);
       if (ticket !== demoInputEpoch) return;
 
@@ -10593,6 +10594,13 @@ ${issuesText || '（暂无）'}
   }
 
   function boot() {
+    // 回答进行中时 Esc 优先用于中止回答，避免同一次按键继续冒泡后又关闭面板或弹窗。
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !chatStreaming || chatStopped) return;
+      e.preventDefault();
+      e.stopPropagation();
+      stopAnswering();
+    }, { capture: true });
     updateKeyUI();
     initPanelToggle();
     initFloatMode();
@@ -10606,15 +10614,51 @@ ${issuesText || '（暂无）'}
     msgEl?.addEventListener('scroll', () => scheduleFadeUpdate(), { passive: true });
     // 只认这几种"确实是用户自己动的"操作,程序化的 scrollTo 不会触发它们,
     // 所以不需要再去区分某次 scroll 事件是谁发起的。
-    const releaseStick = () => { stickToBottom = false; };
-    msgEl?.addEventListener('wheel', releaseStick, { passive: true });
-    msgEl?.addEventListener('touchmove', releaseStick, { passive: true });
+    const syncStickAfterUserScroll = () => {
+      requestAnimationFrame(() => {
+        if (msgEl && isNearBottom(msgEl)) stickToBottom = true;
+      });
+    };
+    msgEl?.addEventListener('wheel', (e) => {
+      if (e.deltaY < 0) stickToBottom = false;
+      else if (e.deltaY > 0) syncStickAfterUserScroll();
+    }, { passive: true });
+    let lastTouchY = null;
+    let touchMovedTowardBottom = false;
+    msgEl?.addEventListener('touchstart', (e) => {
+      lastTouchY = e.touches[0]?.clientY ?? null;
+      touchMovedTowardBottom = false;
+    }, { passive: true });
+    msgEl?.addEventListener('touchmove', (e) => {
+      const y = e.touches[0]?.clientY;
+      if (y == null || lastTouchY == null) return;
+      if (y > lastTouchY) {
+        stickToBottom = false;
+        touchMovedTowardBottom = false;
+      } else if (y < lastTouchY) {
+        touchMovedTowardBottom = true;
+        syncStickAfterUserScroll();
+      }
+      lastTouchY = y;
+    }, { passive: true });
+    msgEl?.addEventListener('touchend', () => {
+      if (touchMovedTowardBottom) syncStickAfterUserScroll();
+      lastTouchY = null;
+      touchMovedTowardBottom = false;
+    }, { passive: true });
     msgEl?.addEventListener('keydown', (e) => {
-      if (/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End)$/.test(e.key)) releaseStick();
+      if (/^(ArrowUp|PageUp|Home)$/.test(e.key)) stickToBottom = false;
+      else if (/^(ArrowDown|PageDown|End)$/.test(e.key)) syncStickAfterUserScroll();
     });
     // 拖滚动条:按下点落在内容宽度之外就是滚动条那一条
     msgEl?.addEventListener('mousedown', (e) => {
-      if (e.offsetX > msgEl.clientWidth) releaseStick();
+      if (e.offsetX <= msgEl.clientWidth) return;
+      stickToBottom = false;
+      const finishScrollbarDrag = () => {
+        syncStickAfterUserScroll();
+        window.removeEventListener('mouseup', finishScrollbarDrag);
+      };
+      window.addEventListener('mouseup', finishScrollbarDrag);
     });
     $('trainChatJumpBtn')?.addEventListener('click', () => {
       stickToBottom = true;

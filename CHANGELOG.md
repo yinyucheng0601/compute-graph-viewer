@@ -5,6 +5,81 @@
 
 ---
 
+## 2026-09-04 — 关系观测器事件机制图补齐 p1-spread / p2-peak / p2-oom
+
+- **p1-spread（PP3 断裂，2048 NPU hang）→ `pp-cascade`**：上排画 PP 依赖拓扑（前向送激活 / 反向回梯度，首尾成闭环），中间四条 stage 泳道画「在算 → 在等」的逐级回压（3→2→1→0，方向不能反），下排把受影响卡数拆成一条可验算的乘法链 `1 →×EP64→ 64 →×EDP8→ 512 →×PP4→ 2048`——逐层差值正好是 evidence 的 63 / 448 / 1536。
+- **p2-peak（激活值占用 36.2 GB）→ `activation-lifetime`**：上半是 12 层 + LM Head 的激活**存活区间条**，下半是由这些区间逐槽位加出来的显存占用曲线（曲线就是区间的竖向计数，两者逐格对齐）。峰值出现在 12 层尚未释放、LM Head logits 又叠上来的那一个槽位：9.0 + 27.2 = 36.2 GB，加常驻 27.8 恰好 64.0。
+- **p2-oom（碎片 OOM）→ `fragmented-oom`**：把 64 GB 摊成 8 行真实地址空间，已分配块与 22 个空洞交替排列；0.5 GB 的申请块用 SMIL `calcMode="discrete"` 沿空洞逐个试放，连最大的 0.32 GB 也装不下。底部三根对照条点题：决定成败的不是空闲总量（3.9）而是最大连续块（0.32）。
+- 机制图自检脚本扩到 5 张图 × 4 相位，并新增**数值自洽**断言：图上写死的数必须与事件 evidence 逐位对得上（空洞总量 3.9 / 已分配 60.1 / 合计 64、峰值激活 36.2、12 层 9.0、L38 1.2、乘法链 1/64/512/2048）。
+
+---
+
+## 2026-09-04 — 关系观测器 MoE 区：宫格拆成「标编号」与「可下钻」两个独立开关
+
+- 上一版把两者绑在一起，导致点 Cluster 的 rank 格也放开了下钻。但专家实例是**按层**分的：只定到 PP stage（一段里往往十几个 MoE 层）仍回答不了「问的是哪一层的那份」。现在拆开：`numbered` 只需 stage + dpIdx；`drillable` 还需具体 MoE layer（`moeBoundOf` 无 `moeBindLayer` 即返回 null）。于是点 Cluster rank 格 → 标出编号但格子仍禁点，复用同一段禁点提示。
+- 禁点光标由 `help` 改为 `not-allowed`：这里确实点不动，`pointer` 是撒谎、`help` 只说了「有话讲」没说「按不动」。
+- 禁点提示拆成共用正文 `MOE_NO_DRILL_HINT` + 仅未标号时追加的 `MOE_UNBOUND_TAIL`（正文不能写死「编号已隐去」——按 Cluster rank 进来时编号是标着的）。
+- 层内下钻不再丢层号：`moeBindingOf` 除 `kind:"layer"` 外也认 `expert`/`epRank` 携带的 `scopeLayer`（并校验它确实落在该 stage 上，防脏 payload）。口径说明与格子/胶囊的悬浮读数全部点明「Layer N」，口径尾巴写「下面的格子是这一层内的下钻」；只定到 stage 时写「未指定 MoE layer，格子暂不可点」。
+
+---
+
+## 2026-09-04 — 关系观测器 MoE 区：EP rank 宫格分「未绑定 / 已绑定」两态
+
+- 宫格画的是**一个 EP group 内部**的 EP rank（0…EP-1），不是集群里的 global rank；EP=64 时它写着 Rank 0~63，而集群有 2048 张卡，被读成 global rank 几乎是必然。根子在于 EP rank → global rank 要 `rankOf(stage, dpIdx, epIdx, inner)`，而 stage / dpIdx 不在 MoE 区里。
+- 未绑定（默认）：抹去 Rank 后的编号，卡片带 `.is-anon`（光标 `help`），悬浮/点击弹说明气泡「每个 MoE layer 有相互独立的一套专家，编号相同的 Expert 权重一定不同……请先点一个 MoE Layer 或一张 Rank 卡」，点击**不发出连线**。
+- 已绑定：关系收敛到唯一一个 PP stage 且触及 MoE（点 MoE Layer / PP 段 / 集群某张卡）时，每张卡标出对应 global rank（TP×CP>1 时标区间），悬浮换成读数，点击照常连回四域。判据 `rel.stages.size === 1 && rel.epRanks.size > 0` —— 前半是 `rankOf` 的充要条件，后半排掉「点了 Dense 层」这类与专家无关的单 stage 选择。
+- 标题旁新增「编号口径：Layer 38 · PP3 · DP 副本 0（共 8 个，默认取第 0 个）」：从层/PP 段进来时副本是页面替用户挑的，必须写破。
+- `resolveRelation` 的 expert / epRank 分支新增收敛口径：payload 带 `scopeStage` 时（来自已绑定宫格的点击）只取该 stage 的 MoE 层与指定 DP 副本，让连线与卡片上写着的编号一致；无 `scopeStage` 时退回原来的全展开口径。
+- 事件详情角色卡里那套只读宫格不参与两态，保持「Rank N + 读数悬浮」原样。
+
+---
+
+## 2026-09-04 — 关系观测器 MoE 区：专家胶囊满 4 换行，撑高 EP rank 卡片
+
+- `.cro-moe-group__experts` 原是 `flex` + `nowrap`，靠 `.cro-expert` 的 `flex:1 1 0` 把一个 rank 的专家全挤进一行。默认档每 rank 4 个正好，但 EP 拨小到 32 / 16 时一个 rank 有 8 / 16 个专家，每枚只剩几像素，`E12` 被压成一道竖条。改为 `grid` + `repeat(var(--cro-expert-cols, 4), minmax(0, 1fr))`：满 4 换行，卡片高度跟着内容长，同一行的 rank 卡由外层 grid 拉伸对齐。
+- 列数由 `renderMoe()` 新增的 `setExpertCols()` 按 `min(4, 实际个数)` 写进内联样式（下限 1，`repeat(0, …)` 非法）——不足 4 个时列数收到实际个数，胶囊仍铺满整行宽，「1 个共享专家」不会缩成四分之一宽。共享专家那一格复用同一个类，同样走这条。
+- `config-relation-observer.html` 里 observer 的 css / js 缓存版本号一并推到 `20260904-expert-wrap`。
+
+---
+
+## 2026-09-04 — 关系观测器 MoE 区：EP 标签补问号，说清「一套专家摊在多少 rank 上」
+
+- `FIELD_SPECS.ep` 原先没有 `title`，标签后面因而没有问号：`EP = 64` 有三种误读（一共 64 个专家 / 64 个专家并行组 / 每张卡 64 个专家）。现在与 `Routed` 一样写成 `(topology) => string`，按当前拓扑报出「一套路由专家分布在多少个 rank 上；每个 rank 上的专家人头数 = Routed ÷ EP = 256 ÷ 64 = 4 个」，并接着说明凑齐这 64 个 rank 才是一整套专家、当前有几组 EP 域并排跑，以及 EP 拨大拨小在「每卡专家参数」与「all-to-all 跨度」之间的取舍。除不尽时直说切不平。
+
+---
+
+## 2026-09-04 — 关系观测器 MoE 区：把「Routed 是每层一套」这件事说清楚
+
+- MoE 区 stepper 的 `Routed` 容易被读成「全模型一共 256 个专家」。标签本身塞不下限定词（那一行是 nowrap 四等分、约 300px 一列，标签早已挂省略号，写成 `Routed (per MoE Layer)` 只会被截成碎片并压窄邻居），改为两处补足：`Routed` 新增问号气泡，按当前拓扑报出「46 层里 44 层是 MoE，每层各一套 256 → 全模型 44 × 256 = 11264 个专家实例」；下方 section 标题改成「单个 MoE Layer 的路由专家在 EP ranks 上的分布」。
+- `FIELD_SPECS[].title` 现在允许写成 `(topology) => string`，由新的 `fieldTitle()` 在 `emit()` 那一趟按当前拓扑落成文字（建控件时先建空问号，`controller.refresh()` 必定补上）。FLAG_SPECS 的静态 title 路径不变。
+- 「单个 EP group · EP size 64 · 256 experts · 每个 rank 4 个」那块占满一行网格的实底摘要下线，同一条口径改挂到 section 标题右侧的问号气泡（复用既有 `buildHint` / `data-hint` 委托），列表第一眼直接是 EP rank 卡片。`.cro-moe-group-summary` 样式一并移除。
+- Model Architecture 区标题「Layer 导航」改为「Layer 布局」。
+
+---
+
+## 2026-09-04 — 关系观测器 Global Batch：口径浮层补上「条」这个单位
+
+- `js/config-relation-observer.js` `globalBatchSummary()`：格子里只有一个光秃秃的 12288，
+  浮层原先只说「吃掉多少样本」，读不出单位（最容易被当成 token 数，差一个 Seq Length）。
+  现在浮层新增「单位是「条」，不是 token」一段：一条样本 = 一条长 Seq Length 的序列（[B,S,H] 的 B），
+  并按当前配置算出换算式 `12288 条 × Seq 4096 = 50,331,648 token`；三因子那行也带上「条」，
+  「表单上那枚 Micro Batch 不是它」一段点明两者同单位、差在「每卡每次」与「全集群一步」。
+
+## 2026-09-04 — 关系观测器事件详情：机制舞台取代传播范围图占据主区
+
+- `config-relation-observer` 事件模式的中区改为「机制舞台 + 右下角地图」：原「传播源 → 受影响」范围图退成停靠在右侧栏底部的只读缩略图，点击铺满中区、可平移缩放，再点收回。事件未声明 `mechanism` 时中区回到原来的满铺传播图（`data-mech="off"`），机制图可逐个事件铺开。
+- 新增机制图渲染层（`MECHANISM_RENDERERS`）：按 `event.mechanism.phases` 的相位推进，相位轴复用 `tab-control`，可点选、可播放，演到末相定格。动效只用 SVG + SMIL（沿连线跑的 `stroke-dashoffset` 彗星、双相位 ripple），不引库、不占 rAF。
+- 首批两个试点事件：问题2.5 Router FP8 溢出画「打分 → 越界 → softmax 塌成 one-hot → 流量全汇到 E193」的 dispatch 扇出塌缩（相位 ①② 的健康态即 ③④ 的对照）；问题2.4 all-to-all 超时画 64 条泳道的 barrier 空等，越过 barrier 后持续生长的行军蚁就是「空等了多久」。
+
+---
+
+## 2026-09-04 — Transformer 知识漫游卡片支持公式渲染
+
+- 卡片 Markdown 内容接入本地 KaTeX，支持 `$...$`、`$$...$$`、`\\(...\\)` 和 `\\[...\\]` 数学定界符；代码块和行内代码保持原样，不会误渲染其中的美元符号。
+- KaTeX 脚本、样式和字体随静态页面一同发布并加入 Service Worker 缓存，离线打开仍可显示公式；长块公式可在卡片内横向滚动。
+
+---
+
 ## 2026-09-03 — 按 Rank 训练步泳道:调色板拉开色相 + 聚光灯到本图时「只留红、其余去色」
 
 - **红色只留给错误**。原来前向蓝 + 反向 `#ff4b7b` 粉红 + 琥珀 + 橙红挤在暖端,一屏下来到处像在报警,真正的故障条反而不跳。现在按色相环把各类事件铺开,每两类至少隔一个可辨的色相段:红 0°(fault) → 琥珀 38°(梯度同步) → 黄绿 77°(参数更新) → 翠绿 160°(通信) → 青 187°(激活驻留) → 天蓝 199°(训练步) → 蓝 228°(前向) → 紫 271°(反向) → 玫红 330°(loss),空等仍是中性灰。取值来自设计系统语义色与 combo-workbench 的 ARCH_NODE_COLORS,不新造色板。

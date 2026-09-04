@@ -25,7 +25,7 @@
   <!-- 集群热力图样式（复用 training-monitoring-v2 的 .twin-heat* 视觉） -->
   <link rel="stylesheet" href="./css/training-run-twin.css">
   <!-- 本页模块私有 layout -->
-  <link rel="stylesheet" href="./css/config-relation-observer.css?v=20260903-hint-bubble">
+  <link rel="stylesheet" href="./css/config-relation-observer.css?v=20260904-mech-all">
   <!-- 单卡容量（Cluster 区右栏）：容量是「卡」的属性，与集群矩阵同区并排 -->
   <link rel="stylesheet" href="./css/config-relation-capacity.css?v=20260820-spread-head">
   <!-- 顶栏视图页签 / 导出配置键 / YAML 代码框 -->
@@ -196,7 +196,39 @@
                运行事件栏回到配置仿真态。 -->
           <div class="cro-incident-view" id="croIncidentView" hidden>
 
-            <!-- ── 中区 · 一块编排画布 ──
+            <!-- ── 中区 ────────────────────────────────────────────────────
+                 「传播源 → 受影响」回答的是**打到了谁**（集合 A → 集合 B），回答不了
+                 **为什么会打过去、怎么传的**；而 11 个事件共用同一张范围图，机制差异
+                 全被拉平。所以中区主位让给「机制舞台」：一个事件一张按相位推进的机制
+                 图（event.mechanism），范围图退成右下角的只读地图，点开才铺满。
+                 事件没写 mechanism 时 data-mech="off"，地图回到原来的满铺形态。 -->
+            <div class="cro-incident-center" id="croIncidentCenter" data-mech="off" data-map="dock">
+
+              <!-- 机制舞台：上=相位轴（可点可播）/ 中=机制图 / 下=当前相位说明 -->
+              <section class="cro-mech" id="croMech" aria-label="事件机制" hidden>
+                <header class="cro-mech__axis">
+                  <button class="btn btn-icon btn-ghost btn-sm cro-mech__play" id="croMechPlay" type="button"
+                          aria-label="播放机制演进" title="播放机制演进">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>
+                  </button>
+                  <div class="tab-control cro-mech__phases" id="croMechPhases" role="tablist" aria-label="机制相位"></div>
+                  <span class="cro-mech__clock" id="croMechClock"></span>
+                </header>
+                <div class="cro-mech__canvas" id="croMechCanvas" role="img"></div>
+                <p class="cro-mech__caption" id="croMechCaption"></p>
+              </section>
+
+              <!-- 传播源→受影响：默认停靠成右下角地图，整块可点开 -->
+              <div class="cro-mech-map" id="croMechMap">
+                <button class="cro-mech-map__head" id="croMechMapToggle" type="button" aria-expanded="false">
+                  <span class="cro-mech-map__title">传播源 → 受影响</span>
+                  <svg class="cro-mech-map__icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="cro-mech-map__icon-expand" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+                    <path class="cro-mech-map__icon-close" d="M18 6 6 18M6 6l12 12"></path>
+                  </svg>
+                </button>
+
+            <!-- ── 一块编排画布 ──
                  传播源 / 连接线 / 受影响不是三个各自带滚动条的容器，而是同一张图上
                  的三个部位。舞台（.cro-incident-stage）按内容排到自然尺寸，视口只负责
                  「看哪一块、看多大」：进场自动适配屏幕，滚轮缩放、拖拽平移。 -->
@@ -241,6 +273,8 @@
                 <button class="btn btn-sm btn-ghost" id="croStageZoomFit" type="button" title="适配屏幕">适配</button>
               </div>
             </div>
+              </div><!-- /.cro-mech-map -->
+            </div><!-- /.cro-incident-center -->
 
             <!-- ── 下区 · 问题详情（图表 + 文字）── -->
             <section class="cro-incident-detail" aria-label="问题详情">
@@ -317,7 +351,7 @@
 
               <div class="cro-section">
                 <div class="cro-section__heading">
-                  <div class="cro-section__title">Layer 导航</div>
+                  <div class="cro-section__title">Layer 布局</div>
                 </div>
                 <div class="cro-layer-nav" id="croLayerNav">
                   <div class="cro-placeholder">46 层刻度 · PP 分段 · Dense/MoE 分区 · 第 4 项接入</div>
@@ -372,9 +406,25 @@
               </div>
 
               <div class="cro-section">
-                <div class="cro-section__title">路由专家</div>
+                <!-- 「这是一个 EP group 的内部」这句口径原先是列表里第一格的一条
+                     实底摘要块，占掉一整行网格宽度，而它只是**怎么读下面这些卡片**
+                     的前提、不是一条数据。改挂成标题右侧的问号气泡：要看才看，
+                     列表第一眼就是 EP rank 卡片本身。文案由 renderMoe 按当前
+                     EP / 专家数实时写入。 -->
+                <!-- 「单个 MoE Layer 的」不是啰嗦：上面 stepper 的「Routed 256」很容易
+                     被读成全模型一共 256 个专家，而这里铺开的正是**其中一层**的那一套。
+                     限定词放在这条标题上（整行、可换行，放得下），stepper 那一行放不下
+                     —— 它是 nowrap 四等分、标签早已挂着省略号，改标签只会截成碎片。 -->
+                <div class="cro-section__heading cro-section__heading--tight" id="croRoutedHeading">
+                  <div class="cro-section__title">单个 MoE Layer 的路由专家在 EP ranks 上的分布</div>
+                  <!-- 绑定说明：宫格上的 global rank 是按「哪个 PP stage、哪个 DP 副本」
+                       算出来的，这两个前提必须写在编号旁边 —— 不写就等于又造了一个
+                       「看着确定、其实是页面替你挑的」编号，与这次要治的毛病同源。
+                       未绑定时这一格是空的（编号也不显示）。 -->
+                  <span class="cro-moe-bind" id="croMoeBind" aria-live="polite"></span>
+                </div>
                 <div class="cro-moe-groups" id="croRoutedExperts">
-                  <div class="cro-placeholder">EP 分组 · 第 5 项接入</div>
+                  <div class="cro-placeholder">EP rank 分布 · 第 5 项接入</div>
                 </div>
               </div>
             </section>
@@ -2832,7 +2882,7 @@ t  TP 序号              c  CP 序号      n  物理节点号</div>
   <script src="./js/ide-frame-pattern.js"></script>
   <script src="./js/model-graphviz-pattern.js"></script>
   <script src="./js/model-architecture-3d-deck-pattern.js"></script>
-  <script src="./js/config-relation-observer.js?v=20260903-hint-bubble"></script>
+  <script src="./js/config-relation-observer.js?v=20260904-mech-all"></script>
   <!-- 单卡容量：必须排在主脚本之后（要读它导出的 croObserver / croSelect） -->
   <script src="./js/config-relation-capacity.js?v=20260821-edp"></script>
   <!-- YAML 视图：同样排在主脚本之后（要读它导出的 croObserver.topology）。
