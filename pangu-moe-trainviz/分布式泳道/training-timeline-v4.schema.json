@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "training-timeline.v4",
+  "type": "object",
+  "required": ["schemaVersion", "id", "label", "step", "fidelity", "timeUnit", "contentHash", "inputHash", "model", "training", "coverage", "modelExecution", "stages", "ranks", "epGroups", "expertPlacements", "routingMode", "routingRecords", "routerMetrics", "expertLoads", "modelBindings", "incident", "events", "stepBounds", "provenance"],
+  "properties": {
+    "schemaVersion": { "enum": ["training-timeline.v4"] },
+    "id": { "type": "string", "minLength": 1 },
+    "label": { "type": "string", "minLength": 1 },
+    "step": { "type": "integer", "minimum": 0 },
+    "fidelity": { "enum": ["simulated", "measured"] },
+    "timeUnit": { "enum": ["ms"] },
+    "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "inputHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "model": { "$ref": "#/$defs/model" },
+    "training": { "$ref": "#/$defs/training" },
+    "coverage": { "$ref": "#/$defs/coverage" },
+    "modelExecution": { "$ref": "#/$defs/modelExecution" },
+    "stages": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/stage" } },
+    "ranks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rank" } },
+    "epGroups": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/epGroup" } },
+    "expertPlacements": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/expertPlacement" } },
+    "routingMode": { "enum": ["aggregate-only", "token-level"] },
+    "routingRecords": { "type": "array", "items": { "$ref": "#/$defs/routingRecord" } },
+    "routerMetrics": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/routerMetric" } },
+    "expertLoads": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/expertLoad" } },
+    "modelBindings": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/modelBinding" } },
+    "incident": { "$ref": "#/$defs/incident" },
+    "events": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/event" } },
+    "stepBounds": { "$ref": "#/$defs/timeRange" },
+    "provenance": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/provenance" } }
+  },
+  "$defs": {
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 },
+    "stringArray": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "integerArray": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "numHiddenLayers", "denseLayers", "moeLayers", "expertCount", "topK", "architectureAsset"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "numHiddenLayers": { "type": "integer", "minimum": 1 },
+        "denseLayers": { "$ref": "#/$defs/integerArray" },
+        "moeLayers": {
+          "type": "object",
+          "required": ["first", "last"],
+          "properties": {
+            "first": { "type": "integer", "minimum": 0 },
+            "last": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "expertCount": { "type": "integer", "minimum": 1 },
+        "topK": { "type": "integer", "minimum": 1 },
+        "architectureAsset": {
+          "type": "object",
+          "required": ["id", "version", "schemaVersion", "contentHash", "graphContentHash", "uri"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "version": { "type": "integer", "minimum": 1 },
+            "schemaVersion": { "enum": ["model_architecture_graph.v1"] },
+            "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "graphContentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "uri": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "training": {
+      "type": "object",
+      "required": ["dp", "pp", "tp", "ep", "worldSize", "microbatchesPerDp", "worldSizePolicy"],
+      "properties": {
+        "dp": { "type": "integer", "minimum": 1 },
+        "pp": { "type": "integer", "minimum": 1 },
+        "tp": { "type": "integer", "minimum": 1 },
+        "ep": { "type": "integer", "minimum": 1 },
+        "worldSize": { "type": "integer", "minimum": 1 },
+        "microbatchesPerDp": { "type": "integer", "minimum": 1 },
+        "worldSizePolicy": {
+          "type": "object",
+          "required": ["kind", "source", "note"],
+          "properties": {
+            "kind": { "enum": ["scenario-declared", "cartesian-product", "measured"] },
+            "source": { "type": "string", "minLength": 1 },
+            "dimensions": { "type": "array", "items": { "enum": ["dp", "pp", "tp", "ep"] } },
+            "note": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["mode", "visibleDp", "visibleRanks", "note"],
+      "properties": {
+        "mode": { "enum": ["full-world", "focused-slice"] },
+        "visibleDp": { "$ref": "#/$defs/integerArray" },
+        "visibleRanks": { "type": "integer", "minimum": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "modelExecution": {
+      "type": "object",
+      "required": ["decoderResidualBranch", "moeCommunicationStrategy", "provenanceIds"],
+      "properties": {
+        "decoderResidualBranch": { "enum": ["use_mhc=true", "use_mhc=false"] },
+        "moeCommunicationStrategy": { "enum": ["allreduce", "allgather_reducescatter", "all2allv", "dispatch_combine", "fused"] },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "required": ["id", "first", "last", "provenanceIds"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 0 },
+        "first": { "type": "integer", "minimum": 0 },
+        "last": { "type": "integer", "minimum": 0 },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "rank": {
+      "type": "object",
+      "required": ["rank", "globalRank", "dp", "stage", "tp", "epRank", "epGroupId", "node", "device", "provenanceIds"],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 0 },
+        "globalRank": { "type": "integer", "minimum": 0 },
+        "dp": { "type": "integer", "minimum": 0 },
+        "stage": { "type": "integer", "minimum": 0 },
+        "tp": { "type": "integer", "minimum": 0 },
+        "epRank": { "type": "integer", "minimum": 0 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "node": { "type": "integer", "minimum": 0 },
+        "device": { "type": "integer", "minimum": 0 },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "epGroupMember": {
+      "type": "object",
+      "required": ["globalRank", "epRank"],
+      "properties": {
+        "globalRank": { "type": "integer", "minimum": 0 },
+        "epRank": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "epGroup": {
+      "type": "object",
+      "required": ["id", "label", "stage", "dp", "tp", "ranks", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "stage": { "type": "integer", "minimum": 0 },
+        "dp": { "type": "integer", "minimum": 0 },
+        "tp": { "type": "integer", "minimum": 0 },
+        "ranks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/epGroupMember" } },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "expertPlacement": {
+      "type": "object",
+      "required": ["id", "layer", "epGroupId", "logicalExpertId", "physicalExpertId", "ownerGlobalRank", "epRank", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "layer": { "type": "integer", "minimum": 0 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "logicalExpertId": { "type": "integer", "minimum": 0 },
+        "physicalExpertId": { "type": ["integer", "null"], "minimum": 0 },
+        "ownerGlobalRank": { "type": "integer", "minimum": 0 },
+        "epRank": { "type": "integer", "minimum": 0 },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "routingRecord": {
+      "type": "object",
+      "required": ["id", "layer", "microbatchId", "epGroupId", "tokenId", "routes", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "layer": { "type": "integer", "minimum": 0 },
+        "microbatchId": { "type": "string", "minLength": 1 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "tokenId": { "type": "integer", "minimum": 0 },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["logicalExpertId", "weight"],
+            "properties": {
+              "logicalExpertId": { "type": "integer", "minimum": 0 },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "routerMetric": {
+      "type": "object",
+      "required": ["id", "layer", "microbatchId", "epGroupId", "topExpertId", "topExpertTop1Share", "baselineTop1Share", "idleTop1Experts", "baselineIdleTop1Experts", "loadCv", "entropy", "totalTop1Assignments", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "layer": { "type": "integer", "minimum": 0 },
+        "microbatchId": { "type": "string", "minLength": 1 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "topExpertId": { "type": "integer", "minimum": 0 },
+        "topExpertTop1Share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "baselineTop1Share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "idleTop1Experts": { "type": "integer", "minimum": 0 },
+        "baselineIdleTop1Experts": { "type": "integer", "minimum": 0 },
+        "loadCv": { "type": "number", "minimum": 0 },
+        "entropy": { "type": "number", "minimum": 0 },
+        "totalTop1Assignments": { "type": "integer", "minimum": 1 },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "expertLoad": {
+      "type": "object",
+      "required": ["id", "layer", "microbatchId", "epGroupId", "logicalExpertId", "ownerGlobalRank", "epRank", "top1TokenCount", "top1Share", "topKCopyCount", "routingWeightSum", "baselineTop1Share", "capacity", "status", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "layer": { "type": "integer", "minimum": 0 },
+        "microbatchId": { "type": "string", "minLength": 1 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "logicalExpertId": { "type": "integer", "minimum": 0 },
+        "ownerGlobalRank": { "type": "integer", "minimum": 0 },
+        "epRank": { "type": "integer", "minimum": 0 },
+        "top1TokenCount": { "type": "integer", "minimum": 0 },
+        "top1Share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "topKCopyCount": { "type": ["integer", "null"], "minimum": 0 },
+        "routingWeightSum": { "$ref": "#/$defs/nullableNumber" },
+        "baselineTop1Share": { "type": "number", "minimum": 0, "maximum": 1 },
+        "capacity": { "$ref": "#/$defs/nullableNumber" },
+        "status": { "enum": ["normal", "warning", "critical", "idle-top1", "missing"] },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "modelBinding": {
+      "type": "object",
+      "required": ["semanticNodeId", "architectureNodeId", "rendererNodeId", "label", "architectureAssetId"],
+      "properties": {
+        "semanticNodeId": { "type": "string", "minLength": 1 },
+        "architectureNodeId": { "type": "string", "minLength": 1 },
+        "rendererNodeId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "architectureAssetId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "incident": {
+      "type": "object",
+      "required": ["id", "status", "summary", "timeRange", "focus", "provenanceIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["warning", "critical"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "timeRange": { "$ref": "#/$defs/timeRange" },
+        "focus": {
+          "type": "object",
+          "required": ["stage", "layer", "microbatchId", "epGroupId", "eventIds", "rankIds", "nodeIds", "expertIds"],
+          "properties": {
+            "stage": { "type": "integer", "minimum": 0 },
+            "layer": { "type": "integer", "minimum": 0 },
+            "microbatchId": { "type": "string", "minLength": 1 },
+            "epGroupId": { "type": "string", "minLength": 1 },
+            "eventIds": { "$ref": "#/$defs/stringArray" },
+            "rankIds": { "$ref": "#/$defs/integerArray" },
+            "nodeIds": { "$ref": "#/$defs/stringArray" },
+            "expertIds": { "$ref": "#/$defs/integerArray" }
+          }
+        },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["id", "label", "kind", "start", "end", "scope", "microbatchId", "rank", "globalRank", "dp", "stage", "tp", "epRank", "epGroupId", "layer", "status", "diagnosisRole", "graphNodeIds", "participants", "stream", "taskId", "anomaly", "communication", "dependsOn", "blockedBy", "affects", "expertIds", "provenanceIds", "fidelity"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["forward", "backward", "comm", "wait", "optimizer", "hold", "misc"] },
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 },
+        "scope": { "enum": ["layer", "step"] },
+        "microbatchId": { "type": ["string", "null"] },
+        "rank": { "type": "integer", "minimum": 0 },
+        "globalRank": { "type": "integer", "minimum": 0 },
+        "dp": { "type": "integer", "minimum": 0 },
+        "stage": { "type": "integer", "minimum": 0 },
+        "tp": { "type": "integer", "minimum": 0 },
+        "epRank": { "type": "integer", "minimum": 0 },
+        "epGroupId": { "type": "string", "minLength": 1 },
+        "layer": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "enum": ["normal", "warning", "critical"] },
+        "diagnosisRole": { "enum": ["root-cause", "symptom", "affected", "context"] },
+        "graphNodeIds": { "$ref": "#/$defs/stringArray" },
+        "participants": { "$ref": "#/$defs/integerArray" },
+        "stream": { "type": "string", "minLength": 1 },
+        "taskId": { "type": ["string", "null"] },
+        "anomaly": { "type": ["object", "null"] },
+        "communication": { "type": ["object", "null"] },
+        "dependsOn": { "$ref": "#/$defs/stringArray" },
+        "blockedBy": { "$ref": "#/$defs/stringArray" },
+        "affects": { "$ref": "#/$defs/stringArray" },
+        "expertIds": { "$ref": "#/$defs/integerArray" },
+        "provenanceIds": { "$ref": "#/$defs/stringArray" },
+        "fidelity": { "enum": ["simulated", "measured"] }
+      }
+    },
+    "timeRange": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["id", "kind", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["source-checked", "simulated-config", "simulated-incident", "measured", "derived"] },
+        "label": { "type": "string", "minLength": 1 },
+        "source": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

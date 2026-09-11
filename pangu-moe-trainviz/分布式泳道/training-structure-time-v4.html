@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MoE 通信异常现场回放</title>
+  <link rel="stylesheet" href="../../vendor/pto-design-system/tokens/foundation.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/tokens/semantic.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/tokens/components.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/css/style.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/workbench-shell/pattern.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/ide-frame/pattern.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/swimlane-task/pattern.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/pass-ir-graph-node/pattern.css">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/model-graphviz/pattern.css?v=toggle-hit-2">
+  <link rel="stylesheet" href="../../vendor/pto-design-system/patterns/model-architecture-front-view/pattern.css?v=front-view-8">
+  <link rel="stylesheet" href="./training-structure-time-v4.css?v=20260911-front-view-4">
+</head>
+<body class="pto-model-graphviz-pattern-page">
+  <main class="training-workspace" data-ide-frame data-host="standalone">
+    <header class="pto-ide-frame__topbar">
+      <div class="pto-ide-frame__topbar-left">
+        <span class="pto-ide-frame__brand">PTO</span>
+        <span class="pto-ide-frame__workspace">MoE 通信异常现场回放</span>
+      </div>
+      <div class="pto-ide-frame__topbar-right">
+        <span class="incident-status status-critical" aria-label="critical 模拟事故">⚠ 模拟事故</span>
+        <span class="pto-ide-frame__pane-meta" id="training-context">正在加载场景数据…</span>
+        <button class="btn btn-ghost btn-sm" id="fidelity" aria-expanded="false">数据边界 ⓘ</button>
+        <button class="btn btn-ghost btn-sm" id="theme" aria-label="切换明暗主题">◐ 主题</button>
+      </div>
+    </header>
+
+    <div class="pto-ide-frame__split training-split" data-ide-split="training-structure-time-v4" data-sizes="42,58" data-min-size="440,680" data-gutter-size="8">
+      <section class="pto-ide-frame__pane" data-ide-pane="structure" aria-label="模型结构与 Routed Experts">
+        <header class="pto-ide-frame__pane-header">
+          <h1 class="pto-ide-frame__pane-title" id="structure-title">模型与路由证据</h1>
+          <span class="pto-ide-frame__pane-meta" id="structure-meta">正在加载模型结构…</span>
+        </header>
+        <div class="incident-evidence" id="incident-evidence" aria-label="Router 异常摘要">
+          <div class="incident-evidence__item"><span>Top1 Expert</span><strong id="kpi-top1">—</strong><small id="kpi-top1-base">—</small></div>
+          <div class="incident-evidence__item"><span>Owner</span><strong id="kpi-owner">—</strong><small id="kpi-owner-group">—</small></div>
+        </div>
+
+        <div class="structure-view" id="structure-view">
+          <div id="model-graph" class="model-graph pto-model-architecture-stage" role="application" aria-label="模型源结构图；Routed Experts 可展开为全量 logical experts"></div>
+        </div>
+      </section>
+
+      <section class="pto-ide-frame__pane" data-ide-pane="timeline" id="timeline-pane" aria-label="EP 感知执行时序">
+        <header class="pto-ide-frame__pane-header">
+          <h2 class="pto-ide-frame__pane-title" id="timeline-title">执行时序</h2>
+          <span class="pto-ide-frame__pane-meta" id="timeline-meta">正在加载资源树…</span>
+        </header>
+        <div class="pto-ide-frame__domain-toolbar pto-ide-frame__tabstrip timeline-controls">
+          <div class="pto-ide-frame__toolbar-group">
+            <select class="training-select" id="view" aria-label="时间窗口">
+              <option value="global">完整 step</option>
+              <option value="stage">PP 阶段</option>
+              <option value="layer">层对象</option>
+              <option value="group">EP Group</option>
+              <option value="incident">异常窗口</option>
+              <option value="forward">Rank 前向</option>
+              <option value="backward">Rank 反向</option>
+            </select>
+            <select class="training-select" id="stage" aria-label="PP 阶段"></select>
+            <select class="training-select training-select-wide" id="ep-group" aria-label="EP Group"></select>
+            <select class="training-select" id="microbatch" aria-label="Microbatch 焦点"></select>
+          </div>
+          <div class="toolbar-control">
+            <button class="btn btn-ghost btn-sm" id="zoom-out" aria-label="缩小时间轴">−</button>
+            <input type="range" id="zoom" min="0" max="4" value="0" aria-label="时间轴缩放">
+            <span class="toolbar-readout" id="zoom-value">1×</span>
+            <button class="btn btn-ghost btn-sm" id="zoom-in" aria-label="放大时间轴">＋</button>
+            <button class="btn btn-ghost btn-sm" id="hierarchy" aria-label="泳道层级说明" aria-expanded="false">ⓘ</button>
+          </div>
+        </div>
+
+        <div class="selection-context" id="selection-context" aria-live="polite">
+          <span id="selection-copy">异常已展开到 PP3 / EP Group，但未自动选中事件。</span>
+          <div id="selection-actions">
+            <button class="btn btn-ghost btn-sm" id="show-incident">查看异常窗口</button>
+            <button class="btn btn-ghost btn-sm" id="trace" hidden>追踪 MB</button>
+            <button class="btn btn-ghost btn-sm" id="clear" hidden>清除选择</button>
+          </div>
+        </div>
+
+        <div class="timeline-viewport" id="timeline-viewport">
+          <div class="timeline-extent" id="timeline-extent">
+            <canvas id="timeline" tabindex="0" aria-label="MoE 通信异常泳道，点击行头展开，点击事件定位 Layer 和模型对象"></canvas>
+          </div>
+        </div>
+
+        <footer class="timeline-legend">
+          <div class="lifecycle-legend">
+            <span><i style="--legend-color:var(--primary)"></i>计算</span>
+            <span><i style="--legend-color:var(--success)"></i>通信</span>
+            <span><i style="--legend-color:var(--foreground-muted)"></i>等待</span>
+            <span class="status-warning">⚠ warning</span>
+            <span class="status-critical">⚠ critical</span>
+            <span>颜色=事件类型 · ⚠+边界强调=异常状态</span>
+          </div>
+          <span id="range-label">0–8500 ms</span>
+        </footer>
+      </section>
+    </div>
+  </main>
+
+  <div id="detail" class="panel-shell panel-shell-quiet event-popover" role="dialog" aria-label="事件详情" hidden></div>
+
+  <script src="../../vendor/pto-design-system/patterns/workbench-shell/pattern.js"></script>
+  <script src="../../vendor/pto-design-system/patterns/ide-frame/pattern.js"></script>
+  <script src="../../vendor/pto-design-system/patterns/swimlane-task/pattern.js"></script>
+  <script src="../../vendor/pto-design-system/patterns/pass-ir-graph-node/pattern.js"></script>
+  <script src="../../vendor/pto-design-system/patterns/model-graphviz/pattern.js?v=toggle-hit-2"></script>
+  <script src="../../vendor/pto-design-system/patterns/model-architecture-front-view/pattern.js?v=front-view-8"></script>
+  <script src="./timeline-contract-v4.js?v=20260911-front-view-3"></script>
+  <script src="./training-view-adapters-v4.js?v=20260911-front-view-4"></script>
+  <script src="./training-structure-time-v4.js?v=20260911-front-view-3"></script>
+</body>
+</html>
