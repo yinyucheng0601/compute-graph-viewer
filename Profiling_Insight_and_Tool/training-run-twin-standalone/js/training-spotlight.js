@@ -14,6 +14,16 @@
 
   var MARGIN = 8;
 
+  // 256 专家负载热力循环动画(问题二「模型·数值层」步专用,见 js/training-run-twin.js
+  // 的 window.PtoTrainingExpertHeatLoop):谁开的谁关——每步开头统一停一次(freeze 在
+  // 坍缩终态,与不在该步时页面别处看到的"非常极端"保持一致),该步 prep 再按需重新开始。
+  function startExpertHeatLoop() {
+    try { window.PtoTrainingExpertHeatLoop && window.PtoTrainingExpertHeatLoop.start(); } catch (x) {}
+  }
+  function stopExpertHeatLoop() {
+    try { window.PtoTrainingExpertHeatLoop && window.PtoTrainingExpertHeatLoop.stop(); } catch (x) {}
+  }
+
   function scrollCardIntoView(sel, block) {
     var el = document.querySelector(sel);
     if (el && el.scrollIntoView) {
@@ -118,7 +128,11 @@
       { n: 5, layer: "模型层 → 数值层（根因）", short: "模型·数值",
         eventId: "p1-root",
         target: function () { return document.getElementById("deckStage"); },
-        prep: function () { /* activateProblemLens 已聚焦 layer 38 router 并展开 routed_expert_bank */ },
+        // activateProblemLens 已聚焦 layer 38 router 并展开 routed_expert_bank;
+        // 这里让 256 专家负载热力循环播放"均衡 → 坍缩"过渡,而不是停在坍缩终态干等
+        // (见 js/training-run-twin.js 的 window.PtoTrainingExpertHeatLoop,离开本步由
+        // go() 开头统一调用 stopExpertHeatLoop() 关掉,与 clearSwimlaneFocus 同一套谁开谁关)。
+        prep: function () { startExpertHeatLoop(); },
         body: "layer 38 router 把 98% token 路由到 expert 193，247 个 dead expert = 路由彻底塌缩。根因：router softmax 在 FP8 下 max(logits)=1846 → exp 溢出为 inf。",
         nums: ["98% token → E193", "max(logits)=1846→inf", "FP8 softmax 溢出"],
         fix: [0, 1, 2, 3] },
@@ -493,6 +507,7 @@
     // 跨组件的临时视觉态在每一步开头统一复位,再由本步的 prep 按需重新打开 ——
     // 这样组件不必知道"上一步是谁",步与步之间也不会互相漏状态。
     clearSwimlaneFocus();
+    stopExpertHeatLoop();
 
     // 把当前证据挪到可见
     if (st.prep) { try { st.prep(); } catch (x) {} }
@@ -681,6 +696,7 @@
     if (!open) return;
     open = false;
     clearSwimlaneFocus();
+    stopExpertHeatLoop();
     if (raf) { window.cancelAnimationFrame(raf); raf = 0; }
     guideOn = true;
     if (els) {

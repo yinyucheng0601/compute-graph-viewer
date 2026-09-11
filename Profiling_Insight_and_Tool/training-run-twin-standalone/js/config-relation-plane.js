@@ -317,7 +317,22 @@
     { at: 0.82, tag: "④ 路由塌缩", clock: "exp() = Inf · softmax 塌成 one-hot" },
   ];
   const ROUTE_COLLAPSE_AT = ROUTE_PHASES[3].at;   // 从这里开始才向 one-hot 混合
-  const ROUTE_COLLAPSE_MAX = 0.98;               // 事件 2.5 的读数：单专家吃掉 98%
+  /* 问题一的现场数据（定位链 §3–4）：这里不用四舍五入后的 0.98 反推，保留采样
+     与通信 trace 的原始口径，横幅、气泡和右栏才能互相核对。真实部署的 expert →
+     EP rank 映射不是本页配置态采用的连续切分；事故记录明确给出 E193 → EP rank 23，
+     所以运行态热力按观测映射落点，而不是用 floor(193 / 4) 猜一个 rank。 */
+  const ROUTE_INCIDENT = Object.freeze({
+    model: "openpangu-flash",
+    layer: 38,
+    expert: 193,
+    epRank: 23,
+    totalTokens: 8192,
+    expertTokens: 8028,
+    deadExperts: 247,
+    sendTokens: 0,
+    recvTokens: 9832,
+  });
+  const ROUTE_COLLAPSE_MAX = ROUTE_INCIDENT.expertTokens / ROUTE_INCIDENT.totalTokens;
 
   /* ── 这根轴的时间口径：step ────────────────────────────────────────────────
      轴上那个 τ 只是「进程」，读的人第一个问题一定是「这是多长的一段时间」。答案
@@ -633,9 +648,32 @@
        所以按「锐化到底（α 取最大值 6）时哪一格最重」来定，再在那一格里挑最重的
        那个专家 —— 与 routeOf 的分布同一把尺子量出来的答案。 */
     let hotPoint = null;
+    let routeIncident = null;
     function hotOf() {
       if (hotPoint) return hotPoint;
       const moeLayers = t.layers.filter((l) => l.ffn === "moe").map((l) => l.index);
+
+      /* openPangu 的事故不是模拟器自由挑出的“某个热点”，而是一条已经取证的数据：
+         Layer 38 / E193 / EP rank 23。openPangu 的其它 EP 配置也固定跟踪 E193，只把
+         它投影到当前配置的专家分片；切到参考 EP64 时再启用 rank 23 与原始 trace。 */
+      const openPanguCaseFits = (cfg.model || pre.id) === ROUTE_INCIDENT.model
+        && ROUTE_INCIDENT.expert < routedTotal
+        && moeLayers.includes(ROUTE_INCIDENT.layer);
+      if (openPanguCaseFits) {
+        const exactIncident = routedTotal === 256 && ep === 64;
+        /* 事故 token 数据与“投影到当前配置的哪一个 EP rank”是两件事：EP8 默认档
+           同样演 E193 的 8028/8192，只是它按当前分片落在 EP6（rank108）而非事故
+           部署的 EP23；切回 EP64 参考配置时才恢复 trace 里的 rank23。 */
+        routeIncident = ROUTE_INCIDENT;
+        hotPoint = {
+          expert: ROUTE_INCIDENT.expert,
+          layer: ROUTE_INCIDENT.layer,
+          epIdx: exactIncident ? ROUTE_INCIDENT.epRank : t.epRankOfExpert(ROUTE_INCIDENT.expert),
+          incident: routeIncident,
+        };
+        return hotPoint;
+      }
+
       // 层多时抽样即可：要的是「哪一层最容易塌」，不是把每一层都排个名次
       const stride = Math.max(1, Math.ceil(moeLayers.length / 32));
       let layer = moeLayers.length ? moeLayers[0] : -1;
@@ -669,10 +707,72 @@
       return hotPoint;
     }
 
-    /* 一层的分布算一次就够（ep 个数），但它随 τ 变 —— 缓存连 τ 一起记，拖动
-       时间轴自动失效。一层的代价是 routedExpert 次幂运算，不进逐格热路径。 */
+    /* 一层的分布算一次就够，但右栏现在还要把 EP rank 继续展开到每个 expert，所以
+       缓存的源数据改成 expert 份额；rank 份额只做一次聚合。两份缓存都连 τ 一起记。 */
+    let expertRouteCache = new Map();
+    let expertRouteCacheTau = -1;
     let routeCache = new Map();
     let routeCacheTau = -1;
+
+    function expertRouteOf(layer) {
+      if (!routeOn) return null;
+      if (expertRouteCacheTau !== routeTau) {
+        expertRouteCache = new Map();
+        expertRouteCacheTau = routeTau;
+      }
+      let arr = expertRouteCache.get(layer);
+      if (arr) return arr;
+
+      const hot = hotOf();
+      const ramp = clamp(routeTau / ROUTE_COLLAPSE_AT, 0, 1);
+      const alpha = 1 + 5 * ramp * ramp;        // 慢起快落：前半段几乎还是均衡的
+      const collapseP = routeTau <= ROUTE_COLLAPSE_AT ? 0
+        : (routeTau - ROUTE_COLLAPSE_AT) / (1 - ROUTE_COLLAPSE_AT);
+      // 塌缩只发生在那一层；邻层跟着更偏一点（α 再抬），但不向 one-hot 走
+      const d = Math.abs(layer - hot.layer);
+      const p = layer === hot.layer ? collapseP : 0;
+      const a = alpha * (d > 0 && d <= 3
+        ? 1 + 0.5 * ROUTE_COLLAPSE_MAX * collapseP / Math.max(1, d) : 1);
+
+      arr = new Float64Array(routedTotal);
+      let total = 0;
+      for (let e = 0; e < routedTotal; e += 1) {
+        const w = Math.pow(expertBase(e, layer), a);
+        arr[e] = w;
+        total += w;
+      }
+      const norm = total > 0 ? 1 / total : 0;
+      for (let e = 0; e < routedTotal; e += 1) arr[e] *= norm;
+
+      if (p > 0) {
+        const target = new Float64Array(routedTotal);
+        target[hot.expert] = ROUTE_COLLAPSE_MAX;
+        if (routeIncident) {
+          /* 8028 + 164 = 8192；除 E193 外仅 8 个专家仍有 token，正好留下 247 个
+             dead experts。8 个幸存者取事故前基础热度最高者，保证塌缩是原有偏斜的
+             延续；164 按 21×4 + 20×4 分完，不凭空丢 token。 */
+          const survivors = Array.from({ length: routedTotal }, (_, e) => e)
+            .filter((e) => e !== hot.expert)
+            .sort((x, y) => expertBase(y, layer) - expertBase(x, layer))
+            .slice(0, 8);
+          survivors.forEach((e, i) => {
+            target[e] = (i < 4 ? 21 : 20) / routeIncident.totalTokens;
+          });
+        } else {
+          const rest = Math.max(1e-12, 1 - arr[hot.expert]);
+          const scale = (1 - ROUTE_COLLAPSE_MAX) / rest;
+          for (let e = 0; e < routedTotal; e += 1) {
+            if (e !== hot.expert) target[e] = arr[e] * scale;
+          }
+        }
+        for (let e = 0; e < routedTotal; e += 1) {
+          arr[e] = (1 - p) * arr[e] + p * target[e];
+        }
+      }
+
+      expertRouteCache.set(layer, arr);
+      return arr;
+    }
 
     function routeOf(layer) {
       if (!routeOn) return null;
@@ -681,28 +781,17 @@
       if (arr) return arr;
 
       const hot = hotOf();
-      const ramp = clamp(routeTau / ROUTE_COLLAPSE_AT, 0, 1);
-      const alpha = 1 + 5 * ramp * ramp;        // 慢起快落：前半段几乎还是均衡的
-      const gRaw = routeTau <= ROUTE_COLLAPSE_AT ? 0
-        : ROUTE_COLLAPSE_MAX * (routeTau - ROUTE_COLLAPSE_AT) / (1 - ROUTE_COLLAPSE_AT);
-      // 塌缩只发生在那一层；邻层跟着更偏一点（α 再抬），但不向 one-hot 走
-      const d = Math.abs(layer - hot.layer);
-      const g = layer === hot.layer ? gRaw : 0;
-      const a = alpha * (d > 0 && d <= 3 ? 1 + 0.5 * gRaw / Math.max(1, d) : 1);
-
+      const expertShares = expertRouteOf(layer);
       arr = new Float64Array(ep);
-      let total = 0;
       for (let e = 0; e < routedTotal; e += 1) {
-        const w = Math.pow(expertBase(e, layer), a);
-        arr[Math.floor(e / epr)] += w;
-        total += w;
+        /* 运行态按 trace 的 E193 → EP rank 23 落点；其余专家仍沿用配置态分片。
+           这条只在精确事故配置启用，避免把观测映射冒充通用切分公式。 */
+        const p = routeIncident && e === hot.expert
+          ? hot.epIdx : Math.floor(e / epr);
+        arr[p] += expertShares[e];
       }
-      const norm = total > 0 ? 1 / total : 0;
-      for (let p = 0; p < ep; p += 1) {
-        const share = arr[p] * norm;
-        // 份额 → 「均分的多少倍」：均分 = 1/ep，所以乘 ep
-        arr[p] = ((1 - g) * share + (p === hot.epIdx ? g : 0)) * ep;
-      }
+      // 份额 → 「均分的多少倍」：均分 = 1/ep，所以乘 ep
+      for (let p = 0; p < ep; p += 1) arr[p] *= ep;
       routeCache.set(layer, arr);
       return arr;
     }
@@ -1019,6 +1108,10 @@
       range: (metric) => (metric === "route" ? routeRange() : allRanges()[metric]),
       // 塌缩点（专家 / 层 / EP rank）：气泡与时间轴读数要指名道姓
       hot: () => (routeOn ? hotOf() : null),
+      // 只有 openPangu EP64 的已取证事故有这份原始统计；通用回退返回 null
+      incident: () => { if (!routeOn) return null; hotOf(); return routeIncident; },
+      // 右栏 Expert Compute 矩阵：每项是该 expert 占本层 routed token 的份额
+      expertRoute: (layer) => expertRouteOf(layer),
       // 这一格踩到故障没有（气泡用）；FAULT 本身给横幅，要写出「哪台机器 / 哪一段」
       note: faultNote,
       faults: FAULT,
@@ -3086,7 +3179,13 @@
         + ` · ${routePhase(routeTau).tag} · ${routeStepText(routeTau)}`;
       if (hot && col.type === "layer" && col.layer === hot.layer
         && topology.coordsOfRank(Number(cell.dataset.rank)).epIdx === hot.epIdx) {
-        line += `\n⚠ 塌缩点：这张卡持有 E${hot.expert}`;
+        line += `\n⚠ 塌缩点：E${hot.expert} 的 token 聚集到这张卡`;
+        const incident = hm.incident();
+        if (incident) {
+          line += `（${incident.expertTokens}/${incident.totalTokens}，`
+            + `${(incident.expertTokens / incident.totalTokens * 100).toFixed(1)}%）`
+            + `\nAll-to-All：send=${incident.sendTokens} / recv=${incident.recvTokens}`;
+        }
       }
     } else {
       // 前五个度量：踩到那处构造的故障就说清是什么烫了它
@@ -4053,6 +4152,24 @@
   function heatWorstPick() {
     const hm = heatModel();
     if (!hm || !layout) return null;
+    /* 专家负载不是“从均衡首帧找最大值”，而是跟踪这次事故的已知塌缩点。
+       否则自动播放从 τ=0 起步时会选中一张普通热点卡，动画终局虽然 E193 变红，
+       右栏却还停在别处，事故证据永远不会自动出现。 */
+    if (heatMetric === "route") {
+      const hot = hm.hot();
+      if (!hot) return null;
+      const stage = topology.stageOfLayer(hot.layer);
+      return {
+        rank: topology.rankOf(stage, 0, hot.epIdx, 0),
+        stage,
+        layer: hot.layer,
+        unit: null,
+        span: 1,
+        isIncidentFocus: Boolean(hm.incident()),
+        worstMetric: heatMetric,
+        worstTau: routeTau,
+      };
+    }
     let best = null;
     let bestValue = -Infinity;
     layout.blocks.forEach((block) => {
@@ -4076,6 +4193,86 @@
   function selectHeatWorst() {
     heatPick = heatWorstPick();
     renderHeatDetail();
+  }
+
+  /* 右栏放大的是“选中这一格”的 Expert Compute，不是全层 256 expert 总览：专家
+     集合直接取该格 EP rank 的 expertsOfEpRank()，与配置寻优放大格子的来源完全相同。
+     颜色直接走 heatColor，同一根时间轴每 120ms 重绘，因此 E193 的升温与画布上的
+     rank 热带严格同拍。 */
+  function routeExpertMatrix(hm, col, hot, incident, co) {
+    if (!col.moe || !hot) return null;
+    const shares = hm.expertRoute(col.layer);
+    if (!shares || !shares.length) return null;
+
+    let experts = topology.expertsOfEpRank(co.epIdx).slice();
+    const exactObservedMapping = incident && topology.counts.ep === 64
+      && co.epIdx === hot.epIdx && !experts.includes(hot.expert);
+    /* EP64 事故 trace 只证明 E193 在 rank23，未给同卡另外三位的编号。配置态的连续
+       切分与这条观测映射冲突时，不编造三个 ID：保留四个槽位，只写已知的 E193。 */
+    if (exactObservedMapping) {
+      experts = Array.from({ length: Math.max(1, topology.counts.expertsPerEpRank) }, () => null);
+      experts[experts.length - 1] = hot.expert;
+    }
+    if (!experts.length) return null;
+
+    const known = experts.filter(Number.isFinite);
+    const rangeText = known.length
+      ? `E${Math.min(...known)}–E${Math.max(...known)}` : `${experts.length} experts`;
+    const sec = section(`Expert Compute · 本格 ${rangeText}`);
+    sec.classList.add("crop-route-experts");
+    const totalTokens = incident ? incident.totalTokens : 0;
+    const hotShare = shares[hot.expert] || 0;
+    const localShare = known.reduce((sum, expert) => sum + (shares[expert] || 0), 0);
+    const alive = known.filter((expert) => totalTokens
+      ? Math.round((shares[expert] || 0) * totalTokens) > 0 : (shares[expert] || 0) > 1e-8).length;
+    const meta = el("div", "crop-route-experts__meta");
+    meta.appendChild(el("span", "crop-route-experts__step",
+      `${routeStepText(routeTau)} · ${routePhase(routeTau).tag}`));
+    meta.appendChild(el("span", "crop-route-experts__read",
+      incident
+        ? `本格 ${Math.round(localShare * totalTokens)} token · 活跃 ${alive}/${known.length}`
+        : `本格 ${(localShare * 100).toFixed(2)}% · 活跃 ${alive}/${known.length}`));
+    sec.appendChild(meta);
+
+    const grid = el("div", "crop-detail__grid crop-route-experts__grid");
+    grid.style.setProperty("--crop-chip-cols", String(Math.min(8, experts.length)));
+    grid.setAttribute("role", "grid");
+    grid.setAttribute("aria-label", `rank ${co.rank} × Layer ${col.layer} 本地专家 token 负载矩阵`);
+    experts.forEach((expert) => {
+      const knownExpert = Number.isFinite(expert);
+      const share = knownExpert ? (shares[expert] || 0) : 0;
+      const isHot = expert === hot.expert;
+      const chip = el("span", `crop-expert crop-expert--mini crop-route-expert${isHot ? " is-hot" : ""}`,
+        knownExpert ? `E${expert}` : "—");
+      const tokens = totalTokens ? Math.round(share * totalTokens) : null;
+      const load = share * shares.length;
+      /* 固定以事故终态 98% 为热端，而不是每帧拿当前最大值重新拉伸：这样正常态整片
+         是冷的，E193 真正聚集 token 时才一路走到火红。0.45 次幂抬高中段辨识度。 */
+      const u = clamp(Math.pow(share / Math.max(1e-12, ROUTE_COLLAPSE_MAX), 0.45), 0, 1);
+      chip.style.setProperty("--crop-heat", heatColor(u));
+      if (knownExpert) chip.dataset.expert = expert;
+      else chip.classList.add("is-unknown");
+      chip.setAttribute("role", "gridcell");
+      chip.setAttribute("aria-label", knownExpert
+        ? `Expert ${expert}，${tokens == null ? `${(share * 100).toFixed(3)}%` : `${tokens} token`}，均分的 ${load.toFixed(2)} 倍`
+        : "事故 trace 未提供本地专家编号");
+      chip.title = knownExpert
+        ? `E${expert}\n${tokens == null ? `份额 ${(share * 100).toFixed(3)}%` : `${tokens} token · 份额 ${(share * 100).toFixed(3)}%`}\n均分的 ${load.toFixed(2)}×`
+        : "该槽位的 expert ID 未出现在事故 trace 中";
+      grid.appendChild(chip);
+    });
+    sec.appendChild(grid);
+
+    const legend = el("div", "crop-route-experts__legend");
+    legend.append(
+      el("span", "", "0 token"),
+      el("span", "crop-heat__legend-ramp"),
+      el("span", "", incident && known.includes(hot.expert)
+        ? `E${hot.expert} ${Math.round(hotShare * totalTokens)} token` : "高负载"),
+    );
+    legend.querySelector(".crop-heat__legend-ramp").style.background = HEAT_RAMP_CSS;
+    sec.appendChild(legend);
+    return sec;
   }
 
   function renderHeatDetail() {
@@ -4127,6 +4324,28 @@
       metrics.appendChild(kvRow(m.label, Number.isFinite(v) ? heatFmt(v, m) : "不适用", true));
     });
     heatDetail.appendChild(metrics);
+
+    /* 专家负载的最热点要能直接完成一次诊断，而不是只给一个红格子。右栏保留定位链
+       里的四个可核对原始量：专家 token、dead experts、send/recv、最终判据。 */
+    const hot = heatMetric === "route" ? hm.hot() : null;
+    const incident = heatMetric === "route" ? hm.incident() : null;
+    const expertMatrix = heatMetric === "route" ? routeExpertMatrix(hm, col, hot, incident, co) : null;
+    if (expertMatrix) heatDetail.appendChild(expertMatrix);
+    const onIncident = hot && incident && p.layer === hot.layer && co.epIdx === hot.epIdx;
+    if (onIncident) {
+      const evidence = section("事故证据 · step 15203");
+      evidence.appendChild(kvRow("聚集专家", `Layer ${incident.layer} · Expert ${incident.expert}`, true));
+      evidence.appendChild(kvRow("位置映射", hot.epIdx === incident.epRank
+        ? `EP rank ${incident.epRank}`
+        : `当前配置 EP rank ${hot.epIdx} · 事故部署 EP rank ${incident.epRank}`, true));
+      evidence.appendChild(kvRow("Token 分配",
+        `${incident.expertTokens} / ${incident.totalTokens}（${(incident.expertTokens / incident.totalTokens * 100).toFixed(1)}%）`, true));
+      evidence.appendChild(kvRow("Dead experts", `${incident.deadExperts} / ${c.routedExpert}`, true));
+      evidence.appendChild(kvRow(`事故 rank ${incident.epRank} buffer`, `send=${incident.sendTokens} · recv=${incident.recvTokens}`, true));
+      evidence.appendChild(el("p", "crop-warn",
+        `Router 输出塌缩为近 one-hot：1 个 EP rank 承载几乎全部 token，其余 ${Math.max(0, c.ep - 1)} 个 rank 空等，最终触发 All-to-All send/recv 失配。`));
+      heatDetail.appendChild(evidence);
+    }
 
     const note = hm.note(heatMetric, col, p.rank);
     if (note) heatDetail.appendChild(el("p", "crop-warn", note.trim()));
@@ -5896,11 +6115,13 @@
        同框。lead 只留两样下面那条说不了的：拖到了第几个 step，以及塌缩点是哪张卡。 */
     if (heatMetric === "route") {
       const hot = hm.hot();
+      const incident = hm.incident();
       if (!hot) return "";
       return `${routeStepText(routeTau)} —— 塌缩点在 Layer ${hot.layer} 的 E${hot.expert}`
         + `（EP rank ${hot.epIdx}）`
         + (routeTau > ROUTE_COLLAPSE_AT
-          ? `：它正在吃掉本层 ${Math.round(ROUTE_COLLAPSE_MAX * 100)}% 的 token，同层其余全灭`
+          ? `：它正在吃掉本层 ${incident ? `${incident.expertTokens}/${incident.totalTokens}（${(ROUTE_COLLAPSE_MAX * 100).toFixed(1)}%）` : `${Math.round(ROUTE_COLLAPSE_MAX * 100)}%`} 的 token`
+            + (incident ? `，${incident.deadExperts} 个 dead experts，send=${incident.sendTokens}/recv=${incident.recvTokens}` : "，同层其余全灭")
           : "：这会儿还只是偏，拖到底看它塌下去");
     }
     if (heatMetric === "mem") {
@@ -5950,9 +6171,10 @@
     /* 末相把塌缩点写实：不指名道姓的话，「④ 路由塌缩」只是一句形容词，而这幅图
        真正的用处是**指到那张卡上**（同一份配置每次指同一张，可复现）。 */
     const hot = model ? model.hot() : null;
+    const incident = model ? model.incident() : null;
     const last = heatBannerPhaseEls[heatBannerPhaseEls.length - 1];
     last.clock.textContent = routeTau >= 1 && hot
-      ? `E${hot.expert} 吃掉 ${Math.round(ROUTE_COLLAPSE_MAX * 100)}% · Layer ${hot.layer} · EP rank ${hot.epIdx}`
+      ? `E${hot.expert} 吃掉 ${incident ? `${incident.expertTokens}/${incident.totalTokens}` : `${Math.round(ROUTE_COLLAPSE_MAX * 100)}%`} · Layer ${hot.layer} · EP rank ${hot.epIdx}`
       : ROUTE_PHASES[ROUTE_PHASES.length - 1].clock;
   }
 

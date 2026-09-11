@@ -2241,6 +2241,13 @@
     toggleExpertExpand: function () { toggleRoutedExpertBankExpand(); },
   };
 
+  // 供 js/training-spotlight.js 的问题二「模型·数值层」步调用:进入该步循环播放
+  // 256 专家负载热力"均衡 → 坍缩"过渡,离开该步(或关闭聚光灯)时钉回坍缩终态。
+  window.PtoTrainingExpertHeatLoop = {
+    start: function () { startExpertHeatLoop(); },
+    stop: function () { stopExpertHeatLoop(); },
+  };
+
   function renderAll() {
     renderVitals();
     renderProgress();
@@ -4706,6 +4713,80 @@
     // 卡片是按当前 step 生成的,记下来,免得紧接着的一次 syncExpertHeatToStep() 又原值重写一遍
     // (重写会把刚起步的 2s 揭示动画从头打断)
     if (grids.some((g) => !g.dataset.heatStatic)) lastHeatStep = state.step;
+  }
+
+  // ── 聚光灯定位链「模型·数值层」步专用:循环播放"均衡 → 坍缩"过渡 ──────────────
+  // 只作用在会跟着卡片走的活网格(排除「模型层展开图」那种钉死终态的 data-heat-static 举证图)。
+  // 坍缩态直接读 data-fill/data-op(当前 step 的真实负载);均衡态现算(见 setEven,带自然抖动,
+  // 不用整片同色的静态初值)。两态都只改行内 style,不碰 dataset,数据本身全程不动。
+  // 不进 rAF、只用一根 setTimeout 链自我调度,stop 时 clearTimeout 即可整链掐断。
+  var expertHeatLoopTimer = null;
+  function expertHeatLoopGrids() {
+    return Array.from(document.querySelectorAll(".lv-heat-grid:not([data-heat-static])"));
+  }
+  // freeze=false 只清定时器不改画面(startExpertHeatLoop 重启前调用);
+  // 默认(freeze 省略/true)额外把画面钉回坍缩终态,与不在该步时页面别处看到的"非常极端"一致。
+  function stopExpertHeatLoop(freeze) {
+    if (expertHeatLoopTimer) { clearTimeout(expertHeatLoopTimer); expertHeatLoopTimer = null; }
+    if (freeze === false) return;
+    expertHeatLoopGrids().forEach((g) => {
+      var cells = Array.from(g.querySelectorAll(".lv-heat-cell"));
+      g.classList.add("is-heat-live");
+      cells.forEach((el) => {
+        el.style.transition = "none";
+        el.style.fill = el.dataset.fill || el.getAttribute("fill");
+        el.style.opacity = el.dataset.op || el.getAttribute("opacity");
+      });
+      void g.getBoundingClientRect();
+      cells.forEach((el) => { el.style.transition = ""; });
+    });
+  }
+  var LV_HEAT_LOOP_HOT_MS = 2000, LV_HEAT_LOOP_HOT_HOLD_MS = 1400, LV_HEAT_LOOP_EVEN_HOLD_MS = 500;
+  function startExpertHeatLoop() {
+    stopExpertHeatLoop(false);   // 先掐掉可能残留的旧循环,画面不动(马上会被下面接管)
+    var grids = expertHeatLoopGrids();
+    if (!grids.length) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { stopExpertHeatLoop(); return; }   // 尊重「减少动态效果」,直接停在坍缩终态
+    // 均衡态不用 evenFill/evenOp 那个整片同色的静态初值(256 格一个色,循环起来像在演示
+    // "开关"而不是"训练")——换成 lvExpertLoads() 自带的跨专家正弦扰动(健康训练本来就有
+    // 这点自然不均):取 step=0(落在 lvRouteSkew 的 floor 区间,skew≈0.002 几乎纯均衡分量),
+    // 每个专家因此各自落在略有高低的档位上,而不是 256 个格子一模一样的颜色。
+    var EVEN_SAMPLE_STEP = 0;
+    function setEven() {
+      grids.forEach((g) => {
+        g.classList.remove("is-heat-live");   // 循环两个方向都走 2s,节奏才看得清
+        var hotId = Number(g.dataset.heatHot);
+        var neutral = g.dataset.heatNeutral === "1";
+        var loads = lvExpertLoads(hotId, EVEN_SAMPLE_STEP);
+        g.querySelectorAll(".lv-heat-cell").forEach((el) => {
+          var load = loads[Number(el.dataset.e)];
+          var t = load == null ? lvHeatT(1 / LV_BASE.routedExperts) : lvHeatT(load);
+          el.style.fill = lvHeatFill(t, neutral);
+          el.style.opacity = lvHeatOpacity(t).toFixed(3);
+        });
+      });
+    }
+    function setHot() {
+      grids.forEach((g) => {
+        g.classList.remove("is-heat-live");
+        g.querySelectorAll(".lv-heat-cell").forEach((el) => {
+          el.style.fill = el.dataset.fill || el.getAttribute("fill");
+          el.style.opacity = el.dataset.op || el.getAttribute("opacity");
+        });
+      });
+    }
+    // 首帧不带过渡地定格在「均衡」,避免从当前(可能已是上一次的坍缩终态)直接跳读成一次瞬移
+    grids.forEach((g) => { g.querySelectorAll(".lv-heat-cell").forEach((el) => { el.style.transition = "none"; }); });
+    setEven();
+    void grids[0].getBoundingClientRect();
+    grids.forEach((g) => { g.querySelectorAll(".lv-heat-cell").forEach((el) => { el.style.transition = ""; }); });
+    function cycle(hot) {
+      if (hot) setHot(); else setEven();
+      expertHeatLoopTimer = window.setTimeout(function () { cycle(!hot); },
+        LV_HEAT_LOOP_HOT_MS + (hot ? LV_HEAT_LOOP_HOT_HOLD_MS : LV_HEAT_LOOP_EVEN_HOLD_MS));
+    }
+    expertHeatLoopTimer = window.setTimeout(function () { cycle(true); }, 60);
   }
 
   // 按给定 step 给一块热力网格重新着色(含格子 <title> 的占比读数)。
