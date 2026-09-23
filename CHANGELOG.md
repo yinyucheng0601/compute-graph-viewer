@@ -5,16 +5,25 @@
 
 ---
 
+## 2026-09-23 — rank-intro 切换为 memory-improved 版本
+
+- `Profiling_Insight_and_Tool/rank-intro/rank-intro.html` 改由 memory-improved 版本顶替，原版改存 `rank-intro-old.html`；`config-relation-observer.html` / `config-relation-plane.html` 的「what is rank」入口继续指向 `../rank-intro/rank-intro.html`，自动落到新页面。
+- 新增 `rank-memory-figures-guide.md`（Rank 显存柱右侧三图解读）与 `改进意见.md`（两级显存账本反馈）。
+
 ## 2026-09-23 — 训练监控 v2 顶栏新增 moe load 入口
 
 - `training-run-twin-standalone/training-monitoring-v2.html` 顶栏右侧新增 “moe load” 外链入口（`#navMoeLoad`），新标签页打开 `pangu-moe-trainviz/op-rank-time-wzhBranch.html`；复用 `.twin-problem-link` 样式，与“问题2释义”并排，不新增按钮样式。
 
 ## 2026-09-22 — Router logits 第二步加入 15000→15203 快速训练视图
 
-- `training-run-twin-standalone/router-logits-viz.html` 的第二步保留单行 x × 单列 W_gate 的逐项乘加讲解，随后切换到 204 个真实 step 的快速播放；micro-batch 从紫色数据池飞入并覆盖 x，四张矩阵按序刷新。
-- 第二步复用后续章节的 W_gate 根因卡、logits 量表与双曲线视觉，并新增 256 expert token 热力图，联动呈现列范数 30→50、max|logit| 290→410→1846，以及 expert 193 负载逐渐偏斜到 98%。
+- `training-run-twin-standalone/router-logits-viz.html` 的第二步保留单行 x × 单列 W_gate 的逐项乘加讲解，随后切换到 204 个真实 step 的快速播放；训练数据格从紫色数据池飞入并覆盖 x，四张矩阵按序刷新。
+- 第二步复用后续章节的 W_gate 根因卡与 logits 趋势线，并新增 256 expert token 热力图，联动呈现列范数 30→50、max|logit| 290→410→1846，以及 expert 193 负载逐渐偏斜到 98%。
 - step 15203 只让命中的 token 行因 1846 越过 E4M3 上界而变成 NaN，其余展示行保持有限，和定位链的单行污染叙事一致。
-- 收紧第二步信息密度：上下两排共用同一套七列网格，四个诊断卡与 x / W_gate / logits / probs 逐列等宽；上排压到 132px。数据池扩为 480 格、本窗口仅消耗 204 格；热力图明确为 Layer 28；移除重复的 W_gate 趋势与说明行，计算公式常驻并默认折叠。
+- 收紧第二步信息密度：上下两排共用同一套七列网格，四个诊断卡与 x / W_gate / logits / probs 逐列等宽；上排压到 132px。数据池扩为 480 格，进入 step 15000 时预先留出 72 格历史消耗，本窗口继续消耗 204 格；热力图明确为 Layer 28；移除重复的 W_gate 趋势与说明行，计算公式常驻并默认折叠。
+- Layer 28 专家 token 热力矩阵改用 `config-relation-plane`「负载热力」页签同款 6 段非等距色阶（冷蓝 → 紫红 → 火橙，中段绕开绿色），并复用相同停点与线性插值。
+- 第二步进一步精简卡片：统一隐藏标题色点，W_gate 数值固定使用正文色；训练数据卡移除进度条并弱化右上角 step，logits 曲线移除内嵌图例；专家热力去除 meta 行并将数量并入“Layer 28 · 256专家 token 热力”标题。
+- 第二步 W_gate 卡标题明确为“W_gate 第 193 列 L2 范数”，删除重复的范数说明，新增第 193 列与其余 255 列平均值的横向柱状对比，并随 step 将目标列从 30 推进到 50。
+- 当 Router logit 越过 E4M3 上界进入报错态时，x、W_gate、Router logits、Router probs 四张计算卡统一切换为淡红背景与红色弱边框；重播或回到有限值场景时自动恢复。
 
 ## 2026-09-22 — rank-intro·案例四性能分析：列/卡选择互斥，域内耗时分布移入右栏
 

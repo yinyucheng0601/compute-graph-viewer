@@ -59,9 +59,6 @@
        -webkit-font-smoothing:antialiased;overflow:hidden}
   .page{height:100%;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:340px 1fr;
         grid-template-areas:"top top" "side stage" "foot foot"}
-  .page.mem-detail-open{grid-template-columns:340px 1fr;
-        grid-template-areas:"top top" "side stage" "foot foot"}
-  .page[data-side="off"].mem-detail-open{grid-template-columns:0 1fr}
 
   .top{grid-area:top;position:relative;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:22px 36px 0 36px}
   /* 左上角是两枚页签，不是一枚 brand：当前这套分步入门是第一页，「实战场景」先留空位 */
@@ -433,7 +430,7 @@
   html[data-theme="dark"] .theme .sun{display:block}
   html[data-theme="dark"] .theme .moon{display:none}
 
-  /* min-height:0 + overflow:hidden：左栏只承载步骤说明，不把右边画布撑高。 */
+  /* min-height:0 + overflow:hidden：左栏被钉在自己那一行里，读出卡长高只在栏内滚，不把整行撑高、把右边的画布一起拉长 */
   .side{grid-area:side;padding:40px 24px 24px 36px;display:flex;flex-direction:column;gap:18px;min-width:0;min-height:0;overflow:hidden}
   .side .no{font-family:var(--mono);font-size:11px;color:var(--fg3);letter-spacing:.08em}
   .side h1{font-size:22px;line-height:1.3;margin:0;font-weight:700}
@@ -443,9 +440,8 @@
   .side code{font-family:var(--mono);font-size:12px;background:rgba(var(--fgrgb),.05);padding:1px 5px;border-radius:4px;color:var(--fg)}
   .side .fade{transition:opacity .25s}
   .side.switching .fade{opacity:0}
-  /* 读出卡悬浮在画布左下、工具组上方，不再占用说明侧栏。 */
-  .rankmem{--rm-surface:var(--bg);position:absolute;left:14px;bottom:56px;z-index:8;width:min(340px,calc(100% - 28px));max-height:calc(100% - 70px);
-           background:var(--rm-surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;font-family:var(--mono);font-size:12px;color:var(--fg2)}
+  /* 读出卡（照 demo 的 .pt-rankmem）：选中一张卡之后，它的显存账列在左栏底部 */
+  .rankmem{margin-top:auto;background:var(--bg2);border-radius:16px;padding:14px 16px;font-family:var(--mono);font-size:12px;color:var(--fg2)}
   .rankmem[hidden]{display:none}
   .rankmem .rm-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
   .rankmem .rm-h b{font-family:var(--sans);font-size:14px;font-weight:800;color:var(--fg);white-space:nowrap;flex:1}
@@ -465,20 +461,7 @@
   .rankmem tr.t td{border-top:1px solid var(--line);padding-top:5px;font-weight:800;font-size:13px;color:var(--fg)}
   .rankmem tr.t td.n{font-weight:400;font-size:12px;color:var(--fg3)}
   .rankmem .over{color:var(--bad)}
-  .rankmem .rm-subline{display:block;margin:1px 0 1px 15px;color:var(--fg3);font:400 10.5px/1.35 var(--sans)}
-  .rankmem .rm-cut-zone td{padding:4px 0 3px 14px;background:rgba(var(--fgrgb),.025);color:var(--fg3);font:600 10px/1.35 var(--sans);letter-spacing:.02em}
-  .rankmem .rm-axis{display:inline-flex;align-items:center;margin-left:4px;padding:0 4px;border-radius:4px;border:1px solid color-mix(in srgb,var(--axis-c,var(--line)) 45%,transparent);color:var(--axis-c,var(--fg3));font:700 9px/1.5 var(--mono)}
-  .rankmem .rm-water{height:7px;margin-top:6px;display:flex;position:relative;overflow:hidden;border-radius:999px;background:var(--bg);outline:1px solid var(--line)}
-  .rankmem .rm-water i{display:block;height:100%;flex:none}
-  .rankmem .rm-water.is-over{overflow:visible;margin-right:14px}
-  .rankmem .rm-water-cap{position:absolute;right:0;top:-2px;width:1px;height:11px;background:var(--fg);opacity:.55}
-  .rankmem .rm-water-meta{display:flex;justify-content:space-between;margin-top:3px;color:var(--fg3);font:10px/1.3 var(--mono)}
-  .rankmem .rm-summary{position:sticky;bottom:-14px;z-index:2;margin:6px -2px -14px;padding:7px 2px 12px;background:var(--rm-surface);border-top:1px solid var(--line)}
-  .rankmem .rm-summary-line{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:var(--fg)}
-  .rankmem .rm-summary-line b{font:800 13px/1.4 var(--mono)}
-  .rankmem .rm-summary-line span{color:var(--fg3);font:400 11px/1.4 var(--mono);white-space:nowrap}
-  .rankmem .rm-summary-line.over b,.rankmem .rm-summary-line.over span{color:var(--bad)}
-  /* 读出卡长高后在自身范围内滚动，不压住下面的画布工具。 */
+  /* 读出卡长高了就自己滚，不把左栏顶穿 */
   .rankmem{min-height:0;overflow:auto}
   /* 滚动条收细、去轨道，平时几乎看不见，指针进来才浮出来 */
   .rankmem{scrollbar-width:thin;scrollbar-color:transparent transparent;transition:scrollbar-color .2s}
@@ -515,55 +498,6 @@
   .rankmem .rm-d .c5 .c5h .c5d{color:var(--c);font-weight:800;margin-right:4px}
   .rankmem .rm-d .c5why{color:var(--fg3);font-size:11.5px;line-height:1.45}
   .rankmem .rm-d .c5gr{color:var(--c, var(--fg3));font-size:10.5px;letter-spacing:.04em;opacity:.85;margin-bottom:2px}
-
-  /* 二级信息覆盖在画布右侧，不参与主网格排版，打开时不挤压或重新适配画布。 */
-  .memdetail{position:fixed;right:12px;top:66px;bottom:72px;z-index:70;width:min(390px,calc(100vw - 24px));min-width:0;min-height:0;
-             padding:18px 24px;background:var(--bg);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.24);overflow:auto;
-             scrollbar-width:thin;scrollbar-color:rgba(var(--fgrgb),.20) transparent}
-  .memdetail[hidden]{display:none}
-  .memdetail .md-head{position:sticky;top:-18px;z-index:2;display:flex;align-items:flex-start;gap:10px;margin:-2px 0 12px;padding:14px 0 10px;background:var(--bg);border-bottom:1px solid var(--line)}
-  .memdetail .md-head>div{min-width:0;flex:1}
-  .memdetail .md-kicker{display:block;color:var(--fg3);font:600 10px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase}
-  .memdetail .md-title{display:block;margin-top:2px;color:var(--fg);font:700 16px/1.35 var(--sans)}
-  .memdetail .md-close{flex:none;border:1px solid var(--line);border-radius:6px;background:none;color:var(--fg3);padding:2px 7px;cursor:pointer;font:12px/1.5 var(--sans)}
-  .memdetail .md-close:hover{color:var(--fg);border-color:rgba(var(--fgrgb),.3)}
-  .memdetail .rm-d{font:400 12px/1.55 var(--mono);color:var(--fg2)}
-  .memdetail .rm-d .rm-dh{display:none}
-  .memdetail .rm-d dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;margin:0 0 10px}
-  .memdetail .rm-d dt{color:var(--fg3);white-space:nowrap}
-  .memdetail .rm-d dd{margin:0;color:var(--fg2)}
-  .memdetail .rm-d dd b{color:var(--fg);font-weight:700}
-  .memdetail .rm-note{margin:10px 0 0;padding:9px 10px;border-radius:8px;background:var(--bg2);color:var(--fg2);font:400 12px/1.55 var(--sans)}
-  .memdetail .rm-fig{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line)}
-  .memdetail .rm-fig svg{display:block;max-width:100%;height:auto}
-  .memdetail .rm-cap{margin-top:6px;color:var(--fg3);font:400 11.5px/1.5 var(--sans)}
-  .memdetail .c5{margin-top:10px;padding:7px 0 7px 10px;border-left:2px solid var(--c,var(--line))}
-  .memdetail .c5.off{opacity:.58;border-left-style:dashed}
-  .memdetail .c5h{color:var(--fg);font-weight:700;margin-bottom:3px}
-  .memdetail .c5d{color:var(--c);font-weight:800;margin-right:5px}
-  .memdetail .c5why{color:var(--fg3);font:11.5px/1.45 var(--sans)}
-  .memdetail .c5gr{color:var(--c,var(--fg3));font-size:10.5px;letter-spacing:.04em;opacity:.85;margin-bottom:2px}
-  .memdetail .comp-list{display:grid;gap:7px;margin-top:4px}
-  .memdetail .comp-row{display:grid;grid-template-columns:minmax(68px,auto) 1fr auto;gap:8px;align-items:center}
-  .memdetail .comp-name{color:var(--fg2);font:600 11px/1.3 var(--mono);white-space:nowrap}
-  .memdetail .comp-track{position:relative;height:7px;border-radius:999px;background:rgba(var(--fgrgb),.07);overflow:hidden}
-  .memdetail .comp-fill{display:block;height:100%;min-width:2px;border-radius:999px;background:var(--cc)}
-  .memdetail .comp-val{color:var(--fg3);font:10.5px/1.3 var(--mono);white-space:nowrap;text-align:right}
-  .memdetail .opt-compare{display:grid;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-  .memdetail .opt-compare h4{margin:0 0 2px;color:var(--fg);font:700 12px/1.4 var(--sans)}
-  .memdetail .opt-plan{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 9px;border-radius:8px;background:var(--bg2)}
-  .memdetail .opt-plan b{color:var(--fg);font:700 11.5px/1.35 var(--sans)}
-  .memdetail .opt-plan strong{color:var(--fg);font:800 12px/1.35 var(--mono)}
-  .memdetail .opt-plan span{grid-column:1/-1;color:var(--fg3);font:400 11px/1.45 var(--sans)}
-
-  /* 左下工具组：压力场景紧跟在缩放 HUD 右侧。 */
-  .canvas-bottom-tools{position:absolute;left:14px;bottom:12px;z-index:7;display:flex;align-items:center;gap:8px}
-  .mem-scenario[hidden]{display:none}
-  .mem-scenario{position:relative;display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
-  .mem-scenario button{border:0;border-radius:999px;background:none;color:var(--fg3);padding:5px 9px;cursor:pointer;font:600 11px/1 var(--sans)}
-  .mem-scenario button:hover{color:var(--fg)}
-  .mem-scenario button.is-on{background:var(--fg);color:var(--bg)}
-  .mem-scenario button[data-mem-scenario="danger"].is-on{background:var(--bad);color:#fff}
 
   /* 舞台：一块 canvas，十步全在上面变形 */
   .stage{grid-area:stage;position:relative;padding:12px 36px 12px 12px;min-width:0;min-height:0}
@@ -613,7 +547,7 @@
   .pt-cfgpanel .acts{display:flex;gap:8px}
   .pt-cfgpanel .acts button{flex:1;height:28px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg2);font:500 12px var(--sans);cursor:pointer}
   .pt-cfgpanel .acts button:hover{background:var(--bg2);color:var(--fg)}
-  .pt-zoomhud{position:relative;display:flex;align-items:center;gap:4px;padding:4px;
+  .pt-zoomhud{position:absolute;left:14px;bottom:12px;z-index:7;display:flex;align-items:center;gap:4px;padding:4px;
               border-radius:999px;border:1px solid var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent);
               backdrop-filter:blur(6px);box-shadow:0 1px 4px rgba(var(--fgrgb),.06)}
   .pt-zoomhud[hidden]{display:none}
@@ -705,18 +639,6 @@
     .pt-cfgpanel.is-open{width:min(410px,calc(100vw - 32px));max-height:calc(100vh - 68px)}
     .foot{padding:8px 16px 20px;flex-direction:column;align-items:stretch;gap:12px}
     .steps{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)}
-    .page.mem-detail-open,.page[data-side="off"].mem-detail-open{grid-template-columns:1fr;grid-template-areas:"top" "side" "stage" "foot"}
-    .memdetail{left:10px;right:10px;top:auto;bottom:10px;z-index:80;width:auto;max-height:68vh;padding:12px 16px 18px;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
-    .memdetail .md-head{top:-12px;margin:0 0 10px;padding:10px 0}
-    .rankmem{left:8px;bottom:50px;width:min(340px,calc(100% - 16px));max-height:calc(100% - 60px);padding:12px 14px}
-    .canvas-bottom-tools{left:8px;right:8px;bottom:8px;gap:4px}
-    .mem-scenario{padding:2px}
-    .mem-scenario button{padding:5px 6px;font-size:10px}
-  }
-  @media (min-width:861px) and (max-width:1200px){
-    .page.mem-detail-open,.page[data-side="off"].mem-detail-open{grid-template-columns:340px 1fr;grid-template-areas:"top top" "side stage" "foot foot"}
-    .page[data-side="off"].mem-detail-open{grid-template-columns:0 1fr}
-    .memdetail{position:fixed;right:12px;top:66px;bottom:72px;z-index:70;width:390px;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--bg);box-shadow:0 18px 50px rgba(0,0,0,.24)}
   }
 </style>
 <script>
@@ -726,10 +648,10 @@
 </script>
 </head>
 <body>
-<div class="page" data-side="off">
+<div class="page">
   <div class="top">
     <div class="tl">
-      <button class="sidetg" id="sideTg" type="button" title="收起 / 展开左侧栏" aria-label="收起 / 展开左侧栏" aria-pressed="false">
+      <button class="sidetg" id="sideTg" type="button" title="收起 / 展开左侧栏" aria-label="收起 / 展开左侧栏" aria-pressed="true">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect class="pane" x="3" y="5" width="7" height="14" rx="1.5"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 5v14"/></svg>
       </button>
       <div class="tabs" id="tabs" role="tablist">
@@ -783,33 +705,22 @@
     <div class="no fade" id="no"></div>
     <h1 class="fade" id="title"></h1>
     <div class="fade" id="body"></div>
+    <aside class="rankmem" id="rankMem" hidden></aside>
   </aside>
 
   <div class="stage" id="stage">
     <div class="box">
       <canvas id="cv"></canvas>
       <button class="ctog" id="etpTog" type="button" role="switch" aria-checked="false" hidden title="开：专家也按 TP 切成两半（ETP = TP = 2）；关：专家整份、只做 EP（ETP = 1，业界默认）。开关只改连线与门牌，不改卡阵"><span class="sw" aria-hidden="true"></span>按 TP 切分专家（ETP）</button>
-      <aside class="rankmem" id="rankMem" hidden aria-label="Rank 显存"></aside>
-      <div class="canvas-bottom-tools">
-        <div class="pt-zoomhud" id="zoomHud" aria-label="画布缩放">
-          <button type="button" data-zoom="out" title="缩小（滚轮/触控板同样可用）">−</button>
-          <button class="zpct" id="zoomPct" type="button" data-zoom="fit" title="适应画布，完整显示当前视图">Fit</button>
-          <button type="button" data-zoom="in" title="放大">＋</button><span class="zsep"></span>
-          <button class="zicon" type="button" data-zoom="center" aria-label="居中" title="平移归零，把场景拉回画面中央（缩放不变）"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.5v2.3M8 12.2v2.3M1.5 8h2.3M12.2 8h2.3"/></svg></button>
-          <button class="zicon" type="button" data-zoom="reset" aria-label="复位" title="缩放、平移全部回到当前步骤的标准画面"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.52 3.29v3.53h3.53"/><path d="M3.2 10.24A5.3 5.3 0 1 0 5.76 3.2L1.52 6.82"/></svg></button>
-        </div>
-        <div class="mem-scenario" id="memScenario" hidden aria-label="内存压力场景">
-          <button type="button" data-mem-scenario="base" class="is-on" aria-pressed="true">基线 · MBS 1</button>
-          <button type="button" data-mem-scenario="danger" aria-pressed="false">压力 · MBS 3</button>
-        </div>
+      <div class="pt-zoomhud" id="zoomHud" aria-label="画布缩放">
+        <button type="button" data-zoom="out" title="缩小（滚轮/触控板同样可用）">−</button>
+        <button class="zpct" id="zoomPct" type="button" data-zoom="fit" title="适应画布，完整显示当前视图">Fit</button>
+        <button type="button" data-zoom="in" title="放大">＋</button><span class="zsep"></span>
+        <button class="zicon" type="button" data-zoom="center" aria-label="居中" title="平移归零，把场景拉回画面中央（缩放不变）"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.1"/><path d="M8 1.5v2.3M8 12.2v2.3M1.5 8h2.3M12.2 8h2.3"/></svg></button>
+        <button class="zicon" type="button" data-zoom="reset" aria-label="复位" title="缩放、平移全部回到当前步骤的标准画面"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.52 3.29v3.53h3.53"/><path d="M3.2 10.24A5.3 5.3 0 1 0 5.76 3.2L1.52 6.82"/></svg></button>
       </div>
     </div>
   </div>
-
-  <aside class="memdetail" id="memDetail" hidden aria-label="显存块详情">
-    <div class="md-head"><div><span class="md-kicker">Rank 显存 · 二级详情</span><strong class="md-title" id="memDetailTitle"></strong></div><button class="md-close" id="memDetailClose" type="button" aria-label="关闭详情">✕</button></div>
-    <div id="memDetailBody"></div>
-  </aside>
 
   <div class="scene" id="scene" role="tabpanel">
     <nav class="cs-rail" id="csRail" aria-label="案例"></nav>
@@ -843,8 +754,7 @@
   /* 显存五档的基准色相照 demo 的 MEM_BASE；最终填色照 demo 的 syncTopologyPalette 按主题调：
      浅色原样用，深色保留色相、统一压到 S .82 / L .40（近中性的那档退成 L .48 的灰），
      这样第 8 / 9 步卡里的填充跟原组件深色下是同一套颜色 */
-  /* 优化器态沿用原版的柔和紫色；显存档位与并行维度靠位置和语义区分。 */
-  var MEM_BASE = {w:'#5C86C7', g:'#6F9BA6', opt:'#9F93D1', act:'#78A866', rsv:'#C8CACB'};
+  var MEM_BASE = {w:'#5C86C7', g:'#6F9BA6', opt:'#9F93D1', act:'#8FBB7A', rsv:'#C8CACB'};
   var MEM_PROFILE = {dark:{s:.82, l:.40, neutralL:.48}, light:{preserve:true}};
   var MEMC = {};
   function hexToHsl(hex){
@@ -870,7 +780,7 @@
   }
   function readTheme(){
     var cs = getComputedStyle(document.documentElement), g = function(n){ return cs.getPropertyValue(n).trim(); };
-    TH.bg = g('--bg'); TH.fg = g('--fg'); TH.fg2 = g('--fg2'); TH.fg3 = g('--fg3'); TH.rgb = g('--fgrgb'); TH.bad = g('--bad');
+    TH.bg = g('--bg'); TH.fg = g('--fg'); TH.fg2 = g('--fg2'); TH.fg3 = g('--fg3'); TH.rgb = g('--fgrgb');
     TH.face = {front:g('--card-front'), right:g('--card-right'), top:g('--card-top')}; TH.tile = g('--tile');
     syncMemPalette();
   }
@@ -894,7 +804,7 @@
     ];
   }
   function loadSeed(k, salt){ var r = Math.sin((k+1)*45.233 + (salt+1)*97.117) * 28657.13; return r - Math.floor(r); }
-  function memOf(c, scenario){
+  function memOf(c){
     var D = CFG, p = c.pp, ep = c.dp % D.ep;
     var key = (((c.tp*7 + 0)*13 + c.dp)*17 + p) + ep*211;
     var actK = (0.74 + loadSeed(ep, 3)*0.62) * (0.95 + loadSeed(key, 11)*0.10);
@@ -908,14 +818,12 @@
     sub.sort(function(a, b){ return ord[a.cut] - ord[b.cut]; });
     var P = sub.reduce(function(a, x){ return a + x.bytes; }, 0)/2;          /* 参数个数 */
     var inflight = Math.max(1, Math.min(D.pp, D.ga) - p);                     /* 1F1B 稳态峰值：越靠前压的微批越多 */
-    /* 压力场景只服务这份入门页第 8 步：MBS 1 → 3，让前级 stage 真正越过 64GB。 */
-    var effectiveMbs = scenario === 'danger' ? 3 : D.mbs;
-    var act = effectiveMbs*(D.seq/D.cp)*D.hidden*LPS*4*inflight*actK;
+    var act = D.mbs*(D.seq/D.cp)*D.hidden*LPS*4*inflight*actK;
     return [
       {k:'w',   label:'权重 (bf16)',      bytes:2*P,  c:MEMC.w, sub:sub, kind:'model'},
       {k:'g',   label:'梯度 (bf16)',      bytes:2*P,  c:MEMC.g, kind:'model'},
       {k:'opt', label:'优化器态 (fp32×3)', bytes:12*P, c:MEMC.opt, kind:'model'},
-      {k:'act', label:'激活', bytes:act, c:MEMC.act, kind:'exec', inflight:inflight, mbs:effectiveMbs},
+      {k:'act', label:'激活·in-flight '+inflight+'μb', bytes:act, c:MEMC.act, kind:'exec'},
       {k:'rsv', label:'碎片/预留',        bytes:rsv,  c:MEMC.rsv, kind:'exec'}
     ];
   }
@@ -925,7 +833,6 @@
     try{ return memOf(c); } finally{ CFG = o; LPS = oL; }
   }
   function fmtGB(b){ return (b/GiB).toFixed(1); }
-  function fmtMem(b){ return b >= .1*GiB ? fmtGB(b) + ' GB' : (b/Math.pow(2,20)).toFixed(1) + ' MB'; }
   var STEPS = [
     { key:'一张卡', color:null, title:'用个能装东西的框，表示一个 Rank',
       html:'<p>每张加速卡上跑一个训练进程，框架给它一个从 0 数起的编号，这就是 <b>rank</b>。框的容积是这张卡的显存，现在还空着。</p>' },
@@ -948,8 +855,8 @@
     { key:'EP', color:VC.ep, title:'EP：专家分桶，8 张一组',
       html:'<p>MoE 的 64 个专家分成 8 桶，同一层里横向连着的 8 个 DP 组凑齐全部专家，就是一个 <b>EP 组</b>：<code>R0·R2·…·R14</code> 一组，<code>R1·R3·…·R15</code> 另一组，共 16 组。排布到此和原 pattern 一致。</p>' },
 
-    { key:'内存分配', color:null, title:'往框里装内存，识别溢出风险',
-      html:'<p>空框从下往上装入<b>权重、梯度、优化器态、激活、碎片</b>。DP 不改变权重、梯度、优化器态这些常驻账的单卡份量；激活会随路由负载波动，碎片也会因各卡分配历史不同。切换右上角的<b>压力场景</b>观察溢出，再<b>点一张卡</b>核对显存账。</p>' },
+    { key:'内存分配', color:'#9F93D1', title:'往框里装内存，规避溢出',
+      html:'<p>空框开始装东西，从下往上：<b>权重、梯度、优化器态、激活、碎片</b>。DP 是复制，不改变每张卡装多少；决定份量的是 PP、TP、EP 三把刀。<b>点一张卡</b>，下面列出它的显存账。</p>' },
 
     { key:'跨机通信', color:null, title:'训练时：一个 rank 跟谁说话',
       html:'<p>选中的卡向兄弟们<b>发射</b>连线：机内<b>实线</b>，跨机<b>虚线</b>。按<b>前向 / 反向 / 更新</b>三批轮演，<b>一次只亮一维</b>：前向 TP → EP → PP，反向倒回，更新先 <b>DP</b> 再 <b>EDP</b>。<b>点别的卡</b>换主语，右上角切 <b>ETP=2</b> 对比。</p>' },
@@ -960,7 +867,6 @@
 
   /* ── 卡阵：128 只，编号照 demo 的 rankOf ─────────────────────────── */
   var CW = 1, CD = 1, CH = 1.6, S0 = 1.45;
-  var memScenario = 'base';
   /* TP 上下两层之间的空隙：原来 0.35，等距视角下上层卡的底棱几乎贴着下层卡的顶棱，两层的
      边线叠在一起像一道虚影；拉到 0.9 两层才断得开 */
   var TPG = 0.9;
@@ -969,26 +875,7 @@
     cards.push({r:r, tp:r&1, dp:(r>>1)&15, pp:r>>5, k:r&31, node:r>>3, slot:r&7,
                 x:0, y:0, z:0, a:0, fx:0, fy:0, fz:0, fa:0, tx:0, ty:0, tz:0, ta:0, hl:null});
   }
-  cards.forEach(function(c){ c.mem = memOf(c, memScenario); });
-  var memScenarioEl = document.getElementById('memScenario');
-  function syncMemScenarioButtons(){
-    Array.prototype.forEach.call(memScenarioEl.querySelectorAll('[data-mem-scenario]'), function(b){
-      var on = b.dataset.memScenario === memScenario; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on));
-    });
-  }
-  function setMemScenario(next, quiet){
-    if(next !== 'danger') next = 'base';
-    if(next === memScenario) return;
-    memScenario = next;
-    cards.forEach(function(c){ c.mem = memOf(c, memScenario); });
-    syncMemScenarioButtons();
-    if(!quiet){ renderRankMem(); needDraw = true; tick(); }
-  }
-  function syncMemStageUi(i){
-    memScenarioEl.hidden = i !== 7;
-    if(i !== 7 && memScenario !== 'base') setMemScenario('base', true);
-  }
-  memScenarioEl.addEventListener('click', function(e){ var b = e.target.closest('[data-mem-scenario]'); if(b) setMemScenario(b.dataset.memScenario, false); });
+  cards.forEach(function(c){ c.mem = memOf(c); });
 
   /* 每一步的排布：只给目标坐标，动画由外面插值。返回 {pos:[{x,y,z,vis}], labels:[], groups:{color, of(card)}} */
   function layoutOf(i){
@@ -1118,11 +1005,7 @@
     W = box.clientWidth; H = box.clientHeight;
     cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
     camHoldS = 0;
-    if(lay){
-      camHome = fitCam(lay, step);
-      cam = step === 7 && memRankFocused && selRank !== null ? rankCameraTarget(selRank) : {s:camHome.s, ox:camHome.ox, oy:camHome.oy};
-      camF = camT = null;
-    }
+    if(lay){ camHome = fitCam(lay, step); cam = {s:camHome.s, ox:camHome.ox, oy:camHome.oy}; camF = camT = null; }
     if(plane && step === 9) fitPlane();
     needDraw = true; tick();
   }
@@ -1133,7 +1016,6 @@
   var GREY = '#8a93a3', SEL = 23, comm = null, labs = {};
   var REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);   /* 关了动效：线上的点不跑 */
   var selRank = null;          /* 内存分配 / 跨机通信两步里手动选中的卡；读出卡跟着它走 */
-  var MEM_AUTO_RANK = 16, rankFocus = null, memRankFocused = false, memRankFadeLevel = 0;
   var markOn = {rank:true, label:true, memory:true};
   var commOn = {tp:true, ep:true, dp:true, edp:true, pp:true};
   var etpOn = false;           /* 第 9 步的开关：专家也按 TP 切（ETP = TP）。只影响连线 / 门牌 / 读出卡里的通信行 */
@@ -1169,21 +1051,8 @@
   }
   function ease(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; }
   function now(){ return performance.now(); }
-  function rankCameraTarget(rank){
-    var c = cards[rank], s = Math.min((camHome ? camHome.s : cam.s)*2.15, 150);
-    var u = U(c.x + CW/2, c.y + CH/2, c.z + CD/2);
-    return {s:s, ox:W*.52 - s*u[0], oy:H*.52 - s*u[1]};
-  }
-  /* 第 8 步的补充镜头：可延迟到显存涨完再启动；手动换 Rank 时复用同一段平滑运镜。 */
-  function queueRankFocus(rank, at, duration){
-    rankFocus = {rank:rank, at:at == null ? now() : at, dur:duration || 680, started:false,
-                 fadeFrom:memRankFadeLevel, fadeTo:rank === null ? 0 : 1};
-    needDraw = true; if(!animating) tick();
-  }
 
   function applyStep(i){
-    var carriedRank = selRank;
-    syncMemStageUi(i);
     lay = layoutOf(i);
     cards.forEach(function(c, j){
       var p = lay.pos[j];
@@ -1208,13 +1077,6 @@
     var tn = now();
     t0 = tn; animating = true;
     memT = i >= 7 ? 1 : 0; memFrom = memF; memAt = tn + (i === 7 ? DUR : 0);
-    if(i === 7){
-      /* 先让 128 张卡完整长出显存，再选中并拉近主语；前序已有选择时沿用它。 */
-      selRank = null; memSel = null; memRankFocused = false; memRankFadeLevel = 0;
-      queueRankFocus(carriedRank !== null ? carriedRank : MEM_AUTO_RANK, memAt + 900 + 160, 720);
-    } else {
-      rankFocus = null; memRankFocused = false; memRankFadeLevel = 0;
-    }
     /* 发射线：离开第 9 步时淡出，不是一下子抽掉。主语沿用上一步手动选的卡（没有就 R23） */
     if(i === 8){ if(!comm || comm.off){ comm = commOf(selRank !== null ? selRank : SEL); comm.at = tn + DUR*0.5; } selRank = comm.sel; }
     else if(comm && !comm.off) comm.off = tn;
@@ -1275,29 +1137,6 @@
     if(memF !== memT){
       if(t >= memAt){ var dm = Math.min(1, (t - memAt)/(memT === 1 ? 900 : 450)); memF = memFrom + (memT - memFrom)*ease(dm); }
       busy = true;
-    }
-    /* 显存涨满后的第二拍：确定主语、弱化其余 Rank，同时把主语平滑拉到镜头中央。 */
-    if(rankFocus && step === 7){
-      if(t < rankFocus.at) busy = true;
-      else {
-        if(!rankFocus.started){
-          rankFocus.started = true;
-          rankFocus.from = {s:cam.s, ox:cam.ox, oy:cam.oy};
-          rankFocus.to = rankFocus.rank === null ? {s:camHome.s, ox:camHome.ox, oy:camHome.oy} : rankCameraTarget(rankFocus.rank);
-          selRank = rankFocus.rank;
-          memRankFocused = rankFocus.rank !== null;
-          memSel = null;
-          syncStagebar(); renderRankMem();
-        }
-        var rk = Math.min(1, (t-rankFocus.at)/rankFocus.dur), re = ease(rk);
-        cam.s = rankFocus.from.s + (rankFocus.to.s-rankFocus.from.s)*re;
-        cam.ox = rankFocus.from.ox + (rankFocus.to.ox-rankFocus.from.ox)*re;
-        cam.oy = rankFocus.from.oy + (rankFocus.to.oy-rankFocus.from.oy)*re;
-        memRankFadeLevel = rankFocus.fadeFrom + (rankFocus.fadeTo-rankFocus.fadeFrom)*re;
-        syncZoomHud();
-        if(rk < 1) busy = true;
-        else { if(rankFocus.rank === null) memRankFocused = false; rankFocus = null; }
-      }
     }
     /* 展平：0 → 1 压成平面，1 → 0 立回 3D。缓动在这里做完，drawPlane 拿到的就是插值用的进度 */
     if(flatF !== flatT){
@@ -1383,10 +1222,7 @@
 
   /* 选中态三档（照 demo）：选中的卡 / 沿任一维与它同组的兄弟卡 / 其余淡去 */
   function roleOf(c){
-    if(!comm){
-      if(step === 7 && memRankFocused && selRank !== null) return c.r === selRank ? 'sel' : 'dim';
-      return (selRank !== null && c.r === selRank) ? 'sel' : 'none';
-    }
+    if(!comm) return (selRank !== null && c.r === selRank) ? 'sel' : 'none';
     if(c.r === comm.sel) return 'sel';
     for(var i = 0; i < comm.dims.length; i++) if(comm.dims[i].sib(c)) return 'sib';
     return 'dim';
@@ -1404,7 +1240,7 @@
     /* 展平进行中 3D 壳子按进度淡出：它的内容正飞去平面上自己那一行 */
     var a3 = c.a * (1 - flatF);
     if(a3 <= 0.01) return;
-    var role = roleOf(c), fade = comm ? commFade(t) : (step === 7 ? memRankFadeLevel : 0);
+    var role = roleOf(c), fade = commFade(t);
     ctx.globalAlpha = a3 * (role === 'dim' && !layerRankMatch(c) ? 1 - 0.82*fade : 1);
     var tint = tintOf(c, t), ha = tint ? tint.a : 0, hc = tint ? tint.c : null;
     /* 前排遮后排：卡按远→近的画家序画，但壳面半透明，后排整张（尤其 TP 摞成两层、EP 分桶、
@@ -1420,25 +1256,18 @@
     if(markOn.memory && mf > 0){
       /* 五档按字节 ÷ HBM 容量折成高度，从底往上垒；顶出壳外就是超容 */
       var ins = 0.08, yy = c.y + ins, iw = CW - 2*ins, id = CD - 2*ins, cap = CFG.hbm*GiB;
-      var memTotal = c.mem.reduce(function(sum, m){ return sum + m.bytes; }, 0);
       c.mem.forEach(function(m){
         var hh = (m.bytes/cap)*(CH - 2*ins)*mf; if(hh <= 0.001) return;
         drawBox(c.x + ins, yy, c.z + ins, iw, hh, id, {front:m.c, right:shade(m.c, .82), top:shade(m.c, 1.28)}, null, null);
         yy += hh;
       });
-      /* 压力场景超过物理容量的部分统一覆成危险色，让“顶出壳”不只靠几何位置表达。 */
-      if(mf > .98 && memTotal > cap){
-        var oh = ((memTotal-cap)/cap)*(CH-2*ins);
-        drawBox(c.x+ins, c.y+ins+(CH-2*ins), c.z+ins, iw, oh, id,
-          {front:hexA(TH.bad,.82), right:hexA(TH.bad,.68), top:hexA(TH.bad,.94)}, TH.bad, null, 1.2);
-      }
     }
     var k = drawBox(c.x, c.y, c.z, CW, CH, CD, TH.face, 'rgba(' + TH.rgb + ',.34)', null);
     /* 屏幕包围盒，留给点卡换主语用 */
     var xs = [k.A[0], k.B[0], k.C[0], k.D[0], k.G[0], k.H[0]], ys = [k.A[1], k.B[1], k.C[1], k.D[1], k.G[1], k.H[1]];
     c.bb = [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
     if(ha){ drawBox(c.x, c.y, c.z, CW, CH, CD, {front:hexA(hc, ha*.55), right:hexA(hc, ha*.7), top:hexA(hc, ha*.4)}, hexA(hc, Math.min(1, ha*1.6)), null); }
-    if(role === 'sel'){ var oa = (comm || step === 7) ? fade : 1; if(oa > 0) drawBox(c.x, c.y, c.z, CW, CH, CD, null, 'rgba(' + TH.rgb + ',' + (0.9*oa) + ')', null, 2); }
+    if(role === 'sel'){ var oa = comm ? fade : 1; if(oa > 0) drawBox(c.x, c.y, c.z, CW, CH, CD, null, 'rgba(' + TH.rgb + ',' + (0.9*oa) + ')', null, 2); }
     /* 读出卡里点开了某一块：沿它的兄弟轴与选中卡同组的卡描一圈刀色的棱（通信那一步不叠这一层） */
     if(memSel !== null && selRank !== null && !comm && c.r !== selRank){
       var sibD = memSibDims(memSel).filter(dimLive).filter(function(d){ return isSib(cards[selRank], c, d); })[0];
@@ -1711,10 +1540,9 @@
     if(hit && !(pick && !pick.off && pick.key === hit.key)) pick = {key:hit.key, c:hit.c, sel:hit.sel, on:tn};
     else if(hc){
       if(comm && !comm.off){ if(hc.r !== comm.sel){ comm = commOf(hc.r); comm.at = tn; selRank = hc.r; } }
-      else if(step === 7) queueRankFocus(selRank === hc.r && memRankFocused ? null : hc.r, tn, 620);
-      else selRank = selRank === hc.r ? null : hc.r;
+      else selRank = selRank === hc.r ? null : hc.r;        /* 内存分配：再点一次取消 */
       if(pick && !pick.off) pick.off = tn;
-      if(step !== 7){ syncStagebar(); renderRankMem(); }
+      syncStagebar(); renderRankMem();
     }
     else if(pick && !pick.off) pick.off = tn;
     tick();
@@ -1722,46 +1550,16 @@
 
   /* ── 读出卡：这张卡装了什么（照 demo 的 renderRankMem 精简） ─────────── */
   var rankMemEl = document.getElementById('rankMem');
-  var memDetailEl = document.getElementById('memDetail'), memDetailBodyEl = document.getElementById('memDetailBody'), memDetailTitleEl = document.getElementById('memDetailTitle');
   /* 点开的那一块（五档之一或权重带里某一块 'w:xxx'）；只属于点开它时那张卡，换卡就清 */
   var memSel = null, memSelR = null;
   rankMemEl.addEventListener('click', function(e){
-    if(e.target.classList.contains('rm-x')){
-      memSel = null;
-      if(step === 7) queueRankFocus(null, now(), 520);
-      else { selRank = null; syncStagebar(); renderRankMem(); needDraw = true; tick(); }
-      return;
-    }
+    if(e.target.classList.contains('rm-x')){ selRank = null; memSel = null; syncStagebar(); renderRankMem(); needDraw = true; tick(); return; }
     var t = e.target.closest ? e.target.closest('[data-mk]') : null;
     if(t){ var mk = t.getAttribute('data-mk'); memSel = (mk && mk !== memSel) ? mk : null; renderRankMem(); needDraw = true; tick(); }
   });
-  memDetailEl.addEventListener('click', function(e){
-    if(e.target.closest('#memDetailClose')){ memSel = null; renderRankMem(); needDraw = true; tick(); return; }
-    var t = e.target.closest ? e.target.closest('[data-mk]') : null;
-    if(t){ var mk = t.getAttribute('data-mk'); if(mk){ memSel = mk; renderRankMem(); needDraw = true; tick(); } }
-  });
-  function detailTitle(c, key){
-    if(key.indexOf('w:') === 0) return key.slice(2) + ' · rank ' + c.r;
-    var out = key; c.mem.forEach(function(s){ if(s.k === key) out = s.label; });
-    return out + ' · rank ' + c.r;
-  }
-  function syncMemDetail(c, withMem){
-    var page = document.querySelector('.page'), open = !!(c && withMem && memSel);
-    page.classList.toggle('mem-detail-open', open);
-    memDetailEl.hidden = !open;
-    if(open){ memDetailTitleEl.textContent = detailTitle(c, memSel); memDetailBodyEl.innerHTML = memBlockDetail(c, memSel); }
-    else { memDetailTitleEl.textContent = ''; memDetailBodyEl.innerHTML = ''; }
-  }
-  function waterHTML(segs, tot, cap){
-    var bands = segs.map(function(s){ return '<i style="width:' + (s.bytes/cap*100).toFixed(2) + '%;background:' + s.c + '"></i>'; }).join('');
-    var pct = tot/cap*100, rest = cap - tot;
-    return '<div class="rm-water' + (tot > cap ? ' is-over' : '') + '">' + bands + '<span class="rm-water-cap" aria-hidden="true"></span></div>'
-      + '<div class="rm-water-meta"><span>' + pct.toFixed(0) + '% 已用</span><span>' + (rest >= 0 ? '余量 ' + fmtGB(rest) + ' GB' : '超出 ' + fmtGB(-rest) + ' GB') + '</span></div>';
-  }
   function renderRankMem(){
-    if(selRank === null){ rankMemEl.hidden = true; memSel = null; memSelR = null; syncMemDetail(null, false); return; }
-    /* 内存分配页首次落到一个 Rank 时，默认从最有运行态辨识度的「激活」开始读。 */
-    if(memSelR !== selRank){ memSel = step === 7 ? 'act' : null; memSelR = selRank; }
+    if(selRank === null){ rankMemEl.hidden = true; memSel = null; memSelR = null; return; }
+    if(memSelR !== selRank){ memSel = null; memSelR = selRank; }
     var c = cards[selRank], segs = c.mem, cap = CFG.hbm*GiB;
     var tot = segs.reduce(function(a, x){ return a + x.bytes; }, 0);
     var g = c.pp*4 + (c.dp>>3)*2 + c.tp;
@@ -1771,20 +1569,18 @@
     /* 图例按卡上从上往下的顺序：碎片 → 激活 → 优化器态 → 梯度 → 权重（权重下面列它的分块）。
        每一行都可点（照 demo 的 tr.rm-p）：点开就在它下面接一段二级读数（memBlockDetail），
        选中那行反白一层它自己的颜色（--rmc），跟卡上那条带同色 */
-    if(!withMem) memSel = null;
     if(withMem) segs.slice().reverse().forEach(function(sg){
       if(sg.kind !== lastKind){
         lastKind = sg.kind;
-        rows.push('<tr class="k"><td colspan="2">' + (sg.kind === 'exec' ? '执行态 · 此刻压着什么' : '模型态 · 整步常驻') + '</td></tr>');
+        if(sg.kind === 'model') rows.push('<tr class="k"><td colspan="2">模型态 · 哪一段归我</td></tr>');
       }
       var onSg = memSel === sg.k;
-      var actWhy = sg.k === 'act' ? '<span class="rm-subline">1F1B · stage ' + c.pp + ' 当前压着 ' + sg.inflight + ' 个 μb · MBS ' + sg.mbs + '<br>PP0→PP3 的在途数依次为 4 / 3 / 2 / 1</span>' : '';
-      rows.push('<tr class="m rm-p' + (onSg ? ' on' : '') + '" data-mk="' + sg.k + '" style="--rmc:' + sg.c + '"><td><span class="sw" style="background:' + sg.c + '"></span>' + sg.label + actWhy + '</td><td class="n">' + fmtMem(sg.bytes) + '</td></tr>');
-      if(sg.sub) rows.push('<tr class="rm-cut-zone"><td colspan="2">权重内部构成 · 轴标记表示切分维度</td></tr>');
+      rows.push('<tr class="m rm-p' + (onSg ? ' on' : '') + '" data-mk="' + sg.k + '" style="--rmc:' + sg.c + '"><td><span class="sw" style="background:' + sg.c + '"></span>' + sg.label + '</td><td class="n">' + fmtGB(sg.bytes) + ' GB</td></tr>');
+      if(onSg) rows.push('<tr class="d"><td colspan="2">' + memBlockDetail(c, sg.k) + '</td></tr>');
       if(sg.sub) sg.sub.forEach(function(x){
         var col = cutColor(x.cut), mk = 'w:' + x.id, onX = memSel === mk;
-        var axis = x.cut === 'none' ? '复制' : DIMN[x.cut] + '×' + CFG[x.cut];
-        rows.push('<tr class="s rm-p' + (onX ? ' on' : '') + '" data-mk="' + mk + '" style="--rmc:' + col + '"><td>' + x.id + '<span class="rm-axis" style="--axis-c:' + col + '">' + axis + '</span></td><td class="n">' + fmtMem(x.bytes) + '</td></tr>');
+        rows.push('<tr class="s rm-p' + (onX ? ' on' : '') + '" data-mk="' + mk + '" style="--rmc:' + col + '"><td><span class="sw s" style="background:' + col + '"></span>' + x.id + ' <span style="color:var(--fg3)">' + x.how + '</span></td><td class="n">' + fmtGB(x.bytes) + ' GB</td></tr>');
+        if(onX) rows.push('<tr class="d"><td colspan="2">' + memBlockDetail(c, mk) + '</td></tr>');
       });
     });
     rankMemEl.innerHTML =
@@ -1794,11 +1590,9 @@
       + '<span>tp' + c.tp + ' dp' + c.dp + ' pp' + c.pp + ' ep' + (c.dp&7) + ' · EP 组 ' + g + ' · stage' + c.pp + ' · L' + (c.pp*LPS) + '–L' + ((c.pp+1)*LPS-1) + ' · node ' + c.node + ' 槽 ' + c.slot + (selLayer ? ' · 选中列 ' + selLayer.label : '') + '</span>'
       /* 专家权重的副本关系写成一句：展平图上同色的上下两块是同一份权重，别让颜色去暗示 */
       + '<span>专家权重与 EDP ' + (1 - (c.dp>>3)) + ' 的 rank ' + (c.r ^ 16) + ' 是同一份（副本，步末在 EDP 组 all-reduce 对齐）</span></div>'
-      + (withMem ? '<table>' + rows.join('') + '</table>'
-      + '<div class="rm-summary"><div class="rm-summary-line' + (tot > cap ? ' over' : '') + '"><b>' + (tot > cap ? 'OOM · ' : '') + fmtGB(tot) + ' / ' + CFG.hbm + ' GB</b><span>' + (tot > cap ? '超出 ' + fmtGB(tot-cap) : '余量 ' + fmtGB(cap-tot)) + '</span></div>'
-      + waterHTML(segs, tot, cap) + '</div>' : '');
+      + (withMem ? '<table>' + rows.join('')
+      + '<tr class="t"><td' + (tot > cap ? ' class="over"' : '') + '>合计 ' + fmtGB(tot) + ' / ' + CFG.hbm + ' GB</td><td class="n">余量 ' + fmtGB(cap - tot) + '</td></tr></table>' : '');
     rankMemEl.hidden = false;
-    syncMemDetail(c, withMem);
   }
 
   /* ══ 二级读数：读出卡里点开的那一块显存（照 demo 的 memBlockDetail 搬过来）═════
@@ -1874,10 +1668,8 @@
       + (sp ? '<dt>效果</dt><dd>' + sp.effect + '</dd>' : '') + '</dl></div>';
   }
   /* ── SVG 小图（照 demo 的 proj / boxSVG / cavityGrid / compStrip / cavityBox3D / memChainFig）── */
-  /* 详情小图与主 Rank 矩阵共用同一观察方向：x 向右下、y 向上、z（PP）从近处向右上延伸。
-     之前这里用了另一套等角投影，还把 PP 放在竖轴，导致主图 PP0→PP3 的近远顺序到了详情里
-     既换轴又反向。这里保留独立函数（SVG 不吃主画布相机），但投影系数和 U3D 完全一致。 */
-  function sproj(x, y, z){ return [0.95*x + 0.5*z, 0.25*x - 0.42*z - y]; }
+  var PC6 = Math.cos(Math.PI/6), PS6 = Math.sin(Math.PI/6);
+  function sproj(x, y, z){ return [(x - z)*PC6, (x + z)*PS6 - y]; }
   function ptsStr(p){ return p.map(function(q){ return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '); }
   function boxSVG(x, y, z, w, h, d, o){
     o = o || {};
@@ -1885,11 +1677,10 @@
     var V = [[x,y,z],[x+w,y,z],[x+w,y,z+d],[x,y,z+d],[x,y+h,z],[x+w,y+h,z],[x+w,y+h,z+d],[x,y+h,z+d]];
     var Pp = V.map(function(v){ return sproj(v[0], v[1], v[2]); });
     if(o.fill){
-      /* 可见面与主矩阵 drawBox 一致：顶面 / 近端 z=0 面 / +x 侧面。PP0 在近端，PP3 在远端。 */
-      var FF = [{i:[4,5,6,7], alpha:68}, {i:[0,1,5,4], alpha:50}, {i:[1,2,6,5], alpha:40}], out = '';
+      /* 机位固定在 +(1,1,1)：可见的就是顶 / +z / +x 三面，明度三档照 demo */
+      var FF = [{i:[4,5,6,7], sh:.83}, {i:[3,7,6,2], sh:.47}, {i:[1,2,6,5], sh:.26}], out = '';
       FF.forEach(function(fc){
-        /* 半透明填格而不是画一只独立的实心小方块：后压上来的格线仍然穿得过，视觉上就是腔内那一格。 */
-        var c9 = 'color-mix(in srgb,' + o.fill + ' ' + fc.alpha + '%, transparent)';
+        var c9 = fc.sh > .66 ? 'color-mix(in srgb,' + o.fill + ' 86%, #fff 14%)' : fc.sh > .36 ? 'color-mix(in srgb,' + o.fill + ' 82%, #000 18%)' : 'color-mix(in srgb,' + o.fill + ' 68%, #000 32%)';
         out += '<polygon points="' + ptsStr([Pp[fc.i[0]], Pp[fc.i[1]], Pp[fc.i[2]], Pp[fc.i[3]]]) + '" style="fill:' + c9 + ';' + st + '"/>';
       });
       return '<g>' + out + '</g>';
@@ -1918,35 +1709,35 @@
       + '<text x="' + (BW + 6) + '" y="' + (BH/2 + 4) + '" style="font-size:9.5px;fill:var(--fg3)">' + esc(ax.ly) + (ny > 1 ? '×' + ny : '') + '</text>'
       + '<text x="0" y="' + (BH + 13) + '" style="font-size:9.5px;fill:var(--fg3)">' + esc(ax.lx) + (nx > 1 ? '×' + nx : '') + '</text></svg>';
   }
-  /* 权重构成改为排序列表：数字保持真实，极小项也有最小可见标记，不再退化成一根 experts 纯色条。 */
+  /* 整条带的构成：按字节分宽度，每段上它自己那把刀的色 */
   function compStrip(blocks){
-    var tot = 0;
+    var BW = 210, BH = 20, tot = 0;
     blocks.forEach(function(b){ tot += b.bytes; });
     if(!(tot > 0)) return '';
-    return '<div class="comp-list">' + blocks.slice().sort(function(a,b){ return b.bytes-a.bytes; }).map(function(b){
-      var pct = b.bytes/tot*100, axis = b.cut === 'none' ? '复制' : DIMN[b.cut];
-      return '<div class="comp-row"><span class="comp-name">' + esc(b.id) + ' · ' + axis + '</span>'
-        + '<span class="comp-track"><i class="comp-fill" style="--cc:' + cutColor(b.cut) + ';width:' + Math.max(0.7,pct).toFixed(2) + '%"></i></span>'
-        + '<span class="comp-val">' + fmtMem(b.bytes) + ' · ' + (pct < .1 ? '&lt;0.1' : pct.toFixed(1)) + '%</span></div>';
-    }).join('') + '</div>';
+    var x = 0, segs = '', labs = [];
+    blocks.forEach(function(b){
+      var w = BW*b.bytes/tot;
+      if(w > 0.4){
+        segs += '<rect x="' + x.toFixed(1) + '" y="0" width="' + w.toFixed(1) + '" height="' + BH + '" style="fill:' + cutColor(b.cut) + ';fill-opacity:' + (b.cut === 'none' ? .28 : .62) + ';stroke:var(--bg);stroke-width:.6"/>';
+        if(w >= 28) labs.push('<text x="' + (x + w/2).toFixed(1) + '" y="' + (BH/2 + 3) + '" style="font-size:7.6px;fill:var(--fg);font-weight:700" text-anchor="middle">' + esc(b.id) + '</text>');
+      }
+      x += w;
+    });
+    return '<svg width="' + BW + '" height="' + (BH + 2) + '" style="margin:2px 0 0;overflow:visible">' + segs + labs.join('')
+      + '<rect x="0" y="0" width="' + BW + '" height="' + BH + '" style="fill:none;stroke:var(--fg3);stroke-width:.8"/></svg>';
   }
-  /* 体腔：轴方向固定对齐主 Rank 矩阵——x=横排、y=上下、z=近→远（PP0→PP3）。
-     三根轴各被自己那把刀切出格子（线用刀色），本卡持有的那一格填实。
-     实心块先画、切分线和外框后画，让块真正待在格腔里，而不是盖住网格后像从盒子里飞出来。 */
+  /* 体腔：三根轴各被自己那把刀切出格子（线用刀色），本卡持有的那一格填实。ax/ay/az = {n, dim, i} */
   function cavityBox3D(ax, ay, az, o){
     o = o || {};
     var W = 138, HH = 84, DD = 73, dx = W/Math.max(1, ax.n), dy = HH/Math.max(1, ay.n), dz = DD/Math.max(1, az.n), body = '', i;
-    var dxScreen = dx*Math.hypot(.95, .25), dzScreen = dz*Math.hypot(.5, .42);
     function ln(a, b, st){ return '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" style="' + st + '"/>'; }
     function gl(stp, dim){ return 'stroke:' + (VC[dim] || 'var(--line)') + ';stroke-width:' + (stp > 5 ? .75 : .5) + ';stroke-opacity:' + (stp > 5 ? .55 : .3); }
+    body += boxSVG(0, 0, 0, W, HH, DD, {stroke:'var(--line)', sw:1, dash:'3 2.5'});
+    if(dy >= 2) for(i = 1; i < ay.n; i++) body += ln(sproj(0, i*dy, DD), sproj(W, i*dy, DD), gl(dy, ay.dim)) + ln(sproj(W, i*dy, 0), sproj(W, i*dy, DD), gl(dy, ay.dim));
+    if(dx*PC6 >= 2) for(i = 1; i < ax.n; i++) body += ln(sproj(i*dx, HH, 0), sproj(i*dx, HH, DD), gl(dx*PC6, ax.dim)) + ln(sproj(i*dx, 0, DD), sproj(i*dx, HH, DD), gl(dx*PC6, ax.dim));
+    if(dz*PC6 >= 2) for(i = 1; i < az.n; i++) body += ln(sproj(0, HH, i*dz), sproj(W, HH, i*dz), gl(dz*PC6, az.dim)) + ln(sproj(W, 0, i*dz), sproj(W, HH, i*dz), gl(dz*PC6, az.dim));
     var cx = ax.i*dx, cy = ay.i*dy, cz = az.i*dz;
     body += boxSVG(cx, cy, cz, dx, dy, dz, {fill:o.cell || 'var(--fg)'});
-    body += boxSVG(0, 0, 0, W, HH, DD, {stroke:'var(--line)', sw:1, dash:'3 2.5'});
-    /* 当前机位的三个可见面与主矩阵一致：近端 z=0、右侧 x=W、顶面 y=HH。
-       投影翻向后不能继续把线画在旧机位的 z=DD 背面，否则看起来像切割线钻进盒子后方。 */
-    if(dy >= 2) for(i = 1; i < ay.n; i++) body += ln(sproj(0, i*dy, 0), sproj(W, i*dy, 0), gl(dy, ay.dim)) + ln(sproj(W, i*dy, 0), sproj(W, i*dy, DD), gl(dy, ay.dim));
-    if(dxScreen >= 2) for(i = 1; i < ax.n; i++) body += ln(sproj(i*dx, HH, 0), sproj(i*dx, HH, DD), gl(dxScreen, ax.dim)) + ln(sproj(i*dx, 0, 0), sproj(i*dx, HH, 0), gl(dxScreen, ax.dim));
-    if(dzScreen >= 2) for(i = 1; i < az.n; i++) body += ln(sproj(0, HH, i*dz), sproj(W, HH, i*dz), gl(dzScreen, az.dim)) + ln(sproj(W, 0, i*dz), sproj(W, HH, i*dz), gl(dzScreen, az.dim));
     body += boxSVG(cx, cy, cz, dx, dy, dz, {stroke:o.cell || 'var(--fg)', sw:.8});
     var xs = [], ys = [];
     [[0,0,0],[W,0,0],[W,HH,0],[0,HH,0],[0,0,DD],[W,0,DD],[W,HH,DD],[0,HH,DD]].forEach(function(v){ var q = sproj(v[0], v[1], v[2]); xs.push(q[0]); ys.push(q[1]); });
@@ -1986,7 +1777,7 @@
     var D = CFG, p = c.pp, ep = c.dp & 7, segs = c.mem, wSeg = segs[0], Pn = wSeg.bytes/2;
     var rows = [], title = '', tint = 'var(--fg)', note = '', figs = [];
     function kv(k, v){ rows.push('<dt>' + esc(k) + '</dt><dd>' + v + '</dd>'); }
-    function fig(svg, cap){ figs.push('<figure class="rm-fig">' + svg + (cap ? '<figcaption class="rm-cap">' + esc(cap) + '</figcaption>' : '') + '</figure>'); }
+    function fig(svg, cap){ figs.push('<div class="rm-fig"' + (cap ? ' title="' + esc(cap) + '"' : '') + '>' + svg + '</div>'); }
     var sub = key.indexOf('w:') === 0 ? key.slice(2) : null;
     if(sub){
       /* ── 权重带里的某一块：只把切它那把刀的那根轴分开 ── */
@@ -1999,13 +1790,12 @@
         'embed':'[' + fmtN(vOwn) + ', ' + fmtN(D.hidden) + ']', 'lm_head':'[' + fmtN(D.hidden) + ', ' + fmtN(vOwn) + ']'};
       title = sub; tint = cutColor(blk.cut);
       var perLayer = sub !== 'embed' && sub !== 'lm_head';
-      kv('这一块', fmtMem(blk.bytes) + (SHP[sub] ? ' · ' + (perLayer ? '每层 ' : '') + esc(SHP[sub]) : ''));
+      kv('这一块', fmtGB(blk.bytes) + ' GB' + (SHP[sub] ? ' · ' + (perLayer ? '每层 ' : '') + esc(SHP[sub]) : ''));
       var cavW = {n:1, dim:'tp', i:0}, cavE = {n:1, dim:'ep', i:0}, cap = blk.how;
-      if(blk.cut === 'tp'){ cavW = {n:D.tp, dim:'tp', i:D.tp - 1 - c.tp}; cap = blk.how + ' · 本卡第 ' + c.tp + ' 片'; }
+      if(blk.cut === 'tp'){ cavW = {n:D.tp, dim:'tp', i:c.tp}; cap = blk.how + ' · 本卡第 ' + c.tp + ' 片'; }
       else if(blk.cut === 'ep'){ var kE = D.experts/D.ep; cavE = {n:D.ep, dim:'ep', i:ep}; cap = blk.how + ' · 本卡 E' + (ep*kE) + '–E' + (ep*kE + kE - 1); }
       else cap = '不切——每张卡逐字节相同';
-      /* 与主 Rank 矩阵同轴：EP 横排、TP 上下、PP 从近到远（PP0→PP3）。 */
-      fig(cavityBox3D(cavE, cavW, {n:D.pp, dim:'pp', i:p}, {cell:tint}), cap + ' · 近→远 PP0→PP' + (D.pp - 1));
+      fig(cavityBox3D(cavW, {n:D.pp, dim:'pp', i:p}, cavE, {cell:tint}), cap);
       if(sub === 'experts') note = 'ETP=1：桶内每个专家是整份的，h 方向没再切——盒子上 h 那根轴因此没有格线。';
       if(sub === 'embed')   note = '只有 stage 0 有：PP 那一刀把词嵌入留在了第一段。';
       if(sub === 'lm_head') note = '只有末 stage 有：出口那一层不重复，PP 的另一头。';
@@ -2013,15 +1803,14 @@
       /* ── 五档里的某一档 ── */
       var sg = null; segs.forEach(function(x){ if(x.k === key) sg = x; });
       if(!sg) return '';
-      title = sg.label; tint = key === 'rsv' ? 'var(--fg3)' : MEMC[key];
+      title = sg.label; tint = key === 'act' ? VC.dp : (key === 'rsv' ? 'var(--fg3)' : MEMC[key]);
       var per = {w:2, g:2, opt:12}[key], model = sg.kind === 'model';
-      kv('这一档', fmtMem(sg.bytes) + (model ? ' · ' + fmtN(Math.round(Pn/1e6)) + ' M 参数 × ' + per + ' B' : ''));
+      kv('这一档', fmtGB(sg.bytes) + ' GB' + (model ? ' · ' + fmtN(Math.round(Pn/1e6)) + ' M 参数 × ' + per + ' B' : ''));
       if(model){
-        /* 整条带一起说：谁占多宽、各被哪把刀切；然后是①腔。
-           几何方向严格照主 Rank 矩阵：e/EP 横排、h/TP 上下、ℓ/PP 从近到远。 */
+        /* 整条带一起说：谁占多宽、各被哪把刀切；然后是①腔 ℓ←PP × h←TP × e←EP */
         fig(compStrip(wSeg.sub), '宽度=字节占比 · 颜色=切它那把刀');
-        fig(cavityBox3D({n:D.ep, dim:'ep', i:ep}, {n:D.tp, dim:'tp', i:D.tp - 1 - c.tp}, {n:D.pp, dim:'pp', i:p}, {cell:MEMC[key]}), '①权重体 · 横向 e←EP · 上下 h←TP（TP0 在上）· 近→远 ℓ←PP（PP0→PP' + (D.pp - 1) + '）· 填色格就是本卡');
-        kv('层段', '参数属于具体 Layer；PP' + p + ' 放 L' + (p*LPS) + '–L' + ((p+1)*LPS - 1) + '（' + LPS + '/' + D.layers + ' 层）。同 Stage 的 Rank 负责同一层段，但会继续按 TP / EP 分片或按 DP / EDP 复制，并非人人持有完整相同的权重；均匀切分时 GB 相同也不代表内容相同。');
+        fig(cavityBox3D({n:D.tp, dim:'tp', i:c.tp}, {n:D.pp, dim:'pp', i:p}, {n:D.ep, dim:'ep', i:ep}, {cell:MEMC[key]}), '①权重体 ℓ×h×e · 本卡 = 三根轴的交集那一格');
+        kv('层段', 'ℓ ' + LPS + '/' + D.layers + ' · L' + (p*LPS) + '–L' + ((p+1)*LPS - 1) + '（PP 定段，不切张量）');
         if(MEM_OBJ[key].follow) kv('切法', esc(MEM_OBJ[key].follow));
       }
       if(key === 'w')   note = '每块的刀各不相同——点下面任意一块，才谈得上「本卡拿的是哪一份」。';
@@ -2029,8 +1818,8 @@
       if(key === 'opt') note = '主参数 fp32 + 动量 m + 二阶矩 v。面积最大的一档，也是「换 optimizer 能省多少」的全部战场。';
       if(key === 'act'){
         var mub = Math.max(1, Math.min(D.pp, D.ga) - p);
-        /* ②腔同样照主矩阵：b/DP 横排、s/CP 上下、ℓ/PP 从近到远；h 全长（TP 不切它） */
-        fig(cavityBox3D({n:D.dp, dim:'dp', i:c.dp}, {n:D.cp, dim:'cp', i:0}, {n:D.pp, dim:'pp', i:p}, {cell:MEMC.act}), '②激活体 · 横向 b←DP · 竖向 s←CP · 近→远 ℓ←PP（PP0→PP' + (D.pp - 1) + '）· h 全长 ' + fmtN(D.hidden) + '（TP 不切，算子间 AllGather 回全长）');
+        /* ②腔 ℓ←PP × s←CP × b←DP：同一把 DP 刀在这只盒子上是轴，在①上只能整只复印；h 全长（TP 不切它） */
+        fig(cavityBox3D({n:D.cp, dim:'cp', i:0}, {n:D.pp, dim:'pp', i:p}, {n:D.dp, dim:'dp', i:c.dp}, {cell:MEMC.act}), '②激活体 ℓ×s×b · h 全长 ' + fmtN(D.hidden) + '（TP 不切，算子间 AllGather 回全长）');
         fig(cavityGrid({nx:mub, ix:0, lx:'in-flight μb', ny:1, iy:0, ly:'', c:MEMC.act}), '1F1B：stage ' + p + ' 此刻压着 ' + mub + ' 份');
         note = '唯一随时间轴动的一档。它不是切出来的常驻账，是流——装满不会崩的是流，装满会崩的是常驻那三档。';
       }
@@ -2047,17 +1836,9 @@
       fig(chain, (CHCAP[sub ? 'w' : key] || '') + '淡的那几格可点，跳过去。');
     }
     /* 对应通信：这一档被切开之后，本卡为它跟谁说话 */
-    var optLine = '';
-    if(!sub && key === 'opt'){
-      var cur = segs.filter(function(s){ return s.k === 'opt'; })[0].bytes, eightBit = cur/2, zero1 = cur/D.dp;
-      optLine = '<section class="opt-compare"><h4>优化策略预览</h4>'
-        + '<div class="opt-plan"><b>当前 · fp32 主参数 + m + v</b><strong>' + fmtMem(cur) + '</strong><span>12 B/参数 = 主参数 4B + 动量 m 4B + 二阶矩 v 4B</span></div>'
-        + '<div class="opt-plan"><b>8-bit 状态示意</b><strong>' + fmtMem(eightBit) + '</strong><span>约 6 B/参数 · 预计节省 ' + fmtMem(cur-eightBit) + '；精度与算子支持需实测</span></div>'
-        + '<div class="opt-plan"><b>ZeRO-1 · DP ' + D.dp + ' 路分片</b><strong>' + fmtMem(zero1) + '</strong><span>优化器状态按 DP 组均摊；会增加更新阶段通信与状态管理</span></div></section>';
-    }
     var mo = memObj(key), commLine = '';
     if(mo.comm && mo.comm.length){
-      commLine = '<div class="rm-note"><b style="color:var(--fg)">对应通信</b><br>每次搬运都按源、张量、前后 layout、并行域、原语和目的卡来读。</div>'
+      commLine = '<div class="rm-note" style="margin-top:5px;cursor:help" title="' + esc('一次搬运记全是五样：源 / 张量（含前后 layout）/ 并行域 / 原语 / 宿。') + '"><b style="color:var(--fg)">对应通信</b> <span style="opacity:.6">ⓘ</span></div>'
         + mo.comm.map(function(cm){ return comm5HTML(c, key, cm); }).join('');
     } else if(mo.silent) commLine = '<div class="rm-note">对应通信：<b>无</b>——' + esc(mo.silent) + '</div>';
     /* 兄弟卡：阵列上沿这几根轴的同组卡描了刀色的边 */
@@ -2068,8 +1849,9 @@
     }).join(' · ') + '——沿这几根轴与本卡凑齐一整份（棱色=刀色）</div>';
     return '<div class="rm-d" style="--rmc:' + tint + '">'
       + '<div class="rm-dh"><b style="color:' + tint + '">' + esc(title) + '</b>'
+      + (note ? '<span style="margin-left:5px;color:var(--fg3);cursor:help" title="' + esc(note) + '">ⓘ</span>' : '')
       + '<button class="rm-dx" data-mk="" title="收起这一块">✕</button></div>'
-      + '<dl>' + rows.join('') + '</dl>' + (note ? '<div class="rm-note">' + esc(note) + '</div>' : '') + figs.join('') + optLine + commLine + sibLine + '</div>';
+      + '<dl>' + rows.join('') + '</dl>' + figs.join('') + commLine + sibLine + '</div>';
   }
 
   /* ── 第 10 步：展平视图 ──────────────────────────────────────────────
@@ -2380,13 +2162,11 @@
     var input = document.getElementById('rankFind'), r = parseInt(input.value, 10);
     if(!isFinite(r)) return; r = clamp(r, 0, cards.length - 1); input.value = r;
     if(step < 2) go(2);
-    if(step === 7){ queueRankFocus(r, now(), 620); return; }
     selRank = r;
     if(step === 8){ comm = commOf(r); comm.at = now(); }
     syncStagebar(); renderRankMem(); needDraw = true; tick();
   });
   document.getElementById('rankClearBtn').addEventListener('click', function(){
-    if(step === 7){ queueRankFocus(null, now(), 520); return; }
     selRank = null; if(comm && !comm.off) comm.off = now(); syncStagebar(); renderRankMem(); needDraw = true; tick();
   });
   document.getElementById('rankFind').addEventListener('keydown', function(e){ if(e.key === 'Enter') document.getElementById('rankFindBtn').click(); });
@@ -2847,8 +2627,7 @@
   var pageEl = document.querySelector('.page'), tabsEl = document.getElementById('tabs');
   function setTab(id){
     if(id !== 'scene') id = 'intro';
-    if(id === 'scene'){ setStageCfgOpen(false); memSel = null; syncMemDetail(null, false); }
-    if(id === 'intro') applySide(false, false);
+    if(id === 'scene') setStageCfgOpen(false);
     pageEl.dataset.tab = id;
     Array.prototype.forEach.call(tabsEl.children, function(b){ b.setAttribute('aria-selected', String(b.dataset.tab === id)); });
     try{ var q = new URLSearchParams(location.search); if(id === 'intro') q.delete('tab'); else q.set('tab', id);
@@ -2856,18 +2635,18 @@
     if(id === 'intro') resize();          /* 画布刚从 display:none 回来，尺寸要重新量 */
   }
   tabsEl.addEventListener('click', function(e){ var b = e.target.closest('button[data-tab]'); if(b) setTab(b.dataset.tab); });
-  /* 侧栏开关：实战页沿用用户记录；每次进入 Rank 的设计表达时默认收起。 */
-  var sideBtn = document.getElementById('sideTg'), sideOn = true;
-  try{ sideOn = localStorage.getItem('ri-side') !== 'off'; }catch(e){}
-  function applySide(on, persist){
-    sideOn = !!on;
-    if(sideOn) delete pageEl.dataset.side; else pageEl.dataset.side = 'off';
-    sideBtn.setAttribute('aria-pressed', String(sideOn));
-    if(persist){ try{ localStorage.setItem('ri-side', sideOn ? 'on' : 'off'); }catch(e){} }
-    window.dispatchEvent(new Event('resize'));
-  }
-  sideBtn.addEventListener('click', function(){ applySide(!sideOn, true); });
-  applySide(sideOn, false);
+  /* 侧栏开关：记在 localStorage；两页的画布尺寸都跟着列宽变，广播一次 resize 让它们各自重量 */
+  (function(){
+    var btn = document.getElementById('sideTg'), on = true;
+    try{ on = localStorage.getItem('ri-side') !== 'off'; }catch(e){}
+    function apply(){
+      if(on) delete pageEl.dataset.side; else pageEl.dataset.side = 'off';
+      btn.setAttribute('aria-pressed', String(on));
+      window.dispatchEvent(new Event('resize'));
+    }
+    btn.addEventListener('click', function(){ on = !on; try{ localStorage.setItem('ri-side', on ? 'on' : 'off'); }catch(e){} apply(); });
+    apply();
+  })();
 
   resize();
   var q0 = new URLSearchParams(location.search), st = parseInt(q0.get('step'), 10);
