@@ -39,7 +39,7 @@
     --surface-1:var(--bg); --surface-2:var(--bg2); --surface-3:rgba(var(--fgrgb),.10); --surface-4:rgba(var(--fgrgb),.16);
     --foreground:var(--fg); --foreground-secondary:var(--fg2); --foreground-muted:var(--fg3);
     --border-subtle:rgba(var(--fgrgb),.06); --border-default:var(--line); --border-strong:rgba(var(--fgrgb),.22);
-    --primary:var(--dp); --primary-foreground:#fff; --success:#22c55e; --warning:#f59e0b;
+    --primary:var(--dp); --primary-foreground:#fff; --success:#22c55e; --warning:#f59e0b; --accent:#7C8DB8; --danger:var(--bad);
     --state-hover:rgba(var(--fgrgb),.06); --state-focus:rgba(67,105,239,.20); --state-muted:rgba(var(--fgrgb),.06);
     --font-sans:var(--sans); --font-mono:var(--mono);
     --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px;
@@ -839,8 +839,56 @@
   .memdetail.is-observer .md-head{position:static;flex:none;align-items:center;min-height:28px;margin:0;padding:0;background:none;border-bottom:0}
   .memdetail.is-observer .md-kicker{display:none}
   .memdetail.is-observer .md-title{font-size:15px}
-  .mem-observer{display:flex;flex-direction:column;gap:12px;color:var(--fg2);font:400 12px/1.5 var(--sans)}
-  .mem-observer-intro{margin:0;padding:9px 10px;border-radius:8px;background:var(--bg2);color:var(--fg2)}
+  .mem-observer{display:flex;flex-direction:column;color:var(--fg2);font:400 12px/1.55 var(--sans)}
+  .mem-observer-intro{margin:0;color:var(--fg2)}
+  /* 峰值 / GAP 右栏是一条“事故怎么发生”的证据链，不再是平铺指标卡。
+     每段由细分隔线串起来，只有主结论使用一块语义底色。 */
+  .mem-story-section{display:grid;gap:9px;padding:14px 0;border-top:1px solid var(--border-subtle,var(--line))}
+  .mem-story-section:first-child{padding-top:0;border-top:0}
+  .mem-story-kicker{color:var(--bad);font:700 10px/1.25 var(--sans);letter-spacing:.08em;text-transform:uppercase}
+  .mem-story-hero{padding:12px;border-radius:var(--radius-lg);background:color-mix(in srgb,var(--bad) 8%,var(--bg2))}
+  .mem-story-hero h3{margin:0;color:var(--fg);font:750 16px/1.4 var(--sans)}
+  .mem-story-hero p{margin:7px 0 0;color:var(--fg2);font:400 13px/1.6 var(--sans)}
+  .mem-story-pulse{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:end;margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--bad) 22%,var(--line))}
+  .mem-story-pulse span{color:var(--fg3);font:600 10px/1.3 var(--sans)}
+  .mem-story-pulse strong{grid-row:1/3;grid-column:2;color:var(--bad);font:850 24px/1 var(--mono);letter-spacing:-.04em;white-space:nowrap}
+  .mem-story-pulse b{color:var(--fg);font:650 11px/1.35 var(--sans)}
+  .mem-story-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .mem-story-head b{color:var(--fg);font:750 12px/1.35 var(--sans)}
+  .mem-story-head span{color:var(--fg3);font:600 10px/1.3 var(--mono)}
+  .mem-story-flow{display:grid;gap:0;margin:0;padding:0;list-style:none;counter-reset:story}
+  .mem-story-flow li{counter-increment:story;position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:0 0 13px;color:var(--fg2);font:400 12px/1.5 var(--sans)}
+  .mem-story-flow li:last-child{padding-bottom:0}
+  .mem-story-flow li::before{content:counter(story);position:relative;z-index:1;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--bg2);color:var(--fg2);font:750 10px/1 var(--mono)}
+  .mem-story-flow li:not(:last-child)::after{content:"";position:absolute;left:10.5px;top:22px;bottom:0;width:1px;background:var(--line)}
+  .mem-story-flow li b{display:block;margin-bottom:2px;color:var(--fg);font-weight:700}
+  .mem-story-flow li span{display:block;color:var(--fg3)}
+  .mem-story-ledger{display:grid;gap:8px}
+  .mem-story-capacity{position:relative;display:flex;height:30px;overflow:hidden;border-radius:var(--radius-sm);background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line)}
+  .mem-story-capacity i{display:block;min-width:0;height:100%;transition:width .16s linear}
+  .mem-story-capacity i[data-ledger="allocated"]{background:var(--success)}
+  .mem-story-capacity i[data-ledger="delayed"]{background:var(--warning)}
+  .mem-story-capacity i[data-ledger="idle"]{background:var(--accent)}
+  .mem-story-capacity i[data-ledger="other"]{background:var(--bad)}
+  .mem-story-capacity i[data-ledger="headroom"]{background:transparent}
+  .mem-story-capacity::after{content:"HBM";position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--fg3);font:700 8px/1 var(--mono);mix-blend-mode:difference}
+  .mem-story-formula{display:flex;justify-content:space-between;gap:8px;color:var(--fg3);font:600 10px/1.35 var(--mono)}
+  .mem-story-formula b{color:var(--fg);font-weight:750}
+  .mem-story-ledger-list{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px}
+  .mem-story-ledger-row{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:6px;align-items:center;min-width:0;color:var(--fg3);font:600 10px/1.3 var(--sans)}
+  .mem-story-ledger-row i{width:8px;height:8px;border-radius:2px;background:var(--lc)}
+  .mem-story-ledger-row[data-ledger-row="allocated"]{--lc:var(--success)}
+  .mem-story-ledger-row[data-ledger-row="delayed"]{--lc:var(--warning)}
+  .mem-story-ledger-row[data-ledger-row="idle"]{--lc:var(--accent)}
+  .mem-story-ledger-row[data-ledger-row="other"]{--lc:var(--bad)}
+  .mem-story-ledger-row b{color:var(--fg);font:750 10.5px/1.2 var(--mono);white-space:nowrap}
+  .mem-story-ledger-row.is-focus span,.mem-story-ledger-row.is-focus b{color:var(--bad)}
+  .mem-story-meaning{padding:10px;border-radius:var(--radius-md);background:var(--bg2);color:var(--fg2);font:400 12px/1.55 var(--sans)}
+  .mem-story-meaning b{color:var(--fg);font-weight:750}
+  .mem-story-checks{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+  .mem-story-checks li{display:grid;grid-template-columns:14px minmax(0,1fr);gap:7px;color:var(--fg2);font:400 12px/1.5 var(--sans)}
+  .mem-story-checks li::before{content:'→';color:var(--fg3);font:700 11px/1.6 var(--mono)}
+  .mem-story-boundary{margin:0;color:var(--fg3);font:400 11px/1.55 var(--sans)}
   .mem-observer-phase{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--fg3);font:600 10px/1.3 var(--mono)}
   .mem-observer-phase b{color:var(--fg);font-weight:750}
   .mem-observer-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px}
@@ -865,18 +913,15 @@
   .mem-observer-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
   .mem-observer-section-head b{color:var(--fg);font:750 11px/1.3 var(--sans)}
   .mem-observer-section-head span{color:var(--fg3);font:600 9px/1.3 var(--mono)}
-  .mem-observer-results{display:grid;gap:5px}
-  .mem-observer-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;min-height:52px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg2);cursor:pointer;text-align:left}
-  .mem-observer-result:hover{border-color:rgba(var(--fgrgb),.28);background:var(--bg2)}
-  .mem-observer-result.is-on{border-color:var(--bad);box-shadow:inset 2px 0 0 var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--bg))}
+  .mem-observer-results{display:grid}
+  .mem-observer-result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;min-height:54px;padding:9px 6px;border:0;border-top:1px solid var(--border-subtle,var(--line));border-radius:0;background:none;color:var(--fg2);cursor:pointer;text-align:left}
+  .mem-observer-result:first-child{border-top:0}
+  .mem-observer-result:hover{background:var(--bg2)}
+  .mem-observer-result.is-on{border-radius:var(--radius-md);background:color-mix(in srgb,var(--bad) 7%,var(--bg2))}
   .mem-observer-result-copy{min-width:0}
-  .mem-observer-result-copy>b{display:block;color:var(--fg);font:700 10.5px/1.25 var(--sans)}
-  .mem-observer-result-copy>small{display:block;margin-top:4px;color:var(--fg3);font:500 9.5px/1.3 var(--sans)}
+  .mem-observer-result-copy>b{display:block;color:var(--fg);font:700 12px/1.35 var(--sans)}
+  .mem-observer-result-copy>small{display:block;margin-top:3px;color:var(--fg3);font:400 11px/1.4 var(--sans)}
   .mem-observer-result>strong{align-self:center;color:var(--bad);font:800 11px/1.2 var(--mono);white-space:nowrap}
-  .mem-observer-tabs{display:flex;width:100%}
-  .mem-observer-tabs .mem-observer-tab{min-width:0;flex:1;padding:0 7px}
-  .mem-observer-tab:hover{color:var(--fg)}
-  .mem-observer-tabs .mem-observer-tab.is-on{background:var(--fg);box-shadow:none;color:var(--bg)}
   .mem-observer-heat{display:grid;gap:7px;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
   .mem-observer-heat-head{display:flex;align-items:flex-start;gap:8px}
   .mem-observer-heat-head b{color:var(--fg);font:750 11px/1.3 var(--sans)}
@@ -886,13 +931,6 @@
   .mem-observer-cell.is-peak{z-index:2;border-color:var(--bad);box-shadow:0 0 0 1px var(--bg),0 0 0 2px var(--bad);color:#fff;font-weight:850}
   .mem-observer-heat-legend{display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center;color:var(--fg3);font:600 8.5px/1 var(--sans)}
   .mem-observer-heat-legend i{height:5px;border-radius:999px;background:linear-gradient(90deg,rgb(13,30,66) 0%,rgb(38,86,178) 22%,rgb(104,78,196) 44%,rgb(176,66,148) 64%,rgb(226,68,84) 82%,rgb(255,124,46) 100%)}
-  .mem-observer-evidence{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .mem-observer-evidence-section{display:grid;gap:6px}
-  .mem-observer-evidence-section .mem-observer-section-head{margin:0}
-  .mem-observer-evidence>div{min-width:0;padding:7px 8px;border-radius:7px;background:var(--bg2)}
-  .mem-observer-evidence span{display:block;color:var(--fg3);font:600 9px/1.25 var(--sans)}
-  .mem-observer-evidence b{display:block;margin-top:3px;overflow:hidden;color:var(--fg);font:800 11px/1.2 var(--mono);text-overflow:ellipsis;white-space:nowrap}
-  .mem-observer-evidence>div.is-gap b{color:var(--bad)}
 
   /* OOM 页签的 R23 / L7 热点专家根因面板。 */
   .oom-observer{gap:10px}
@@ -1498,13 +1536,13 @@
     ]}
   };
   var OBSERVER_METRICS = {
-    allocated:{label:'算子分配 A', resultLabel:'最大真实工作集', definition:'算子仍在使用的真实业务内存；高不等于坏'},
+    allocated:{label:'算子分配 A', resultLabel:'业务工作集突然增大', definition:'算子仍在使用的真实业务内存；高不等于坏'},
     active:{label:'算子持有 H', definition:'算子分配 + 跨流延迟释放'},
     reserved:{label:'算子保留 R', definition:'算子持有 + 内存池空闲'},
-    app:{label:'进程保留 P', resultLabel:'最高容量压力', definition:'最接近整卡容量压力；应在峰值时刻拆成 A + D + I + O'},
-    delayed:{label:'延迟释放 D', resultLabel:'延迟释放负担', definition:'H - A；逻辑已释放但仍被 Stream / Event 持有'},
-    idle:{label:'池内空闲 I', resultLabel:'池内空闲负担', definition:'R - H；已回到内存池但当前没有被流持有'},
-    other:{label:'进程其他 O', resultLabel:'进程其他负担', definition:'P - R；通信、runtime、图执行器等算子账外占用'},
+    app:{label:'进程保留 P', resultLabel:'整卡容量最危险', definition:'最接近整卡容量压力；应在峰值时刻拆成 A + D + I + O'},
+    delayed:{label:'延迟释放 D', resultLabel:'释放了却没有归还', definition:'H - A；逻辑已释放但仍被 Stream / Event 持有'},
+    idle:{label:'池内空闲 I', resultLabel:'空闲但仍占在池里', definition:'R - H；已回到内存池但当前没有被流持有'},
+    other:{label:'进程其他 O', resultLabel:'算子之外的占用', definition:'P - R；通信、runtime、图执行器等算子账外占用'},
     delayedRatio:{label:'延迟释放占比', definition:'D ÷ R；只用于跨体量辅助比较'},
     idleRatio:{label:'池内空闲占比', definition:'I ÷ R；只用于跨体量辅助比较'}
   };
@@ -2969,12 +3007,6 @@
       }
       updateScenarioInsight(memoryDiagnosticState); return;
     }
-    var observerTab = e.target.closest ? e.target.closest('[data-ob-metric-tab]') : null;
-    if(observerTab){
-      var tabMetric = observerTab.getAttribute('data-ob-metric-tab');
-      if(OBSERVER_METRICS[tabMetric]) memoryObserverMetric = tabMetric;
-      updateScenarioInsight(memoryDiagnosticState); return;
-    }
     var diagRankButton = e.target.closest ? e.target.closest('[data-diag-rank]') : null;
     if(diagRankButton){
       var diagRank = +diagRankButton.getAttribute('data-diag-rank');
@@ -3107,22 +3139,29 @@
         + '<span class="mem-observer-result-copy"><b>' + esc(OBSERVER_METRICS[key].resultLabel || (OBSERVER_METRICS[key].label + '峰值')) + '</b><small data-ob-result-note>等待整 Step 扫描</small></span>'
         + '<strong data-ob-result-value>—</strong></button>';
     }).join('');
-    var tabs = metricKeys.map(function(key){
-      return '<button type="button" class="mem-observer-tab" role="tab" data-ob-metric-tab="' + key + '" aria-selected="false">' + esc(OBSERVER_METRICS[key].label) + '</button>';
-    }).join('');
     var cells = cards.map(function(card){ return '<span class="mem-observer-cell" data-ob-heat-rank="' + card.r + '">' + card.r + '</span>'; }).join('');
     return '<div class="mem-observer" data-observer-scenario="' + memScenario + '">'
-      + '<p class="mem-observer-intro">' + (memScenario === 'peak'
-        ? '先用进程保留 P 找容量风险，再在同一峰值时刻拆 A（业务）+ D（延迟释放）+ I（池内空闲）+ O（通信/runtime）。A 高本身不等于异常。'
-        : '分别看 D = H - A、I = R - H、O = P - R；不按占比单独判坏，而是综合峰值 GB、高位持续时间、byte-time，以及它与进程高水位是否重叠。') + '</p>'
-      + '<section><div class="mem-observer-section-head"><b>分析结果</b><span>整 Step · 128 Rank</span></div><div class="mem-observer-results">' + results + '</div></section>'
-      + '<div class="mem-observer-phase"><span>当前采样</span><b data-ob-phase>等待 Step 回放</b></div>'
-      + '<div class="mem-observer-tabs mem-scenario" role="tablist" aria-label="当前采样观测口径">' + tabs + '</div>'
+      + '<section class="mem-story-section"><div class="mem-story-kicker" data-ob-story-kicker>整 Step 扫描结论</div>'
+      + '<div class="mem-story-hero"><h3 data-ob-story-title>正在扫描问题</h3><p data-ob-story-copy>回放一个 Step 后，这里会把指标翻译成一次具体的显存事故。</p>'
+      + '<div class="mem-story-pulse"><span data-ob-story-pulse-label>最需要注意</span><strong data-ob-story-pulse>—</strong><b data-ob-story-meta>等待 Step 回放</b></div></div></section>'
+      + '<section class="mem-story-section"><div class="mem-story-head"><b>同一时刻，64 GB 到底装了什么</b><span data-ob-ledger-at>目标时刻</span></div>'
+      + '<div class="mem-story-ledger"><div class="mem-story-capacity" data-ob-ledger role="img" aria-label="同一时刻的 HBM 内存账">'
+      + '<i data-ledger="allocated"></i><i data-ledger="delayed"></i><i data-ledger="idle"></i><i data-ledger="other"></i><i data-ledger="headroom"></i></div>'
+      + '<div class="mem-story-formula"><span>P = A + D + I + O</span><b data-ob-ledger-total>— / 64 GB</b></div>'
+      + '<div class="mem-story-ledger-list">'
+      + '<div class="mem-story-ledger-row" data-ledger-row="allocated"><i></i><span>A · 业务正在使用</span><b data-ledger-value="allocated">—</b></div>'
+      + '<div class="mem-story-ledger-row" data-ledger-row="delayed"><i></i><span>D · 已释放但仍被流持有</span><b data-ledger-value="delayed">—</b></div>'
+      + '<div class="mem-story-ledger-row" data-ledger-row="idle"><i></i><span>I · 池内空闲</span><b data-ledger-value="idle">—</b></div>'
+      + '<div class="mem-story-ledger-row" data-ledger-row="other"><i></i><span>O · 通信/runtime 等</span><b data-ledger-value="other">—</b></div>'
+      + '</div><div class="mem-story-meaning" data-ob-story-meaning>等待同一时刻的内存账。</div></div></section>'
+      + '<section class="mem-story-section"><div class="mem-story-head"><b>问题是怎样一步步发生的</b><span>因果链</span></div><ol class="mem-story-flow" data-ob-story-flow></ol></section>'
+      + '<section class="mem-story-section"><div class="mem-story-head"><b>' + (memScenario === 'peak' ? '集群里还有谁值得看' : '这是哪一种 GAP') + '</b><span>整 Step · 128 Rank</span></div><div class="mem-observer-results">' + results + '</div></section>'
+      + '<section class="mem-story-section"><div class="mem-observer-phase"><span>回放中的当前采样</span><b data-ob-phase>等待 Step 回放</b></div>'
       + '<section class="mem-observer-heat"><div class="mem-observer-heat-head"><b data-ob-heat-title>算子分配 · 128 Rank</b></div>'
       + '<div class="mem-observer-grid" aria-label="128 Rank 动态内存热力图">' + cells + '</div>'
-      + '<div class="mem-observer-heat-legend"><span data-ob-legend-min>0 GB</span><i></i><span data-ob-legend-max>64 GB</span></div></section>'
-      + '<section class="mem-observer-evidence-section"><div class="mem-observer-section-head"><b data-ob-evidence-title>当前 Rank 证据</b><span>整 Step · 同一目标时刻</span></div><div class="mem-observer-evidence" data-ob-evidence></div></section>'
-      + '<div class="mem-observer-verdict" style="--obc:var(--bad)" data-ob-verdict></div></div>';
+      + '<div class="mem-observer-heat-legend"><span data-ob-legend-min>0 GB</span><i></i><span data-ob-legend-max>64 GB</span></div></section></section>'
+      + '<section class="mem-story-section"><div class="mem-story-head"><b>落到真实业务，还要核对什么</b><span>生产证据</span></div><ul class="mem-story-checks" data-ob-story-checks></ul>'
+      + '<p class="mem-story-boundary">本页数值是按真实训练与 allocator 机制构造的确定性教学数据，用来解释分析方法，不代表某次生产训练结论。</p></section></div>';
   }
   function observerGB(v){ return isFinite(v) ? (v/GiB).toFixed(1) + ' GB' : '—'; }
   function observerMetricValue(key,v){ return key === 'delayedRatio' || key === 'idleRatio' ? (isFinite(v) ? (v*100).toFixed(1) + '%' : '—') : observerGB(v); }
@@ -3146,31 +3185,75 @@
     if(!(median > 0)) return '—';
     var delta = value/median-1; return (delta >= 0 ? '+' : '') + (delta*100).toFixed(1) + '%';
   }
-  function observerEvidenceHTML(key, m, analysis, r){
-    if(!m) return '<div><span>当前 Rank</span><b>等待采样</b></div>';
-    function card(label, value, gap){ return '<div' + (gap ? ' class="is-gap"' : '') + '><span>' + label + '</span><b>' + value + '</b></div>'; }
-    var peakAt = analysis && analysis.peakAtByRank && analysis.peakAtByRank[r] ? analysis.peakAtByRank[r][key] : 0, peakStat = observerPeakStat(analysis,r,key);
-    if(key === 'app') return card('进程峰值 P',observerGB(m.app),m.app>CFG.hbm*GiB*.9) + card('安全余量',observerGB(CFG.hbm*GiB-m.app),m.app>CFG.hbm*GiB*.9)
-      + card('业务工作集 A',observerGB(m.allocated)) + card('延迟释放 D',observerGB(m.delayed),m.delayed>CFG.hbm*GiB*.05)
-      + card('池内空闲 I',observerGB(m.idle),m.idle>CFG.hbm*GiB*.05) + card('进程其他 O',observerGB(m.other || 0),(m.other || 0)>CFG.hbm*GiB*.05)
-      + card('峰值位置',(m.phaseLabel || '—') + ' · ' + Math.round(peakAt*100) + '%') + card('P≥90%峰值',peakStat ? observerPct(peakStat.duration) + ' Step' : '—')
-      + card('全局 P95',analysis && analysis.globalP95 ? observerGB(analysis.globalP95.app) : '—');
-    if(key === 'allocated') return card('业务工作集 A',observerGB(m.allocated)) + card('同时刻 P',observerGB(m.app)) + card('安全余量',observerGB(CFG.hbm*GiB-m.app),m.app>CFG.hbm*GiB*.9)
-      + card('A / HBM',observerPct(m.allocated/(CFG.hbm*GiB))) + card('同角色峰值偏离',observerRoleDelta(analysis,r,key)) + card('峰值位置',(m.phaseLabel || '—') + ' · ' + Math.round(peakAt*100) + '%')
-      + card('A≥90%峰值',peakStat ? observerPct(peakStat.duration) + ' Step' : '—') + card('全局 P95',analysis && analysis.globalP95 ? observerGB(analysis.globalP95.allocated) : '—') + card('判断','高不等于坏');
-    if(key === 'active') return card('算子分配',observerGB(m.allocated)) + card('算子持有',observerGB(m.active)) + card('延迟释放 GAP',observerGB(m.delayed),m.delayed>4*GiB);
-    if(key === 'reserved') return card('算子持有',observerGB(m.active)) + card('算子保留',observerGB(m.reserved)) + card('内存池空闲 GAP',observerGB(m.idle),m.idle>4*GiB);
-    if(key === 'delayed' || key === 'idle' || key === 'other'){
-      var stat = observerGapStat(analysis,r,key), ratio = key === 'delayed' ? m.delayedRatio : (key === 'idle' ? m.idleRatio : (m.app > 0 ? m.other/m.app : 0));
-      var gapLabel = key === 'delayed' ? '延迟释放 D' : (key === 'idle' ? '池内空闲 I' : '进程其他 O');
-      return card(gapLabel,observerGB(m[key]),true) + card(key === 'other' ? '占进程保留 P' : '占算子保留 R',observerPct(ratio))
-        + card('高位持续 ≥5% HBM',stat ? observerPct(stat.duration) + ' Step' : '—') + card('Byte-time',stat ? (stat.byteTime/GiB).toFixed(1) + ' GB·Step' : '—')
-        + card('与 P≥90%峰值重叠',stat ? observerPct(stat.overlap) + ' Step' : '—',stat && stat.overlap>.1) + card('峰值阶段',m.phaseLabel || '—')
-        + card('峰值时刻','Step ' + Math.round((stat ? stat.at : peakAt)*100) + '%');
+  function observerStoryModel(key,r,m,analysis){
+    m = m || {};
+    var info = memDiagnosticRank(r), stat = observerGapStat(analysis,r,key), peakAt = stat ? stat.at : (analysis && analysis.peakAtByRank && analysis.peakAtByRank[r] ? analysis.peakAtByRank[r][key] : 0);
+    var stage = m.phaseLabel || '训练阶段', atLabel = stage + ' · Step ' + Math.round((peakAt || 0)*100) + '%';
+    var headroom = Math.max(0,CFG.hbm*GiB-(m.app || 0)), duration = stat ? observerPct(stat.duration) + ' Step' : observerPct(observerPeakStat(analysis,r,key) && observerPeakStat(analysis,r,key).duration) + ' Step';
+    var story = {kicker:'整 Step 扫描结论',title:'R' + r + ' 出现显存异常',copy:'把同一时刻的内存账拆开后，才能判断问题真正来自哪里。',pulseLabel:'最需要注意',pulse:observerMetricValue(key,m[key]),meta:atLabel,focus:key,
+      flow:[],meaning:'四段相加才是进程真正压在 HBM 上的水位。',checks:[]};
+    if(key === 'app'){
+      story.title = 'R' + r + ' 快满卡了，但风险不只在算子里';
+      story.copy = '进程实际压住了 ' + observerGB(m.app) + '，距离 ' + CFG.hbm + ' GB 上限只剩 ' + observerGB(headroom) + '。此时必须在同一峰值时刻拆账，不能只看算子分配。';
+      story.pulseLabel = '安全余量'; story.pulse = observerGB(headroom); story.focus = (m.other || 0) >= Math.max(m.delayed || 0,m.idle || 0) ? 'other' : 'app';
+      story.flow = [
+        ['业务先占用 A = ' + observerGB(m.allocated),'权重、激活和 workspace 是算子仍在使用的真实工作集。'],
+        ['账外又叠加 O = ' + observerGB(m.other || 0),'通信 buffer、runtime 或图执行器没有记在算子分配里。'],
+        ['进程水位 P 升到 ' + observerGB(m.app),atLabel + ' 达到整 Step 最高点。'],
+        ['下一次申请只剩 ' + observerGB(headroom),'即使 A 看起来不夸张，整卡仍可能被下一块 workspace 推向 OOM。']
+      ];
+      story.meaning = '<b>读图方法：</b>绿色 A 说明业务需要多少；红色 O 说明算子账外又压了多少。这里先按 P 判断容量风险，再追红色部分属于哪个组件。';
+      story.checks = ['按组件与 PID 拆 P − R：HCCL、runtime、图执行器分别占多少','对齐峰值时刻的 memory_record、operator_memory 与 step marker','检查账外 buffer 的创建/销毁调用栈，确认是必要驻留还是生命周期过长'];
+    } else if(key === 'allocated'){
+      story.title = 'R' + r + ' 的业务工作集在' + stage + '突然变大';
+      story.copy = 'A = ' + observerGB(m.allocated) + ' 表示算子此刻确实还在使用这些内存。它可能是必要计算，也可能是热点专家、异常 shape 或过大的临时 workspace；高本身不等于坏。';
+      story.pulseLabel = '同时刻安全余量'; story.pulse = observerGB(headroom); story.focus = 'allocated';
+      story.flow = [
+        [(info && info.cause) || '某类张量或 workspace 突然放大','先定位到具体 Layer、算子与张量，而不是先给 A 判好坏。'],
+        ['业务工作集 A 达到 ' + observerGB(m.allocated),'这是仍会被后续计算读取的真实占用。'],
+        ['同时刻进程水位 P = ' + observerGB(m.app),'距离 HBM 上限还剩 ' + observerGB(headroom) + '。'],
+        ['再与同角色 Rank 比较','当前峰值相对同 PP / TP / EP 角色中位数偏离 ' + observerRoleDelta(analysis,r,key) + '。']
+      ];
+      story.meaning = '<b>读图方法：</b>A 高只说明“业务真的在用”。只有它同时挤压 P 的安全余量、明显偏离同角色，且能落到可优化张量/算子时，才构成问题。';
+      story.checks = ['列出该时刻 Top 张量、Layer、算子和 workspace','按同 PP / TP / EP 角色比较副本，排除模型切分造成的结构性台阶','核对异常 shape、专家 token 倾斜，以及激活重计算是否符合预期'];
+    } else if(key === 'delayed'){
+      story.title = 'R' + r + ' 已经“释放”，' + observerGB(m.delayed) + ' 却还没有归还';
+      story.copy = '算子逻辑已经不用这块内存，所以它离开了 A；但另一条 Stream / Event 还没完成最后访问，它仍留在 H。这个差值就是 D。';
+      story.pulseLabel = '延迟释放 GAP'; story.pulse = observerGB(m.delayed); story.focus = 'delayed';
+      story.flow = [
+        ['算子发出逻辑释放','从业务代码看，这块内存已经“用完了”。'],
+        ['最后访问仍在另一条流上排队','Event 未完成前，allocator 不能安全复用这块地址。'],
+        ['H 比 A 多出 ' + observerGB(m.delayed),'这部分持续约 ' + duration + '，期间看得见却拿不回来。'],
+        ['它与 P 高水位重叠 ' + observerPct(stat && stat.overlap) + ' Step','如果下一次大申请恰好到来，延迟释放会直接压缩安全余量。']
+      ];
+      story.meaning = '<b>这不是普通“忘记 free”：</b>逻辑释放已经发生，真正的问题是异步执行尚未允许复用。要沿最后访问 Stream → kernel → Event 找谁拖住了回收。';
+      story.checks = ['定位最后访问这块内存的 Stream、kernel 与 Event','对齐 kernel 长尾和 Event wait，确认谁延长了生命周期','验证 Event 完成后 D 是否回落；若不回落，再排查真正泄漏'];
+    } else if(key === 'idle'){
+      story.title = 'R' + r + ' 有 ' + observerGB(m.idle) + ' 已空闲，却仍占在内存池里';
+      story.copy = '这些字节已经不被算子或 Stream 使用，但 allocator 为了下次复用仍保留着，所以 R 比 H 高。它可能只是合理缓存，不能仅凭 I 大就叫“碎片”。';
+      story.pulseLabel = '池内空闲 GAP'; story.pulse = observerGB(m.idle); story.focus = 'idle';
+      story.flow = [
+        ['动态 shape 留下不同尺寸的 segment','请求尺寸变化后，旧 block 回到池里等待复用。'],
+        ['池内空闲 I 达到 ' + observerGB(m.idle),'这些内存当前没人使用，但进程还没有还给 HBM。'],
+        ['高位持续约 ' + duration,'持续时间与 byte-time 比单帧占比更能说明缓存负担。'],
+        ['只有“总空闲够、连续块不够”才指向碎片','还必须伴随失败申请、inactive split、retry、清池或 OOM。']
+      ];
+      story.meaning = '<b>当前只能判断池内空闲偏高：</b>如果后续同尺寸申请能顺利复用，它可能是健康缓存；没有 block / segment 证据时不能宣称碎片。';
+      story.checks = ['查看 block / segment 分布、最大连续空闲块与 inactive split','核对相同尺寸请求的复用率，以及 allocation retry / empty cache 事件','将失败申请尺寸与最大连续块比较，再决定是否属于碎片'];
+    } else if(key === 'other'){
+      story.title = 'R' + r + ' 有 ' + observerGB(m.other) + ' 内存根本不在算子账里';
+      story.copy = 'A、H、R 都解释不了这部分占用，但进程保留 P 能看到它；因此 O = P − R。常见来源是 HCCL、runtime、图执行器或其他 PID/组件。';
+      story.pulseLabel = '进程其他 GAP'; story.pulse = observerGB(m.other); story.focus = 'other';
+      story.flow = [
+        ['算子 allocator 的 R 保持正常','只看 Operator Reserved 会误以为容量仍然安全。'],
+        ['通信/runtime buffer 在账外驻留','这部分不会出现在算子张量或内存池明细中。'],
+        ['P 比 R 多出 ' + observerGB(m.other),'差值在进程高水位附近持续约 ' + duration + '。'],
+        ['整卡余量被无声压缩到 ' + observerGB(headroom),'下一次算子申请仍会和这部分占用争同一块 HBM。']
+      ];
+      story.meaning = '<b>关键误区：</b>“算子内存正常”不代表整卡安全。容量风险必须看 P；O 的归因则要转到组件、PID 和通信/runtime 生命周期。';
+      story.checks = ['按 HCCL、runtime、图执行器和 PID 拆分进程级占用','核对通信 buffer 是否跨阶段过早创建或过晚销毁','关联通信长尾，判断 buffer 高驻留是否由慢链路或等待放大'];
     }
-    if(key === 'delayedRatio') return card('算子分配',observerGB(m.allocated)) + card('延迟释放',observerGB(m.delayed),m.delayedRatio>.1) + card('延迟释放占比',observerMetricValue(key,m.delayedRatio),m.delayedRatio>.1);
-    if(key === 'idleRatio') return card('算子持有',observerGB(m.active)) + card('内存池空闲',observerGB(m.idle),m.idleRatio>.1) + card('池空闲占比',observerMetricValue(key,m.idleRatio),m.idleRatio>.1);
-    return card('算子保留',observerGB(m.reserved)) + card('进程保留',observerGB(m.app)) + card('进程其他',observerGB(m.other || 0),(m.other || 0)>4*GiB);
+    return story;
   }
   function updateScenarioInsight(state){
     var root = memDetailBodyEl.querySelector('[data-observer-scenario]'), d = memDiagnostic();
@@ -3198,10 +3281,6 @@
       if(resultValue) resultValue.textContent = 'R' + leader.r + ' | ' + observerMetricValue(key,leader.value);
       if(note) note.textContent = observerResultNote(key,leader.r,analysis);
     });
-    Array.prototype.forEach.call(root.querySelectorAll('[data-ob-metric-tab]'),function(button){
-      var on = button.getAttribute('data-ob-metric-tab') === memoryObserverMetric;
-      button.classList.toggle('is-on',on); button.setAttribute('aria-selected',String(on));
-    });
     var meta = OBSERVER_METRICS[memoryObserverMetric], leader = leaders && leaders[memoryObserverMetric];
     put('[data-ob-heat-title]',meta.label + ' · 128 Rank');
     var heatLegend = root.querySelector('.mem-observer-heat-legend i');
@@ -3219,15 +3298,33 @@
         cell.title = 'R' + rank + ' · ' + meta.label + ' ' + observerMetricValue(memoryObserverMetric,value);
       });
     }
-    put('[data-ob-evidence-title]','R' + r + ' · ' + meta.label + '证据');
     var targetFrame = observerPeakFrame(analysis,r,memoryObserverMetric), gapStat = observerGapStat(analysis,r,memoryObserverMetric);
     if(gapStat && gapStat.frame) targetFrame = gapStat.frame;
-    var evidence = root.querySelector('[data-ob-evidence]'); if(evidence) evidence.innerHTML = observerEvidenceHTML(memoryObserverMetric,targetFrame || m,analysis,r);
-    var verdict = root.querySelector('[data-ob-verdict]');
-    var verdictCopy = memoryObserverMetric === 'app' ? '先看 P / HBM 与安全余量，再在同一峰值时刻拆 A + D + I + O。'
-      : (memoryObserverMetric === 'allocated' ? 'A 是真实工作集，高不等于坏；结合容量余量、同角色偏离和张量构成判断。'
-      : 'GAP 的优先级由绝对 GB、持续时间和与 P 高位的重叠共同决定；占比只作辅助。');
-    if(verdict) verdict.innerHTML = '<b>R' + r + ' · ' + esc(meta.label) + '</b><br>' + esc(verdictCopy) + ' 热力矩阵使用固定量程显示当前采样，红框标出整 Step 分析结果。';
+    var storyFrame = targetFrame || m, story = observerStoryModel(memoryObserverMetric,r,storyFrame,analysis);
+    put('[data-ob-story-kicker]',story.kicker);
+    put('[data-ob-story-title]',story.title);
+    put('[data-ob-story-copy]',story.copy);
+    put('[data-ob-story-pulse-label]',story.pulseLabel);
+    put('[data-ob-story-pulse]',story.pulse);
+    put('[data-ob-story-meta]',story.meta);
+    var storyFlow = root.querySelector('[data-ob-story-flow]');
+    if(storyFlow) storyFlow.innerHTML = story.flow.map(function(item){ return '<li><div><b>' + esc(item[0]) + '</b><span>' + esc(item[1]) + '</span></div></li>'; }).join('');
+    var storyMeaning = root.querySelector('[data-ob-story-meaning]'); if(storyMeaning) storyMeaning.innerHTML = story.meaning;
+    var storyChecks = root.querySelector('[data-ob-story-checks]');
+    if(storyChecks) storyChecks.innerHTML = story.checks.map(function(item){ return '<li>' + esc(item) + '</li>'; }).join('');
+    var cap = CFG.hbm*GiB, ledgerKeys = ['allocated','delayed','idle','other'], appBytes = Math.max(0,storyFrame.app || 0), ledger = root.querySelector('[data-ob-ledger]');
+    ledgerKeys.forEach(function(key){
+      var bytes = Math.max(0,storyFrame[key] || 0), bar = root.querySelector('[data-ledger="' + key + '"]'), value = root.querySelector('[data-ledger-value="' + key + '"]'), row = root.querySelector('[data-ledger-row="' + key + '"]');
+      if(bar) bar.style.width = Math.max(0,Math.min(100,bytes/cap*100)).toFixed(2) + '%';
+      if(value) value.textContent = observerGB(bytes);
+      if(row) row.classList.toggle('is-focus',key === story.focus);
+    });
+    var headroom = Math.max(0,cap-appBytes), headroomBar = root.querySelector('[data-ledger="headroom"]');
+    if(headroomBar) headroomBar.style.width = Math.max(0,Math.min(100,headroom/cap*100)).toFixed(2) + '%';
+    put('[data-ob-ledger-total]',observerGB(appBytes) + ' / ' + CFG.hbm + ' GB');
+    var targetAt = gapStat ? gapStat.at : (analysis && analysis.peakAtByRank && analysis.peakAtByRank[r] ? analysis.peakAtByRank[r][memoryObserverMetric] : 0);
+    put('[data-ob-ledger-at]',(storyFrame.phaseLabel || '训练阶段') + ' · Step ' + Math.round((targetAt || 0)*100) + '%');
+    if(ledger) ledger.setAttribute('aria-label','R' + r + ' 在目标时刻的 HBM 内存账：业务 ' + observerGB(storyFrame.allocated) + '，延迟释放 ' + observerGB(storyFrame.delayed) + '，池内空闲 ' + observerGB(storyFrame.idle) + '，进程其他 ' + observerGB(storyFrame.other) + '，合计 ' + observerGB(appBytes));
   }
   function syncScenarioInsight(c){
     var d = memDiagnostic(), inIntro = document.querySelector('.page').dataset.tab !== 'scene';
