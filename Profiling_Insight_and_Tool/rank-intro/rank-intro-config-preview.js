@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 
-  /* ── 第 10 步：配置预览 ────────────────────────────────────────────
+  /* ── 第 11 步：配置预览 ────────────────────────────────────────────
      照 config-relation-plane 那页的做法：左边一块表单改配置，右边的图跟着变。三样东西都是借的：
        · 表单照那页的 Model Architecture / MoE / Cluster 三个区排，一行两格，只留首屏那几格（EP 口径做成一格二选一）——
          每格的「高级选项」折叠、「配置」预设下拉、底部的对话输入框都不要；
@@ -12,17 +12,17 @@
      配置 → 图的口径：矩阵画的永远是**最近一组自洽的配置**（lastValid）；校验不过就升红横幅、图停更
      （照那页 renderConfigError 的「图形已暂停更新，仍显示上一组自洽的参数」），横幅给建议修法与
      「一键应用 / 取消修改」两个出口。口径三档（切出 / 正交 / MindFormers）切换时卡数不变，只换算 DP。
-     模型是本页那套 128 卡配置的缩样（48 层，前两层 Dense、后 46 层 MoE，64 个路由专家）。
+     模型是本页那套 128 卡配置的缩样（PP4 × DP8 × CP2 × TP2、EP4、MBS2、GA8；
+     48 层，前两层 Dense、后 46 层 MoE，64 个路由专家）。
      五段自动播，配置每段从基线重来，查询上下文连续传递（段控点哪段就只播放一次）：
-       ① 配置联动：EP 口径切到正交，DP 16 → 2 自动换算、那格闪一下，矩阵左尺换字；切回后再把 PP 4 → 8，
+       ① 配置联动：EP 口径切到正交，DP 8 → 2 自动换算、那格闪一下，矩阵左尺换字；切回后再把 PP 4 → 8，
           Total Rank / World Size 由 128 实时变为 256，矩阵同步重排，最后 PP 8 → 4 回到 128；
-       ② 内存可视：选中 R23，先把 Micro Batch 1 → 2，展示激活与总占用本身上涨；再把卡型号切到 32 GB——
-          账不再变化、容量框变矮，柱子涨过容量线，矩阵上装不下的格子填浅红，取消后回到 64 GB；
+       ② 内存可视：选中 R23，先把 Micro Batch 2 → 4，展示激活与总占用本身上涨；再把卡型号切到 64 GB——
+          账不再变化、容量框变矮，柱子涨过容量线，矩阵上装不下的格子填浅红，取消后回到 128 GB；
        ③ 算子查询：左栏切到整网图，先点 Final RMSNorm，只亮输出端 Norm；再点 EP Combine，只亮当前实例所在的 Layer 24；
-       ④ 专家查询：从 Layer 24 单列点到 R23 × L7 单格，再放大到「计算图」那一档，Expert Compute 里是 E24–E31；
-       ⑤ 配置校验：DP 手输 4，4 除不尽 EP 8 → 红横幅、DP / EP / Total Rank 三格描红、图停更；
-          建议稿不只求合法还要装得下：EP 8 → 4 每卡专家翻倍会撑过 64 GB，所以联动 PP 4 → 8 分摊层数；
-          开始时延续 R23 × L7，一键应用后 EP 4、PP 8、Total Rank 64，清掉 Layer 7 选择并按 8 段 × 8 行整体重画。 */
+       ④ 专家查询：从 Layer 24 单列点到 R23 × L7 单格，再放大到「计算图」那一档，Expert Compute 里是 E16–E31；
+       ⑤ 配置校验：DP 手输 2，2 除不尽 EP 4 → 配置建议；联动 EP 4 → 2、PP 4 → 8，
+          一键应用后 Total Rank 64，并按新口径重排。 */
 window.createRIConfigPreview = function(deps){
     var PR = deps.PR, SIDE = deps.SIDE, DemoPointer = deps.DemoPointer;
     var MEMORY_HEAT_LIGHT = [[0,226,232,244],[.22,166,186,230],[.44,160,130,210],[.64,196,88,158],[.82,226,68,84],[1,255,124,46]];
@@ -31,7 +31,7 @@ window.createRIConfigPreview = function(deps){
     var PLC = PLN.PL, BLUE = PLN.BLUE, GiB = RI.GiB, DENSE = 2;   /* 右列复用通用 Rank 详情栏 */
     var CARDS = {'910b-32':{label:'昇腾 910 · 32 GB', hbm:32}, '910b-64':{label:'昇腾 910B · 64 GB', hbm:64}, '950':{label:'昇腾 950PR · 128 GB', hbm:128}};
     var CARD_ORDER = ['910b-32', '910b-64', '950'];
-    var BASE = {layers:48, dp:16, pp:4, tp:2, cp:1, mode:'split', routed:64, topk:8, shared:1, ep:8, card:'910b-64', mbs:1, seq:8192, ga:8};
+    var BASE = {layers:48, dp:8, pp:4, tp:2, cp:2, mode:'split', routed:64, topk:8, shared:1, ep:4, card:'950', mbs:2, seq:8192, ga:8};
     var HIDDEN = 4096;
     /* 字段规格：规范值（标签、pow2、量程）来自共享规则层的 FIELD_SPECS —— 与
        config-relation-plane 同一份，pow2 = 加减键按 2 的幂走，手输可以是任意整数。
@@ -89,7 +89,7 @@ window.createRIConfigPreview = function(deps){
       return {ok:!errs.length, errs:errs, bad:bad};
     }
     /* 建议修法：锚住用户刚改的那一格（f），把别的字段挪到最近的合法值；算不出就 null（横幅只剩「取消修改」）。
-       合法只是第一关：EP 8 → 4 这类改法每卡专家翻倍，账会撑过容量线，应用后反而 OOM——所以合法稿还要过 fitCapacity 那关 */
+       合法只是第一关：EP 减半会让每卡专家翻倍，所以合法稿还要过 fitCapacity 容量检查。 */
     function propose(c, f){
       var p = copy(c);
       for(var i = 0; i < 6; i++){
@@ -142,7 +142,7 @@ window.createRIConfigPreview = function(deps){
       else { cfg = c; pending = {field:f, value:val, proposal:propose(c, f), v:v}; }
       syncConf(); renderSide(); redraw();
     }
-    /* 切口径（照 setEpMode）：卡数不变，DP 按 EP 换算 —— 同一份 128 卡，切出档读作 DP 16，正交档读作 DP 2 */
+    /* 切口径（照 setEpMode）：卡数不变，DP 按 EP 换算 —— 同一份 128 卡，切出档读作 DP 8，正交档读作 DP 2 */
     function setMode(m){
       if(m === cfg.mode) return;
       var c = copy(cfg), was = c.mode;
@@ -220,7 +220,7 @@ window.createRIConfigPreview = function(deps){
 
     /* ── 配置 → 拓扑 → 画布上的那批卡、每张卡的账 ── */
     var R23 = 23;
-    var E = {ctx:null, W:0, H:0, DPR:1, tag:4, PC:[], TOPO:null, plane:null, view:{x:0, y:0, k:1}, selRank:R23, selLayer:null, layerGuide:false, hoverLayer:null, tpOn:true, paintOn:false, hiCols:null, hiDomain:null, cellHeat:null, chipPaint:true, layerVisible:true, memoryMode:false, memoryByRank:null, memoryCapacity:0};   /* 第 10 步始终以 R23 为主语；chipPaint：放大到计算图那档时专家胶囊带色，矩阵本身不按专家上色 */
+    var E = {ctx:null, W:0, H:0, DPR:1, tag:4, PC:[], TOPO:null, plane:null, view:{x:0, y:0, k:1}, selRank:R23, selLayer:null, layerGuide:false, hoverLayer:null, cpOn:true, tpOn:true, paintOn:false, hiCols:null, hiDomain:null, cellHeat:null, chipPaint:true, layerVisible:false, memoryMode:false, memoryByRank:null, memoryCapacity:0};   /* 默认以 PP Stage 聚合显示；Layer 明细可手动打开。 */
     var memoryPrefs = null;
     var MEM = [], CAP = 0, over = [], overA = 0, rulerFlash = 0, hiOp = null, panelTab = 'form';   /* panelTab：左栏在「表单」还是「整网图」页签 */
     var netMode = 'perf', netLayer = 1, layerPageStart = 1;   /* 整网查询默认：性能分析 · Layer 1 */
@@ -249,11 +249,18 @@ window.createRIConfigPreview = function(deps){
     }
     function memCfg(c){ return {tp:c.tp, cp:c.cp, pp:c.pp, dp:c.dp, ep:c.ep, etp:1, layers:c.layers, hidden:HIDDEN, heads:32, kv:8, ffn:2048,
                                 vocab:128256, seq:c.seq, experts:c.routed, mbs:c.mbs, ga:c.ga, hbm:CARDS[c.card].hbm}; }
-    function cardsOf(T){ var a = [], r = 0; for(var p = 0; p < T.pp; p++) for(var d = 0; d < T.dp; d++) for(var t = 0; t < T.tp; t++, r++) a.push({r:r, pp:p, dp:d, tp:t, k:d*T.tp + t, x:0, y:0, z:0}); return a; }
+    function cardsOf(T){
+      var a = [], r = 0;
+      for(var p = 0; p < T.pp; p++) for(var d = 0; d < T.dp; d++)
+        for(var cp = 0; cp < T.cp; cp++) for(var t = 0; t < T.tp; t++, r++)
+          a.push({r:r, pp:p, dp:d, dp8:d, cp:cp, tp:t, k:d*T.cp*T.tp + cp*T.tp + t, node:Math.floor(r/8), x:0, y:0, z:0});
+      return a;
+    }
     function total(m){ return m.reduce(function(a, x){ return a + x.bytes; }, 0); }
     function applyTopo(){
       var D = memCfg(lastValid), T = PLN.topoOf(D, {mode:lastValid.mode, dense:DENSE});
       E.TOPO = T; E.PC = cardsOf(T);
+      syncPlaneToggles();
       MEM = E.PC.map(function(c){ return PLN.memWith(D, c); });
       E.memoryByRank = MEM; E.memoryCapacity = CARDS[lastValid.card].hbm*GiB;
       if(E.selRank !== null && E.selRank >= E.PC.length) E.selRank = null;
@@ -413,6 +420,7 @@ window.createRIConfigPreview = function(deps){
         + '</span><span class="end">100%</span></div></div>'
         + '<div class="pzoom" aria-label="画布工具"><button type="button" data-z="out" title="缩小">−</button><span class="rd" id="c4zr">100%</span>'
         + '<button type="button" data-z="in" title="放大">+</button><button type="button" data-z="fit" title="适配屏幕">适配</button><span class="cs4-layer-sep" aria-hidden="true"></span>'
+        + '<button class="ctog cs4-layer-toggle" id="c4cpToggle" type="button" role="switch" aria-checked="' + E.cpOn + '"' + (lastValid.cp <= 1 ? ' hidden' : '') + '><span class="sw" aria-hidden="true"></span>CP标注</button>'
         + '<button class="ctog cs4-layer-toggle" id="c4tpToggle" type="button" role="switch" aria-checked="' + E.tpOn + '"><span class="sw" aria-hidden="true"></span>TP标注</button>'
         + '<button class="ctog cs4-layer-toggle" id="c4layerToggle" type="button" role="switch" aria-checked="' + E.layerVisible + '" title="切换 Layer 明细与 PP Stage 聚合视图"><span class="sw" aria-hidden="true"></span>Layer标注</button>'
         + '<button class="ctog cs4-layer-toggle" id="c4memoryToggle" type="button" role="switch" aria-checked="' + E.memoryMode + '" title="每个 Rank 聚合成一个格子，按 HBM 容量显示权重、梯度、优化器态、激活与预留占比"><span class="sw" aria-hidden="true"></span>内存观测</button></div></div></div>';
@@ -585,10 +593,12 @@ window.createRIConfigPreview = function(deps){
       return col && col.type === 'layer' ? col : null;
     }
     function syncPlaneToggles(){
+      var cpToggle = document.getElementById('c4cpToggle');
       var tpToggle = document.getElementById('c4tpToggle');
       var layerToggle = document.getElementById('c4layerToggle');
       var memoryToggle = document.getElementById('c4memoryToggle');
-      if(tpToggle){ tpToggle.setAttribute('aria-checked', String(E.tpOn)); tpToggle.disabled = E.memoryMode; }
+      if(cpToggle){ cpToggle.hidden = !E.TOPO || E.TOPO.cp <= 1; cpToggle.setAttribute('aria-checked', String(E.cpOn)); }
+      if(tpToggle) tpToggle.setAttribute('aria-checked', String(E.tpOn));
       if(layerToggle){ layerToggle.setAttribute('aria-checked', String(E.layerVisible)); layerToggle.disabled = E.memoryMode; }
       if(memoryToggle) memoryToggle.setAttribute('aria-checked', String(E.memoryMode));
     }
@@ -599,22 +609,26 @@ window.createRIConfigPreview = function(deps){
       on = !!on;
       if(on === E.memoryMode) return;
       if(on){
-        memoryPrefs = {tpOn:E.tpOn, layerVisible:E.layerVisible};
-        E.memoryMode = true; E.tpOn = false; E.layerVisible = false;
+        memoryPrefs = {layerVisible:E.layerVisible};
+        E.memoryMode = true; E.layerVisible = false;
         E.hoverLayer = null;
       } else {
         E.memoryMode = false;
-        if(memoryPrefs){ E.tpOn = memoryPrefs.tpOn; E.layerVisible = memoryPrefs.layerVisible; }
+        if(memoryPrefs) E.layerVisible = memoryPrefs.layerVisible;
         memoryPrefs = null;
       }
       syncPlaneToggles(); rebuildPlane();
     }
     function bindCanvas(){
+      var cpToggle = document.getElementById('c4cpToggle');
       var tpToggle = document.getElementById('c4tpToggle');
       var layerToggle = document.getElementById('c4layerToggle');
       var memoryToggle = document.getElementById('c4memoryToggle');
+      cpToggle.addEventListener('click', function(){
+        E.cpOn = !E.cpOn; syncPlaneToggles();
+        PLN.sync(E, E.view.k); PLN.pan(E); redraw();
+      });
       tpToggle.addEventListener('click', function(){
-        if(E.memoryMode) return;
         E.tpOn = !E.tpOn; syncPlaneToggles();
         PLN.sync(E, E.view.k); PLN.pan(E); redraw();
       });
@@ -755,21 +769,21 @@ window.createRIConfigPreview = function(deps){
        两处**形态不同**的典型故障，能不能被一眼分开正是这张矩阵存在的理由：
          · 掉队卡：一张卡全程慢 38%（降频 / 坏件），与层类型无关 → **一整行**发烫；
          · 热 EP 组：路由偏爱这一组的专家，只在 MoE 层慢 26%、dense 层完全正常
-           → **隔行成组**（EP 成员在 rank 序里按 TP 跨步排列，不是连续的一块）。
+           → **隔行成组**（EP 成员在 rank 序里按 CP×TP 跨步排列）。
        而且掉队卡就落在 R23 所在的那个 EP 组里：组内 a2a 是同步点，于是「一张卡的毛病」
-       会变成「八张卡的代价」——这一笔由域聚合面板算给你看。 */
+       会变成「四张卡的代价」——这一笔由域聚合面板算给你看。 */
     function stragglerRank(){
       var T = E.TOPO; if(!T) return -1;
-      return (Math.floor(T.dp/2) + 1)*T.tp + (T.tp - 1);   /* BASE 下 = R19：PP0 · DP9 · TP1，与 R23 同一个 EP 组 */
+      return Math.floor(T.dp/2)*T.cp*T.tp + (T.cp - 1)*T.tp + (T.tp - 1);   /* 基线 R19：PP0 · DP4 · CP1 · TP1，与 R23 同一个 EP 组 */
     }
     function hotEpGroup(){
       var T = E.TOPO; if(!T) return null;
-      return {pp:Math.min(2, T.pp - 1), tp:0, g:0};
+      return {pp:Math.min(2, T.pp - 1), cp:1, tp:0, g:0};
     }
-    /* 一个 EP 组横跨几台机器：组员 r 在一段里按 TP 跨步排列，首尾一算就知道，不必扫全表 */
+    /* 一个 EP 组横跨几台机器：组员 r 在一段里按 CP×TP 跨步排列。 */
     function epNodeSpan(c){
       var T = E.TOPO, g = Math.floor(c.dp/T.ep), rpn = T.rpn || 8;
-      var first = c.pp*T.dp*T.tp + g*T.ep*T.tp + c.tp, last = first + (T.ep - 1)*T.tp;
+      var first = c.pp*T.rows + g*T.ep*T.cp*T.tp + c.cp*T.tp + c.tp, last = first + (T.ep - 1)*T.cp*T.tp;
       return Math.floor(last/rpn) - Math.floor(first/rpn) + 1;
     }
     function rankLayerMs(r, layer){
@@ -778,7 +792,7 @@ window.createRIConfigPreview = function(deps){
       var moe = layer >= T.dense, f = 0.97 + ((r*37 + layer*11) % 13)/200;   /* 同型号卡之间 ±3% 的常态离散 */
       if(r === stragglerRank()) f *= 1.38;
       var hot = hotEpGroup();
-      if(moe && hot && c.pp === hot.pp && c.tp === hot.tp && Math.floor(c.dp/T.ep) === hot.g) f *= 1.26;
+      if(moe && hot && c.pp === hot.pp && c.cp === hot.cp && c.tp === hot.tp && Math.floor(c.dp/T.ep) === hot.g) f *= 1.26;
       if(moe && epNodeSpan(c) > 1) f *= 1.05;   /* a2a 出机器，走机间网络 */
       return layerPerformanceMs(layer)*f;
     }
@@ -799,6 +813,7 @@ window.createRIConfigPreview = function(deps){
     var DOMAINS = [
       {k:'tp', name:'TP 组', at:'每层', perLayer:true},
       {k:'ep', name:'EP 组', at:'每 MoE 层', perLayer:true, moeOnly:true},
+      {k:'cp', name:'CP 组', at:'每层', perLayer:true},
       {k:'dp', name:'DP 组', at:'步末'},
       {k:'edp', name:'EDP 组', at:'步末', moeOnly:true},
     ];
@@ -812,17 +827,19 @@ window.createRIConfigPreview = function(deps){
        差别只有一处：那里的 (dp>>3) 在这里参数化成 (dp / T.ep)。 */
     function groupKeyOf(kind, c){
       var T = E.TOPO;
-      return kind === 'tp' ? c.pp + '/' + c.dp
-        : kind === 'ep' ? c.pp + '/' + c.tp + '/' + Math.floor(c.dp/T.ep)
-        : kind === 'dp' ? c.pp + '/' + c.tp
-        : c.pp + '/' + (c.dp % T.ep);   /* edp：持有同一片专家的那几张，跨 TP 片 */
+      return kind === 'tp' ? c.pp + '/' + c.dp + '/' + c.cp
+        : kind === 'ep' ? c.pp + '/' + c.cp + '/' + c.tp + '/' + Math.floor(c.dp/T.ep)
+        : kind === 'cp' ? c.pp + '/' + c.dp + '/' + c.tp
+        : kind === 'dp' ? c.pp + '/' + c.cp + '/' + c.tp
+        : c.pp + '/' + c.cp + '/' + (c.dp % T.ep);   /* EDP：同 CP 的专家副本；CP 对片另归约 */
     }
     function groupLabel(kind, c){
       var T = E.TOPO;
-      return kind === 'tp' ? 'PP' + c.pp + '·DP' + c.dp
-        : kind === 'ep' ? 'PP' + c.pp + '·TP' + c.tp + '·组' + Math.floor(c.dp/T.ep)
-        : kind === 'dp' ? 'PP' + c.pp + '·TP' + c.tp
-        : 'PP' + c.pp + '·片' + (c.dp % T.ep);
+      return kind === 'tp' ? 'PP' + c.pp + '·DP' + c.dp + '·CP' + c.cp
+        : kind === 'ep' ? 'PP' + c.pp + '·CP' + c.cp + '·TP' + c.tp + '·组' + Math.floor(c.dp/T.ep)
+        : kind === 'cp' ? 'PP' + c.pp + '·DP' + c.dp + '·TP' + c.tp
+        : kind === 'dp' ? 'PP' + c.pp + '·CP' + c.cp + '·TP' + c.tp
+        : 'PP' + c.pp + '·CP' + c.cp + '·片' + (c.dp % T.ep);
     }
     function columnDomainStats(kind, layer){
       if(!E.TOPO || !E.PC.length) return null;
@@ -872,7 +889,7 @@ window.createRIConfigPreview = function(deps){
        它是 (rank, layer, 拓扑) 的纯函数，连同每层的中位数一起按拓扑签名缓存，拓扑一变整份作废。 */
     var perfCache = {sig:'', med:null, cell:null};
     function perfCacheOf(){
-      var sig = E.TOPO ? [E.TOPO.layers, E.TOPO.pp, E.TOPO.dp, E.TOPO.tp, E.TOPO.ep, E.TOPO.dense].join('/') : '';
+      var sig = E.TOPO ? [E.TOPO.layers, E.TOPO.pp, E.TOPO.dp, E.TOPO.cp, E.TOPO.tp, E.TOPO.ep, E.TOPO.dense].join('/') : '';
       if(perfCache.sig !== sig) perfCache = {sig:sig, med:{}, cell:{}};
       return perfCache;
     }
@@ -1006,7 +1023,7 @@ window.createRIConfigPreview = function(deps){
       cx.restore();
     }
     /* ② 域聚合读数。三种状态：点了集合通信算子 → 那一个域的名单与代价；只选了 Layer 列 →
-       四个域各自的分布；其余（没在性能分析、或选的是端点列）→ 收起。
+       五个域各自的分布；其余（没在性能分析、或选的是端点列）→ 收起。
        签名去重：redraw 是按帧跑的，状态没变就不碰 DOM。 */
     function fmtMs(v){ return v.toFixed(2); }
     function pct(v){ return (v >= 0 ? '+' : '−') + Math.round(Math.abs(v)*100) + '%'; }
@@ -1316,7 +1333,7 @@ window.createRIConfigPreview = function(deps){
         sideDomSig = '';
         var c = E.PC[r], m = MEM[r], T = E.TOPO, tot = total(m);
         var edpNo = Math.floor(c.k/T.groupRows);
-        var sub = 'PP' + c.pp + ' · ' + (T.ortho ? 'DP ' + edpNo + ' · EP ' + (c.dp % T.ep) : 'EDP ' + edpNo + ' · 切出口径 DP' + c.dp + ' · EP ' + (c.dp % T.ep)) + ' · TP' + c.tp + ' · node ' + Math.floor(r/8)
+        var sub = 'PP' + c.pp + ' · ' + (T.ortho ? 'DP ' + edpNo + ' · EP ' + (c.dp % T.ep) : 'EDP ' + edpNo + ' · DP' + c.dp + ' · EP ' + (c.dp % T.ep)) + ' · CP' + c.cp + ' · TP' + c.tp + ' · node ' + Math.floor(r/8)
           + (E.selLayer && E.selLayer.type === 'layer' ? ' · Layer 实例 ' + E.selLayer.layer : '');
         sideP.head(c, sub, m);
         if(E.selLayer) sideP.closeTitle('返回 ' + E.selLayer.label + ' 耗时差异');
@@ -1324,7 +1341,7 @@ window.createRIConfigPreview = function(deps){
         return;
       }
       /* 选中一列 → 右栏是这一层的各域计算耗时差异（标题带层号）。它取代了原先浮在画布左上的那块卡片：
-         同样的内容放到右栏，既不遮挡矩阵，也有地方把四个维度摊开写。 */
+         同样的内容放到右栏，既不遮挡矩阵，也有地方把五个维度摊开写。 */
       /* 「全部」档：什么都没选、整张矩阵铺满热力，右栏给全景读数（不能还写着「点一格…」） */
       if(perfMode() && heatMode === 'all'){
         var osig = ['all', E.TOPO ? [E.TOPO.layers, E.TOPO.pp, E.TOPO.dp, E.TOPO.tp, E.TOPO.ep].join('/') : ''].join('|');
@@ -1338,7 +1355,7 @@ window.createRIConfigPreview = function(deps){
         return;
       }
       sideDomSig = '';
-      sideP.empty('点矩阵里的一格看那张卡的显存账；点顶部刻度或用左栏翻页选一层，这里给出那一层各卡计算耗时在四个同步域上的差异。');
+      sideP.empty('点矩阵里的一格看那张卡的显存账；点顶部刻度或用左栏翻页选一层，这里给出那一层各卡计算耗时在 TP、EP、CP、DP、EDP 五个同步域上的差异。');
       sideP.hide();
     }
 
@@ -1388,13 +1405,14 @@ window.createRIConfigPreview = function(deps){
     function reset(nextStage){
       DemoPointer.stop();
       cancelAnim();
-      var topologyChanged = !E.TOPO || !sameConfig(lastValid, BASE);
+      var topologyChanged = !E.TOPO || !sameConfig(lastValid, BASE) || E.layerVisible !== (nextStage >= 3);
       /* 步骤四先保留算子查询命中的单个 Layer 列，再点回单格；步骤五沿用这个单格，应用新配置时才清除。 */
       var keptLayer = nextStage === 5
         ? (E.selLayer && E.selLayer.type === 'layer' ? E.selLayer : {type:'layer', layer:7, label:'Layer7', short:'L7', dense:false})
         : null;
       var keptCols = nextStage === 4 ? (E.hiCols || columnForOp('a2a_combine', deckLayerFor('a2a_combine'))) : null;
       cfg = copy(BASE); lastValid = copy(BASE); pending = null; oomAdvice = null;
+      E.layerVisible = nextStage >= 3; /* 入场默认聚合 PP；查询算子时自动展开 Layer 轴。 */
       E.selRank = R23; E.selLayer = keptLayer; E.layerGuide = !!keptLayer;
       E.hiCols = keptCols; hiOp = keptCols ? 'a2a_combine' : null; overA = 0; rulerFlash = 0;
       /* 整网查询跟着留下来的选择走：步骤五留 L7 列 → Layer 7；其余段先回「全部」（步骤三要在整条链上先点 Final RMSNorm，
@@ -1403,6 +1421,7 @@ window.createRIConfigPreview = function(deps){
       netLayer = keptLayer ? keptLayer.layer : 'all';
       /* 配置本来就在基线时不重建同一张矩阵，避免步骤交界处无意义地闪一下。 */
       if(topologyChanged || nextStage === 5) applyTopo(); else recalcOver();
+      syncPlaneToggles();
       if(keptCols){ E.hiCols = keptCols; hiOp = 'a2a_combine'; netLayer = deckLayerFor('a2a_combine'); }
       layerPageStart = typeof netLayer === 'number' ? clamp(netLayer, 0, Math.max(0, E.TOPO.layers - 2)) : 0;
       syncNetControls(); applyNetView();
@@ -1411,38 +1430,38 @@ window.createRIConfigPreview = function(deps){
       if(conf) conf.scrollTop = 0;
     }
     function baseCaps(){
-      CAPS = ['同一批 128 张卡，EP 与 DP 有两种记法。现在是<b>切出口径</b>：DP 16 里含着 EP 组（16 = 2 个副本 × 8 个 EP rank），矩阵左尺读作 EDP | DP。',
-              '点 R23（stage 0 · DP 11）：右栏列出它的显存账——权重 / 梯度 / 优化器态 / 激活 / 预留五档，放大的那张按 64 GB 的壳画、大字是占容量的百分比。',
+      CAPS = ['同一批 128 张卡，PP4 × DP8 × CP2 × TP2；EP4 从 DP 中切出，EDP=2。CP0 在上、CP1 在下，每个 CP 片内再排 TP0/TP1。Layer 明细默认关闭。',
+              '点 R23（PP0 · DP5 · CP1 · TP1）：右栏列出它的显存账——权重、梯度、优化器态、激活与预留五档，容量为 128 GB。',
               '左栏切到<b>整网查询</b>：从 Token Embedding 到 LM Head 的一条计算流，中间那块是当前层的算子图——Pre-MLP RMSNorm 之后走哪条 FFN 由层类型决定：L0–L1 是 Dense FFN，L2 起是 MoE。点一枚算子，矩阵回答的是「它落在哪些卡上、这些卡里谁慢」。',
               '沿用上一步高亮的 <b>Layer 24 单列</b>：再点 <b>R23 × L7</b> 单格，把它放大到计算图。',
-              '延续步骤四选中的 <b>R23 × L7</b>，最后再把 DP 手输成 <b>4</b>：切出口径下 EP 还是 8，4 除不尽 8……'];
+              '延续步骤四选中的 <b>R23 × L7</b>，最后再把 DP 手输成 <b>2</b>：切出口径下 EP 仍是 4，2 除不尽 4。'];
     }
     var BEATS = [
       {end:11800, b:[
-        {at:1300, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('#c4mode [data-m="ortho"]'); }, function(){ setMode('ortho'); cap(1, '切到<b>正交口径</b>：DP 自动换算成 <b>2</b>（16 ÷ EP 8）、那格闪了一下，Total Rank 仍是 128——卡一张没多没少；矩阵没重画，只有左尺的字换成了 DP | EP。'); }, '切到正交口径'); }},
-        {at:5000, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('#c4mode [data-m="split"]'); }, function(){ setMode('split'); cap(1, '切回<b>切出口径</b>：DP 又换算回 16。口径只改「这些数字怎么读」，改不了「卡怎么排」——所以切它不必担心。'); }, '切回切出口径'); }},
-        {at:6900, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="pp"] button[data-d="1"]'); }, function(){ set('pp', 8); flash(['totalRank']); cap(1, '再把 <b>PP 4 → 8</b>：每个 Stage 分到的层数减半，<b>Total Rank / World Size 从 128 实时变为 256</b>（16 × 2 × 8），表单派生值与矩阵一起刷新。'); }, '增加 PP'); }},
+        {at:1300, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('#c4mode [data-m="ortho"]'); }, function(){ setMode('ortho'); cap(1, '切到<b>正交口径</b>：DP 8 ÷ EP 4 = <b>2</b>，Total Rank 保持 128；矩阵左尺由 EDP | DP 改为 DP | EP，CP/TP 仍在各组内部。'); }, '切到正交口径'); }},
+        {at:5000, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('#c4mode [data-m="split"]'); }, function(){ setMode('split'); cap(1, '切回<b>切出口径</b>：DP 恢复为 8，EP4、CP2、TP2 与 128 张卡的排布保持一致。'); }, '切回切出口径'); }},
+        {at:6900, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="pp"] button[data-d="1"]'); }, function(){ set('pp', 8); flash(['totalRank']); cap(1, '把 <b>PP 4 → 8</b>：每段层数减半，<b>Total Rank 128 → 256</b>（8 × 2 × 2 × 8），表单与矩阵同步更新。'); }, '增加 PP'); }},
         {at:9000, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="pp"] button[data-d="-1"]'); }, function(){ set('pp', 4); flash(['totalRank']); cap(1, '演示完成后把 <b>PP 8 → 4</b>：Total Rank / World Size 回到 <b>128</b>，矩阵恢复为 4 个 Stage，为下一步的 R23 内存预览保留同一份主画面。'); }, '恢复 PP'); }}]},
       {end:11300, b:[
-        {at:300, fn:function(){ DemoPointer.click(matrixTarget(R23, 'L7'), function(){ selectCell(R23, 'L7'); var m = MEM[R23]; cap(2, 'R23（stage 0 · DP 11）的显存账：五档合计 <b>' + fmt(total(m)) + ' GB</b>，卡是 64 GB——右栏放大的那张装到六成多。'); }, '点 R23 × L7'); }},
-        {at:2200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="mbs"] button[data-d="1"]'); }, function(){ set('mbs', 2); var m = MEM[R23]; cap(2, '先把 <b>Micro Batch 1 → 2</b>：卡仍是 64 GB，但单卡激活与总显存占用随批量增大，右栏账本和占用率同步上升；当前 R23 合计 <b>' + fmt(total(m)) + ' GB</b>。'); }, '增加 Micro Batch'); }},
-        {at:5200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('select[data-f="card"]'); }, function(){ setCard('910b-32'); fadeOver(1, 800); var n = over.filter(Boolean).length;
-          cap(2, '再把卡型号换成 <b>32 GB</b>：刚才增大的账本一个字节没少，只有容量壳变矮——R23 的柱子越过容量线，矩阵中共有 <b>' + n + ' 张卡</b>过线并浅红提示。'); }, '选择 32 GB 卡'); }},
-        {at:8200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('[data-act="discard-card"]'); }, function(){ discardCardChange(); cap(2, '选择<b>取消修改</b>：卡型号恢复到 64 GB，OOM 提示与红色填充退场；Micro Batch 造成的账本增量仍在，下一步开始时再统一恢复基线配置。'); }, '取消修改'); }}]},
+        {at:300, fn:function(){ DemoPointer.click(matrixTarget(R23, 'S0'), function(){ selectCell(R23, 'S0'); var m = MEM[R23]; cap(2, 'R23（PP0 · DP5 · CP1 · TP1）的显存账：五档合计 <b>' + fmt(total(m)) + ' GB</b>，卡容量为 128 GB。'); }, '点 R23 × PP0'); }},
+        {at:2200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="mbs"] button[data-d="1"]'); }, function(){ set('mbs', 4); var m = MEM[R23]; cap(2, '<b>Micro Batch 2 → 4</b>：CP1 仍只处理后半段 token，单卡激活与总占用随批量增大；R23 当前合计 <b>' + fmt(total(m)) + ' GB</b>。'); }, '增加 Micro Batch'); }},
+        {at:5200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('select[data-f="card"]'); }, function(){ setCard('910b-64'); fadeOver(1, 800); var n = over.filter(Boolean).length;
+          cap(2, '改用 <b>64 GB</b> 卡：显存账数值不变，容量线降到 64 GB；矩阵中有 <b>' + n + ' 张卡</b>超出容量。'); }, '选择 64 GB 卡'); }},
+        {at:8200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('[data-act="discard-card"]'); }, function(){ discardCardChange(); cap(2, '取消修改后恢复 <b>128 GB</b> 卡；Micro Batch 4 的占用增量仍在，下一段再恢复 MBS2 基线。'); }, '取消修改'); }}]},
       {end:10300, b:[
         {at:300, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('[data-pt="net"]'); }, function(){ setPanel('net'); }, '切到整网查询'); }},
         {at:1900, fn:function(){ DemoPointer.click(netTarget('final_norm'), function(){ pickOp('final_norm'); cap(3, '先点输出端的 <b>Final RMSNorm</b>：它不属于重复的 Transformer Layer，只对应矩阵中的单独 <b>Norm</b> 列，因此当前只高亮这一列。'); }, '点 Final RMSNorm'); }},
-        {at:5600, fn:function(){ DemoPointer.click(netTarget('a2a_combine'), function(){ pickOp('a2a_combine'); cap(3, '再点 <b>EP Combine</b>：整网视图自动翻到包含该节点的 <b>Layer 24</b>，矩阵那一列改按<b>每张卡跑这一层的耗时</b>上色（相对全列中位）——一眼看出谁慢；右栏换成 <b>Layer 24 · 各域计算耗时差异</b>（口径是纯计算，不含通信与等待），把 TP / EP / DP / EDP 四维各自的「组中位耗时最高」与「组内耗时差最大」摊开，并自动在矩阵里标出 EP 这一维当下最值得看的那一组。'); }, '点 EP Combine'); }}]},
+        {at:5600, fn:function(){ DemoPointer.click(netTarget('a2a_combine'), function(){ pickOp('a2a_combine'); cap(3, '再点 <b>EP Combine</b>：整网视图翻到 <b>Layer 24</b>，矩阵按每张卡在这一层的纯计算耗时上色；右栏分别给出 TP、EP、CP、DP、EDP 五个域的组间与组内差异。'); }, '点 EP Combine'); }}]},
       {end:10300, b:[
         {at:300, fn:function(){ DemoPointer.click(matrixTarget(R23, 'L7'), function(){ selectCell(R23, 'L7'); cap(4, '从上一步高亮的 <b>L24 单列</b> 切到一个格子：选中 <b>R23 × L7</b>，接下来只查看这张卡在这一层里的专家。'); }, '点 R23 × L7'); }},
         {at:2200, fn:function(){
           var home = {x:E.view.x, y:E.view.y, k:E.view.k};
           zoomTo(R23, 'L7', 1900, function(){ at(2000, function(){ zoomBack(home, 1900); }); });
-          cap(4, '放大到一格：这就是 R23 在 L7 上的计算图——Attention 五步、MoE 四步；<b>Expert Compute</b> 里是它持有的 8 个专家 <b>E24–E31</b>（EP 组 3 = DP 11 mod 8，每组 64 ÷ 8 = 8 个）。停留 2 秒后回到整网视图。');
+          cap(4, '放大到一格：R23 属于 PP0 · DP5 · CP1 · TP1，在 L7 的 <b>Expert Compute</b> 持有 16 个专家 <b>E16–E31</b>（EP 位置 1，每桶 64 ÷ 4 = 16）。');
         }}]},
       {end:12300, b:[
-        {at:1200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="dp"] input'); }, function(){ set('dp', 4); cap(5, '4 除不尽 8：横幅升格成红色——DP、EP、Total Rank 三格描红，图形<b>暂停更新</b>、仍画上一组自洽的 128 卡；横幅给出兼容改法：EP 8 → 4；但 EP 减半意味着每卡专家翻倍，账会撑过 64 GB，所以建议同时把 PP 4 → 8 分摊层数，Total Rank 128 → 64，预计峰值约 52 GB/卡。'); }, '输入 DP = 4'); }},
-        {at:6000, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('[data-act="apply"]'); }, function(){ applyFix(); cap(5, '一键应用：EP 降到 4、PP 升到 8，Total Rank 从 128 整体刷新为 <b>64</b>（4 × 2 × 8）；矩阵按 8 段 × 8 行完整重画，Layer 7 选择同时清除。每卡持有的专家从 8 个变成 16 个，但每卡只承载 6 层，账仍在容量线之下，没有一张卡 OOM。'); }, '一键应用'); }}]}
+        {at:1200, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('.c4s[data-f="dp"] input'); }, function(){ set('dp', 2); cap(5, 'DP2 不能被 EP4 整除：配置横幅报错，画布停在上一组自洽的 128 卡；建议按参数约束和 128 GB 容量联动调整。'); }, '输入 DP = 2'); }},
+        {at:6000, fn:function(){ DemoPointer.click(function(){ return conf && conf.querySelector('[data-act="apply"]'); }, function(){ applyFix(); cap(5, '应用建议：EP' + cfg.ep + '、PP' + cfg.pp + '、DP' + cfg.dp + '、CP' + cfg.cp + '、TP' + cfg.tp + '，Total Rank <b>' + world(cfg) + '</b>；矩阵按新配置重排。'); }, '一键应用'); }}]}
     ];
     function runSeg(s, then){
       reset(s); baseCaps(); if(onStage) onStage(s, true);
