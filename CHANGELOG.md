@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-11-20 — Transformer 训练 FAQ
+
+- 在贯穿案例与反向传播章节补充首字预测、token / step 损失与参数梯度关系、相反梯度抵消三个 FAQ，增加 Mermaid 关系图、梯度累积与优化器更新边界说明。
+
+## 2026-11-17 — Transformer 训练机制说明
+
+- 补充「我喜欢吃苹果」逐位置预测、因果掩码、teacher forcing 与 optimizer step / 梯度累积的关系；明确末字案例仅为损失切片，修正注意力方向、梯度计算与参数更新顺序及相关 head / embedding 表述。
+
 ## 2026-11-04 — Profiling 工具与资料矩阵
 
 - 核对并更新工具矩阵，覆盖本目录 39 个 HTML 页面及配套文档，修正文档路径、Rank / Router 版本描述与运行边界；建立 InsightChat、Constraint Lens、MindSpeed 配置平面基线及 MCP App 的跨仓库资料索引，保留原项目并标明样例、理论估算与验收缺口。
